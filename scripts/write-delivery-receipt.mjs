@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const sha=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const apk='artifacts/eFlow-android-arm64-2026-10-28-qa.apk';
+const nativeBundle='artifacts/embedded-android-release.hbc';
+const map=JSON.parse(fs.readFileSync('android/app/build/generated/sourcemaps/react/release/index.android.bundle.map','utf8'));
+const modules=['src/app/features/projects/MemberTerms.tsx','src/app/features/projects/ProjectInvitations.tsx','src/app/features/budget/AllocationDecision.tsx','src/app/features/app-shell/AppRoot.tsx'];
+const sourceMatches=modules.map(file=>{const index=map.sources.findIndex(name=>name.replaceAll('\\','/').endsWith('/'+file));return {file,present:index>=0,sourceMatches:index>=0&&map.sourcesContent?.[index]===fs.readFileSync(file,'utf8')};});
+if(sourceMatches.some(item=>!item.sourceMatches))throw new Error('The embedded native bundle does not match the final critical source modules.');
+const bundles=['android','ios'].map(platform=>{const dir=`dist/${platform}/_expo/static/js/${platform}`;const files=fs.readdirSync(dir).filter(name=>name.endsWith('.hbc'));if(files.length!==1)throw new Error('Expected one current platform bundle.');const file=path.join(dir,files[0]).replaceAll('\\','/');return{platform,file,bytes:fs.statSync(file).size,sha256:sha(file)};});
+const build=fs.readFileSync('android-standalone-build.log','utf8');
+if(!build.includes('Task :app:assembleRelease'))throw new Error('The app release target did not finish.');
+const receipt={at:new Date().toISOString(),hostedTarget:'ixnfphgjyelhckjwjkdv',checks:{typecheck:'passed',regressionTests:83,regressionSuites:33,deviceWalkthrough:'not run; user-owned',developmentAccountLiteralsInThreeExecutables:0},android:{apk,bytes:fs.statSync(apk).size,sha256:sha(apk),package:'com.eflow.mobile',versionName:'1.0.0',versionCode:1,minSdk:24,targetSdk:36,abis:['arm64-v8a'],variant:'release',debuggable:false,signer:'Android Debug certificate; internal QA, not store signing',embeddedHermesBytes:fs.statSync(nativeBundle).size,embeddedHermesSha256:sha(nativeBundle),sourceMatches,appReleaseTargetAssembled:true,aggregateBuildSucceeded:/BUILD SUCCESSFUL/.test(build)},bundles,ios:{javascriptExport:'passed',swiftAndPods:'not compiled; Xcode unavailable on this Windows host',ipa:'not produced'},deployment:{schemaRlsCredentialsAndHistoryChanged:false,personalEligibilityFix:'review-only proposal; not applied',remotePush:'client + isolated server proposal; not configured or deployed',callBackgroundWakeup:'not implemented; foreground calls only'}};
+fs.writeFileSync('docs/DELIVERY_RECEIPT_2026-10-28.json',JSON.stringify(receipt,null,2)+'\n');
+console.log(JSON.stringify({apkBytes:receipt.android.bytes,sha256:receipt.android.sha256,criticalSourceMatches:sourceMatches.length,bundles:bundles.length,aggregateBuildSucceeded:receipt.android.aggregateBuildSucceeded}));

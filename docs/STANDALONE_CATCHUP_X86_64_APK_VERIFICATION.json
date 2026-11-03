@@ -1,0 +1,16 @@
+{
+  "apk": "C:\\Users\\gabri\\OneDrive\\Desktop\\EflowMobile\\artifacts\\eFlow-android-standalone-catchup-x86_64.apk",
+  "versionCode": 3,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5994412,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "89b560913a107df2300236aa898aeaa5ffdd7aa918c3cb8dc7bca4ded54e37b4",
+  "bytes": 60742881
+}

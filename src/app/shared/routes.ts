@@ -1,0 +1,52 @@
+export type RouteName =
+  | "overview"
+  | "personal_work"
+  | "projects"
+  | "project"
+  | "task"
+  | "tasks"
+  | "subtasks"
+  | "reviews"
+  | "budget"
+  | "financial_reviews"
+  | "accounting_overview"
+  | "accounting_releases"
+  | "accounting_journal"
+  | "accounting_audit"
+  | "accounting_budgets"
+  | "team"
+  | "office_team"
+  | "identity"
+  | "intelligence"
+  | "reports"
+  | "deadlines"
+  | "history"
+  | "performance"
+  | "announcements"
+  | "inbox"
+  | "notifications"
+  | "messages"
+  | "profile"
+  | "settings"
+  | "users"
+  | "org_tree"
+  | "permissions"
+  | "audit"
+  | "administration"
+  | "migration"
+  | "help"
+  | "live"
+  | "invitation"
+  | "activation"
+  | "personal_project";
+export interface AppRoute {
+  name: RouteName;
+  id?: string;
+  projectId?: string;
+  taskId?: string;
+  nodeId?: string;
+  title?: string;
+  view?: string;
+  token?: string;
+}
+export type Navigate = (route: AppRoute) => void;

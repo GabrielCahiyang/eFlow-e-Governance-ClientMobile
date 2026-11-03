@@ -1,0 +1,207 @@
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  AccessibilityInfo,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
+import { Pressable, ScrollView, View } from "./Primitives";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import X from "lucide-react-native/icons/x";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  runOnJS,
+} from "react-native-reanimated";
+import {
+  motionDuration,
+  motionEase,
+  useMotionPreferences,
+} from "../../shared/motion";
+import { colors } from "./theme";
+import { Text } from "./Typography";
+import { useAppearance, themedStyle } from "./Appearance";
+
+export function Sheet({
+  title,
+  open,
+  onClose,
+  children,
+  footer,
+  busy,
+  description,
+  presentation = "dialog",
+  maxWidth = 900,
+}: {
+  title: string;
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  busy?: boolean;
+  description?: string;
+  presentation?: "dialog" | "inspector";
+  maxWidth?: number;
+}) {
+  const { isDark } = useAppearance();
+  const inset = useSafeAreaInsets(),
+    { width, height } = useWindowDimensions(),
+    { reduced } = useMotionPreferences();
+  const [present, setPresent] = useState(open);
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    cancelAnimation(progress);
+    if (open) setPresent(true);
+    const curve = open ? motionEase.enter : motionEase.exit;
+    progress.value = withTiming(
+      open ? 1 : 0,
+      {
+        duration: reduced ? 0 : motionDuration.productiveLong,
+        easing: Easing.bezier(curve[0], curve[1], curve[2], curve[3]),
+      },
+      (finished) => {
+        if (finished && !open) runOnJS(setPresent)(false);
+      },
+    );
+    return () => cancelAnimation(progress);
+  }, [open, reduced]);
+  const backdrop = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const panel = useAnimatedStyle(() => ({
+    opacity: presentation === "inspector" ? 1 : progress.value,
+    transform:
+      presentation === "inspector"
+        ? [{ translateX: (1 - progress.value) * Math.min(width, 900) }]
+        : [
+            { scale: 0.96 + 0.04 * progress.value },
+            { translateY: (1 - progress.value) * 6 },
+          ],
+  }));
+  const close = () => {
+    if (!busy) onClose();
+  };
+  return (
+    <Modal
+      visible={present}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={close}
+      onShow={() => AccessibilityInfo.announceForAccessibility(title)}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={[
+          s.container,
+          {
+            paddingTop: Math.max(inset.top, 16),
+            paddingBottom: Math.max(inset.bottom, 16),
+          },
+          presentation === "inspector" && {
+            alignItems: "flex-end",
+            padding: 0,
+          },
+        ]}
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, s.shade, backdrop]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss dialog"
+            disabled={busy}
+            onPress={close}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+        <Animated.View
+          accessibilityViewIsModal
+          accessibilityState={{ busy: !!busy }}
+          style={[
+            themedStyle(s.panel, isDark),
+            {
+              width: Math.min(width - 32, maxWidth),
+              maxHeight: height - inset.top - inset.bottom - 32,
+            },
+            presentation === "inspector" && {
+              width: Math.min(width, maxWidth),
+              borderRadius: 0,
+              height: "100%",
+              maxHeight: "100%",
+            },
+            panel,
+          ]}
+        >
+          <View style={s.header}>
+            <View style={{ flex: 1, gap: 5 }}>
+              <Text accessibilityRole="header" style={s.title}>
+                {title}
+              </Text>
+              {!!description && (
+                <Text style={s.description}>{description}</Text>
+              )}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close dialog"
+              accessibilityState={{ disabled: !!busy }}
+              disabled={busy}
+              onPress={close}
+              style={s.close}
+            >
+              <X color={colors.text} size={22} />
+            </Pressable>
+          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={s.content}
+          >
+            {children}
+          </ScrollView>
+          {!!footer && <View style={s.footer}>{footer}</View>}
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+const s = StyleSheet.create({
+  container: { flex: 1, alignItems: "center", justifyContent: "center" },
+  shade: { backgroundColor: "#0f1e1e73" },
+  panel: {
+    flexShrink: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  header: {
+    padding: 24,
+    flexDirection: "row",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    alignItems: "flex-start",
+  },
+  title: { fontSize: 22, fontWeight: "700", color: colors.text },
+  description: { fontSize: 13, color: colors.muted, lineHeight: 20 },
+  close: {
+    height: 40,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  content: { padding: 24, gap: 16 },
+  footer: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 10,
+  },
+});

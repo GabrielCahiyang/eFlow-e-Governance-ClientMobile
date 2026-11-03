@@ -1,0 +1,409 @@
+import { Text } from "../../components/ui/Typography";
+import { useState } from "react";
+import { Linking } from "react-native";
+import {
+  Button,
+  Card,
+  Choice,
+  ErrorState,
+  Field,
+  LabelValue,
+  Notice,
+  Row,
+  Sheet,
+  Status,
+  colors,
+  dateLabel,
+  peso,
+} from "../../components/ui";
+import { useAction } from "../../shared/useAction";
+import { useAuth } from "../authentication";
+import { confirmAction } from "../../shared/confirm";
+import {
+  cancelContextualCashRequest,
+  acknowledgePettyCashRelease,
+  createReceiptSignedUrl,
+  decidePettyCashRequest,
+  decidePettyCashLeaderReview,
+  recordAccountingRelease,
+  overrideAccountingPettyCashReleaseSchedule,
+} from "../../../core/web/app/features/budget/services/budgetService";
+import type {
+  DepartmentBudgetBundle,
+  PettyCashRequest,
+} from "../../../core/web/app/features/budget/types";
+import { LiquidationSheet } from "./LiquidationSheet";
+import { SettlementPanel } from "./SettlementPanel";
+import { useFinancialAction } from "./useFinancialCommand";
+import { FinancialCancelled } from "./financialReceipt";
+import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
+export function CashRequestCard({
+  request,
+  bundle,
+  onSaved,
+  onCorrect,
+  readOnly = false,
+}: {
+  request: PettyCashRequest;
+  bundle: DepartmentBudgetBundle;
+  onSaved: () => Promise<void>;
+  onCorrect?: () => void;
+  readOnly?: boolean;
+}) {
+  const { profile, can, organization } = useAuth(),
+    readAction = useAction();
+  const [receipts, setReceipts] = useState(false),
+    [operation, setOperation] = useState<
+      "cancel" | "approve" | "reject" | "release" | "override"
+    >(),
+    [reason, setReason] = useState(""),
+    [method, setMethod] = useState<"cash" | "cheque">("cash"),
+    [cheque, setCheque] = useState(""),
+    [releaseId, setReleaseId] = useState("");
+  const action = useFinancialAction(
+    profile?.id || "",
+    `cash:${request.id}:${JSON.stringify([request.status, bundle.releases.filter((r) => r.requestId === request.id).map((r) => [r.id, r.status, r.acknowledgedAt]), bundle.liquidations.filter((l) => l.requestId === request.id).map((l) => [l.id, l.version, l.status])])}`,
+    JSON.stringify([
+      request.status,
+      operation,
+      releaseId,
+      bundle.releases
+        .filter((r) => r.requestId === request.id)
+        .map((r) => [r.id, r.status, r.acknowledgedAt]),
+      bundle.liquidations
+        .filter((l) => l.requestId === request.id)
+        .map((l) => [l.id, l.version, l.status]),
+    ]),
+  );
+  const own = request.requesterId === profile?.id,
+    recipient = request.cashRecipientId === profile?.id,
+    head =
+      isAppointedOfficeHead(profile, organization ? [organization] : []) &&
+      profile?.org_id === request.fundingOrgId,
+    accounting =
+      profile?.role === "accounting_staff" &&
+      can("navigation.accounting_releases");
+  const releases = bundle.releases.filter((r) => r.requestId === request.id),
+    liquidations = bundle.liquidations
+      .filter((l) => l.requestId === request.id)
+      .sort((a, b) => b.version - a.version),
+    latest = liquidations[0];
+  const canCancel =
+    own &&
+    ![
+      "partially_released",
+      "released",
+      "liquidation_submitted",
+      "pending_leader_liquidation_review",
+      "pending_department_settlement",
+      "changes_requested",
+      "overdue_liquidation",
+      "settled",
+      "rejected",
+      "cancelled",
+      "expired",
+    ].includes(request.status);
+  const canCorrect =
+    own &&
+    ["leader_changes_requested", "department_changes_requested"].includes(
+      request.status,
+    );
+  const leaderDecision =
+      profile?.id === request.taskLeaderId &&
+      request.status === "pending_leader_review",
+    headDecision =
+      head &&
+      ["pending", "pending_department_approval"].includes(request.status);
+  const decide = () =>
+    action.run(async () => {
+      if (!operation) return;
+      if (operation !== "release" && !reason.trim())
+        throw new Error("Record a reason for this decision.");
+      if (operation === "cancel")
+        await cancelContextualCashRequest(request.id, reason);
+      if (operation === "approve" || operation === "reject") {
+        if (
+          !(await confirmAction(
+            operation === "approve"
+              ? "Authorize this cash request?"
+              : "Reject this cash request?",
+            `${peso(request.requestedAmount)} · ${request.purpose}`,
+            operation === "approve" ? "Authorize request" : "Reject request",
+          ))
+        )
+          throw new FinancialCancelled();
+        if (leaderDecision)
+          await decidePettyCashLeaderReview(
+            request.id,
+            operation === "approve",
+            reason,
+          );
+        else
+          await decidePettyCashRequest(
+            request.id,
+            operation === "approve",
+            reason,
+          );
+      }
+      if (operation === "release") {
+        if (
+          !(await confirmAction(
+            "Record cash release?",
+            `${peso(releases.find((r) => r.id === releaseId)?.amount || 0)} · ${method === "cheque" ? "Cheque " + cheque : "Cash"}. Record this only after the actual handover.`,
+            "Record release",
+          ))
+        )
+          throw new FinancialCancelled();
+        await recordAccountingRelease({
+          releaseId,
+          method,
+          chequeNumber: cheque || undefined,
+        });
+      }
+      if (operation === "override")
+        await overrideAccountingPettyCashReleaseSchedule({
+          releaseId,
+          reason,
+          method,
+          chequeNumber: cheque || undefined,
+        });
+      setOperation(undefined);
+      setReason("");
+      await onSaved();
+    }, "Financial action recorded.");
+  return (
+    <Card title={`FR-${String(request.requestNumber).padStart(5, "0")}`}>
+      <Status value={request.status} />
+      <Text style={{ color: colors.text, lineHeight: 21 }}>
+        {request.purpose}
+      </Text>
+      <LabelValue label="Work" value={request.taskTitle || "Authorized work"} />
+      <LabelValue label="Requested" value={peso(request.requestedAmount)} />
+      <LabelValue label="Approved" value={peso(request.approvedAmount || 0)} />
+      <LabelValue
+        label="Cash released"
+        value={peso(request.releasedAmount || 0)}
+      />
+      <LabelValue label="Actual spent" value={peso(request.actualSpent || 0)} />
+      <LabelValue label="Returned" value={peso(request.returnedAmount || 0)} />
+      <LabelValue label="Needed by" value={dateLabel(request.neededBy)} />
+      {[
+        request.approvalReason,
+        request.leaderDecisionReason,
+        request.departmentDecisionReason,
+      ]
+        .filter(Boolean)
+        .map((text, index) => (
+          <Notice key={index}>{text}</Notice>
+        ))}
+      <Row>
+        {!!(!readOnly && canCorrect && onCorrect) && (
+          <Button variant="outline" onPress={onCorrect}>
+            Correct and re-request
+          </Button>
+        )}
+        {!!(!readOnly && canCancel) && (
+          <Button variant="outline" onPress={() => setOperation("cancel")}>
+            Withdraw request
+          </Button>
+        )}
+        {!!(!readOnly && (leaderDecision || headDecision)) && (
+          <>
+            <Button onPress={() => setOperation("approve")}>
+              Authorize request
+            </Button>
+            <Button variant="outline" onPress={() => setOperation("reject")}>
+              Reject request
+            </Button>
+          </>
+        )}
+      </Row>
+      {releases.map((release) => (
+        <Card key={release.id} title={release.voucherNumber || "Cash release"}>
+          <LabelValue
+            label="Scheduled"
+            value={dateLabel(release.scheduledDate)}
+          />
+          <LabelValue label="Amount" value={peso(release.amount)} />
+          <Status value={release.status} />
+          <Row>
+            {!!(!readOnly && accounting && release.status === "scheduled") && (
+              <>
+                <Button
+                  variant="outline"
+                  onPress={() => {
+                    setReleaseId(release.id);
+                    setOperation("release");
+                  }}
+                >
+                  Record cash release
+                </Button>
+                <Button
+                  variant="outline"
+                  onPress={() => {
+                    setReleaseId(release.id);
+                    setOperation("override");
+                  }}
+                >
+                  Override schedule
+                </Button>
+              </>
+            )}
+            {!!(
+              !readOnly &&
+              release.status === "released" &&
+              !release.acknowledgedAt &&
+              release.recipientId === profile?.id
+            ) && (
+              <Button
+                variant="outline"
+                onPress={() =>
+                  void action.run(async () => {
+                    if (
+                      !(await confirmAction(
+                        "Acknowledge cash receipt?",
+                        `${peso(release.amount)} · ${release.voucherNumber || "Cash release"}`,
+                        "Acknowledge receipt",
+                      ))
+                    )
+                      throw new FinancialCancelled();
+                    await acknowledgePettyCashRelease(
+                      release.id,
+                      release.voucherNumber,
+                    );
+                    await onSaved();
+                  })
+                }
+              >
+                Acknowledge receipt
+              </Button>
+            )}
+          </Row>
+        </Card>
+      ))}
+      {!!(
+        !readOnly &&
+        recipient &&
+        ["released", "changes_requested", "overdue_liquidation"].includes(
+          request.status,
+        )
+      ) && (
+        <Button onPress={() => setReceipts(true)}>
+          Submit receipts and cash return
+        </Button>
+      )}
+      {liquidations.map((liquidation) => (
+        <Card
+          key={liquidation.id}
+          title={`Receipt package · version ${liquidation.version}`}
+        >
+          <Status value={liquidation.status} />
+          <LabelValue
+            label="Actual spent"
+            value={peso(liquidation.declaredSpent)}
+          />
+          <LabelValue
+            label="Returned cash"
+            value={peso(liquidation.returnedAmount)}
+          />
+          <Text style={{ color: colors.text, lineHeight: 20 }}>
+            {liquidation.note}
+          </Text>
+          {!!liquidation.decisionReason && (
+            <Notice>{liquidation.decisionReason}</Notice>
+          )}
+          {liquidation.receipts.map((receipt) => (
+            <Button
+              key={receipt.id}
+              variant="outline"
+              onPress={() =>
+                void readAction.run(async () => {
+                  await Linking.openURL(
+                    await createReceiptSignedUrl(receipt.filePath),
+                  );
+                })
+              }
+            >
+              {receipt.vendor} · {peso(receipt.amount)} · Open receipt
+            </Button>
+          ))}
+        </Card>
+      ))}
+      {!!(
+        latest &&
+        !readOnly &&
+        (head || accounting || profile?.id === request.taskLeaderId)
+      ) && (
+        <SettlementPanel
+          request={request}
+          liquidation={latest}
+          onSaved={onSaved}
+        />
+      )}
+      {!!action.error && <ErrorState error={action.error} />}
+      {!!readAction.error && <ErrorState error={readAction.error} />}
+      {!!action.notice && (
+        <Text style={{ color: colors.success }}>{action.notice}</Text>
+      )}
+      {!!receipts && (
+        <LiquidationSheet
+          request={request}
+          bundle={bundle}
+          onClose={() => setReceipts(false)}
+          onSaved={onSaved}
+        />
+      )}
+      <Sheet
+        open={!!operation}
+        title={
+          operation === "cancel"
+            ? "Withdraw cash request"
+            : operation === "release"
+              ? "Record cash release"
+              : operation === "override"
+                ? "Override release schedule"
+                : operation === "reject"
+                  ? "Reject cash request"
+                  : "Authorize cash request"
+        }
+        onClose={() => setOperation(undefined)}
+        busy={action.busy}
+        footer={
+          <Button busy={action.busy} onPress={() => void decide()}>
+            Confirm action
+          </Button>
+        }
+      >
+        {!!["release", "override"].includes(operation || "") && (
+          <>
+            <Choice
+              label="Release method"
+              value={method}
+              onChange={setMethod}
+              options={[
+                { value: "cash", label: "Cash" },
+                { value: "cheque", label: "Cheque" },
+              ]}
+            />
+            {!!(method === "cheque") && (
+              <Field
+                label="Cheque number"
+                value={cheque}
+                onChangeText={setCheque}
+              />
+            )}
+          </>
+        )}
+        {!!(operation !== "release") && (
+          <Field
+            label="Reason / required correction"
+            value={reason}
+            onChangeText={setReason}
+            multiline
+          />
+        )}
+        {!!action.error && <ErrorState error={action.error} />}
+      </Sheet>
+    </Card>
+  );
+}

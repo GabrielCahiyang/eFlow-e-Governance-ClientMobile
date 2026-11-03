@@ -1,0 +1,6 @@
+import fs from 'node:fs';
+let text=fs.readFileSync('src/core/web/app/features/project-import/hooks/usePdfImportSession.ts','utf8');
+text=text.replace("from '../../../../lib/supabase'","from '../../../../platform/supabase'").replace("import { readProjectDocument } from '../services/documentService';","import { readProjectDocument,cacheImportFile,readImportFile,clearImportFile,type NativePdf } from '../../../../platform/pdf';");
+text=text.replaceAll("from '../services/","from '../../../../core/web/app/features/project-import/services/").replace("from '../selectors/","from '../../../../core/web/app/features/project-import/selectors/").replace("from '../../staffing'","from '../../../../core/web/app/features/staffing'").replace("from '../types'","from '../../../../core/web/app/features/project-import/types'").replace("from '../../ai'","from '../../../../core/web/app/features/ai'");
+text=text.replace('cacheImportFile,readImportFile,clearImportFile,pendingPdfImport','pendingPdfImport').replace('usePdfImportSession','useNativePdfImport').replace('file:File','file:NativePdf');
+fs.mkdirSync('src/app/features/projects/import',{recursive:true});fs.writeFileSync('src/app/features/projects/import/useNativePdfImport.ts',text);

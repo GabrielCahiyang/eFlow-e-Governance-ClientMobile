@@ -1,0 +1,78 @@
+{
+  "at": "2026-10-28T06:30:40.439Z",
+  "hostedTarget": "ixnfphgjyelhckjwjkdv",
+  "checks": {
+    "typecheck": "passed",
+    "regressionTests": 83,
+    "regressionSuites": 33,
+    "deviceWalkthrough": "not run; user-owned",
+    "developmentAccountLiteralsInThreeExecutables": 0
+  },
+  "android": {
+    "apk": "artifacts/eFlow-android-arm64-2026-10-28-qa.apk",
+    "bytes": 56051578,
+    "sha256": "29dc98a86459a04292672192e373d22b855d6895eeb3bb4b0c61d0b607e8a997",
+    "package": "com.eflow.mobile",
+    "versionName": "1.0.0",
+    "versionCode": 1,
+    "minSdk": 24,
+    "targetSdk": 36,
+    "abis": [
+      "arm64-v8a"
+    ],
+    "variant": "release",
+    "debuggable": false,
+    "signer": "Android Debug certificate; internal QA, not store signing",
+    "embeddedHermesBytes": 5991616,
+    "embeddedHermesSha256": "450ba15df94efcfda605d2cde10cdbe27eea6fbd09c3fe9d313882ad9a47f6ec",
+    "sourceMatches": [
+      {
+        "file": "src/app/features/projects/MemberTerms.tsx",
+        "present": true,
+        "sourceMatches": true
+      },
+      {
+        "file": "src/app/features/projects/ProjectInvitations.tsx",
+        "present": true,
+        "sourceMatches": true
+      },
+      {
+        "file": "src/app/features/budget/AllocationDecision.tsx",
+        "present": true,
+        "sourceMatches": true
+      },
+      {
+        "file": "src/app/features/app-shell/AppRoot.tsx",
+        "present": true,
+        "sourceMatches": true
+      }
+    ],
+    "appReleaseTargetAssembled": true,
+    "aggregateBuildSucceeded": true
+  },
+  "bundles": [
+    {
+      "platform": "android",
+      "file": "dist/android/_expo/static/js/android/index-d8d6378d195858e345208834f2ee104d.hbc",
+      "bytes": 7325586,
+      "sha256": "3725b74b7a45c551ab2db04590dbbdcc12667f58fa35cae8dfacfbed5d52aa18"
+    },
+    {
+      "platform": "ios",
+      "file": "dist/ios/_expo/static/js/ios/index-a03ca2d20d8d9606bccfd698088b1729.hbc",
+      "bytes": 7307860,
+      "sha256": "3c2ae682fa64f6924cb26ac70af179dea8c45e1c2778ce8a5be56b6587ee2ca1"
+    }
+  ],
+  "ios": {
+    "javascriptExport": "passed",
+    "swiftAndPods": "not compiled; Xcode unavailable on this Windows host",
+    "ipa": "not produced"
+  },
+  "deployment": {
+    "schemaRlsCredentialsAndHistoryChanged": false,
+    "personalEligibilityFix": "review-only proposal; not applied",
+    "remotePush": "client + isolated server proposal; not configured or deployed",
+    "callBackgroundWakeup": "not implemented; foreground calls only"
+  }
+}

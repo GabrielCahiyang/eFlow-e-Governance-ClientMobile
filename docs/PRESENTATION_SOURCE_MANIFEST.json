@@ -1,0 +1,46 @@
+{
+  "source": "EflowWeb",
+  "generatedAt": "2026-10-27T16:49:49.712Z",
+  "files": [
+    {
+      "file": "src/pages/Login/components/EFlowMark.tsx",
+      "sha256": "4357164c68418a117d818bb90bdd0e745fa1abb101d519ed88d0b6bc05ad0772"
+    },
+    {
+      "file": "src/pages/Login/motion.ts",
+      "sha256": "733ff7366a3f0d30f6a5b9743cf677ad0ce5ed2ad7a021053e9777d7617c3ccc"
+    },
+    {
+      "file": "src/app/shared/motion/motionTokens.ts",
+      "sha256": "c46020bada5a8b97d9c63f2b122778d1c9e832cb6125ae211ab48471346ec34a"
+    },
+    {
+      "file": "src/app/components/ui/ViewLoadingState.tsx",
+      "sha256": "1f18518d02c676bd33e1f746bb9dc2f68f165fdb1be622df87a1dc86df0ddb90"
+    },
+    {
+      "file": "src/app/components/ui/viewLoadingState.css",
+      "sha256": "36132720bb148b5e690f97b7cab1b3e958e8821315cc8b92369b6a6b263f922f"
+    },
+    {
+      "file": "src/app/components/workflow/WorkspaceLoadingSkeleton.tsx",
+      "sha256": "f712f8591c106414a0a74af8d55bd126a3df2b2c6f3ccfb59e0acf65db82c9a4"
+    },
+    {
+      "file": "src/app/components/ui/workspace/WorkspaceSkeleton.tsx",
+      "sha256": "d8821b5c2b3c7eb7e9d084ebeb8b483dc0f61c51ab6c284ba429cf0c5d5f2fee"
+    },
+    {
+      "file": "src/app/features/app-shell/LoadingScreen.tsx",
+      "sha256": "8994ff7117ec23c7a4917e54c3404e3bc9e492d24b90cdfb93cd7f715fefeedc"
+    },
+    {
+      "file": "src/pages/Login/components/LivingBoard.tsx",
+      "sha256": "735404b99023ef874ec0e33e6bee030bd54b1b2e15444926d6afa970f4eeeb2b"
+    },
+    {
+      "file": "index.html",
+      "sha256": "f5b44141a348db888780a7467be817fc1bef5f1a65aba7d05402e06f6a1a1d8e"
+    }
+  ]
+}

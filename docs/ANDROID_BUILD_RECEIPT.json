@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-27T19:01:31.481Z",
+  "artifact": "artifacts/eFlow-Android-development-arm64.apk",
+  "sha256": "c2d5140dd72a862f8432ca65c025015b0ca34916285e2d5379d2065b8e744306",
+  "bytes": 102415019,
+  "architecture": "arm64-v8a",
+  "variant": "debug development client",
+  "embeddedProductionJavaScript": false,
+  "androidDeviceVerified": false,
+  "iosDeviceVerified": false
+}

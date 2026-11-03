@@ -1,0 +1,16 @@
+{
+  "apk": "C:\\Users\\gabri\\OneDrive\\Desktop\\EflowMobile\\artifacts\\latest mobile eflow andres bading.apk",
+  "versionCode": 5,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6107852,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "03684027150e04fcdc523aa4e025016ec7cc0bbee6a926944866e1f75d487102",
+  "bytes": 97394830
+}

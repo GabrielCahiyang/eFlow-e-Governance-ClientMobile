@@ -1,0 +1,6 @@
+import fs from 'node:fs';
+const file='scripts/adapt-native-core.mjs';let s=fs.readFileSync(file,'utf8');s=s.replace('!(ts.isPropertyAssignment(node.parent) && node.parent.name === node)','!((ts.isPropertyAssignment(node.parent) || ts.isPropertySignature(node.parent) || ts.isParameter(node.parent) || ts.isVariableDeclaration(node.parent)) && node.parent.name === node)');
+if(!s.includes('Native PDF replaces'))s+=`\n// Native PDF replaces the browser-only PDF.js export pulled through the public barrel.\nfs.writeFileSync(path.join(root,'src/core/web/app/features/proposal-import/services/pdfTextExtractor.ts'),\`import {readProjectDocument,type NativePdf} from '../../../../../platform/pdf';\\nexport async function extractTextFromPdf(file:File):Promise<string>{return readProjectDocument(file as unknown as NativePdf); }\\n\`);\n`;
+fs.writeFileSync(file,s);
+const ai='src/core/web/app/features/ai/types.ts';if(fs.existsSync(ai)){let t=fs.readFileSync(ai,'utf8').replaceAll('__nativeDocument: string','document: string');fs.writeFileSync(ai,t);}
+fs.writeFileSync('src/core/web/app/features/proposal-import/services/pdfTextExtractor.ts',"import {readProjectDocument,type NativePdf} from '../../../../../platform/pdf';\nexport async function extractTextFromPdf(file:File):Promise<string>{return readProjectDocument(file as unknown as NativePdf);}\n");

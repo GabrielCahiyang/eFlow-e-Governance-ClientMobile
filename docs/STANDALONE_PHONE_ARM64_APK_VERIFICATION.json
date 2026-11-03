@@ -1,0 +1,16 @@
+{
+  "apk": "C:\\Users\\gabri\\OneDrive\\Desktop\\EflowMobile\\.release-stage\\eFlow-Android.apk",
+  "versionCode": 4,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6095064,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "2ddec2aa908987f37dc9f19cee9105d00a30d7f1ef40ba94f0e4ffc754dd3442",
+  "bytes": 97382038
+}

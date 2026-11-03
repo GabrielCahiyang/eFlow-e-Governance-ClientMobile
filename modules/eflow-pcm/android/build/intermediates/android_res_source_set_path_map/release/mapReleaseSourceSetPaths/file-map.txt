@@ -1,0 +1,9 @@
+expo.modules.eflowpcm.eflow-pcm-pngs-0 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\build\generated\res\pngs\release
+expo.modules.eflowpcm.eflow-pcm-updated_navigation_xml-1 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\build\generated\updated_navigation_xml\release
+expo.modules.eflowpcm.eflow-pcm-mergeReleaseResources-2 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\build\intermediates\incremental\release\mergeReleaseResources\merged.dir
+expo.modules.eflowpcm.eflow-pcm-mergeReleaseResources-3 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\build\intermediates\incremental\release\mergeReleaseResources\stripped.dir
+expo.modules.eflowpcm.eflow-pcm-release-4 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\build\intermediates\merged_res\release\mergeReleaseResources
+expo.modules.eflowpcm.eflow-pcm-release-5 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\build\intermediates\packaged_res\release\packageReleaseResources
+expo.modules.eflowpcm.eflow-pcm-main-6 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\res
+expo.modules.eflowpcm.eflow-pcm-release-7 C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\release\res
+gradleHome-0 C:\Users\gabri\.gradle

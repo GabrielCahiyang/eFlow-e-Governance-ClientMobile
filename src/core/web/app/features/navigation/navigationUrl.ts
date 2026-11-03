@@ -1,0 +1,215 @@
+import {nativeWindow as __nativeWindow} from '../../../../../platform/webRuntime';
+import { getDefaultSection, getRoleNavigationCandidates, } from "./roleNavigation";
+import { getSidebarContent } from "./sidebarContent";
+import { pushNavigationHistory, replaceNavigationHistory, } from "../../shared/navigationHistory";
+import { resolveSupportPage } from "./administrativePages";
+import { destinationNavigationParameters, navigationDisplayKeys } from './queryContext';
+export const NAVIGATION_PAGE_QUERY = "page";
+const SECTION_PATHS: Record<string, string> = {
+    personal_work: "my-work",
+    inbox: "inbox",
+    dashboard: "overview",
+    command: "command-center",
+    projects: "projects",
+    tasks: "tasks",
+    budget: "office-budget",
+    subtasks: "subtasks",
+    leading: "leading",
+    reviews: "reviews",
+    team: "team-supervision",
+    identity: "identity-and-access",
+    intelligence: "team-intelligence",
+    reports: "reports",
+    announcements: "announcements",
+    settings: "settings",
+    users: "users",
+    permissions: "permissions",
+    org_tree: "organization",
+    audit: "audit",
+    administration: "system-settings",
+    migration: "data-tools",
+    deadlines: "deadlines",
+    history: "task-history",
+    performance: "performance",
+    workforce: "workforce-intelligence",
+    wellness: "wellness-attendance",
+    compliance: "performance-compliance",
+    portfolio: "portfolio-intelligence",
+    transform: "project-transformation",
+    financial: "financial-oversight",
+    legdash: "legislative-dashboard",
+    session: "session-management",
+    committee: "committee-affairs",
+    councilor: "councilor-workspace",
+    projfin: "project-finance",
+    liquidation: "liquidation",
+    crypto: "immutable-ledger",
+    accounting_overview: "accounting-overview",
+    accounting_releases: "voucher-cash-releases",
+    accounting_journal: "general-journal",
+    accounting_audit: "financial-audit-trail",
+    accounting_budgets: "office-budget-ledgers",
+};
+interface NavigationCandidate {
+    id: string;
+    label: string;
+}
+export interface NavigationLocation {
+    section: string;
+    page?: string;
+}
+function slugify(value: string): string {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/&/g, "and")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+export function getNavigationPath(section: string): string {
+    return `/${SECTION_PATHS[section] || slugify(section)}`;
+}
+export function getNavigationSectionFromPath(pathname: string): string | undefined {
+    const segment = pathname.split('/').filter(Boolean)[0]?.toLowerCase();
+    if (segment === 'department-budget')
+        return 'budget';
+    if (segment === 'department-budget-ledgers')
+        return 'accounting_budgets';
+    return Object.entries(SECTION_PATHS).find(([section, path]) => segment === path || segment === section)?.[0];
+}
+function getSectionFromPath(pathname: string, candidates: NavigationCandidate[]): string | undefined {
+    const segment = pathname.split("/").filter(Boolean)[0]?.toLowerCase();
+    if (!segment)
+        return undefined;
+    if (segment === SECTION_PATHS.settings)
+        return "settings";
+    if (segment === "department-budget" &&
+        candidates.some((candidate) => candidate.id === "budget"))
+        return "budget";
+    if (segment === "department-budget-ledgers" &&
+        candidates.some((candidate) => candidate.id === "accounting_budgets"))
+        return "accounting_budgets";
+    return candidates.find((candidate) => {
+        const candidatePath = getNavigationPath(candidate.id).slice(1);
+        return (candidatePath === segment ||
+            candidate.id.toLowerCase() === segment ||
+            slugify(candidate.label) === segment);
+    })?.id;
+}
+function getPageFromUrl(url: URL): string | undefined {
+    return (url.searchParams.get(NAVIGATION_PAGE_QUERY) ||
+        url.searchParams.get("view") ||
+        undefined);
+}
+function getValidPage(role: string, section: string, requestedPage: string | undefined, getInitialPage: (section: string) => string | undefined): string | undefined {
+    if (section === "users")
+        return resolveSupportPage(section, requestedPage);
+    if (section !== "users" &&
+        ["org_tree", "audit", "administration", "migration"].includes(section))
+        return resolveSupportPage(section, requestedPage);
+    if (section === "settings" && requestedPage?.toLowerCase() === "settings")
+        return "Appearance";
+    if (!requestedPage)
+        return getInitialPage(section);
+    if (section === "personal_work" && requestedPage === "My Work")
+        return "Assigned work";
+    if (section === "personal_work" && requestedPage === "Recently completed")
+        return "History";
+    if (section === "personal_work" &&
+        [
+            "All my work",
+            "Assigned to me",
+            "Due today",
+            "Due this week",
+            "Overdue",
+        ].includes(requestedPage))
+        return "Assigned work";
+    if (section === "dashboard" &&
+        ["Dashboard", "Overview", "Home"].includes(requestedPage))
+        return "Workspace Overview";
+    const pages = getSidebarContent(role, section).sections.flatMap((group) => group.items.map((item) => item.label));
+    return pages.includes(requestedPage)
+        ? requestedPage
+        : getInitialPage(section);
+}
+export function readNavigationLocation(role: string, getInitialPage: (section: string) => string | undefined): NavigationLocation {
+    const defaultSection = getDefaultSection(role);
+    if (typeof __nativeWindow === "undefined") {
+        return { section: defaultSection, page: getInitialPage(defaultSection) };
+    }
+    const url = new URL(__nativeWindow.location.href);
+    if (role === "admin") {
+        const legacySupport: Record<string, string> = {
+            organization: "All Users",
+            audit: "Account Audit",
+            "system-settings": "System Settings",
+            "data-tools": "Backup & Export",
+            permissions: "Role Defaults",
+        };
+        const supportPage = legacySupport[url.pathname.split("/").filter(Boolean)[0] || ""];
+        if (supportPage)
+            return {
+                section: "users",
+                page: supportPage === "System Settings"
+                    ? resolveSupportPage("administration", getPageFromUrl(url))
+                    : supportPage,
+            };
+    }
+    if (role !== "admin" && ["leading", "leader"].includes(url.pathname.split("/").filter(Boolean)[0] || ""))
+        return { section: "personal_work", page: "Leading" };
+    const candidates = getRoleNavigationCandidates(role);
+    if (role !== "admin" &&
+        ["home", "dashboard", "overview"].includes(url.pathname.split("/").filter(Boolean)[0] || ""))
+        return { section: "dashboard", page: "Workspace Overview" };
+    const section = getSectionFromPath(url.pathname, candidates) || defaultSection;
+    return {
+        section,
+        page: getValidPage(role, section, getPageFromUrl(url), getInitialPage),
+    };
+}
+export function writeNavigationLocation(section: string, page?: string, mode: "push" | "replace" = "push", context?: {
+    project?: string;
+    view?: string;
+    parameters?: Record<string, string>;
+    isCurrent?: () => boolean;
+}): void {
+    if (typeof __nativeWindow === "undefined")
+        return;
+    const url = new URL(__nativeWindow.location.href);
+    const previousSection = getNavigationSectionFromPath(url.pathname);
+    const currentParameters = Object.fromEntries(url.searchParams);
+    const source = context?.parameters ?? (previousSection === section ? currentParameters :
+        previousSection?.startsWith('accounting_') && section.startsWith('accounting_') ? { fy: currentParameters.fy } : {});
+    const parameters = destinationNavigationParameters(section, {
+        ...source,
+        ...(context?.project ? { project: context.project } : {}),
+        ...(context?.view ? { view: context.view } : {}),
+    }, currentParameters.page || page);
+    url.pathname = getNavigationPath(section);
+    for (const key of navigationDisplayKeys)
+        if (key !== 'workspace')
+            url.searchParams.delete(key);
+    if (context?.project)
+        delete parameters.plans;
+    if (page)
+        url.searchParams.set(NAVIGATION_PAGE_QUERY, page);
+    else
+        url.searchParams.delete(NAVIGATION_PAGE_QUERY);
+    for (const [key, value] of Object.entries(parameters))
+        url.searchParams.set(key, value);
+    const nextLocation = `${url.pathname}${url.search}${url.hash}`;
+    if (`${__nativeWindow.location.pathname}${__nativeWindow.location.search}${__nativeWindow.location.hash}` ===
+        nextLocation) {
+        return;
+    }
+    if (mode === "push")
+        pushNavigationHistory(nextLocation);
+    else
+        replaceNavigationHistory(nextLocation);
+}
+export function getNavigationUrl(section: string, page?: string): string {
+    const url = new URL(getNavigationPath(section), "https://eflow.local");
+    if (page)
+        url.searchParams.set(NAVIGATION_PAGE_QUERY, page);
+    return `${url.pathname}${url.search}`;
+}

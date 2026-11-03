@@ -31,7 +31,10 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+*.log
+npm-audit.json
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +42,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Local installable build artifacts
+/artifacts/
+
+# Local APK staging
+/.release-stage/

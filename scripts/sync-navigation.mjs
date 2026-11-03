@@ -1,0 +1,15 @@
+import fs from 'node:fs';import path from 'node:path';import vm from 'node:vm';import ts from 'typescript';
+const root=process.cwd(),web=process.env.EFLOW_WEB_SOURCE||path.resolve(root,'../EflowWeb');
+const source=fs.readFileSync(path.join(web,'src/app/components/Layout/coreWorkflowNavigation.tsx'),'utf8');
+const ast=ts.createSourceFile('navigation.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const names=new Set(['ACCOUNTING_NAV_ITEMS','EMPLOYEE_NAV_ITEMS','CORE_WORKFLOW_NAVIGATION']);
+const selected=ast.statements.filter(statement=>ts.isVariableStatement(statement)&&statement.declarationList.declarations.some(declaration=>names.has(declaration.name.getText(ast))));
+if(selected.length!==3)throw new Error('Review changed role navigation definitions.');
+const transformer=context=>{const visit=node=>{if(ts.isObjectLiteralExpression(node))return ts.factory.updateObjectLiteralExpression(node,node.properties.filter(property=>!property.name||property.name.getText(ast)!=='icon').map(property=>ts.visitNode(property,visit)));return ts.visitEachChild(node,visit,context);};return node=>ts.visitNode(node,visit);};
+const result=ts.transform(ts.factory.updateSourceFile(ast,selected),[transformer]);
+const code=ts.transpile(ts.createPrinter().printFile(result.transformed[0]),{target:ts.ScriptTarget.ES2022});result.dispose();
+const data=vm.runInNewContext(code+'\nJSON.stringify(CORE_WORKFLOW_NAVIGATION)',{}, {timeout:1000});
+fs.mkdirSync('src/app/features/navigation',{recursive:true});
+const mobile=JSON.parse(data);delete mobile.admin;
+fs.writeFileSync('src/app/features/navigation/sourceNavigation.ts','// Generated from EflowWeb coreWorkflowNavigation.tsx. Admin is web-only by user decision.\nexport const sourceNavigation = '+JSON.stringify(mobile,null,2)+' as const;\n');
+console.log('Preserved Head, Member and Accounting Staff navigation. Admin remains web-only.');

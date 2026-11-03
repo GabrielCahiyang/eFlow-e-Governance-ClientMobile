@@ -1,0 +1,2 @@
+
+export { hiddenHeadComponents } from "./legacy";

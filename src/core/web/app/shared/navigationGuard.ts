@@ -1,0 +1,108 @@
+import {nativeWindow as __nativeWindow} from '../../../../platform/webRuntime';
+import { useEffect, useRef } from "react";
+import { isNavigationLocked } from "./navigationLock";
+type Guard = {
+    dirty: boolean;
+    pending?: boolean;
+    pendingCheck?: () => boolean;
+    label: string;
+    identity?: string;
+    onDiscard: () => void;
+};
+const guards = new Map<symbol, () => Guard>();
+function beforeUnload(event: BeforeUnloadEvent) {
+    if ([...guards.values()].some(read => {
+        const guard = read();
+        return guard.dirty || guard.pending;
+    })) {
+        event.preventDefault();
+        event.returnValue = "";
+    }
+}
+let confirmDiscard: ((labels: string[]) => Promise<boolean>) | undefined;
+let deciding = false;
+let guardRevision = 0;
+export function installNavigationConfirmation(confirm: (labels: string[]) => Promise<boolean>) {
+    confirmDiscard = confirm;
+    return () => {
+        if (confirmDiscard === confirm)
+            confirmDiscard = undefined;
+    };
+}
+export function hasDirtyNavigation() {
+    return [...guards.values()].some((read) => read().dirty || read().pending);
+}
+/** Only registered dirty editors prompt. Inline autosave and ordinary navigation do not. */
+export async function requestNavigation(action: () => void): Promise<boolean> {
+    return requestGuardedNavigation(action);
+}
+/** A child dialog can close its own draft without discarding its parent's work. */
+async function requestGuardedNavigation(action: () => void, owner?: symbol): Promise<boolean> {
+    if (isNavigationLocked() || deciding)
+        return false;
+    const registered = [...guards.entries()].map(([token, read]) => ({
+        token,
+        guard: read(),
+    }));
+    if (registered.some(({ guard }) => guard.pending))
+        return false;
+    if (owner && !guards.has(owner))
+        return false;
+    const current = owner ? registered.filter(({ token }) => token === owner) : registered;
+    const dirty = current.filter(({ guard }) => guard.dirty);
+    if (!dirty.length) {
+        action();
+        return true;
+    }
+    if (!confirmDiscard)
+        return false;
+    deciding = true;
+    const revision = guardRevision;
+    try {
+        const accepted = await confirmDiscard(dirty.map(({ guard }) => guard.label));
+        if (!accepted ||
+            guardRevision !== revision ||
+            isNavigationLocked() ||
+            [...guards.values()].some((read) => read().pending))
+            return false;
+        // Never apply an old reset callback to a different record after a live update.
+        const latest = dirty.map(({ token, guard }) => ({
+            before: guard,
+            now: guards.get(token)?.(),
+        }));
+        if (latest.some(({ before, now }) => !now || now.identity !== before.identity))
+            return false;
+        if ([...guards.entries()].some(([token, read]) => (!owner || token === owner) && read().dirty && !dirty.some((entry) => entry.token === token)))
+            return false;
+        latest.forEach(({ now }) => {
+            if (now?.dirty)
+                now.onDiscard();
+        });
+        action();
+        return true;
+    }
+    finally {
+        deciding = false;
+    }
+}
+export function useNavigationBlocker(guard: Guard) {
+    const latest = useRef(guard);
+    const token = useRef(Symbol("dirty editor")).current;
+    latest.current = guard;
+    useEffect(() => {
+        if (!guards.size)
+            __nativeWindow.addEventListener("beforeunload", beforeUnload);
+        guards.set(token, () => ({
+            ...latest.current,
+            pending: latest.current.pending || latest.current.pendingCheck?.(),
+        }));
+        guardRevision++;
+        return () => {
+            guards.delete(token);
+            guardRevision++;
+            if (!guards.size)
+                __nativeWindow.removeEventListener("beforeunload", beforeUnload);
+        };
+    }, []);
+    return (action: () => void) => requestGuardedNavigation(action, token);
+}
