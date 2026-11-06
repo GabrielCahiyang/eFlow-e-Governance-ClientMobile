@@ -118,7 +118,7 @@ export function ProjectPublication({
           Open public record
         </Button>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       {open && (
         <SealSheet
           projectId={projectId}
@@ -208,7 +208,7 @@ function SealSheet({
           retry={() => void preview.refresh()}
         />
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       {state.data && (
         <>
           <Notice>

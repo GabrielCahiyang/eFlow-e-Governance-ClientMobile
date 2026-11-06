@@ -55,7 +55,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: colors.surface,
   },
-  header: { flexDirection: "row", backgroundColor: "#f4f8f8" },
+  header: { flexDirection: "row", backgroundColor: colors.background },
   row: {
     flexDirection: "row",
     borderTopWidth: 1,

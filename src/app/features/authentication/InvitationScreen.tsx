@@ -14,7 +14,7 @@ import { EFlowMark } from "../../components/brand/EFlowMark";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
 import { useAuth } from "./AuthProvider";
-import { signInWithAccountProtection } from "../../../core/web/app/features/authentication/services/accountLogin";
+import { signInOnMobile } from "./mobileSignIn";
 import {
   acceptInvitation,
   createInvitedAccount,
@@ -36,7 +36,7 @@ export function InvitationScreen({
   onClose: () => void;
 }) {
   const { user, refresh, signOut } = useAuth(),
-    action = useAction(),
+    action = useAction({ requireAccess: false }),
     attempt = useRef(crypto.randomUUID());
   const invite = useFacts<InvitationMetadata & { id?: string }>(
     "invitation:" + projectGuest + ":" + token,
@@ -85,14 +85,14 @@ export function InvitationScreen({
             await create(token, name.trim(), password, attempt.current);
           } catch (creationError) {
             try {
-              await signInWithAccountProtection(data.email, password);
+              await signInOnMobile(data.email, password);
             } catch {
               throw creationError;
             }
             await accept(token, name.trim());
           }
         }
-        await signInWithAccountProtection(data.email, password);
+        await signInOnMobile(data.email, password);
       }
       await accept(token, name.trim() || undefined);
       setPassword("");
@@ -110,7 +110,7 @@ export function InvitationScreen({
     <Screen title="You’re invited">
       <EFlowMark height={42} state={action.busy ? "submitting" : "idle"} />
       {invite.loading ? (
-        <Loading label="Checking your invitation…" />
+        <Loading layout="form" label="Checking your invitation…" />
       ) : data ? (
         <Card
           title={
@@ -241,7 +241,7 @@ export function InvitationScreen({
           retry={() => void invite.refresh()}
         />
       )}{" "}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       <Button variant="ghost" disabled={action.busy} onPress={onClose}>
         Back to eFlow
       </Button>

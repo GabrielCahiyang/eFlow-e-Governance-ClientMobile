@@ -40,15 +40,15 @@ const s = StyleSheet.create({
   tab: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 9,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: colors.surface,
   },
   selected: {
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
-  text: { fontSize: 13, color: colors.muted },
-  active: { color: colors.primary, fontWeight: "600" },
+  text: { fontSize: 13, fontWeight: "500", color: colors.muted },
+  active: { color: colors.primary, fontWeight: "700" },
 });

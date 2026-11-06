@@ -395,7 +395,7 @@ const s = StyleSheet.create({
   lane: {
     width: 270,
     padding: 12,
-    backgroundColor: "#edf3f3",
+    backgroundColor: colors.primarySoft,
     borderRadius: 12,
     gap: 12,
   },

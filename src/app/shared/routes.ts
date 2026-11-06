@@ -39,14 +39,23 @@ export type RouteName =
   | "invitation"
   | "activation"
   | "personal_project";
+export type PrimaryTab =
+  "home" | "work" | "inbox" | "accounting" | "projects" | "more";
 export interface AppRoute {
   name: RouteName;
   id?: string;
   projectId?: string;
   taskId?: string;
   nodeId?: string;
+  recordId?: string;
+  recordType?: string;
+  financialOfficeId?: string;
+  fiscalYear?: number;
   title?: string;
   view?: string;
   token?: string;
+  originTab?: PrimaryTab;
+  workspaceId?: string;
+  workspaceKind?: "office" | "personal";
 }
 export type Navigate = (route: AppRoute) => void;

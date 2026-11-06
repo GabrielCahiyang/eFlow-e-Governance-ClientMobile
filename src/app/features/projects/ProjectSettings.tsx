@@ -124,7 +124,7 @@ export function ProjectSettings({
         {!!action.notice && (
           <Text style={{ color: colors.success }}>{action.notice}</Text>
         )}
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Card>
       {!!canManage && (
         <Card title="Project lifecycle">
@@ -205,7 +205,7 @@ export function ProjectSettings({
             onChangeText={setConfirmation}
           />
         )}
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     </>
   );

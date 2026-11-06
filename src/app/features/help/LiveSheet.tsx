@@ -1,6 +1,8 @@
+import { withOpacity } from "../../components/ui/theme";
+import { useTheme } from "../../components/ui/Appearance";
 import { useEffect, useState } from "react";
-import {StyleSheet,useWindowDimensions} from "react-native";
-import {View} from '../../components/ui/Primitives';
+import { StyleSheet, useWindowDimensions } from "react-native";
+import { View } from "../../components/ui/Primitives";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   useSharedValue,
@@ -31,6 +33,7 @@ import type {
 import type { useNativeVoice } from "./voice/useNativeVoice";
 type Voice = ReturnType<typeof useNativeVoice>;
 function VoiceOrb({ level, active }: { level: number; active: boolean }) {
+  const palette = useTheme();
   const { reduced } = useMotionPreferences(),
     phase = useSharedValue(0);
   useEffect(() => {
@@ -50,7 +53,7 @@ function VoiceOrb({ level, active }: { level: number; active: boolean }) {
   return (
     <Animated.View style={[s.orbWrap, style]}>
       <LinearGradient
-        colors={["#80e1c7", "#159b90", "#066e73"]}
+        colors={[palette.blue, palette.heroMiddle, palette.heroStart]}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.9, y: 1 }}
         style={s.orb}
@@ -62,7 +65,7 @@ function VoiceOrb({ level, active }: { level: number; active: boolean }) {
               style={{
                 width: 6,
                 borderRadius: 4,
-                backgroundColor: "#eafff9",
+                backgroundColor: colors.onPrimary,
                 height: Math.max(8, (active ? 18 : 10) + level * 50 * amount),
               }}
             />
@@ -91,6 +94,7 @@ export function LiveSheet({
   error: string;
   onClose: () => void;
 }) {
+  const palette = useTheme();
   const [transcript, setTranscript] = useState(false),
     { height } = useWindowDimensions(),
     latest = messages.filter((m) => m.role === "assistant").at(-1),
@@ -128,9 +132,9 @@ export function LiveSheet({
               <Button
                 icon={
                   voice.paused ? (
-                    <Mic size={18} color="#fff" />
+                    <Mic size={18} color={palette.onPrimary} />
                   ) : (
-                    <MicOff size={18} color="#fff" />
+                    <MicOff size={18} color={palette.onPrimary} />
                   )
                 }
                 onPress={voice.pause}
@@ -220,7 +224,7 @@ const s = StyleSheet.create({
   orbWrap: {
     padding: 13,
     borderWidth: 1,
-    borderColor: "#159b9030",
+    borderColor: withOpacity(colors.blue, 0.2),
     borderRadius: 140,
   },
   orb: {

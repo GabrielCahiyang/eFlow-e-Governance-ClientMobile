@@ -32,7 +32,7 @@ jest.mock("../../authentication", () => ({
 }));
 test("startup Retry remounts a failed font loader instead of only retrying preferences", async () => {
   await render(<AppRoot />);
-  expect(screen.getByText("Font fetch timed out")).toBeOnTheScreen();
+  expect(screen.getByText("This is taking longer than expected. Please try again.")).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Ready sign in")).toBeOnTheScreen();
 });

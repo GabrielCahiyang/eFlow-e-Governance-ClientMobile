@@ -301,7 +301,7 @@ export function ProjectFundingCloseout({
             editable={!retry && !action.busy}
             onChangeText={setReason}
           />
-          {!!action.error && <ErrorState error={action.error} />}
+          {!!action.error && <ErrorState context="action" error={action.error} />}
           <Button busy={action.busy} onPress={() => void save()}>
             {retry ? "Verify saved decision" : "Confirm"}
           </Button>

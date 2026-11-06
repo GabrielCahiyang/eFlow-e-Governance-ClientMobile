@@ -1,5 +1,7 @@
 # Native catch-up: direct subtask completion
 
+> Historical catch-up notes. Use [v1 scope](mobile-redesign/mobile-feature-scope.md) and [M0 QA](mobile-redesign/M0-personal-qa.md) for current acceptance; previous APKs and counts are not fresh verification.
+
 This slice replaces the old subtask submit/review buttons in the task tree with Mark complete for the eligible subtask or parent task lead. The server remains authoritative on work access, ordering and completion. Parent task review is unchanged. The list no longer shows the retired subtask percent. Completion currently supports an optional note; native completion attachments and durable recovery across app restarts are still pending. Retry within the open sheet reuses the request ID.
 
 Checks: TypeScript and Metro configuration passed, 86 tests passed, and Android/iOS JS exports succeeded. See the catchup logs. This does not establish full web parity or iOS native installation.

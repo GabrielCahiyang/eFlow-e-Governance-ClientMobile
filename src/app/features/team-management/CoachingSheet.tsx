@@ -110,7 +110,7 @@ export function CoachingSheet({
         These are manager observations, separate from verified task activity. Do
         not use them as an automatic personnel rating.
       </Notice>
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

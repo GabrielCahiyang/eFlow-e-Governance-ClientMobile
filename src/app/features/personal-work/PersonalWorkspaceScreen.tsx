@@ -1,5 +1,5 @@
 import { useState } from "react";
-import {Pressable} from '../../components/ui/Primitives';
+import { Pressable } from "../../components/ui/Primitives";
 import {
   Button,
   Card,
@@ -29,8 +29,8 @@ export function PersonalWorkspaceScreen({ navigate }: { navigate: Navigate }) {
     <Screen
       title={current?.workspace.name || "Personal workspace"}
       description={`Personal workspace · Owner: ${current?.workspace.owner_name || profile?.full_name || "Workspace owner"}`}
-      onRefresh={() => void workspace.refresh()}
-      refreshing={workspace.loading}
+      onRefresh={() => workspace.refresh()}
+
       actions={
         owner ? (
           <Button onPress={() => setCreating(true)}>
@@ -54,7 +54,7 @@ export function PersonalWorkspaceScreen({ navigate }: { navigate: Navigate }) {
           retry={() => void workspace.refresh()}
         />
       ) : !current ? (
-        <Loading />
+        <Loading label="Loading personal projects" layout="projects" />
       ) : projects.length ? (
         projects.map((project) => (
           <Pressable

@@ -17,6 +17,7 @@ import {
 } from "../../shared/motion";
 import { markPaths } from "./markPaths";
 import { useAppearance } from "../ui/Appearance";
+import { brandColors, darkColors } from "../ui/theme";
 
 export type MarkState = "idle" | "submitting" | "success" | "error";
 export function EFlowMark({
@@ -108,8 +109,9 @@ export function EFlowMark({
   }));
   const unit = height / 88.6632;
   const ringSize = 72;
-  const color = variant === "white" || isDark ? "#ffffff" : "#01006b",
-    accent = variant === "white" || isDark ? "#60a5fa" : "#0073ea";
+  const color =
+      variant === "white" || isDark ? brandColors.white : brandColors.navy,
+    accent = variant === "white" || isDark ? darkColors.blue : brandColors.blue;
   return (
     <View
       accessible
@@ -122,14 +124,25 @@ export function EFlowMark({
           <Path key={index} d={d} fill={color} />
         ))}
       </Svg>
-      <Animated.View pointerEvents="none" style={[{
-        position: "absolute",
-        left: (196.964 - ringSize / 2) * unit,
-        top: (46.234 - ringSize / 2) * unit,
-        width: ringSize * unit,
-        height: ringSize * unit,
-      }, rotation]}>
-        <Svg width="100%" height="100%" viewBox="160.964 10.234 72 72" fill="none">
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: "absolute",
+            left: (196.964 - ringSize / 2) * unit,
+            top: (46.234 - ringSize / 2) * unit,
+            width: ringSize * unit,
+            height: ringSize * unit,
+          },
+          rotation,
+        ]}
+      >
+        <Svg
+          width="100%"
+          height="100%"
+          viewBox="160.964 10.234 72 72"
+          fill="none"
+        >
           <Path d={markPaths[4]} fill={accent} />
           <Path d={markPaths[5]} fill={color} />
         </Svg>

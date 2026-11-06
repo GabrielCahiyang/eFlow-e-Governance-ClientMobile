@@ -16,8 +16,7 @@ export function ShareLanding({
   return (
     <Screen title="Project invitation">
       <Notice>
-        Open this link using the invited account. Access terms, expiry and
-        membership are checked by the server.
+        Open this link using the invited account. Your invitation must still be valid and allow access to this project.
       </Notice>
       <Button
         busy={action.busy}
@@ -40,7 +39,7 @@ export function ShareLanding({
       <Button variant="outline" disabled={action.busy} onPress={onClose}>
         Back to eFlow
       </Button>
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Screen>
   );
 }

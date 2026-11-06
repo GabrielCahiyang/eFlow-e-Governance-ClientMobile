@@ -94,7 +94,7 @@ export function BudgetExport({
           Export PDF
         </Button>
       </Row>
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </>
   );
 }

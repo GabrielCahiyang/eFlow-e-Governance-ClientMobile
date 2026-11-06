@@ -1,3 +1,4 @@
+import { colors } from "../../components/ui/theme";
 import type { DepartmentReportRow } from "../../../core/web/app/features/reports/types";
 export const reportColumns = [
   ["Work item", "title"],
@@ -65,5 +66,5 @@ export function reportHtml(
   scope: string,
 ) {
   const e = escapeReportHtml;
-  return `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:16mm}body{font:10px sans-serif;color:#183136}h1{font-size:22px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:6px;text-align:left;border:1px solid #d3dedf;overflow-wrap:anywhere}th{background:#e1f1ef}tr{break-inside:avoid}</style></head><body><h1>eFlow · ${e(title)}</h1><p>${e(scope)} · ${rows.length} visible rows</p><table><thead><tr>${reportColumns.map(([label]) => `<th>${e(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${reportColumns.map(([, key]) => `<td>${e(reportValue(row, key))}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:16mm}body{font:10px sans-serif;color:${colors.text}}h1{font-size:22px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:6px;text-align:left;border:1px solid ${colors.border};overflow-wrap:anywhere}th{background:${colors.primarySoft}}tr{break-inside:avoid}</style></head><body><h1>eFlow · ${e(title)}</h1><p>${e(scope)} · ${rows.length} visible rows</p><table><thead><tr>${reportColumns.map(([label]) => `<th>${e(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${reportColumns.map(([, key]) => `<td>${e(reportValue(row, key))}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
 }

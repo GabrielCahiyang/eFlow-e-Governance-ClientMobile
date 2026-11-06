@@ -1,0 +1,26 @@
+{
+  "sourceChecks": {
+    "typeScriptMetro": "PASSED - nine Metro exclusions",
+    "jest": "PASSED - 212 tests in 67 suites",
+    "androidExport": "PASSED",
+    "iosExport": "PASSED",
+    "credentialAudit": "PASSED - two production bundles"
+  },
+  "androidVerification": "Existing version-19 debug build / emulator-5554, offline feedback component preview, light and dark; no actor/account/backend calls",
+  "nativeWorkflowVerification": "BLOCKED - no approved accounts/fixtures; device account-access read also encountered a connection/DNS failure",
+  "iosNativeVerification": "NOT TESTED",
+  "newApk": "NOT BUILT - existing user hold",
+  "entryRestored": true,
+  "temporaryPreviewRemoved": true,
+  "sourceSha256": {
+    "src/app/shared/userMessages.ts": "ef7fcaeeac87f1a760ef54b6e15f0059bca186007a044ba7edfc66eee70ade25",
+    "src/app/shared/displayCache.ts": "3730b4f85438942e52d870c9562847b0440f2f6304ac37a2f1f085db51dc3855",
+    "src/app/shared/useFacts.ts": "a4abb8151e3eedef85a94ab522a9f0bdec2d8f8a8de972124950dc9304480dcb",
+    "src/app/shared/readTimeout.ts": "66007a423dd78b318b30465fdb01484cf6ef04973bd7dd0c67828178fbfe978f",
+    "src/app/features/personal-work/displayWorkSnapshot.ts": "1847b40904362cb87c746def0604412bbe9d85cf60ca443fa5126c6b0cbd8704",
+    "src/app/features/authentication/useNativeLogin.ts": "ce2e09ae8e3294fdd86389eac7b3eed0439661a57f47d998201321abee7f8fec",
+    "src/app/features/authentication/loginError.ts": "60c6e5f8aaad571098af9983673d3b7d348db8b0ebcf407f8445610bf1f16436",
+    "src/app/features/authentication/AuthProvider.tsx": "241f0e9cf5641f3fedc4878da99bfcd0301b5623460d9a7c2d3e1044bab8fc9c"
+  },
+  "devServerRestoration": "Restored; Metro LAN listener on port 8081, normal App entry loaded. Account verification displayed plain connection guidance after a device connection/DNS failure; actor/role unverified."
+}

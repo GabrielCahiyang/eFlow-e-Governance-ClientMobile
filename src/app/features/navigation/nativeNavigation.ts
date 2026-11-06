@@ -142,7 +142,9 @@ export const nativeImplementedSections = new Set<RouteName>([
   "reports",
 ]);
 export function nativeDefaultSection(role: string): RouteName {
-  const source = sourceNavigation[role as keyof typeof sourceNavigation];
-  const desired = source ? nativeSection(source.defaultSection) : "profile";
-  return nativeImplementedSections.has(desired) ? desired : "profile";
+  return role === "accounting_staff"
+    ? "personal_work"
+    : role === "head" || role === "member"
+      ? "overview"
+      : "profile";
 }

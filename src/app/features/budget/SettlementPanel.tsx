@@ -1,5 +1,7 @@
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
+import { View } from "../../components/ui/Primitives";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -8,7 +10,6 @@ import {
   Field,
   Loading,
   Notice,
-  Row,
   colors,
 } from "../../components/ui";
 import { useFacts } from "../../shared/useFacts";
@@ -43,6 +44,7 @@ export function SettlementPanel({
   onSaved: () => Promise<void>;
 }) {
   const { profile, can, organization } = useAuth();
+  const palette = useTheme();
   const [reason, setReason] = useState(""),
     [reviewer, setReviewer] = useState("");
   const pending = liquidation.status === "pending_department_settlement";
@@ -110,6 +112,26 @@ export function SettlementPanel({
       }
       await refresh();
     }, "Receipt decision recorded.");
+  const settlementBlocked = pending && independent.data?.eligibleSettlers === 0;
+  // Reuse the existing action visibility conditions for the shared note editor.
+  // A blocked settlement must not hide a separately authorized review action.
+  const canRouteReview = !!(
+    independent.data?.required &&
+    accounting &&
+    independent.data.candidates.length > 0
+  );
+  const canReview = !!(
+    independent.data?.required && independent.data.canReview
+  );
+  const showSettlementActions = !!(
+    leader ||
+    (head && late) ||
+    (accounting &&
+      independent.data &&
+      independentReviewAllowsPosting(independent.data, profile!.id) &&
+      !late)
+  );
+  const showReviewForm = canRouteReview || canReview || showSettlementActions;
   if (!leader && !pending) return null;
   return (
     <Card title="Receipt review and settlement">
@@ -126,7 +148,7 @@ export function SettlementPanel({
         </Notice>
       )}
       {!!(pending && independent.loading && !independent.data) && (
-        <Loading label="Verifying independent review…" />
+        <Loading layout="verification" label="Verifying independent review…" />
       )}
       {!!independent.error && (
         <ErrorState
@@ -134,34 +156,63 @@ export function SettlementPanel({
           retry={() => void independent.refresh()}
         />
       )}
-      {pending && independent.data?.eligibleSettlers === 0 && (
+      {settlementBlocked && (
         <ErrorState
           error={
             new Error(
-              "Settlement blocked. An independent Accounting Officer is required. Receipt endorsement does not settle the advance.",
+              "Settlement blocked. An independent Accounting Officer is required. Receipt endorsement or review approval does not settle the advance or grant journal-posting permission. Resolve the appointment through the authorized Office workflow.",
             )
           }
         />
       )}
-      {!!independent.data?.required && (
-        <>
-          <Notice>
-            Independent review is required. Review approval does not grant
-            permission to settle or post journals.
-          </Notice>
-          {!!independent.data.review && (
-            <Text style={{ color: colors.muted }}>
-              Independent review:{" "}
-              {independent.data.review.status.replaceAll("_", " ")}
-            </Text>
-          )}
-          {!!(accounting && independent.data.candidates.length > 0) && (
+      {!!(independent.data?.required && !settlementBlocked) && (
+        <Notice>
+          Independent review is required. Review approval does not grant
+          permission to settle or post journals.
+        </Notice>
+      )}
+      {!!(independent.data?.required && independent.data.review) && (
+        <Text style={{ color: palette.muted }}>
+          Independent review:{" "}
+          {independent.data!.review!.status.replaceAll("_", " ")}
+        </Text>
+      )}
+      {!!(independent.data?.escalationRequired && !settlementBlocked) && (
+        <Notice>
+          No independent eligible settler is currently available. Resolve the
+          appointment through the authorized Office workflow.
+        </Notice>
+      )}
+      {showReviewForm && (
+        <View
+          style={{
+            gap: 12,
+            paddingTop: 16,
+            borderTopWidth: 1,
+            borderTopColor: palette.border,
+          }}
+        >
+          <Field
+            label="Review note"
+            value={reason}
+            onChangeText={setReason}
+            placeholder="Add your review note or required correction"
+            accessibilityHint="Required before requesting review or recording a decision."
+            multiline
+            numberOfLines={4}
+            editable={!action.busy}
+            style={{ minHeight: 104 }}
+          />
+          <Text style={{ fontSize: 13, color: palette.muted }}>
+            Required before requesting review or recording a decision.
+          </Text>
+          {canRouteReview && (
             <>
               <Choice
                 label="Independent reviewer"
                 value={reviewer}
                 onChange={setReviewer}
-                options={independent.data.candidates.map((c) => ({
+                options={independent.data!.candidates.map((c) => ({
                   value: c.id,
                   label: c.name,
                   description: c.appointment,
@@ -188,8 +239,8 @@ export function SettlementPanel({
               </Button>
             </>
           )}
-          {!!independent.data.canReview && (
-            <Row>
+          {canReview && (
+            <View style={{ gap: 8 }}>
               <Button
                 disabled={action.busy || !reason.trim()}
                 onPress={() =>
@@ -225,48 +276,29 @@ export function SettlementPanel({
               >
                 Request review changes
               </Button>
-            </Row>
+            </View>
           )}
-        </>
+          {showSettlementActions && (
+            <View style={{ gap: 8 }}>
+              <Button busy={action.busy} onPress={() => void settle(true)}>
+                {leader
+                  ? "Endorse receipt package"
+                  : head && late
+                    ? "Authorize late package"
+                    : "Settle and post"}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={action.busy || !reason.trim()}
+                onPress={() => void settle(false)}
+              >
+                Request changes
+              </Button>
+            </View>
+          )}
+        </View>
       )}
-      {!!independent.data?.escalationRequired && (
-        <Notice>
-          No independent eligible settler is currently available. Resolve the
-          appointment through the authorized Office workflow.
-        </Notice>
-      )}
-      <Field
-        label="Review note / required correction"
-        value={reason}
-        onChangeText={setReason}
-        multiline
-      />
-      {!!(
-        leader ||
-        (head && late) ||
-        (accounting &&
-          independent.data &&
-          independentReviewAllowsPosting(independent.data, profile!.id) &&
-          !late)
-      ) && (
-        <Row>
-          <Button busy={action.busy} onPress={() => void settle(true)}>
-            {leader
-              ? "Endorse receipt package"
-              : head && late
-                ? "Authorize late package"
-                : "Settle and post"}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={action.busy || !reason.trim()}
-            onPress={() => void settle(false)}
-          >
-            Request changes
-          </Button>
-        </Row>
-      )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       {!!action.notice && (
         <Text style={{ color: colors.success }}>{action.notice}</Text>
       )}

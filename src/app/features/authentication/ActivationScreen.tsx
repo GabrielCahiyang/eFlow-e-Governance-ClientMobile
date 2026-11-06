@@ -28,7 +28,7 @@ export function ActivationScreen({
   const preview = useFacts("activation", () =>
       validateAccountActivation(token),
     ),
-    action = useAction(),
+    action = useAction({ requireAccess: false }),
     attempt = useRef(crypto.randomUUID());
   const [password, setPassword] = useState(""),
     [confirmation, setConfirmation] = useState(""),
@@ -40,7 +40,7 @@ export function ActivationScreen({
         state={action.busy ? "submitting" : result ? "success" : "idle"}
       />
       {preview.loading ? (
-        <Loading label="Checking your invitation…" />
+        <Loading layout="form" label="Checking your invitation…" />
       ) : result ? (
         <Card
           title={
@@ -126,7 +126,7 @@ export function ActivationScreen({
           retry={() => void preview.refresh()}
         />
       )}{" "}
-      {!!action.error && <ErrorState error={action.error} />}{" "}
+      {!!action.error && <ErrorState context="action" error={action.error} />}{" "}
       {!result && (
         <Button variant="ghost" disabled={action.busy} onPress={onClose}>
           Back to sign in

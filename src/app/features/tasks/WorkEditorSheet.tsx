@@ -38,6 +38,7 @@ import {
 } from "../../../core/web/app/features/nested-work/selectors/staffing";
 import {
   fetchWorkImpact,
+  fetchWorkTree,
   saveWorkTree,
 } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { reparentChoices } from "../../../core/web/app/features/nested-work/selectors/tree";
@@ -50,6 +51,7 @@ import type {
   WorkEditorFields,
 } from "../../../core/web/app/features/nested-work/types/editor";
 import { draftStore } from "../../../platform/draftStore";
+import { personalReviewAllowed } from "./branchInspector";
 import { useFacts } from "../../shared/useFacts";
 import { workEditorReceiptRetryAllowed } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
 export function WorkEditorSheet(
@@ -81,7 +83,10 @@ export function WorkEditorSheet(
   if (retained.loading)
     return (
       <Sheet open title="Checking saved work changes" onClose={props.onClose}>
-        <Loading label="Checking the original work request…" />
+        <Loading
+          layout="verification"
+          label="Checking the original work request…"
+        />
       </Sheet>
     );
   if (retained.error)
@@ -134,7 +139,7 @@ export function WorkEditorSheet(
                     if (
                       !(await confirmAction(
                         "Discard rejected work request?",
-                        "The server confirmed that this request was not committed. Discard it and review current work before creating another change.",
+                        "These changes were not saved. Discard this attempt and review the current work before trying again.",
                         "Discard rejected request",
                       ))
                     )
@@ -155,16 +160,11 @@ export function WorkEditorSheet(
         }
       >
         <Notice>
-          A previous {saved.request.command.replaceAll("_", " ")} request is
-          retained for this work. Checking its exact request ID recovers a
-          committed result without creating duplicate work. A new change cannot
-          replace an unresolved request.
+          A previous attempt still needs to be checked. Use Check original
+          request to find its result before making another change. This avoids
+          duplicate work.
         </Notice>
-        <Text>
-          Request revision: {saved.request.revision} · Current revision:{" "}
-          {data.revision}
-        </Text>
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     );
   }
@@ -246,19 +246,55 @@ function WorkEditorForm({
     action.run(async () => {
       if (!profile) throw new Error("Sign in again.");
       if (!request.current) {
+        if (edit.command === "review") {
+          if (!fields.note.trim())
+            throw new Error("Enter the reason for your decision.");
+          const approve = fields.progress === 100;
+          if (
+            !(await confirmAction(
+              approve ? "Approve this subitem?" : "Return this subitem?",
+              fields.note.trim(),
+              approve ? "Approve subitem" : "Request changes",
+            ))
+          )
+            return;
+        }
+        const latest = await fetchWorkTree(data.root.id);
+        if (
+          readOnly ||
+          latest.revision !== baseline.revision ||
+          latest.root.project !== context.projectId ||
+          latest.root.office !== context.officeId ||
+          latest.root.kind !== context.kind
+        )
+          throw new Error(
+            "Work access or revision changed. Reopen the editor and review the current work.",
+          );
+        if (
+          edit.command === "review" &&
+          (!baseline.nodeId ||
+            !personalReviewAllowed(
+              latest,
+              baseline.nodeId,
+              profile.id,
+              readOnly,
+            ))
+        )
+          throw new Error("Current independent review access is required.");
         const issue = isStaff
           ? staffingDraftError(
-              data,
+              latest,
               context,
               staffing,
               fields.lead || null,
               fields.people,
             )
-          : workEditorDateError(data, baseline, fields);
+          : workEditorDateError(latest, baseline, fields);
         if (issue) throw new Error(issue);
-        if (!isStaff && !capability.allowed)
+        const current = workEditorCapability(latest, baseline, context);
+        if (!isStaff && !current.allowed)
           throw new Error(
-            capability.disabledReason || "Current work access is required.",
+            current.disabledReason || "Current work access is required.",
           );
         if (["create", "edit"].includes(edit.command) && !fields.title.trim())
           throw new Error("Title is required.");
@@ -317,7 +353,7 @@ function WorkEditorForm({
       if (
         !(await confirmAction(
           "Leave these work changes?",
-          "A submitted request remains recoverable with the same request ID. Unsaved field edits will be discarded.",
+          "You can check the result of a previous submission when you return. Unsaved field edits will be discarded.",
           "Leave editor",
         ))
       )
@@ -484,7 +520,7 @@ function WorkEditorForm({
           deletion. Started work cannot be silently erased.
         </Notice>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

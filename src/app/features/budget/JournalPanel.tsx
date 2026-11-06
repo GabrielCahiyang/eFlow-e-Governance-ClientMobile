@@ -359,7 +359,7 @@ function JournalAdjustment({
         Add journal line
       </Button>
       {!!validation && <ErrorState error={validation} />}
-      {!!command.error && <ErrorState error={command.error} />}
+      {!!command.error && <ErrorState context="action" error={command.error} />}
     </Sheet>
   );
 }

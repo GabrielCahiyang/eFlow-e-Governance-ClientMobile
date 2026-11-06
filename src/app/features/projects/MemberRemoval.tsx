@@ -51,8 +51,7 @@ export function MemberRemoval({
         onClose={() => setPreview(undefined)}
       >
         <Notice>
-          The server checks the current responsibility list before removing this
-          membership. It may clear staffing on the listed work.
+          Check the listed responsibilities before removing this person. Their assignments on this work may be cleared.
         </Notice>
         {preview?.impact.tasks.map((t) => (
           <Text key={t.id}>
@@ -77,9 +76,9 @@ export function MemberRemoval({
         >
           Confirm reviewed removal
         </Button>
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
-      {!preview && !!action.error && <ErrorState error={action.error} />}
+      {!preview && !!action.error && <ErrorState context="action" error={action.error} />}
     </>
   );
 }

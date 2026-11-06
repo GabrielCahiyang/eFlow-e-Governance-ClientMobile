@@ -1,3 +1,4 @@
+import { useTheme } from "../../components/ui/Appearance";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import {KeyboardAvoidingView,Platform,StyleSheet} from "react-native";
 import {ScrollView,View} from '../../components/ui/Primitives';
@@ -29,6 +30,7 @@ import { HELP_STAGES } from "../../../core/web/app/features/help-assistant/const
 import { useNativeVoice } from "./voice/useNativeVoice";
 import { LiveSheet } from "./LiveSheet";
 export function HelpScreen({ navigate }: { navigate: Navigate }) {
+  const palette = useTheme();
   const { profile } = useAuth(),
     focused = useIsFocused(),
     insets = useSafeAreaInsets();
@@ -272,7 +274,7 @@ export function HelpScreen({ navigate }: { navigate: Navigate }) {
             disabled={
               !draft.trim() || conversation.busy || voice.mode !== "off"
             }
-            icon={<Send size={19} color="#fff" />}
+            icon={<Send size={19} color={palette.onPrimary} />}
             onPress={submit}
           >
             Send

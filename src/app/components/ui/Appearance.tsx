@@ -7,25 +7,9 @@ import {
 } from "react";
 import { Appearance, StyleSheet, type StyleProp } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { colors } from "./theme";
+import { colors, darkColors } from "./theme";
 export type AppearancePreference = "system" | "light" | "dark";
-const dark: Record<keyof typeof colors, string> = {
-  primary: "#55c9bf",
-  primaryDark: "#095c59",
-  primarySoft: "#153e3b",
-  background: "#101a1d",
-  surface: "#19272b",
-  text: "#edf5f4",
-  muted: "#afc4c3",
-  border: "#3b5053",
-  danger: "#ff8995",
-  dangerSoft: "#48252b",
-  warning: "#f3cc7d",
-  warningSoft: "#3b3422",
-  success: "#78d9ad",
-  successSoft: "#173d31",
-  blue: "#8dc7ff",
-};
+const dark = darkColors;
 const Context = createContext({
   preference: "system" as AppearancePreference,
   isDark: false,
@@ -69,6 +53,8 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   );
 }
 export const useAppearance = () => useContext(Context);
+/** New native controls resolve semantic tokens explicitly; legacy screens retain their adapter. */
+export const useTheme = () => (useAppearance().isDark ? darkColors : colors);
 export function themedStyle<T>(
   style: StyleProp<T>,
   isDark: boolean,

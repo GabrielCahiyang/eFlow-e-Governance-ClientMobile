@@ -1,3 +1,4 @@
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
@@ -39,6 +40,7 @@ export function ProjectOffices({
   project: Project;
   canManage: boolean;
 }) {
+  const palette = useTheme();
   const facts = useFacts("offices:" + project.id, async () => {
     const [participation, identities, orgs] = await Promise.all([
       fetchProjectOffices(project.id),
@@ -87,7 +89,7 @@ export function ProjectOffices({
     <>
       {!!(canManage && !closed) && (
         <Button
-          icon={<Plus color="#fff" size={17} />}
+          icon={<Plus color={palette.onPrimary} size={17} />}
           onPress={() => {
             setInvite(undefined);
             setOpen(true);
@@ -97,7 +99,11 @@ export function ProjectOffices({
         </Button>
       )}
       {facts.loading && !facts.data ? (
-        <Loading />
+        <Loading
+          label="Loading participating Offices"
+          layout="request"
+          rows={2}
+        />
       ) : facts.error ? (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       ) : (
@@ -193,7 +199,7 @@ export function ProjectOffices({
           </>
         )
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       <Sheet
         open={open}
         title={invite ? "Invite project Office contact" : "Add project Office"}
@@ -249,7 +255,7 @@ export function ProjectOffices({
             </Notice>
           </>
         )}
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     </>
   );

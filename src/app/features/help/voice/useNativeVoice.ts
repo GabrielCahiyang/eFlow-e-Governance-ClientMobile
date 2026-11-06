@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../../shared/userMessages";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import {
@@ -85,7 +86,7 @@ export function useNativeVoice(options: Options) {
       latest.current.focused;
     const fail = (message: string) => {
       if (!valid()) return;
-      setError(message);
+      setError(userErrorMessage(new Error(message), "action"));
       s.paused = true;
       setPaused(true);
       s.capture?.pause(true);
@@ -103,7 +104,7 @@ export function useNativeVoice(options: Options) {
         },
         error: (message, final) => {
           if (valid()) {
-            setError(message);
+            setError(userErrorMessage(new Error(message), "action"));
             if (final) {
               s.turnBusy = false;
               fail(message);
@@ -161,7 +162,7 @@ export function useNativeVoice(options: Options) {
         },
         ended: (message) => {
           if (valid()) {
-            setError(message);
+            setError(userErrorMessage(new Error(message), "action"));
             void stop();
           }
         },
@@ -179,7 +180,7 @@ export function useNativeVoice(options: Options) {
             ? cause.message
             : "The microphone could not start.";
         await stop();
-        setError(message);
+        setError(userErrorMessage(new Error(message), "action"));
       }
     } finally {
       if (s.epoch === epoch) {

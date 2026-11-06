@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { PanResponder } from "react-native";
 import { View } from "./Primitives";
 import { Button, Row } from "./index";
+import { colors } from "./theme";
 import { Text } from "./Typography";
 export function OrderList({
   items,
@@ -55,7 +56,7 @@ export function OrderList({
             justifyContent: "center",
             padding: 8,
             borderWidth: 1,
-            borderColor: drag === item.id ? "#0c6f6b" : "#d7dfdf",
+            borderColor: drag === item.id ? colors.primary : colors.border,
             borderRadius: 10,
             transform: [{ translateY: drag === item.id ? offset : 0 }],
             zIndex: drag === item.id ? 2 : 0,

@@ -85,8 +85,8 @@ export function IdentityScreen() {
     <Screen
       title="Identity & Access"
       description="Active people in your Office, account access and protected leadership."
-      onRefresh={() => void refresh()}
-      refreshing={facts.loading}
+      onRefresh={() => refresh()}
+
     >
       <Tabs
         value={tab}
@@ -188,7 +188,7 @@ export function IdentityScreen() {
           </Button>
         </Card>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Screen>
   );
 }

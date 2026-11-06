@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userMessages";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -70,7 +71,7 @@ export function WorkspaceCreateSheet({
         ready.current = true;
       })
       .catch((reason) => {
-        if (revision === generation.current) setError(reason.message);
+        if (revision === generation.current) setError(userErrorMessage(reason, "action"));
       })
       .finally(() => {
         if (revision === generation.current) setLoading(false);
@@ -135,9 +136,7 @@ export function WorkspaceCreateSheet({
     } catch (reason) {
       if (revision === generation.current)
         setError(
-          reason instanceof Error
-            ? reason.message
-            : "Could not create. Retry keeps the original identity.",
+          userErrorMessage(reason, "action"),
         );
     } finally {
       active.current = false;
@@ -165,7 +164,7 @@ export function WorkspaceCreateSheet({
       }
     >
       {loading ? (
-        <Loading />
+        <Loading label="Loading workspace form" layout="form" />
       ) : (
         <>
           <Field

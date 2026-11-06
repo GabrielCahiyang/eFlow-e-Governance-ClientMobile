@@ -1,0 +1,32 @@
+{
+  "apk": "artifacts/M0/eFlow-Mobile-M0-QA-arm64.apk",
+  "versionCode": 5,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6107852,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "99dd47a3f563a3e0fad18332ad169d87d8710820d093c86b327821b65bb6c38b",
+  "bytes": 56167806,
+  "at": "2026-11-04T03:08:52.100026+00:00",
+  "sourceBaseline": "M0-2026-11-04-working-tree",
+  "versionName": "1.0.0",
+  "abis": [
+    "arm64-v8a"
+  ],
+  "buildType": "release",
+  "embeddedBundleSha256": "b04f20d562374404de93e8b1e6e07e7a153857ad64b45ba78d907a1a46360966",
+  "signatureVerified": true,
+  "signingContext": "Local Android debug certificate used by generated release configuration; QA only",
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "environmentOrSigningKeyFilesPackaged": false,
+  "installation": "NOT TESTED",
+  "launch": "NOT TESTED",
+  "authenticatedWorkflows": "NOT TESTED",
+  "personalAcceptance": "PENDING"
+}

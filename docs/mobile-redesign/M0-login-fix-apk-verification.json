@@ -1,0 +1,47 @@
+{
+  "apk": "artifacts/M0/eFlow-Mobile-M0-QA-login-fix-x86_64.apk",
+  "versionCode": 5,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6108584,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "9404e142246f3f2ecad75b98a3ecc13dc50cb58232673823f6be91d85a517150",
+  "bytes": 60857493,
+  "at": "2026-11-04T04:12:09.621050+00:00",
+  "sourceBaseline": "M0-login-fix-2026-11-04-working-tree",
+  "versionName": "1.0.0",
+  "abis": [
+    "x86_64"
+  ],
+  "buildType": "release",
+  "embeddedBundleSha256": "84ba8f3c62769df0100a15f994004a4d6091a52396de0c2c11d33a2e8a867436",
+  "signatureVerified": true,
+  "signingContext": "Local Android debug certificate used by generated release configuration; QA only",
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "environmentOrSigningKeyFilesPackaged": false,
+  "installation": "VERIFIED: adb install -r, same signer, no wipe",
+  "launch": "VERIFIED: native login rendered",
+  "authenticatedWorkflows": "NOT TESTED; user to retry",
+  "personalAcceptance": "PENDING",
+  "currentLoginFixSourcesMatched": [
+    "src/app/features/authentication/useNativeLogin.ts",
+    "src/app/features/authentication/loginError.ts"
+  ],
+  "embeddedGateway": "http://127.0.0.1:8322",
+  "localGatewayQaPolicy": "Verified packaged XML: cleartext denied by default; only exact 127.0.0.1 allowed",
+  "normalAndroidIosExportsEmbedLocalGateway": false,
+  "device": "eFlow_M0_QA Android 16 / API 36, emulator-5556",
+  "processIdAtCheck": "3691",
+  "launchTimeMs": 1945,
+  "testedAt": "2026-11-04T04:13:30.154189+00:00",
+  "screenshot": {
+    "file": "artifacts/M0/login-fix-emulator-login.png",
+    "sha256": "e770c32baf0ce303b8363919e6ff98fccae3bb915e8c38bc34b1eca517507b2f"
+  }
+}

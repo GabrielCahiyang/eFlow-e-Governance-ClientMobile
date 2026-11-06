@@ -1,3 +1,4 @@
+import { brandColors, withOpacity } from "./theme";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,
@@ -25,7 +26,7 @@ import {
 } from "../../shared/motion";
 import { colors } from "./theme";
 import { Text } from "./Typography";
-import { useAppearance, themedStyle } from "./Appearance";
+import { useAppearance, useTheme, themedStyle } from "./Appearance";
 
 export function Sheet({
   title,
@@ -49,6 +50,7 @@ export function Sheet({
   maxWidth?: number;
 }) {
   const { isDark } = useAppearance();
+  const palette = useTheme();
   const inset = useSafeAreaInsets(),
     { width, height } = useWindowDimensions(),
     { reduced } = useMotionPreferences();
@@ -152,7 +154,7 @@ export function Sheet({
               onPress={close}
               style={s.close}
             >
-              <X color={colors.text} size={22} />
+              <X color={palette.text} size={22} />
             </Pressable>
           </View>
           <ScrollView
@@ -169,7 +171,7 @@ export function Sheet({
 }
 const s = StyleSheet.create({
   container: { flex: 1, alignItems: "center", justifyContent: "center" },
-  shade: { backgroundColor: "#0f1e1e73" },
+  shade: { backgroundColor: withOpacity(brandColors.navy, 0.45) },
   panel: {
     flexShrink: 1,
     backgroundColor: colors.surface,

@@ -1,6 +1,9 @@
 import "react-native-url-polyfill/auto";
 import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
+import { configureDevelopmentFeedback } from "./developmentFeedback";
+
+configureDevelopmentFeedback();
 
 // Compatibility is limited to the event/crypto APIs used by headless services;
 // DOM components and browser document APIs are never mounted in the native app.

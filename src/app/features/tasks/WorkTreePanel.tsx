@@ -1,10 +1,6 @@
-import { DeadlineBadge } from "../../components/ui/DeadlineBadge";
-import { Text } from "../../components/ui/Typography";
+import { SelectionSheet } from "../../components/ui/SelectionSheet";
+import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useState } from "react";
-import { Pressable, View } from "../../components/ui/Primitives";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import Plus from "lucide-react-native/icons/plus";
 import {
   Button,
   Card,
@@ -12,13 +8,22 @@ import {
   Notice,
   Row,
   Status,
-  colors,
   dateLabel,
 } from "../../components/ui";
+import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
+import type { Navigate } from "../../shared/routes";
+import { OfficeSubitemActivity } from "./OfficeSubitemActivity";
+import { OfficeSubitemUpdateSheet } from "./OfficeSubitemUpdateSheet";
 import { SubtaskCompletionSheet } from "./SubtaskCompletionSheet";
 import { WorkEditorSheet } from "./WorkEditorSheet";
-import { buildWorkDisplayTree } from "../../../core/web/app/features/nested-work/selectors/displayTree";
+import {
+  branchRows,
+  completionMode,
+  personalReviewAllowed,
+  workNodeRoute,
+  workScope,
+} from "./branchInspector";
 import {
   selectNodeWorkCapability,
   selectRootWorkCapability,
@@ -28,221 +33,243 @@ import type {
   NodeWorkAction,
 } from "../../../core/web/app/features/nested-work/types";
 import type { WorkEdit } from "../../../core/web/app/features/nested-work/types/editor";
+import { nativeWindow } from "../../../platform/webRuntime";
+
 export function WorkTreePanel({
   data,
   onSaved,
   readOnly = false,
+  focusNodeId,
+  navigate,
 }: {
   data: WorkTreeSnapshot;
   onSaved: (data: WorkTreeSnapshot) => Promise<void>;
   readOnly?: boolean;
+  focusNodeId?: string;
+  navigate: Navigate;
 }) {
-  const { profile } = useAuth(),
-    [collapsed, setCollapsed] = useState(new Set<string>()),
-    [edit, setEdit] = useState<WorkEdit>(),
-    [completion, setCompletion] = useState<{ id: string; title: string }>();
-  const context = {
-    actorId: profile?.id || null,
-    rootId: data.root.id,
-    projectId: data.root.project,
-    officeId: data.root.office,
-    kind: data.root.kind,
-    revision: data.revision,
-    readOnly,
+  const actor = useAuth().profile?.id ?? null;
+  const [edit, setEdit] = useState<WorkEdit>();
+  const [completion, setCompletion] = useState<{ id: string; title: string }>();
+  const [menu, setMenu] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const [officeUpdate, setOfficeUpdate] = useState<string>();
+  const { focused, children } = branchRows(data, focusNodeId);
+  const node =
+    focused &&
+    data.nodes.find(
+      (item) => item.id === focused.id && item.task_id === data.root.id,
+    );
+  const context = workScope(data, actor, readOnly);
+  const can = (action: NodeWorkAction) =>
+    !!node && selectNodeWorkCapability(data, node.id, action, context).allowed;
+  const actions: { id: string; title: string; edit: WorkEdit }[] = [];
+  const finish = node && completionMode(data, node.id, actor, readOnly);
+  if (node) {
+    if (can("appoint_lead") || can("manage_contributors"))
+      actions.push({
+        id: "staff",
+        title: "Choose people",
+        edit: { command: "staff", node },
+      });
+    if (can("create_child"))
+      actions.push({
+        id: "create",
+        title: "Add child",
+        edit: { command: "create", parent: node.id },
+      });
+    if (personalReviewAllowed(data, node.id, actor, readOnly)) {
+      actions.push({
+        id: "review",
+        title: "Review subitem",
+        edit: { command: "review", node },
+      });
+    }
+  } else if (!focusNodeId) {
+    if (selectRootWorkCapability(data, "create_child", context).allowed)
+      actions.push({
+        id: "create",
+        title: "Add subitem",
+        edit: { command: "create" },
+      });
+  }
+  const saved = async (receipt: WorkTreeSnapshot) => {
+    nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
+    await onSaved(receipt);
   };
-  const display = buildWorkDisplayTree(data.nodes);
-  const visible = display.filter(
-    (row) => !row.path.slice(0, -1).some((p) => collapsed.has(p.id)),
-  );
-  const rootCan = (action: "create_child" | "order_children") =>
-    selectRootWorkCapability(data, action, context).allowed;
+  if (focusNodeId && (!node || !focused))
+    return (
+      <Notice>This subitem is no longer available in this work tree.</Notice>
+    );
   return (
     <>
-      <Row>
-        {!!rootCan("create_child") && (
-          <Button
-            icon={<Plus color="#fff" size={17} />}
-            onPress={() => setEdit({ command: "create" })}
-          >
-            Add subtask
-          </Button>
-        )}
-        {!!rootCan("order_children") && (
+      {node && focused && (
+        <Card title="Subitem details">
+          <Text>{`Level ${node.depth || focused.depth} · ${focused.pathLabel}`}</Text>
+          <Row>
+            <Status value={node.status} />
+          </Row>
+          <LabelValue label="Progress" value={`${node.percent_complete}%`} />
+          <LabelValue
+            label="Due date"
+            value={dateLabel(node.due_date || undefined)}
+          />
+          <LabelValue
+            label="Subitem Lead"
+            value={
+              data.people.find((p) => p.id === node.lead_id)?.name ||
+              "Needs assignment"
+            }
+          />
+          <LabelValue
+            label="Contributors"
+            value={
+              node.assigned_to_ids
+                .filter((id) => id !== node.lead_id)
+                .map(
+                  (id) =>
+                    data.people.find((p) => p.id === id)?.name ||
+                    "Project person",
+                )
+                .join(", ") || "None"
+            }
+          />
+          {!!node.blocker && <Notice>{node.blocker}</Notice>}
+          {readOnly && (
+            <Notice>
+              Work actions are unavailable while access is being refreshed or
+              this work is closed.
+            </Notice>
+          )}
+          <Row>
+            {can("execute") && (
+              <Button
+                variant="outline"
+                onPress={() => {
+                  if (data.root.kind === "office") setOfficeUpdate(node.id);
+                  else setEdit({ command: "progress", node });
+                }}
+              >
+                Update work
+              </Button>
+            )}
+            {finish === "direct" && (
+              <Button variant="outline" onPress={() => setCompletion(node)}>
+                Mark complete
+              </Button>
+            )}
+            {finish === "review" && (
+              <Button
+                variant="outline"
+                onPress={() => setEdit({ command: "submit", node })}
+              >
+                Submit for review
+              </Button>
+            )}
+          </Row>
+        </Card>
+      )}
+      {node && data.root.kind === "office" && (
+        <>
           <Button
             variant="outline"
-            onPress={() => setEdit({ command: "order" })}
+            onPress={() =>
+              navigate({
+                ...workNodeRoute(data, node.id, node.title),
+                view: "budget",
+              })
+            }
           >
-            Reorder subtasks
+            Open subitem funding
+          </Button>
+          <Button
+            variant="outline"
+            onPress={() => setShowActivity(!showActivity)}
+          >
+            {showActivity ? "Hide subitem activity" : "Show subitem activity"}
+          </Button>
+          {showActivity && (
+            <OfficeSubitemActivity
+              tree={data}
+              nodeId={node.id}
+              actorId={actor}
+            />
+          )}
+        </>
+      )}
+      <Card title={node ? "Child subitems" : "Subitems"}>
+        {!!actions.length && (
+          <Button variant="outline" onPress={() => setMenu(true)}>
+            {node ? "Branch actions" : "Subitem actions"}
           </Button>
         )}
-      </Row>
-      {!data.nodes.length && <Notice>No subtasks in this task.</Notice>}
-      {visible.map((row) => {
-        const node = data.nodes.find((n) => n.id === row.id)!;
-        const can = (action: NodeWorkAction) =>
-          selectNodeWorkCapability(data, node.id, action, context).allowed;
-        return (
-          <View
-            key={node.id}
-            style={{
-              marginLeft: Math.min(row.indentLevel, 4) * 10,
-              borderLeftWidth: 3,
-              borderLeftColor:
-                node.status === "completed" ? colors.success : colors.primary,
-              paddingLeft: 8,
-            }}
-          >
-            <Card>
-              <Row>
-                {!!row.hasChildren && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      (collapsed.has(row.id) ? "Expand " : "Collapse ") +
-                      node.title
-                    }
-                    onPress={() =>
-                      setCollapsed((old) => {
-                        const next = new Set(old);
-                        next.has(row.id)
-                          ? next.delete(row.id)
-                          : next.add(row.id);
-                        return next;
-                      })
-                    }
-                  >
-                    {collapsed.has(row.id) ? (
-                      <ChevronRight color={colors.primary} />
-                    ) : (
-                      <ChevronDown color={colors.primary} />
-                    )}
-                  </Pressable>
-                )}
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: "600",
-                    flex: 1,
-                    color: colors.text,
-                  }}
-                >
-                  {node.title}
-                </Text>
-              </Row>
-              <Status value={node.status} />
-              <LabelValue
-                label="Lead"
-                value={
-                  data.people.find((p) => p.id === node.lead_id)?.name ||
-                  "Needs assignment"
+        {children.length ? (
+          children.map((child) => {
+            const record = data.nodes.find((item) => item.id === child.id)!;
+            return (
+              <NavigationRow
+                key={child.id}
+                title={child.title}
+                description={`Level ${record.depth || child.depth} · ${record.status.replaceAll("_", " ")} · ${record.percent_complete}%`}
+                onPress={() =>
+                  navigate(workNodeRoute(data, child.id, child.title))
                 }
               />
-              <LabelValue
-                label="Contributors"
-                value={
-                  node.assigned_to_ids
-                    .filter((id) => id !== node.lead_id)
-                    .map(
-                      (id) =>
-                        data.people.find((p) => p.id === id)?.name ||
-                        "Project person",
-                    )
-                    .join(", ") || "None"
-                }
-              />
-              <DeadlineBadge value={node.due_date} status={node.status} />
-              {!!node.blocker && <Notice>{node.blocker}</Notice>}
-              {!!row.context && (
-                <Notice>
-                  Some parent context is unavailable. Canonical work links
-                  remain unchanged.
-                </Notice>
-              )}
-              <Row>
-                {!!can("execute") && (
-                  <Button
-                    variant="outline"
-                    onPress={() => setEdit({ command: "progress", node })}
-                  >
-                    Update work
-                  </Button>
-                )}
-                {!!(
-                  can("execute") &&
-                  profile?.id &&
-                  (node.lead_id === profile.id ||
-                    data.root.lead === profile.id) &&
-                  node.status !== "completed"
-                ) && (
-                  <Button variant="outline" onPress={() => setCompletion(node)}>
-                    Mark complete
-                  </Button>
-                )}
-                {!!(can("appoint_lead") || can("manage_contributors")) && (
-                  <Button
-                    variant="outline"
-                    onPress={() => setEdit({ command: "staff", node })}
-                  >
-                    Choose people
-                  </Button>
-                )}
-                {!!can("create_child") && (
-                  <Button
-                    variant="outline"
-                    onPress={() =>
-                      setEdit({ command: "create", parent: node.id })
-                    }
-                  >
-                    Add child
-                  </Button>
-                )}
-                {!!can("edit_details") && (
-                  <Button
-                    variant="ghost"
-                    onPress={() => setEdit({ command: "edit", node })}
-                  >
-                    Edit details
-                  </Button>
-                )}
-                {!!can("move") && (
-                  <Button
-                    variant="ghost"
-                    onPress={() => setEdit({ command: "move", node })}
-                  >
-                    Move
-                  </Button>
-                )}
-                {!!can("order_children") && (
-                  <Button
-                    variant="ghost"
-                    onPress={() =>
-                      setEdit({ command: "order", parent: node.id })
-                    }
-                  >
-                    Reorder children
-                  </Button>
-                )}
-                {!!can("delete") && (
-                  <Button
-                    variant="ghost"
-                    onPress={() => setEdit({ command: "delete", node })}
-                  >
-                    Delete
-                  </Button>
-                )}
-              </Row>
-            </Card>
-          </View>
-        );
-      })}
-      {!!completion && !!profile?.id && (
+            );
+          })
+        ) : (
+          <Text>No child subitems.</Text>
+        )}
+      </Card>
+      {(can("edit_details") ||
+        can("move") ||
+        can("order_children") ||
+        can("delete") ||
+        (!node &&
+          selectRootWorkCapability(data, "order_children", context)
+            .allowed)) && (
+        <NavigationRow
+          title="Planning on eFlow Web"
+          onPress={() =>
+            navigate({
+              ...workNodeRoute(data, node?.id || "", "Work planning"),
+              nodeId: node?.id,
+              view: "planning",
+            })
+          }
+        />
+      )}
+      <SelectionSheet
+        open={menu && !!actions.length}
+        title={node ? "Branch actions" : "Subitem actions"}
+        options={actions}
+        onClose={() => setMenu(false)}
+        onSelect={(id) => {
+          setMenu(false);
+          setEdit(actions.find((action) => action.id === id)?.edit);
+        }}
+      />
+      {!!officeUpdate && !!actor && (
+        <OfficeSubitemUpdateSheet
+          key={officeUpdate + actor}
+          tree={data}
+          readOnly={readOnly}
+          actorId={actor}
+          nodeId={officeUpdate}
+          onClose={() => setOfficeUpdate(undefined)}
+          onSaved={saved}
+        />
+      )}
+      {!!completion && !!actor && (
         <SubtaskCompletionSheet
-          key={completion.id + profile.id}
+          key={completion.id + actor}
           node={completion}
-          actorId={profile.id}
+          actorId={actor}
           rootId={data.root.id}
+          projectId={data.root.project}
+          officeId={data.root.office}
           onClose={() => setCompletion(undefined)}
-          onSaved={onSaved}
+          onSaved={saved}
         />
       )}
       {!!edit && (
@@ -252,7 +279,7 @@ export function WorkTreePanel({
           edit={edit}
           readOnly={readOnly}
           onClose={() => setEdit(undefined)}
-          onSaved={onSaved}
+          onSaved={saved}
         />
       )}
     </>

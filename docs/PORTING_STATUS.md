@@ -1,5 +1,7 @@
 # eFlow native conversion status — 28 October 2026
 
+> Historical full-port status. The [v1 mobile scope](mobile-redesign/mobile-feature-scope.md) supersedes desktop-feature parity requirements. Use the [M0 package](mobile-redesign/M0-personal-qa.md) for this checkout's actual build/evidence status; old download links are not current artifacts.
+
 **Current Android download:** [standalone build 3](../artifacts/eFlow-android-standalone-v3.apk). The native `document` lifecycle crash is fixed and the Expo development launcher remains removed. Native assembly, signature, manifest/DEX and embedded-startup checks passed; physical-phone startup remains user-owned verification. See [build-3 report](NATIVE_DOCUMENT_CRASH_2026-10-28.md).
 
 Android and iOS are both targets. Native React Native screens use the existing hosted backend `ixnfphgjyelhckjwjkdv`; this is not a WebView. Mobile supports Head, Member and Accounting Staff. Admin is web-only.

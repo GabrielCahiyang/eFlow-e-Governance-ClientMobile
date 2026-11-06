@@ -1,0 +1,73 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M4\\eFlow-Mobile-M4-QA-arm64-x86_64.apk",
+  "versionCode": 9,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5232928,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "b5478b6c73a489c21bcb77e14b574d31bf569f1f7bd828a7079ee01f0766b823",
+  "bytes": 98811225,
+  "versionName": "1.0.0",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "buildType": "release",
+  "signatureVerified": true,
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "signingContext": "Local Android debug certificate used by Expo generated release configuration, for QA",
+  "embeddedBundleSha256": "653b6f91a0c61ba17e5d8b1751a475b9620c517b09f23ae419d2b8f299138375",
+  "m4SourcesMatched": [
+    "src/platform/evidenceFiles.ts",
+    "src/app/features/tasks/EvidencePicker.tsx",
+    "src/app/features/tasks/EvidenceAttachment.tsx",
+    "src/app/features/tasks/taskEvidence.ts",
+    "src/app/features/tasks/TaskEvidenceSheet.tsx",
+    "src/app/features/tasks/TaskReviewPanel.tsx",
+    "src/app/features/tasks/reviewAccess.ts",
+    "src/app/features/tasks/TaskActivity.tsx",
+    "src/app/features/tasks/SubtaskCompletionSheet.tsx",
+    "src/app/features/tasks/OfficeSubitemActivity.tsx",
+    "src/app/features/notifications/ActionInbox.tsx",
+    "src/app/features/communication/ChatScreen.tsx",
+    "src/app/features/communication/AnnouncementsScreen.tsx",
+    "src/app/features/office-team/OfficeAttention.tsx",
+    "src/app/features/office-team/OfficeTeamScreen.tsx",
+    "src/app/features/dashboard/OverviewScreen.tsx"
+  ],
+  "localGatewayQa": true,
+  "normalExportsEmbedLocalGateway": false,
+  "credentialFilesPackaged": false,
+  "authenticatedWorkflow": "VERIFIED_READ_ONLY_RESTORED_HEAD",
+  "personalAcceptance": "PENDING",
+  "cameraPermissionPackaged": true,
+  "freshSignIn": "BLOCKED",
+  "emulator": {
+    "serial": "emulator-5556",
+    "api": 36,
+    "abi": "x86_64",
+    "actor": "bplo.head@gmail.com",
+    "serverRole": "head",
+    "office": "LEDIPO",
+    "installedVersionCode": 9,
+    "coldLaunch": true,
+    "verified": [
+      "Office attention",
+      "Task Activity and existing Office subitem completion history",
+      "Evidence and review empty state",
+      "Messages, task and project conversation availability and Back",
+      "Announcement and Office membership unavailable states"
+    ],
+    "blocked": [
+      "Announcements RLS recursion",
+      "Office membership protected gateway",
+      "Live fixture workflows"
+    ]
+  }
+}

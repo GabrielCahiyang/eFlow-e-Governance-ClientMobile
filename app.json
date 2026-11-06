@@ -7,10 +7,11 @@
     "orientation": "default",
     "icon": "./assets/eflow-icon.png",
     "userInterfaceStyle": "automatic",
+    "primaryColor": "#00006b",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.eflow.mobile",
-      "buildNumber": "3"
+      "buildNumber": "8"
     },
     "android": {
       "package": "com.eflow.mobile",
@@ -19,7 +20,7 @@
         "foregroundImage": "./assets/eflow-icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 5
+      "versionCode": 26
     },
     "web": {
       "favicon": "./assets/eflow-icon.png"
@@ -28,6 +29,14 @@
       "expo-secure-store",
       "expo-audio",
       "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow eFlow to take photos for work evidence.",
+          "microphonePermission": false,
+          "photosPermission": false
+        }
+      ],
       "expo-font",
       "@react-native-community/datetimepicker",
       [
@@ -42,7 +51,8 @@
       "./plugins/withWindowsCmake",
       "@config-plugins/react-native-webrtc",
       "expo-notifications",
-      "./plugins/withNativeReleaseRules"
+      "./plugins/withNativeReleaseRules",
+      "./plugins/withLocalGatewayQa"
     ]
   }
 }

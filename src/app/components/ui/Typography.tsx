@@ -1,5 +1,5 @@
 import { forwardRef, type ComponentRef } from "react";
-import { useAppearance, themeText } from "./Appearance";
+import { useAppearance, useTheme, themeText } from "./Appearance";
 import {
   StyleSheet,
   Text as NativeText,
@@ -34,7 +34,11 @@ export const Text = forwardRef<ComponentRef<typeof NativeText>, TextProps>(
       <NativeText
         {...props}
         ref={ref}
-        style={[themeText(style, isDark), font(StyleSheet.flatten(style))]}
+        style={[
+          { fontSize: 15, lineHeight: 22 },
+          themeText(style, isDark),
+          font(StyleSheet.flatten(style)),
+        ]}
       />
     );
   },
@@ -44,13 +48,12 @@ export const TextInput = forwardRef<
   TextInputProps
 >(function TextInput({ style, ...props }, ref) {
   const { isDark } = useAppearance();
+  const palette = useTheme();
   return (
     <NativeInput
       {...props}
       ref={ref}
-      placeholderTextColor={
-        props.placeholderTextColor || (isDark ? "#afc4c3" : "#526161")
-      }
+      placeholderTextColor={props.placeholderTextColor || palette.mutedLabel}
       keyboardAppearance={isDark ? "dark" : "light"}
       style={[themeText(style, isDark), font(StyleSheet.flatten(style))]}
     />

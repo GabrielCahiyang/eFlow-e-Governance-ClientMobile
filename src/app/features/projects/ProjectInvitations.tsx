@@ -385,9 +385,9 @@ export function ProjectInvitations({ project }: { project: string }) {
               ? "Send invitation"
               : "Submit for Head approval"}
         </Button>
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
-      {!!action.error && !open && <ErrorState error={action.error} />}
+      {!!action.error && !open && <ErrorState context="action" error={action.error} />}
     </Card>
   );
 }

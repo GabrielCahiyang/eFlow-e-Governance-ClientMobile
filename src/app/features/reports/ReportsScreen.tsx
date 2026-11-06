@@ -76,8 +76,8 @@ function OfficeReports({ navigate }: { navigate: Navigate }) {
     <Screen
       title="Reports"
       description="Operational, contribution, review, evidence and risk lenses in your authorized Office scope."
-      onRefresh={() => void analytics.refresh()}
-      refreshing={analytics.loading}
+      onRefresh={() => analytics.refresh()}
+
       actions={
         <ExportActions
           disabled={!rows.length || !!analytics.error || action.busy}
@@ -199,7 +199,7 @@ function OfficeReports({ navigate }: { navigate: Navigate }) {
           <ReportRows rows={rows} navigate={navigate} />
         </>
       )}
-      {!!(!!action.error && !briefOpen) && <ErrorState error={action.error} />}
+      {!!(!!action.error && !briefOpen) && <ErrorState context="action" error={action.error} />}
       <Sheet
         open={briefOpen}
         title="Management brief"
@@ -213,7 +213,7 @@ function OfficeReports({ navigate }: { navigate: Navigate }) {
         {action.busy ? (
           <Loading />
         ) : action.error ? (
-          <ErrorState error={action.error} />
+          <ErrorState context="action" error={action.error} />
         ) : (
           <Text selectable style={{ lineHeight: 24 }}>
             {brief}
@@ -263,8 +263,8 @@ function PersonalReports({ navigate }: { navigate: Navigate }) {
     <Screen
       title="My Work Report"
       description="A personal summary of authorized tasks and progress."
-      onRefresh={() => void facts.refresh()}
-      refreshing={facts.loading}
+      onRefresh={() => facts.refresh()}
+
       actions={
         <ExportActions
           disabled={!rows.length || !!facts.error || action.busy}
@@ -310,7 +310,7 @@ function PersonalReports({ navigate }: { navigate: Navigate }) {
           <ReportRows rows={rows} navigate={navigate} />
         </>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Screen>
   );
 }

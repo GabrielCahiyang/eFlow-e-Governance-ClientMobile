@@ -81,7 +81,7 @@ export function AccountMappings({
           </Card>
         ))
       )}
-      {!!command.error && <ErrorState error={command.error} />}
+      {!!command.error && <ErrorState context="action" error={command.error} />}
     </Card>
   );
 }

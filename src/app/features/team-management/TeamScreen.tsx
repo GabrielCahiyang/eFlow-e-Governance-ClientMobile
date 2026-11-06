@@ -91,8 +91,8 @@ export function TeamScreen({
     <Screen
       title={kind === "performance" ? "Performance" : "Analytics"}
       description="Live work, submission and review facts from your authorized Office scope."
-      onRefresh={() => void analytics.refresh()}
-      refreshing={analytics.loading}
+      onRefresh={() => analytics.refresh()}
+
       actions={
         kind === "supervision" ? (
           <Button

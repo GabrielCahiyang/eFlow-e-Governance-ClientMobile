@@ -1,9 +1,9 @@
-import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
-import { Linking } from "react-native";
+import { EvidenceAttachment } from "./EvidenceAttachment";
 import {
   Button,
   Card,
+  Empty,
   ErrorState,
   Field,
   LabelValue,
@@ -11,10 +11,9 @@ import {
   Notice,
   Row,
   Status,
-  colors,
   dateLabel,
-  peso,
 } from "../../components/ui";
+import { Text } from "../../components/ui/Typography";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
@@ -23,153 +22,230 @@ import {
   fetchTaskSubmissions,
   fetchSubmissionAttachments,
 } from "../../../core/web/app/features/reviews/services/reviewService";
-import { canUserReviewTask } from "../../../core/web/app/features/reviews/selectors";
 import { fetchTaskCashBlockers } from "../../../core/web/app/features/budget/services/taskCashClearanceService";
 import { verifyTask } from "../../../core/web/app/features/tasks/services/taskService";
+import { rowToTask } from "../../../core/web/app/features/tasks/services/taskMapper";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 import { supabase } from "../../../platform/supabase";
+import { nativeWindow } from "../../../platform/webRuntime";
+import { independentReviewAllowed } from "./reviewAccess";
+import { assertEvidenceActor } from "./taskEvidence";
+
 export function TaskReviewPanel({
   task,
+  initialSubmissionId,
   onSaved,
   readOnly,
 }: {
   task: Task;
+  initialSubmissionId?: string;
   onSaved: () => Promise<void>;
   readOnly: boolean;
 }) {
   const { profile } = useAuth();
+  const [selectedId, setSelectedId] = useState(initialSubmissionId);
   const [feedback, setFeedback] = useState("");
+  const [attempted, setAttempted] = useState<string>();
   const action = useAction();
-  const submissions = useFacts(
-    "submissions:" + task.id + ":" + task.updatedAt,
-    async () => {
-      const rows = await fetchTaskSubmissions(task.id);
-      return Promise.all(
-        rows.map(async (s) => ({
-          ...s,
-          attachments: await fetchSubmissionAttachments(task.id, s.id),
-        })),
-      );
-    },
+  const scope = [profile?.id, task.id, task.updatedAt].join(":");
+  const submissions = useFacts("submissions:" + scope, () =>
+    fetchTaskSubmissions(task.id),
   );
-  const clearance = useFacts(
-    "cash-clearance:" + task.id + ":" + task.updatedAt,
-    () => fetchTaskCashBlockers(task.id),
+  const latest = submissions.data?.[0];
+  const selected = selectedId
+    ? submissions.data?.find((item) => item.id === selectedId)
+    : latest;
+  const attachments = useFacts(
+    "review-files:" + scope + ":" + selected?.id,
+    () => fetchSubmissionAttachments(task.id, selected!.id),
+    !!selected,
   );
   const mayReview =
     !readOnly &&
-    task.status === "for_review" &&
-    canUserReviewTask(task, profile?.id, profile?.role);
+    !submissions.loading &&
+    !submissions.error &&
+    !!selected &&
+    selected.id === latest?.id &&
+    independentReviewAllowed(task, selected, profile?.id, profile?.role);
+  const clearance = useFacts(
+    "cash-clearance:" + scope,
+    () => fetchTaskCashBlockers(task.id),
+    mayReview,
+  );
+
   const decide = (approve: boolean) =>
     action.run(async () => {
-      if (!profile || !mayReview)
+      if (!profile || !mayReview || !selected || attempted === selected.id)
         throw new Error("Current independent review access is required.");
-      if (!approve && !feedback.trim())
-        throw new Error("Explain what needs to change.");
-      if (approve) {
-        const current = await fetchTaskCashBlockers(task.id);
-        if (current.length)
-          throw new Error(
-            "Settle all outstanding cash before approving this work.",
-          );
-      }
+      const reason = feedback.trim();
+      if (!approve && !reason) throw new Error("Explain what needs to change.");
       if (
         !(await confirmAction(
-          approve ? "Approve completed work?" : "Request changes?",
+          approve ? "Approve this submission?" : "Return this submission?",
           approve
-            ? "The server rechecks evidence, dependencies and cash clearance before approval."
-            : feedback,
-          approve ? "Approve work" : "Send back for changes",
+            ? `Submission ${selected.version} will be approved if all server checks pass.`
+            : reason,
+          approve ? "Approve work" : "Request changes",
         ))
       )
         return;
-      await verifyTask(task.id, approve, feedback, {
-        id: profile.id,
-        name: profile.full_name,
-      });
+      await assertEvidenceActor(profile.id);
+      if (approve && (await fetchTaskCashBlockers(task.id)).length)
+        throw new Error("Settle all outstanding task cash before approval.");
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("id", task.id)
+        .is("deleted_at", null)
+        .single();
+      if (error) throw new Error(error.message);
+      const currentTask = rowToTask(data);
+      const [current] = await fetchTaskSubmissions(task.id);
+      if (
+        current?.id !== selected.id ||
+        currentTask.orgId !== task.orgId ||
+        currentTask.linkedProjectId !== task.linkedProjectId ||
+        !independentReviewAllowed(
+          currentTask,
+          current,
+          profile.id,
+          profile.role,
+        )
+      )
+        throw new Error(
+          "This submission or your access changed. Refresh before deciding.",
+        );
+      await assertEvidenceActor(profile.id);
+      setAttempted(selected.id);
+      let failure: unknown;
+      try {
+        await verifyTask(task.id, approve, reason);
+      } catch (error) {
+        failure = error;
+      }
+      const result = (await fetchTaskSubmissions(task.id)).find(
+        (item) => item.id === selected.id,
+      );
+      if (
+        result?.status !== (approve ? "approved" : "changes_requested") ||
+        result.decidedBy !== profile.id
+      )
+        throw new Error(
+          failure instanceof Error
+            ? failure.message
+            : "The selected decision could not be confirmed. Refresh before trying again.",
+        );
+      setFeedback("");
+      nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       await onSaved();
       await submissions.refresh();
-      await clearance.refresh();
-    }, "Review decision saved.");
+    }, "Review decision confirmed.");
+
   return (
     <>
-      <Card title="Cash clearance">
-        {clearance.error ? (
+      <Card title="Evidence and review">
+        <Status value={task.status} />
+        {submissions.loading && !submissions.data ? (
+          <Loading label="Loading evidence" layout="summary" rows={3} />
+        ) : submissions.error ? (
           <ErrorState
-            error={clearance.error}
-            retry={() => void clearance.refresh()}
+            error={submissions.error}
+            retry={() => void submissions.refresh()}
           />
-        ) : clearance.loading && !clearance.data ? (
-          <Loading />
-        ) : clearance.data?.length ? (
-          clearance.data.map((b) => (
-            <Notice key={b.request.id}>
-              {b.stage} · {b.owner}. {b.nextStep}
-            </Notice>
-          ))
+        ) : !selected ? (
+          <Empty
+            kind="files"
+            title={
+              selectedId
+                ? "This submission is unavailable"
+                : "No evidence submitted yet"
+            }
+          />
         ) : (
-          <Text style={{ color: colors.success }}>
-            No outstanding task cash blocks approval.
-          </Text>
+          <>
+            <LabelValue label="Evidence version" value={selected.version} />
+            <LabelValue label="Submitted by" value={selected.submitterName} />
+            <LabelValue
+              label="Submitted"
+              value={dateLabel(selected.submittedAt)}
+            />
+            <Status
+              value={
+                selected.status === "pending" ? "for_review" : selected.status
+              }
+            />
+            <Text selectable>{selected.note}</Text>
+            {!!selected.decidedByName && (
+              <LabelValue label="Decided by" value={selected.decidedByName} />
+            )}
+            {!!selected.decidedAt && (
+              <LabelValue
+                label="Decision date"
+                value={dateLabel(selected.decidedAt)}
+              />
+            )}
+            {!!selected.decisionFeedback && (
+              <Notice>{selected.decisionFeedback}</Notice>
+            )}
+            {!!profile &&
+              selected.submitterId === profile.id &&
+              selected.status === "pending" && (
+                <Notice>
+                  An independent reviewer must decide your submission.
+                </Notice>
+              )}
+            {attachments.error ? (
+              <ErrorState
+                error={attachments.error}
+                retry={() => void attachments.refresh()}
+              />
+            ) : attachments.loading ? (
+              <Loading label="Loading evidence files" layout="files" />
+            ) : attachments.data?.length ? (
+              attachments.data.map((file) => (
+                <EvidenceAttachment
+                  key={file.id}
+                  path={file.filePath}
+                  name={file.fileName}
+                />
+              ))
+            ) : (
+              <Text>No files attached.</Text>
+            )}
+          </>
         )}
-        <Button variant="ghost" onPress={() => void clearance.refresh()}>
-          Refresh cash clearance
-        </Button>
       </Card>
-      {submissions.loading && !submissions.data ? (
-        <Loading />
-      ) : submissions.error ? (
-        <ErrorState
-          error={submissions.error}
-          retry={() => void submissions.refresh()}
-        />
-      ) : (
-        submissions.data?.map((s) => (
-          <Card key={s.id} title={`Submission ${s.version}`}>
-            <Status value={s.status} />
-            <LabelValue label="Submitted by" value={s.submitterName} />
-            <LabelValue label="Submitted" value={dateLabel(s.submittedAt)} />
-            <Text style={{ color: colors.text, lineHeight: 22 }}>{s.note}</Text>
-            {!!s.decisionFeedback && <Notice>{s.decisionFeedback}</Notice>}
-            {s.attachments.map((file) => (
-              <Button
-                key={file.id}
-                variant="outline"
-                onPress={() =>
-                  void action.run(async () => {
-                    const { data, error } = await supabase.storage
-                      .from("task-attachments")
-                      .createSignedUrl(file.filePath, 60);
-                    if (error || !data)
-                      throw new Error(
-                        error?.message || "Could not open this evidence.",
-                      );
-                    await Linking.openURL(data.signedUrl);
-                  })
-                }
-              >
-                {file.fileName}
-              </Button>
-            ))}
-          </Card>
-        ))
-      )}
-      {!!mayReview && (
-        <Card title="Review decision">
+      {mayReview && (
+        <Card title="Independent decision">
+          {clearance.error ? (
+            <ErrorState
+              error={clearance.error}
+              retry={() => void clearance.refresh()}
+            />
+          ) : clearance.loading ? (
+            <Loading label="Checking cash clearance" layout="verification" />
+          ) : clearance.data?.length ? (
+            <Notice>Outstanding task cash blocks approval.</Notice>
+          ) : null}
           <Field
-            label="Review note / required change feedback"
+            label="Feedback (required when requesting changes)"
             value={feedback}
             onChangeText={setFeedback}
+            editable={!action.busy}
+            maxLength={5000}
             multiline
           />
           <Row>
             <Button
               busy={action.busy}
               disabled={
+                attempted === selected?.id ||
                 clearance.loading ||
                 !!clearance.error ||
                 !clearance.data ||
-                clearance.data.length > 0
+                clearance.data.length > 0 ||
+                attachments.loading ||
+                !!attachments.error
               }
               onPress={() => void decide(true)}
             >
@@ -177,17 +253,54 @@ export function TaskReviewPanel({
             </Button>
             <Button
               variant="outline"
-              disabled={action.busy || !feedback.trim()}
+              disabled={
+                action.busy || attempted === selected?.id || !feedback.trim()
+              }
               onPress={() => void decide(false)}
             >
               Request changes
             </Button>
           </Row>
-          {!!action.error && <ErrorState error={action.error} />}
         </Card>
       )}
-      {!!action.notice && (
-        <Text style={{ color: colors.success }}>{action.notice}</Text>
+      {!!action.error && <ErrorState context="action" error={action.error} />}
+      {!!action.notice && <Notice>{action.notice}</Notice>}
+      {!!attempted && !!action.error && (
+        <Button
+          variant="outline"
+          onPress={() =>
+            void action.run(async () => {
+              const fresh = await fetchTaskSubmissions(task.id);
+              await Promise.all([
+                onSaved(),
+                submissions.refresh(),
+                clearance.refresh(),
+              ]);
+              if (fresh[0]?.id === attempted && fresh[0]?.status === "pending")
+                setAttempted(undefined);
+            })
+          }
+        >
+          Check current decision
+        </Button>
+      )}
+      {!!submissions.data && submissions.data.length > 1 && (
+        <Card title="Submission history">
+          {submissions.data.map((item) => (
+            <Button
+              variant="ghost"
+              key={item.id}
+              disabled={action.busy || item.id === selected?.id}
+              onPress={() => {
+                setSelectedId(item.id);
+                setFeedback("");
+                action.clear();
+              }}
+            >
+              {`Submission ${item.version} · ${item.status.replaceAll("_", " ")}`}
+            </Button>
+          ))}
+        </Card>
       )}
     </>
   );

@@ -1,0 +1,37 @@
+{
+  "platform": "Android emulator-5554 existing versionCode 19 DEBUGGABLE; Metro source preview",
+  "actor": "none - isolated offline component rendering; no authenticated role or backend calls",
+  "normalMotionArtChangedPixels": 37420,
+  "reducedMotionArtChangedPixels": 0,
+  "fontScalesCaptured": [
+    1.0,
+    1.5,
+    2.0
+  ],
+  "restoredFontScale": 1.0,
+  "restoredAppearance": "dark",
+  "skeletonVariantsCaptured": 20,
+  "limitations": [
+    "No approved session in current emulator",
+    "Authenticated screen transitions and loading recovery not executed",
+    "No new APK build",
+    "iOS native QA unavailable",
+    "TalkBack and form keyboard not tested"
+  ],
+  "sourceSha256": {
+    "src/app/features/dashboard/RecentProjectsCard.tsx": "af5f6bb95c42f005da6b92c691b082d898ad3eede7fc45dcb5c1043983ef7f3c",
+    "src/app/components/ui/GlassCard.tsx": "4a210907882589310d517506de93e27492353128133775cabecc897e060144de",
+    "src/app/components/ui/EmptyIllustration.tsx": "6676cf22352c1b423ea05c22d54dc4d8521a8bff6744ba48e960cacef55f7513",
+    "src/app/components/ui/loading/ViewLoadingState.tsx": "3dd4bba04ebb60ed090849907d8074606ba2dcacc6ba90de0e1ae5b00bf89b92"
+  },
+  "entryRestored": true,
+  "temporaryPreviewEntryRemoved": true,
+  "productionPreviewMarkersFound": [],
+  "automatedChecks": {
+    "typeScriptAndMetro": "PASSED - 9 Metro checks",
+    "jest": "PASSED - 199 tests / 65 suites",
+    "androidJSExport": "PASSED",
+    "iosJSExport": "PASSED",
+    "credentialAudit": "PASSED - 2 production exports; development account literals absent"
+  }
+}

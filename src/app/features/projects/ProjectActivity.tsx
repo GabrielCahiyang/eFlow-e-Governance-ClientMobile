@@ -15,7 +15,7 @@ export function ProjectActivity({ ids }: { ids: string[] }) {
   return (
     <>
       {facts.loading && !facts.data ? (
-        <Loading />
+        <Loading label="Loading project activity" layout="activity" />
       ) : facts.error ? (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       ) : facts.data?.length ? (
@@ -28,7 +28,7 @@ export function ProjectActivity({ ids }: { ids: string[] }) {
           </Card>
         ))
       ) : (
-        <Empty title="No recorded activity" />
+        <Empty kind="activity" title="No recorded activity" />
       )}
     </>
   );

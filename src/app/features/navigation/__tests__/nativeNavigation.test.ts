@@ -60,9 +60,9 @@ test("temporary task leadership grants the paired review queue without promoting
     canOpenNativeSection("member", "accounting_journal", permissions, true),
   ).toBe(false);
 });
-test("Head and member defaults follow the source navigation", () => {
+test("M1 defaults follow the approved mobile scope", () => {
   expect(nativeDefaultSection("admin")).toBe("profile");
   expect(nativeDefaultSection("head")).toBe("overview");
-  expect(nativeDefaultSection("member")).toBe("personal_work");
-  expect(nativeDefaultSection("accounting_staff")).toBe("accounting_overview");
+  expect(nativeDefaultSection("member")).toBe("overview");
+  expect(nativeDefaultSection("accounting_staff")).toBe("personal_work");
 });

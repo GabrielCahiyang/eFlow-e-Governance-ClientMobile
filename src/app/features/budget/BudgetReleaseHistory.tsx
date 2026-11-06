@@ -265,7 +265,7 @@ export function BudgetReleaseHistory({
             value={reference}
             onChangeText={setReference}
           />
-          {!!action.error && <ErrorState error={action.error} />}
+          {!!action.error && <ErrorState context="action" error={action.error} />}
           <Button
             busy={action.busy}
             disabled={!reference.trim()}

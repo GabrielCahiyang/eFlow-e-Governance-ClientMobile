@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet } from "react-native";
-import { View } from "../../components/ui/Primitives";
+import { View, SafeAreaView } from "../../components/ui/Primitives";
 import { useFonts } from "expo-font";
 import { Figtree_400Regular } from "@expo-google-fonts/figtree/400Regular";
 import { Figtree_500Medium } from "@expo-google-fonts/figtree/500Medium";
@@ -21,6 +20,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { NativeWorkspace } from "./NativeWorkspace";
 import { ShareLanding } from "../projects";
 import type { AppRoute } from "../../shared/routes";
+import { BackgroundAccessStatus } from "./BackgroundAccessStatus";
 export function AppRoot() {
   const [attempt, setAttempt] = useState(0);
   return (
@@ -49,9 +49,11 @@ function ReadyAppRoot({ onRetry }: { onRetry: () => void }) {
   useEffect(hydrate, []);
   if (fontError || error)
     return (
-      <Screen title="eFlow could not start">
-        <ErrorState error={fontError || error} retry={onRetry} />
-      </Screen>
+      <SafeAreaView style={{ flex: 1 }}>
+        <Screen title="eFlow could not start">
+          <ErrorState error={fontError || error} retry={onRetry} />
+        </Screen>
+      </SafeAreaView>
     );
   if (!fonts || !ready) return <LoadingScreen />;
   return (
@@ -61,7 +63,8 @@ function ReadyAppRoot({ onRetry }: { onRetry: () => void }) {
   );
 }
 function SessionContent() {
-  const { loading, user, profile, error, refresh, signOut } = useAuth();
+  const { loading, accessError, user, profile, error, refresh, signOut } =
+    useAuth();
   const { entry, close } = useNativeEntryLink();
   const [sharedRoute, setSharedRoute] = useState<AppRoute>();
   useEffect(() => setSharedRoute(undefined), [profile?.id]);
@@ -90,21 +93,18 @@ function SessionContent() {
   if (loading && !profile) return <LoadingScreen />;
   if (error)
     return (
-      <Screen title="Check your account access">
-        <ErrorState error={error} retry={() => void refresh()} />
-        <Button variant="outline" onPress={() => void signOut()}>
-          Back to sign in
-        </Button>
-      </Screen>
+      <SafeAreaView style={{ flex: 1 }}>
+        <Screen title="Check your account access">
+          <ErrorState error={error} retry={() => void refresh()} />
+          <Button variant="outline" onPress={() => void signOut()}>
+            Back to sign in
+          </Button>
+        </Screen>
+      </SafeAreaView>
     );
   return (
     <View style={{ flex: 1 }}>
-      <View
-        style={{ flex: 1 }}
-        pointerEvents={loading ? "none" : "auto"}
-        accessibilityElementsHidden={loading}
-        importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
-      >
+      <View style={{ flex: 1 }}>
         {user && profile ? (
           <NativeWorkspace
             key={sharedRoute?.id || profile.id}
@@ -114,10 +114,11 @@ function SessionContent() {
           <LoginScreen />
         )}
       </View>
-      {!!loading && (
-        <View style={StyleSheet.absoluteFill}>
-          <LoadingScreen />
-        </View>
+      {!!profile && (
+        <BackgroundAccessStatus
+          error={accessError}
+          retry={() => void refresh()}
+        />
       )}
     </View>
   );

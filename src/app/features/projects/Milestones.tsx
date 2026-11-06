@@ -189,7 +189,7 @@ export function Milestones({
         >
           Save milestone
         </Button>
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
       <Sheet
         open={ordering}
@@ -207,10 +207,10 @@ export function Milestones({
             });
           }}
         />
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
       {!!action.error && editing === undefined && !ordering && (
-        <ErrorState error={action.error} />
+        <ErrorState context="action" error={action.error} />
       )}
     </>
   );

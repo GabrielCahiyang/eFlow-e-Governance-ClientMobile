@@ -1,0 +1,56 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M5\\eFlow-Mobile-M5-QA-arm64-x86_64.apk",
+  "versionCode": 11,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5147608,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "1f34da7ca17065f55782e143d1c56d2c46d4af801f2841c18ee52d1f22bcb201",
+  "bytes": 98725905,
+  "versionName": "1.0.0",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "buildType": "release",
+  "signatureVerified": true,
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "signingContext": "Local Android debug certificate used by Expo generated release configuration, for QA",
+  "embeddedBundleSha256": "218da2fc563d7519b9d7931b5a82545186632623f53a1533f420a20c0584edfd",
+  "m5SourcesMatched": [
+    "src/app/features/app-shell/MobileContent.tsx",
+    "src/app/features/navigation/mobileScope.ts",
+    "src/app/features/budget/OfficeBudgetScreen.tsx",
+    "src/app/features/budget/mobileFinanceScope.ts",
+    "src/app/features/budget/TaskFundingCard.tsx",
+    "src/app/features/budget/CashRequestCard.tsx",
+    "src/app/features/budget/CashRequestSheet.tsx",
+    "src/app/features/projects/ProjectFundingSummary.tsx",
+    "src/app/features/projects/ProjectScreen.tsx",
+    "src/app/features/tasks/TaskDetailsScreen.tsx",
+    "src/app/features/tasks/WorkTreePanel.tsx",
+    "src/platform/webHandoff.ts"
+  ],
+  "retiredPresentationAbsent": [
+    "AccountMappings.tsx",
+    "AnnualBudgetSheet.tsx",
+    "BudgetExport.tsx",
+    "BudgetReleaseHistory.tsx",
+    "DirectFundingSheet.tsx",
+    "JournalPanel.tsx",
+    "OfficePettyCash.tsx",
+    "ProjectFundingCloseout.tsx",
+    "ProjectTaskAccounts.tsx"
+  ],
+  "localGatewayQa": true,
+  "normalExportsEmbedLocalGateway": false,
+  "credentialFilesPackaged": false,
+  "authenticatedWorkflow": "BLOCKED",
+  "personalAcceptance": "PENDING"
+}

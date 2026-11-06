@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userMessages";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { askNativeHelp } from "./services";
@@ -100,9 +101,7 @@ export function useNativeHelp(
     } catch (reason) {
       if (!controller.signal.aborted && epoch === state.epoch)
         setError(
-          reason instanceof Error
-            ? reason.message
-            : "eFlow Help could not finish.",
+          userErrorMessage(reason),
         );
       return false;
     } finally {
@@ -126,9 +125,7 @@ export function useNativeHelp(
     } catch (reason) {
       if (!controller.signal.aborted && state.epoch === epoch)
         setError(
-          reason instanceof Error
-            ? reason.message
-            : "The spoken answer is unavailable.",
+          userErrorMessage(reason),
         );
     } finally {
       if (state.epoch === epoch) {

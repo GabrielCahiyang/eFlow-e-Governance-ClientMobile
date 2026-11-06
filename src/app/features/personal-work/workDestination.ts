@@ -18,6 +18,9 @@ export function workDestination(row: WorkRow): AppRoute {
     name: "task",
     id: row.rootId,
     projectId: row.projectId,
+    ...(row.projectId || !row.workspaceId
+      ? {}
+      : { workspaceId: row.workspaceId }),
     nodeId: row.kind === "office-node" ? row.id : undefined,
     view: row.kind === "office-node" ? "subitems" : "details",
   };

@@ -62,7 +62,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
         {facts.error ? (
           <ErrorState error={facts.error} retry={() => void facts.refresh()} />
         ) : facts.loading && !facts.data ? (
-          <Loading />
+          <Loading label="Loading professional profile" layout="form" />
         ) : (
           <>
             <Status
@@ -222,7 +222,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
           )}
         </Card>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       {!!action.notice && <Notice>{action.notice}</Notice>}
       {!!validation && <ErrorState error={validation} />}
     </>

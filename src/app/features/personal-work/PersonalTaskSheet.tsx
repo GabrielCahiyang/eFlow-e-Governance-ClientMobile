@@ -1,3 +1,4 @@
+import { confirmAction } from "../../shared/confirm";
 import { useState } from "react";
 import {
   Button,
@@ -37,7 +38,7 @@ export function PersonalTaskSheet({
     [lead, setLead] = useState(task?.lead_id || actor),
     [reviewer, setReviewer] = useState(task?.reviewer_id || ""),
     [progress, setProgress] = useState(String(task?.progress || 0)),
-    [note, setNote] = useState(task?.note || ""),
+    [note, setNote] = useState(mode === "review" ? "" : task?.note || ""),
     [decision, setDecision] = useState("approve"),
     [error, setError] = useState("");
   const eligible = members
@@ -84,6 +85,28 @@ export function PersonalTaskSheet({
       command = "submit_task";
       payload = { ...payload, note };
     } else {
+      if (
+        task?.reviewer_id !== actor ||
+        task.lead_id === actor ||
+        task.status !== "submitted"
+      ) {
+        setError("Current independent review access is required.");
+        return;
+      }
+      if (decision !== "approve" && !note.trim()) {
+        setError("Explain what needs to change.");
+        return;
+      }
+      if (
+        !(await confirmAction(
+          decision === "approve"
+            ? "Approve personal work?"
+            : "Request changes?",
+          note.trim() || task.title,
+          decision === "approve" ? "Approve work" : "Request changes",
+        ))
+      )
+        return;
       command = "review_task";
       payload = { ...payload, decision, note };
     }

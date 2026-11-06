@@ -1,0 +1,5 @@
+project_id = "eflow-mobile"
+
+[functions.mobile-sign-in]
+# Password sign-in begins before the caller has a session.
+verify_jwt = false

@@ -98,7 +98,7 @@ export function ProjectGuestProfile({
           Upload private PDS
         </Button>
         {!!fileName && <Notice>Uploaded {fileName}</Notice>}
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
         <Button
           busy={action.busy}
           disabled={!user || (edited && (profile.loading || !!profile.error))}

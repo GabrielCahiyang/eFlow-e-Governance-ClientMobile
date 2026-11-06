@@ -1,5 +1,7 @@
 # Native presentation and motion — 28 October 2026
 
+> Historical presentation inventory. The [v1 visual contract](mobile-redesign/design-system.md) preserves brand/motion for retained experiences; full desktop/Live replication is outside v1. Android and iOS visual verification remain separate.
+
 The Expo starter is replaced with real eFlow screens. The following implementations are connected to native application state. No Android/iOS visual acceptance is claimed yet; browser preview is supplemental evidence only.
 
 | Web presentation contract | Native implementation | Remaining verification |

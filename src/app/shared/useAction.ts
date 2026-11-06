@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
-export function useAction() {
+import { useAccountActionAccess } from "./AccountActionAccess";
+export function useAction({ requireAccess = true } = {}) {
+  const assertAccess = useAccountActionAccess();
   const pending = useRef(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<Error>(),
@@ -15,6 +17,7 @@ export function useAction() {
     setError(undefined);
     setNotice("");
     try {
+      if (requireAccess) assertAccess();
       await action();
       setNotice(message);
       onDone?.();

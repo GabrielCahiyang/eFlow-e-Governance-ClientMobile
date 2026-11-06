@@ -1,50 +1,125 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  displayCacheEpoch,
+  authoritativeReadEpoch,
+  displayCacheFresh,
+  displayFreshFor,
+  displayCacheOwns,
+  loadDisplayData,
+  readDisplayCache,
+  subscribeDisplayCache,
+  type DisplayCachePolicy,
+} from "./displayCache";
+import { readWithTimeout } from "./readTimeout";
+
+type State<T> = {
+  key: string;
+  data?: T;
+  error?: Error;
+  loading: boolean;
+  stale: boolean;
+};
 export function useFacts<T>(
   key: string,
   load: () => Promise<T>,
   enabled = true,
+  cache?: DisplayCachePolicy<T>,
 ) {
-  const loader = useRef(load);
+  const loader = useRef(load),
+    policy = useRef(cache),
+    scope = useRef({ key, enabled });
   loader.current = load;
-  const sequence = useRef(0);
-  const [state, setState] = useState<{
-    key: string;
-    data?: T;
-    error?: Error;
-    loading: boolean;
-  }>({ key, loading: enabled });
+  policy.current = cache;
+  scope.current = { key, enabled };
+  const sequence = useRef(0),
+    lastRead = useRef(0);
+  const [state, setState] = useState<State<T>>(() => ({
+    key,
+    data: enabled ? readDisplayCache(key, cache) : undefined,
+    loading: enabled,
+    stale: !!cache,
+  }));
   const refresh = useCallback(async () => {
-    if (!enabled) return;
-    const generation = ++sequence.current;
+    if (!enabled || scope.current.key !== key || !scope.current.enabled) return;
+    const generation = ++sequence.current,
+      epoch = policy.current ? displayCacheEpoch() : authoritativeReadEpoch();
+    const stillCurrent = () =>
+      generation === sequence.current &&
+      scope.current.key === key &&
+      scope.current.enabled &&
+      epoch ===
+        (policy.current ? displayCacheEpoch() : authoritativeReadEpoch());
     setState((old) => ({
       key,
       data: old.key === key ? old.data : undefined,
       loading: true,
+      stale: old.key === key && old.stale,
     }));
     try {
-      const data = await loader.current();
-      if (generation === sequence.current)
-        setState({ key, data, loading: false });
+      const requestLoader = loader.current;
+      const data = await loadDisplayData(
+        key,
+        () => readWithTimeout(requestLoader),
+        policy.current,
+      );
+      if (stillCurrent()) {
+        lastRead.current = Date.now();
+        setState({ key, data, loading: false, stale: false });
+      }
     } catch (e) {
-      if (generation === sequence.current)
+      if (stillCurrent())
         setState((old) => ({
           key,
           data: old.key === key ? old.data : undefined,
           loading: false,
+          stale: !!old.data,
           error:
             e instanceof Error ? e : new Error("Could not load this view."),
         }));
     }
   }, [key, enabled]);
+  const refreshIfStale = useCallback(async () => {
+    if (
+      policy.current &&
+      (Date.now() - lastRead.current < displayFreshFor ||
+        displayCacheFresh(key, policy.current.actor))
+    )
+      return;
+    await refresh();
+  }, [key, refresh]);
   useEffect(() => {
-    setState({ key, loading: enabled });
-    void refresh();
+    lastRead.current = 0;
+    const fresh = displayCacheFresh(key, policy.current?.actor);
+    setState({
+      key,
+      data: enabled ? readDisplayCache(key, policy.current) : undefined,
+      loading: enabled && !fresh,
+      stale: !!policy.current,
+    });
+    if (!fresh) void refresh();
+    const unsubscribe = subscribeDisplayCache((reason) => {
+      if (!policy.current && reason === "data") return;
+      ++sequence.current;
+      lastRead.current = 0;
+      const owned = !policy.current || displayCacheOwns(policy.current.actor);
+      setState((old) => ({
+        key,
+        data: reason === "data" && old.key === key ? old.data : undefined,
+        loading: enabled && owned && reason !== "identity",
+        stale: reason === "data" && !!old.data,
+      }));
+      if (enabled && owned && reason !== "identity") void refresh();
+    });
     return () => {
       ++sequence.current;
+      unsubscribe();
     };
-  }, [refresh, key, enabled]);
+  }, [refresh, key, enabled, cache?.actor]);
   return {
-    ...(state.key === key ? state : { key, loading: enabled }),
+    ...(enabled && state.key === key
+      ? state
+      : { key, loading: enabled, stale: false }),
     refresh,
+    refreshIfStale,
   };
 }

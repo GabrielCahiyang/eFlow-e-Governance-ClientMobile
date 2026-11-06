@@ -45,8 +45,7 @@ export function AllocationDecision({
         onClose={() => setDecision(undefined)}
       >
         <Notice>
-          Funding authorization and cash release are separate. The server checks
-          available Office authority and prevents self-approval.
+          Funding authorization and cash release are separate. Only an authorized independent reviewer can approve this request.
         </Notice>
         <Field
           label="Decision reason"
@@ -72,9 +71,9 @@ export function AllocationDecision({
         >
           Confirm {decision}
         </Button>
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
-      {!decision && !!action.error && <ErrorState error={action.error} />}
+      {!decision && !!action.error && <ErrorState context="action" error={action.error} />}
     </>
   );
 }

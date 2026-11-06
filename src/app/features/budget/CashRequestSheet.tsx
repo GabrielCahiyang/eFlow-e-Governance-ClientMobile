@@ -43,12 +43,14 @@ export function CashRequestSheet({
   context,
   orgId,
   correction,
+  readOnly,
   onClose,
   onSaved,
 }: {
   context: TaskFundingContext;
   orgId: string;
   correction?: PettyCashRequest;
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -81,6 +83,7 @@ export function CashRequestSheet({
   const save = () =>
     action.run(async () => {
       if (!profile) throw new Error("Sign in again.");
+      if (readOnly) throw new Error("Refresh to verify current funding access.");
       if (!intent.current)
         intent.current =
           (await draftStore.get<Intent>(profile.id, scope)) || undefined;
@@ -169,7 +172,7 @@ export function CashRequestSheet({
       onClose={onClose}
       busy={action.busy}
       footer={
-        <Button busy={action.busy} onPress={() => void save()}>
+        <Button busy={action.busy} disabled={readOnly} onPress={() => void save()}>
           {intent.current ? "Retry same request" : "Submit cash request"}
         </Button>
       }
@@ -262,7 +265,7 @@ export function CashRequestSheet({
         <LabelValue label="Attachment" value={attachment.name} />
       )}
       <LabelValue label="Total cash requested" value={peso(total)} />
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

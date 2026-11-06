@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-04T23:50:57.639Z",
+  "method": "Exact Hermes string-table entries; quoted literals for JavaScript. Numeric substrings are not credential matches.",
+  "platforms": [
+    "android",
+    "ios"
+  ],
+  "bundles": [
+    "dist/android/_expo/static/js/android/index-25fdc9ff01c76a93eeefe2e74f483f6a.hbc",
+    "dist/ios/_expo/static/js/ios/index-9d472ed294560d3e3a110100aea680f8.hbc",
+    "C:/Users/james/projects/eFlow-e-Governance-ClientMobile/artifacts/M7/edge-phone-embedded.hbc"
+  ],
+  "developmentAccountLiteralCount": 6,
+  "developmentAccountLiteralsFound": 0
+}

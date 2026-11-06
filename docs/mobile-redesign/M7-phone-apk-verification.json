@@ -1,0 +1,29 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Phone-arm64-x86_64.apk",
+  "versionCode": 15,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 4767556,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "ee113425de8d50829fb5afe8a39bfbb3a398d10902dfe474eacb31ef064f1612",
+  "bytes": 98345429,
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "sameSignerAsBuild14": true,
+  "localGatewayQa": false,
+  "credentialFilesPackaged": false,
+  "gatewayDiscoveryHttpStatus": 200,
+  "publishedGatewayReachability": "BLOCKED: DNS ENOTFOUND",
+  "freshSignIn": "BLOCKED",
+  "androidEmulatorUpgradeAndColdLaunch": "VERIFIED",
+  "physicalAndroid": "NOT TESTED"
+}

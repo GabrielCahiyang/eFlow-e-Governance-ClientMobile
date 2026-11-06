@@ -1,10 +1,14 @@
 import { useNativeLogin } from "./useNativeLogin";
+import { SignInProgressNotice } from "./SignInProgressNotice";
 import { validateLoginFields } from "../../../core/web/app/features/authentication/services/loginValidation";
 import { loginStyles as s } from "./loginStyles";
-import {KeyboardAvoidingView,Platform,useWindowDimensions} from "react-native";
-import {Pressable,ScrollView,View} from '../../components/ui/Primitives';
-import {SafeAreaView} from '../../components/ui/Primitives';
-import { LinearGradient } from "expo-linear-gradient";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { Pressable, ScrollView, View } from "../../components/ui/Primitives";
+import { SafeAreaView } from "../../components/ui/Primitives";
 import Eye from "lucide-react-native/icons/eye";
 import EyeOff from "lucide-react-native/icons/eye-off";
 import Info from "lucide-react-native/icons/info";
@@ -18,12 +22,15 @@ import {
   Sheet,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { EFlowMark } from "../../components/brand/EFlowMark";
 import { ErrorShake, MotionView } from "../../shared/motion";
 import { configurationError } from "../../../platform/config";
-import { LivingBoard } from "./LivingBoard";
 
 export function LoginScreen() {
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  const linkColor = palette.blue;
   const { width } = useWindowDimensions(),
     wide = width >= 1200,
     small = width < 768;
@@ -37,6 +44,7 @@ export function LoginScreen() {
     remember,
     setRemember,
     busy,
+    slow,
     error,
     setError,
     errors,
@@ -53,6 +61,7 @@ export function LoginScreen() {
     openScenarios,
     markState,
   } = useNativeLogin();
+
   return (
     <SafeAreaView style={s.safe}>
       <KeyboardAvoidingView
@@ -71,21 +80,22 @@ export function LoginScreen() {
             ]}
           >
             <View style={[s.form, small && { maxWidth: "100%" }]}>
-              {!!small && (
-                <View style={s.mobileBrand}>
-                  <EFlowMark variant="white" height={36} state={markState} />
-                  <Text style={s.mobileCity}>LGU Ormoc City</Text>
-                </View>
-              )}
+              <View style={s.mobileBrand}>
+                <EFlowMark variant="white" height={36} state={markState} />
+                <Text style={s.mobileCity}>LGU Ormoc City</Text>
+              </View>
               <MotionView
                 kind="login"
                 index={0}
                 style={{ gap: 6, marginBottom: 6 }}
               >
-                <Text accessibilityRole="header" style={s.heading}>
+                <Text
+                  accessibilityRole="header"
+                  style={[s.heading, { color: palette.text }]}
+                >
                   {recovery ? "Recover your account" : "Sign in to eFlow"}
                 </Text>
-                <Text style={s.subhead}>
+                <Text style={[s.subhead, { color: palette.muted }]}>
                   {recovery
                     ? "Use your official LGU account email."
                     : "Use your official LGU account."}
@@ -100,6 +110,7 @@ export function LoginScreen() {
                 </MotionView>
               )}
               {!!notice && <Notice>{notice}</Notice>}
+              <SignInProgressNotice waiting={busy && slow} />
               <MotionView kind="login" index={1}>
                 <ErrorShake trigger={errors.email ? shake : 0}>
                   <Field
@@ -153,9 +164,9 @@ export function LoginScreen() {
                         style={s.reveal}
                       >
                         {show ? (
-                          <EyeOff color="#64748b" size={19} />
+                          <EyeOff color={palette.mutedLabel} size={19} />
                         ) : (
-                          <Eye color="#64748b" size={19} />
+                          <Eye color={palette.mutedLabel} size={19} />
                         )}
                       </Pressable>
                     </View>
@@ -193,8 +204,8 @@ export function LoginScreen() {
                         width: 20,
                         height: 20,
                         borderWidth: 1.5,
-                        borderColor: remember ? "#0073ea" : "#cbd5e1",
-                        backgroundColor: remember ? "#0073ea" : "#fff",
+                        borderColor: remember ? linkColor : palette.mutedLabel,
+                        backgroundColor: remember ? linkColor : palette.surface,
                         borderRadius: 4,
                         alignItems: "center",
                         justifyContent: "center",
@@ -203,7 +214,7 @@ export function LoginScreen() {
                       {!!remember && (
                         <Text
                           style={{
-                            color: "#fff",
+                            color: isDark ? palette.onPrimary : "#fff",
                             fontSize: 14,
                             fontWeight: "700",
                           }}
@@ -212,14 +223,14 @@ export function LoginScreen() {
                         </Text>
                       )}
                     </View>
-                    <Text style={{ fontSize: 13, color: "#334155" }}>
+                    <Text style={{ fontSize: 13, color: palette.muted }}>
                       Remember me
                     </Text>
                   </Pressable>
                 )}
                 <Button
                   variant="ghost"
-                  textStyle={{ color: "#0073ea", fontSize: 13 }}
+                  textStyle={{ color: linkColor, fontSize: 13 }}
                   disabled={busy}
                   onPress={() => {
                     setError("");
@@ -234,14 +245,17 @@ export function LoginScreen() {
               </MotionView>
               <MotionView kind="login" index={4}>
                 <Button
-                  style={s.submit}
+                  style={[
+                    s.submit,
+                    { backgroundColor: isDark ? palette.primary : linkColor },
+                  ]}
                   textStyle={{ fontSize: 15, fontWeight: "700" }}
                   busy={busy}
                   disabled={!!configurationError}
                   onPress={() => void signIn()}
                   icon={
                     recovery ? (
-                      <LockKeyhole color="#fff" size={18} />
+                      <LockKeyhole color={palette.onPrimary} size={18} />
                     ) : undefined
                   }
                 >
@@ -256,9 +270,9 @@ export function LoginScreen() {
                 <MotionView kind="login" index={5}>
                   <Button
                     variant="ghost"
-                    textStyle={{ color: "#0073ea" }}
+                    textStyle={{ color: palette.blue }}
                     disabled={busy}
-                    icon={<Info color="#0073ea" size={16} />}
+                    icon={<Info color={palette.blue} size={16} />}
                     onPress={() => void openScenarios()}
                   >
                     Usage scenarios
@@ -267,39 +281,6 @@ export function LoginScreen() {
               )}
             </View>
           </View>
-          <LinearGradient
-            colors={["#0073ea", "#004ea0"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[
-              s.hero,
-              wide && {
-                flex: 1,
-                borderTopLeftRadius: 28,
-                borderBottomLeftRadius: 28,
-                marginTop: 14,
-                marginRight: 14,
-                marginBottom: 14,
-              },
-              small && {
-                paddingHorizontal: 10,
-                paddingTop: 22,
-                paddingBottom: 28,
-              },
-            ]}
-          >
-            <MotionView kind="hero" style={s.heroContent}>
-              {!small && (
-                <View style={s.heroBrand}>
-                  <EFlowMark variant="white" height={50} state={markState} />
-                  <View style={s.divider} />
-                  <Text style={s.heroCity}>LGU Ormoc City</Text>
-                </View>
-              )}
-              {!!small && <Text style={s.boardHint}>Project preview</Text>}
-              <LivingBoard />
-            </MotionView>
-          </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>
       <Sheet

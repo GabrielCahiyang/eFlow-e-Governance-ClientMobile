@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
+import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 import { draftStore } from "../../../platform/draftStore";
+import { feedback, PublicMessageError } from "../../shared/userMessages";
 import {
   executeFinancialCommand,
   FinancialCancelled,
@@ -8,6 +10,7 @@ import {
 import * as Crypto from "expo-crypto";
 const activeScopes = new Set<string>();
 export function useFinancialCommand(actorId: string, scope: string) {
+  const assertAccess = useAccountActionAccess();
   const pending = useRef(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<Error>(),
@@ -18,8 +21,8 @@ export function useFinancialCommand(actorId: string, scope: string) {
     refresh?: () => Promise<void>,
     success = "Financial action recorded.",
   ) => {
-    const activeScope=actorId+':'+scope;
-    if (pending.current||activeScopes.has(activeScope)) return false;
+    const activeScope = actorId + ":" + scope;
+    if (pending.current || activeScopes.has(activeScope)) return false;
     activeScopes.add(activeScope);
     pending.current = true;
     setBusy(true);
@@ -27,6 +30,7 @@ export function useFinancialCommand(actorId: string, scope: string) {
     setNotice("");
     let saved = false;
     try {
+      assertAccess(actorId);
       if (!actorId) throw new Error("Current work access is required.");
       const scopeHash = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
@@ -45,23 +49,29 @@ export function useFinancialCommand(actorId: string, scope: string) {
         },
         receiptKey,
         command,
+        () => assertAccess(actorId),
       );
       saved = true;
       setNotice(success);
       await refresh?.();
       return true;
     } catch (e) {
-      if (e instanceof FinancialCancelled) return false;
+      if (e instanceof FinancialCancelled) {
+        setError(
+          new PublicMessageError(e.message || "This action was cancelled."),
+        );
+        return false;
+      }
       const detail =
         e instanceof Error
           ? e.message
           : "No confirmed financial result was returned.";
       setError(
-        new Error(
-          saved
-            ? `${success} The view could not refresh. Check the current record; do not repeat the write.`
-            : detail,
-        ),
+        saved
+          ? new PublicMessageError(feedback.saved)
+          : e instanceof Error
+            ? e
+            : new Error(detail),
       );
       return false;
     } finally {

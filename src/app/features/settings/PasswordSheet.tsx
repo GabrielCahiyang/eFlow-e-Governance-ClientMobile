@@ -3,7 +3,7 @@ import { Button, ErrorState, Field, Notice, Sheet } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
-import { signInWithAccountProtection } from "../../../core/web/app/features/authentication/services/accountLogin";
+import { signInOnMobile } from "../authentication/mobileSignIn";
 import { supabase } from "../../../platform/supabase";
 import { passwordChangeError } from "./passwordRules";
 export function PasswordSheet({
@@ -48,7 +48,7 @@ export function PasswordSheet({
           ))
         )
           return;
-        await signInWithAccountProtection(user.email, current);
+        await signInOnMobile(user.email, current);
         if (!alive.current || actor.current !== identity) return;
         const verified = await supabase.auth.getUser();
         if (verified.error) throw verified.error;
@@ -125,12 +125,8 @@ export function PasswordSheet({
         maxLength={128}
         editable={!action.busy}
       />
-      <Notice>
-        Use 12 to 128 characters. Additional server password policies still
-        apply. Passwords are never written to eFlow profile data and are cleared
-        after each submission.
-      </Notice>
-      {!!action.error && <ErrorState error={action.error} />}
+      <Notice>Use 12 to 128 characters. Keep your password private.</Notice>
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

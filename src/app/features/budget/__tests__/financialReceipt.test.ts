@@ -92,3 +92,29 @@ test("failure to persist the pre-write marker prevents a server call", async () 
   ).rejects.toThrow("storage");
   expect(command).not.toHaveBeenCalled();
 });
+
+test("unverified account access prevents receipt creation and the financial command", async () => {
+  const { store, rows } = memory(),
+    command = jest.fn(async () => {});
+  await expect(
+    executeFinancialCommand(store, "blocked", command, () => {
+      throw new Error("Please wait while we check your access.");
+    }),
+  ).rejects.toThrow("Please wait");
+  expect(rows.size).toBe(0);
+  expect(command).not.toHaveBeenCalled();
+});
+
+test("access lost during receipt persistence cancels before sending and does not leave an uncertain write", async () => {
+  const { store, rows } = memory(),
+    command = jest.fn(async () => {});
+  let checks = 0;
+  await expect(
+    executeFinancialCommand(store, "background", command, () => {
+      if (++checks === 2)
+        throw new Error("Please wait while we check your access.");
+    }),
+  ).rejects.toBeInstanceOf(FinancialCancelled);
+  expect(rows.size).toBe(0);
+  expect(command).not.toHaveBeenCalled();
+});

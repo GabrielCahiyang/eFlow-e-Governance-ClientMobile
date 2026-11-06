@@ -174,7 +174,7 @@ export function ProjectViewTools({
         </Button>
         {!!facts.error && <ErrorState error={facts.error} />}
       </Sheet>
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </>
   );
 }

@@ -16,17 +16,25 @@ import { useAction } from "../../shared/useAction";
 import { getAssignedIndependentReviews } from "../../../core/web/app/features/budget/services/independentReviewService";
 import { createReceiptSignedUrl } from "../../../core/web/app/features/budget/services/budgetService";
 import { SettlementPanel } from "./SettlementPanel";
-export function FinancialReviewsScreen() {
+export function FinancialReviewsScreen({
+  recordId,
+}: { recordId?: string } = {}) {
   const { profile } = useAuth(),
     facts = useFacts("assigned-review-packages:" + profile!.id, () =>
       getAssignedIndependentReviews(profile!.id),
     ),
     action = useAction();
+  const packages = facts.data?.filter(
+    (pack) =>
+      !recordId ||
+      pack.liquidation.id === recordId ||
+      pack.context.review?.id === recordId,
+  );
   return (
     <Screen
       title="Assigned financial reviews"
-      onRefresh={() => void facts.refresh()}
-      refreshing={facts.loading}
+      onRefresh={() => facts.refresh()}
+
     >
       <Notice>
         These packages are assigned to you. Review approval does not grant
@@ -35,11 +43,23 @@ export function FinancialReviewsScreen() {
       {facts.error ? (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       ) : !facts.data ? (
-        <Loading />
-      ) : !facts.data.length ? (
-        <Empty title="No assigned packages waiting" />
+        <Loading label="Loading assigned review packages" layout="review" />
+      ) : !packages?.length ? (
+        <Empty
+          kind="finance"
+          action={
+            <Button variant="outline" onPress={() => void facts.refresh()}>
+              Refresh assigned reviews
+            </Button>
+          }
+          title={
+            recordId
+              ? "This assigned review is no longer available"
+              : "No assigned packages waiting"
+          }
+        />
       ) : (
-        facts.data.map((pack) => (
+        packages.map((pack) => (
           <Card key={pack.liquidation.id} title={pack.request.purpose}>
             <LabelValue label="Request" value={pack.request.requestNumber} />
             <LabelValue
@@ -84,7 +104,7 @@ export function FinancialReviewsScreen() {
           </Card>
         ))
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Screen>
   );
 }

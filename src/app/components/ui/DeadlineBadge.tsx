@@ -3,12 +3,7 @@ import { AppState } from "react-native";
 import { Text } from "./Typography";
 import { deadlinePresentation } from "../../../core/web/app/shared/deadlinePresentation";
 import { dateLabel } from "./theme";
-const tones = {
-  green: { backgroundColor: "#dcfce7", color: "#166534" },
-  yellow: { backgroundColor: "#fef3c7", color: "#92400e" },
-  red: { backgroundColor: "#fee2e2", color: "#991b1b" },
-  neutral: { backgroundColor: "#e2e8f0", color: "#334155" },
-};
+import { useTheme } from "./Appearance";
 export function DeadlineBadge({
   value,
   status,
@@ -16,6 +11,13 @@ export function DeadlineBadge({
   value?: string | null;
   status?: string;
 }) {
+  const palette = useTheme();
+  const tones = {
+    green: { backgroundColor: palette.successSoft, color: palette.success },
+    yellow: { backgroundColor: palette.warningSoft, color: palette.warning },
+    red: { backgroundColor: palette.dangerSoft, color: palette.danger },
+    neutral: { backgroundColor: palette.background, color: palette.muted },
+  };
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const tick = () => setNow(Date.now());

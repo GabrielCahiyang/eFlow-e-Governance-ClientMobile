@@ -17,7 +17,9 @@ import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import X from "lucide-react-native/icons/x";
 import { MotionView } from "../../shared/motion";
 import { Text } from "./Typography";
+import { useTheme } from "./Appearance";
 import { colors } from "./theme";
+import { userErrorMessage } from "../../shared/userMessages";
 type Tone = "success" | "error" | "warning" | "info";
 type Item = { id: number; message: string; type: Tone };
 const Context = createContext({
@@ -29,6 +31,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     serial = useRef(0),
     insets = useSafeAreaInsets();
   const toast = useCallback((message: string, type: Tone = "info") => {
+    message = userErrorMessage(
+      type === "error" ? new Error(message) : message,
+      "action",
+    );
     setItems((old) => [...old, { id: ++serial.current, message, type }]);
     AccessibilityInfo.announceForAccessibility(message);
   }, []);
@@ -61,14 +67,15 @@ function ToastItem({
     const timeout = setTimeout(() => remove(item.id), 4000);
     return () => clearTimeout(timeout);
   }, [item.id, remove]);
+  const palette = useTheme();
   const color =
     item.type === "error"
-      ? colors.danger
+      ? palette.danger
       : item.type === "warning"
-        ? colors.warning
+        ? palette.warning
         : item.type === "success"
-          ? colors.success
-          : colors.primary;
+          ? palette.success
+          : palette.primary;
   const Icon =
     item.type === "error"
       ? AlertCircle
@@ -91,7 +98,7 @@ function ToastItem({
           onPress={() => remove(item.id)}
           hitSlop={10}
         >
-          <X size={16} color={colors.muted} />
+          <X size={16} color={palette.muted} />
         </Pressable>
       </View>
     </MotionView>

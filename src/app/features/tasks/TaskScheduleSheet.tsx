@@ -120,7 +120,7 @@ export function TaskScheduleSheet({
         proceed.
       </Notice>
       {tasks.loading ? (
-        <Loading label="Loading current prerequisites…" />
+        <Loading layout="verification" label="Loading current prerequisites…" />
       ) : tasks.error ? (
         <ErrorState error={tasks.error} retry={() => void tasks.refresh()} />
       ) : (
@@ -143,7 +143,7 @@ export function TaskScheduleSheet({
           ]}
         />
       )}{" "}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

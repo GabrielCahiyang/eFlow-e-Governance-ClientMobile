@@ -1,3 +1,4 @@
+import { colors } from "../components/ui/theme";
 import { Platform } from "react-native";
 import { File, Paths } from "expo-file-system";
 import * as Print from "expo-print";
@@ -13,7 +14,7 @@ export async function exportTable(
   const csv =
     "\uFEFF" +
     [columns, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
-  const html = `<html><head><meta charset="utf-8"><style>body{font:12px sans-serif;color:#182626}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccd7d7;padding:8px;text-align:left;overflow-wrap:anywhere}th{background:#e5f5ee}thead{display:table-header-group}tr{break-inside:avoid}</style></head><body><h1>${htmlCell(title)}</h1><p>Exported ${htmlCell(new Date().toISOString())} · Authorized records only</p><table><thead><tr>${columns.map((c) => `<th>${htmlCell(c)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${htmlCell(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
+  const html = `<html><head><meta charset="utf-8"><style>body{font:12px sans-serif;color:${colors.text}}table{border-collapse:collapse;width:100%}td,th{border:1px solid ${colors.border};padding:8px;text-align:left;overflow-wrap:anywhere}th{background:${colors.primarySoft}}thead{display:table-header-group}tr{break-inside:avoid}</style></head><body><h1>${htmlCell(title)}</h1><p>Exported ${htmlCell(new Date().toISOString())} · Authorized records only</p><table><thead><tr>${columns.map((c) => `<th>${htmlCell(c)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${htmlCell(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
   if (Platform.OS === "web") {
     if (format === "pdf") {
       await Print.printAsync({ html });

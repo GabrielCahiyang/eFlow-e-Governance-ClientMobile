@@ -12,24 +12,28 @@ import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Search from "lucide-react-native/icons/search";
 import { Sheet } from "./Sheet";
+import { useTheme } from "./Appearance";
 import { colors, dateLabel } from "./theme";
+import { userErrorMessage } from "../../shared/userMessages";
 export function Field({
   label,
   error,
   ...props
 }: TextInputProps & { label: string; error?: string }) {
+  const palette = useTheme();
   return (
     <View style={s.field}>
       <Text style={s.label}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
-        placeholderTextColor="#829499"
+        placeholderTextColor={palette.mutedLabel}
+        selectionColor={palette.blue}
         {...props}
         style={[s.input, props.multiline && s.multiline, props.style]}
       />
       {!!error && (
         <Text accessibilityRole="alert" style={s.error}>
-          {error}
+          {userErrorMessage(error, "action")}
         </Text>
       )}
     </View>
@@ -58,6 +62,7 @@ export function Choice({
   disabled?: boolean;
   multiple?: boolean;
 }) {
+  const palette = useTheme();
   const [open, setOpen] = useState(false),
     [search, setSearch] = useState("");
   const selected = Array.isArray(value) ? value : [value];
@@ -78,7 +83,7 @@ export function Choice({
             .map((o) => o.label)
             .join(", ") || placeholder}
         </Text>
-        <ChevronDown size={18} color={colors.muted} />
+        <ChevronDown size={18} color={palette.muted} />
       </Pressable>
       <Sheet
         open={open}
@@ -128,7 +133,7 @@ export function Choice({
                 )}
               </View>
               {!!selected.includes(option.value) && (
-                <Check size={19} color={colors.primary} />
+                <Check size={19} color={palette.primary} />
               )}
             </Pressable>
           ))}
@@ -147,6 +152,7 @@ export function DateField({
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
+  const palette = useTheme();
   const [open, setOpen] = useState(false);
   const parsed = value ? new Date(value + "T12:00:00") : new Date();
   return (
@@ -172,7 +178,7 @@ export function DateField({
             <Text style={s.choiceText}>
               {value ? dateLabel(parsed.getTime()) : "Set date"}
             </Text>
-            <ChevronDown size={17} color={colors.muted} />
+            <ChevronDown size={17} color={palette.muted} />
           </Pressable>
           {!!open && (
             <DateTimePicker
@@ -211,6 +217,7 @@ export function Toggle({
   onChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const palette = useTheme();
   return (
     <View style={s.toggle}>
       <Text style={[s.label, { flex: 1 }]}>{label}</Text>
@@ -219,7 +226,7 @@ export function Toggle({
         value={value}
         onValueChange={onChange}
         disabled={disabled}
-        trackColor={{ true: colors.primary }}
+        trackColor={{ true: palette.primary }}
       />
     </View>
   );
@@ -228,22 +235,28 @@ export const SearchField = ({
   value,
   onChange,
   placeholder = "Search…",
+  onFocus,
 }: {
   value: string;
   onChange: (text: string) => void;
   placeholder?: string;
-}) => (
-  <View style={s.search}>
-    <Search size={18} color={colors.muted} />
-    <TextInput
-      accessibilityLabel={placeholder}
-      placeholder={placeholder}
-      value={value}
-      onChangeText={onChange}
-      style={{ flex: 1, color: colors.text, minHeight: 44 }}
-    />
-  </View>
-);
+  onFocus?: TextInputProps["onFocus"];
+}) => {
+  const palette = useTheme();
+  return (
+    <View style={s.search}>
+      <Search size={18} color={palette.muted} />
+      <TextInput
+        accessibilityLabel={placeholder}
+        placeholder={placeholder}
+        value={value}
+        onChangeText={onChange}
+        onFocus={onFocus}
+        style={{ flex: 1, color: colors.text, minHeight: 44 }}
+      />
+    </View>
+  );
+};
 const s = StyleSheet.create({
   field: { gap: 7 },
   label: { fontSize: 14, fontWeight: "500", color: colors.text },

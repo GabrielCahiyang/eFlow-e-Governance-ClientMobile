@@ -133,7 +133,10 @@ export function ProjectReadinessSheet({
       }
     >
       {checks.loading && !data ? (
-        <Loading label="Checking current project readiness…" />
+        <Loading
+          layout="verification"
+          label="Checking current project readiness…"
+        />
       ) : checks.error ? (
         <ErrorState error={checks.error} retry={() => void checks.refresh()} />
       ) : (
@@ -221,11 +224,10 @@ export function ProjectReadinessSheet({
       )}
       {!!confirm && (
         <Text style={{ color: colors.primary }}>
-          The server will recheck the current project and financial requirements
-          before saving.
+          The current project and financial requirements must be met before saving.
         </Text>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

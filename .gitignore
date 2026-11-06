@@ -42,6 +42,8 @@ npm-audit.json
 # generated native folders
 /ios
 /android
+**/android/.gradle/
+**/android/build/
 
 # Local installable build artifacts
 /artifacts/

@@ -1,21 +1,25 @@
 import { StyleSheet } from "react-native";
+import { brandColors, colors } from "../../components/ui/theme";
 export const loginStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
   page: { flexGrow: 1, backgroundColor: "#fff" },
-  auth: { padding: 40, justifyContent: "center", alignItems: "center" },
+  auth: {
+    flex: 1,
+    padding: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   form: { width: "100%", maxWidth: 440, gap: 18 },
   heading: {
     fontSize: 30,
     lineHeight: 36,
     fontWeight: "800",
     letterSpacing: -0.6,
-    color: "#0f172a",
   },
   subhead: {
     fontSize: 15,
     lineHeight: 21,
     fontWeight: "500",
-    color: "#334155",
   },
   mobileBrand: {
     flexDirection: "row",
@@ -26,7 +30,7 @@ export const loginStyles = StyleSheet.create({
     alignSelf: "flex-start",
     maxWidth: "100%",
     borderRadius: 10,
-    backgroundColor: "#0073ea",
+    backgroundColor: colors.primary,
     marginBottom: 12,
   },
   mobileCity: {
@@ -48,10 +52,9 @@ export const loginStyles = StyleSheet.create({
     justifyContent: "center",
   },
   submit: {
-    backgroundColor: "#0073ea",
     borderRadius: 8,
     minHeight: 44,
-    shadowColor: "#0073ea",
+    shadowColor: brandColors.blue,
     shadowOpacity: 0.3,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },

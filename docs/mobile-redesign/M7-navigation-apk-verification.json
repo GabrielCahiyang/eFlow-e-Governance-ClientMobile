@@ -1,0 +1,36 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Navigation-arm64-x86_64.apk",
+  "versionCode": 17,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 4770284,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "777a997aa8832f00006719956bad035e223c5b994773c4fb840388423e01eb31",
+  "bytes": 98348157,
+  "bottomNavigationSourceMatched": true,
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "sameSignerAsBuild14": true,
+  "localGatewayQa": false,
+  "credentialFilesPackaged": false,
+  "edgeFunction": "mobile-sign-in",
+  "edgeFunctionVersion": 1,
+  "liveEndpointProbes": {
+    "methodGuard": 405,
+    "invalidPayload": 422,
+    "syntheticUnknownIdentity": 401
+  },
+  "realAccountSignIn": "NOT TESTED",
+  "androidEmulatorUpgradeAndColdLaunch": "VERIFIED",
+  "androidEmulatorTabPressSelectionAndBack": "VERIFIED",
+  "physicalAndroidAndNativeIOS": "NOT TESTED"
+}

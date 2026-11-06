@@ -1,0 +1,57 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M2\\eFlow-Mobile-M2-QA-arm64-x86_64.apk",
+  "versionCode": 7,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6286704,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "8ae6b5db31f585df72684f579ae07149e9cd984426df80f6d7178a57fec07338",
+  "bytes": 99864957,
+  "versionName": "1.0.0",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "buildType": "release",
+  "signatureVerified": true,
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "signingContext": "Local Android debug certificate used by Expo generated release configuration, for QA",
+  "embeddedBundleSha256": "c7388f19a915c17a854c32a58ef7624747b7589fa2fe5a60596fca66c639f0ca",
+  "m2SourcesMatched": [
+    "src/app/features/dashboard/OverviewScreen.tsx",
+    "src/app/features/personal-work/PersonalWorkFeedScreen.tsx",
+    "src/app/features/personal-work/WorkFeedProvider.tsx",
+    "src/app/features/notifications/ActionInbox.tsx",
+    "src/app/features/notifications/inboxDestinations.ts",
+    "src/app/features/tasks/LinkedWorkNodeScreen.tsx",
+    "src/app/features/tasks/TaskReviewPanel.tsx"
+  ],
+  "localGatewayQa": true,
+  "normalExportsEmbedLocalGateway": false,
+  "credentialFilesPackaged": false,
+  "authenticatedWorkflow": "PARTIAL: bplo.head@gmail.com, head, LEDIPO; read-only Home, My Work and Inbox",
+  "personalAcceptance": "PENDING",
+  "releaseCredentialAudit": "VERIFIED",
+  "installation": "VERIFIED on emulator-5556 (Android API 36), physical ARM64 installation not tested",
+  "launch": "VERIFIED cold launch and restored existing session",
+  "deviceChecks": [
+    "Office and personal Home context",
+    "My Work search, keyboard Back, filter and refresh retention",
+    "Inbox unread count, Decisions empty state, exact linked Office task and Back",
+    "Inbox dark mode and 150% Android font scale with system animations disabled"
+  ],
+  "pendingDeviceChecks": [
+    "fresh sign-in",
+    "dedicated Member and Accounting Staff",
+    "populated assigned roots and nested branches",
+    "assigned review fixtures and second Office",
+    "approved test update mark-read",
+    "native iOS"
+  ]
+}

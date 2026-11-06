@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { userErrorMessage } from "../../shared/userMessages";
+import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 import { draftStore } from "../../../platform/draftStore";
 import { sendPersonalRequest, PersonalCommandFailure } from "./services";
 import type { PersonalCommand } from "../../../core/web/app/features/workspaces/types";
@@ -8,6 +10,7 @@ export function usePersonalActions(
   project: string,
   onSaved: () => Promise<void>,
 ) {
+  const assertAccess = useAccountActionAccess();
   const scope = "personal-command:" + project,
     [pending, setPending] = useState<PersonalRequest | null>(null),
     [busy, setBusy] = useState(false),
@@ -44,7 +47,7 @@ export function usePersonalActions(
       })
       .catch((reason) => {
         if (version === generation.current) {
-          setError(reason.message);
+          setError(userErrorMessage(reason, "action"));
           setRecoveryBlocked(true);
         }
       })
@@ -75,10 +78,11 @@ export function usePersonalActions(
     setCanDiscard(false);
     const version = generation.current;
     try {
+      assertAccess(actor);
       let saved = receipt.current;
       if (saved && command)
         throw new Error(
-          "Resolve the saved request before starting another action. Retry sends its original payload and request ID.",
+          "Check your previous attempt before starting another change.",
         );
       if (!saved) {
         saved = {
@@ -94,6 +98,7 @@ export function usePersonalActions(
         receipt.current = saved;
         if (version === generation.current) setPending(saved);
       }
+      assertAccess(actor);
       await sendPersonalRequest(saved);
       await draftStore.remove(actor, scope);
       if (version === generation.current) {
@@ -114,11 +119,7 @@ export function usePersonalActions(
         setCanDiscard(
           reason instanceof PersonalCommandFailure && reason.confirmedRejected,
         );
-        setError(
-          reason instanceof Error
-            ? reason.message
-            : "The request did not finish. Retry keeps its original identity.",
-        );
+        setError(userErrorMessage(reason, "action"));
       }
       return false;
     } finally {
@@ -149,11 +150,7 @@ export function usePersonalActions(
         }
       } catch (reason) {
         if (version === generation.current)
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : "Could not clear the rejected request.",
-          );
+          setError(userErrorMessage(reason, "action"));
       } finally {
         active.current = false;
         if (version === generation.current) setBusy(false);

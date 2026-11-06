@@ -14,6 +14,7 @@ export async function executeFinancialCommand(
   store: ReceiptStore,
   key: string,
   command: () => Promise<unknown>,
+  assertAccess: () => void = () => {},
 ) {
   const active = await store.get("__active__");
   if (active && active.key !== key && active.state !== "saved")
@@ -27,9 +28,16 @@ export async function executeFinancialCommand(
         ? "This financial action was already saved. Refresh the current record."
         : "This action has no confirmed response. Check the current record before repeating the write.",
     );
+  assertAccess();
   await store.set("__active__", { key, state: "started", at: Date.now() });
   await store.set(key, { key, state: "started", at: Date.now() });
   try {
+    // Access may have changed while the durable receipt was being written.
+    try {
+      assertAccess();
+    } catch (error) {
+      throw new FinancialCancelled(error instanceof Error ? error.message : "");
+    }
     await command();
   } catch (error) {
     if (

@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-06 Asia/Singapore",
+  "reportedBuild": 18,
+  "reportedApkSha256": "58318ca236e6326988053f714f410db3b820c617137f5804e8e099a6aa9cd5f8",
+  "cause": {
+    "buildFlag": "EXPO_PUBLIC_EFLOW_MOBILE_SIGN_IN",
+    "buildFlagPresent": false,
+    "priorDefault": "Only exact edge enabled hosted sign-in; absent flag selected protected gateway",
+    "build18LogEvidence": "artifacts/M7/brand-theme-assemble.log exported only EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY and EXPO_PUBLIC_SUPABASE_URL",
+    "oldGatewayDiscoveryRpc": "eflow_login_gateway_endpoint",
+    "oldGatewayDiscoveryStatus": 200,
+    "oldGatewayHostname": "aspects-aims-viewer-pichunter.trycloudflare.com",
+    "oldGatewayDns": "ENOTFOUND"
+  },
+  "hostedEndpoint": {
+    "project": "ixnfphgjyelhckjwjkdv",
+    "function": "mobile-sign-in",
+    "version": 1,
+    "status": "ACTIVE",
+    "methodGuardGET": 405,
+    "emptyPayloadPOST": 422,
+    "realCredentialsSubmitted": false
+  },
+  "repair": {
+    "build": 19,
+    "nativeDefault": "edge",
+    "protectedGatewayMode": "explicit gateway only",
+    "invalidMode": "configuration error before native fallback",
+    "networkErrorFallback": false,
+    "productionExportPreflight": "Pass for absent flag; gateway and invalid mode rejected",
+    "apkSourceIdentityIncludes": [
+      "src/platform/config.ts",
+      "src/app/features/authentication/mobileSignIn.ts"
+    ]
+  },
+  "hostedChangesApplied": false,
+  "validation": {
+    "typeScriptMetro": "PASS",
+    "automatedTests": 190,
+    "automatedSuites": 61,
+    "androidJsExport": "PASS",
+    "iosJsExport": "PASS",
+    "realAccountFreshSignIn": "BLOCKED pending dedicated approved account through protected flow",
+    "physicalAndroid": "NOT TESTED",
+    "nativeIos": "BLOCKED on Windows without Mac/Xcode/device"
+  },
+  "personalAcceptance": "PENDING"
+}

@@ -188,7 +188,7 @@ export function DirectFundingSheet({
         editable={!frozen.current && !action.busy}
       />
       <LabelValue label="Funding total" value={peso(total)} />
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

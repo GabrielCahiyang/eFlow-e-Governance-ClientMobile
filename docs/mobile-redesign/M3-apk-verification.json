@@ -1,0 +1,68 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M3\\eFlow-Mobile-M3-QA-arm64-x86_64.apk",
+  "versionCode": 8,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5236636,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "a8327f0435561837a63f8e860d0ec532c4df6f4c009c1705b48feee912f3d889",
+  "bytes": 98814889,
+  "versionName": "1.0.0",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "buildType": "release",
+  "signatureVerified": true,
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "signingContext": "Local Android debug certificate used by Expo generated release configuration, for QA",
+  "embeddedBundleSha256": "6ff3a9aedfe3845b01629d6f823c60e3d5e83b4ad7417f28aeee8d842c575ea0",
+  "m3SourcesMatched": [
+    "src/app/features/projects/ProjectsScreen.tsx",
+    "src/app/features/projects/ProjectScreen.tsx",
+    "src/app/features/projects/mobileProjects.ts",
+    "src/app/features/tasks/TaskDetailsScreen.tsx",
+    "src/app/features/tasks/LinkedWorkNodeScreen.tsx",
+    "src/app/features/tasks/branchInspector.ts",
+    "src/app/features/tasks/WorkTreePanel.tsx",
+    "src/app/features/tasks/WorkEditorSheet.tsx",
+    "src/app/features/tasks/SubtaskCompletionSheet.tsx",
+    "src/app/features/tasks/OfficeSubitemUpdateSheet.tsx",
+    "src/app/features/tasks/OfficeSubitemActivity.tsx",
+    "src/app/features/personal-work/PersonalProjectScreen.tsx",
+    "src/app/features/navigation/mobileScope.ts"
+  ],
+  "localGatewayQa": true,
+  "normalExportsEmbedLocalGateway": false,
+  "credentialFilesPackaged": false,
+  "authenticatedWorkflow": "VERIFIED_READ_ONLY_RESTORED_HEAD",
+  "personalAcceptance": "PENDING",
+  "freshSignIn": "BLOCKED",
+  "emulator": {
+    "serial": "emulator-5556",
+    "api": 36,
+    "abi": "x86_64",
+    "actor": "bplo.head@gmail.com",
+    "serverRole": "head",
+    "office": "LEDIPO",
+    "installedVersionCode": 8,
+    "coldLaunch": true,
+    "verified": [
+      "Projects, search empty state and keyboard Back",
+      "local Favorites and Recently opened",
+      "Main table, Board, Agenda and progress",
+      "exact Office root and level-one subitem",
+      "subitem activity and completion author",
+      "Back to root, Agenda and Projects",
+      "Personal workspace empty list",
+      "dark mode, 150% font scale and Android animator duration disabled"
+    ],
+    "fixtureWrites": "BLOCKED"
+  }
+}

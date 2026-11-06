@@ -1,5 +1,7 @@
 # Your native mobile verification checklist
 
+> Historical full-port checklist. Follow the current [phase QA package](mobile-redesign/M0-personal-qa.md) and [v1 test plan](mobile-redesign/test-plan.md); web-only/deferred workflows below are not new mobile acceptance requirements.
+
 Use labeled QA records and the existing supported test accounts. Preserve unrelated projects/accounts. Test both Android and iOS; Admin must remain unavailable. This list is for your walkthrough, not a claim that these checks passed.
 
 Before starting: use the current standalone APK/build from `DELIVERY_RECEIPT_2026-10-28.md`, point the app at `ixnfphgjyelhckjwjkdv`, and make the existing server/AI gateway reachable where needed. See `../delivery/README.md` for actual deployment/configuration blockers.

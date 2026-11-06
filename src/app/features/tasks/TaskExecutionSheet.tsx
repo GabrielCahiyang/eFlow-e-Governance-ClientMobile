@@ -16,17 +16,16 @@ import {
   asServiceFile,
   type PickedFile,
 } from "../../../platform/files";
-import { submitTaskForReview } from "../../../core/web/app/features/tasks/services/taskService";
 import { submitProgressUpdate } from "../../../core/web/app/services/taskDiscussionService";
 export function TaskExecutionSheet({
   taskId,
-  mode,
   onClose,
+  verifyAccess,
   onSaved,
 }: {
   taskId: string;
-  mode: "progress" | "submit";
   onClose: () => void;
+  verifyAccess: () => Promise<void>;
   onSaved: () => Promise<void>;
 }) {
   const { profile } = useAuth(),
@@ -40,76 +39,58 @@ export function TaskExecutionSheet({
     action.run(async () => {
       if (!profile) throw new Error("Sign in again.");
       if (!note.trim()) throw new Error("A work note is required.");
-      if (mode === "submit")
-        await submitTaskForReview(taskId, {
-          note,
-          submitterId: profile.id,
-          submitterName: profile.full_name,
-          attachments: await Promise.all(files.map(asServiceFile)),
-        });
-      else
-        await submitProgressUpdate({
-          taskId,
-          author: { id: profile.id, name: profile.full_name },
-          blockerCategory: category,
-          blocker,
-          nextStep: next,
-          note,
-          attachment: files[0] ? await asServiceFile(files[0]) : null,
-        });
+      await verifyAccess();
+      await submitProgressUpdate({
+        taskId,
+        author: { id: profile.id, name: profile.full_name },
+        blockerCategory: category,
+        blocker,
+        nextStep: next,
+        note,
+        attachment: files[0] ? await asServiceFile(files[0]) : null,
+      });
       await onSaved().catch(() => {});
       onClose();
     });
   return (
     <Sheet
       open
-      title={mode === "submit" ? "Submit finished work" : "Update work"}
+      title="Update work"
       onClose={onClose}
       busy={action.busy}
       footer={
         <Button busy={action.busy} onPress={() => void save()}>
-          {mode === "submit" ? "Submit for review" : "Save work update"}
+          Save work update
         </Button>
       }
     >
-      {!!(mode === "progress") && (
-        <>
-          <Choice
-            label="Blocker category"
-            value={category}
-            onChange={setCategory}
-            options={[
-              "None",
-              "Resources",
-              "Dependency",
-              "Approval",
-              "Technical",
-              "Other",
-            ].map((value) => ({ value, label: value }))}
-          />
-          {!!(category !== "None") && (
-            <Field
-              label="Blocker"
-              value={blocker}
-              onChangeText={setBlocker}
-              multiline
-            />
-          )}
-          <Field label="Next step" value={next} onChangeText={setNext} />
-        </>
-      )}
-      <Field
-        label={mode === "submit" ? "Completion note" : "Work note"}
-        value={note}
-        onChangeText={setNote}
-        multiline
+      <Choice
+        label="Blocker category"
+        value={category}
+        onChange={setCategory}
+        options={[
+          "None",
+          "Resources",
+          "Dependency",
+          "Approval",
+          "Technical",
+          "Other",
+        ].map((value) => ({ value, label: value }))}
       />
+      {!!(category !== "None") && (
+        <Field
+          label="Blocker"
+          value={blocker}
+          onChangeText={setBlocker}
+          multiline
+        />
+      )}
+      <Field label="Next step" value={next} onChangeText={setNext} />
+      <Field label="Work note" value={note} onChangeText={setNote} multiline />
       <Button
         variant="outline"
         onPress={() =>
-          void action.run(async () =>
-            setFiles(await chooseFiles("*/*", mode === "submit")),
-          )
+          void action.run(async () => setFiles(await chooseFiles("*/*", false)))
         }
       >
         Attach evidence
@@ -121,7 +102,7 @@ export function TaskExecutionSheet({
           value={`${Math.ceil(file.size / 1024)} KB`}
         />
       ))}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

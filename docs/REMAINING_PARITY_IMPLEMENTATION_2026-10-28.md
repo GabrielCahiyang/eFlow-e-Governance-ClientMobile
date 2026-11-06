@@ -1,5 +1,7 @@
 # Native feature implementation handoff — 28 October 2026
 
+> Historical implementation handoff. [v1 scope](mobile-redesign/mobile-feature-scope.md) supersedes its full-feature backlog; security/backend blockers remain unresolved unless fresh evidence proves otherwise. Do not apply proposed backend changes as part of the redesign.
+
 Scope: eFlow Mobile, Android and iOS, for Head, Member and Accounting Staff. Admin remains web-only. Hosted target remains `ixnfphgjyelhckjwjkdv`.
 
 The user owns the next manual/device walkthrough. No browser walkthrough, PDF import execution, messages, real calls, announcement publication, invitation email, financial mutation or hosted migration was performed in this implementation pass. Compilation and local regression checks are distinct from acceptance.

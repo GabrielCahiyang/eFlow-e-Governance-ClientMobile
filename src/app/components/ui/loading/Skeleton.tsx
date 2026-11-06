@@ -11,12 +11,14 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { loadingMotion, useMotionPreferences } from "../../../shared/motion";
+import { useTheme } from "../Appearance";
 
 export function SkeletonBlock({ style }: { style?: StyleProp<ViewStyle> }) {
+  const palette = useTheme();
   return (
     <View
       style={[
-        { height: 36, borderRadius: 8, backgroundColor: "#e9eeee" },
+        { height: 36, borderRadius: 8, backgroundColor: palette.border },
         style,
       ]}
     />

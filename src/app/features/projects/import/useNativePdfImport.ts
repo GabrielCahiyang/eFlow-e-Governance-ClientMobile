@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../../shared/userMessages";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../../platform/supabase";
 import {
@@ -78,7 +79,7 @@ export function useNativePdfImport(
         if (active) show(value!);
       })
       .catch((reason) => {
-        if (active) setError((reason as Error).message);
+        if (active) setError(userErrorMessage(reason, "action"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -109,7 +110,7 @@ export function useNativePdfImport(
           void touchPdfImport(current.current.id, runner.current).catch(
             (reason) => {
               if (alive.current && inFlight.current && !current.current?.result)
-                setError((reason as Error).message);
+                setError(userErrorMessage(reason, "action"));
             },
           );
       }, 25000);
@@ -369,7 +370,7 @@ export function useNativePdfImport(
         ),
       );
     } catch (reason) {
-      setError((reason as Error).message);
+      setError(userErrorMessage(reason, "action"));
       return;
     } finally {
       inFlight.current = false;
@@ -400,7 +401,7 @@ export function useNativePdfImport(
       });
       void run();
     } catch (reason) {
-      setError((reason as Error).message);
+      setError(userErrorMessage(reason, "action"));
     }
   };
   const discard = async () => {

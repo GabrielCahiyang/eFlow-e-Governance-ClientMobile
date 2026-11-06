@@ -1,6 +1,7 @@
+import { colors } from "../../components/ui/theme";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
-import {StyleSheet,useWindowDimensions} from "react-native";
-import {ScrollView,View,Pressable} from '../../components/ui/Primitives';
+import { StyleSheet, useWindowDimensions } from "react-native";
+import { ScrollView, View, Pressable } from "../../components/ui/Primitives";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   LinearTransition,
@@ -344,12 +345,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
   },
-  columnTitle: { fontSize: 13, fontWeight: "700", color: "#1e293b" },
+  columnTitle: { fontSize: 13, fontWeight: "700", color: colors.text },
   count: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1e293b",
-    backgroundColor: "#f1f5f9",
+    color: colors.text,
+    backgroundColor: colors.background,
     borderRadius: 12,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -357,7 +358,7 @@ const s = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: colors.border,
     borderLeftWidth: 4,
     borderRadius: 10,
     padding: 12,
@@ -367,15 +368,15 @@ const s = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 18,
-    color: "#0f172a",
+    color: colors.text,
   },
   avatars: { flexDirection: "row", flexWrap: "wrap", gap: 3 },
-  avatar: { fontSize: 10, padding: 5, borderRadius: 20, color: "#334155" },
+  avatar: { fontSize: 10, padding: 5, borderRadius: 20, color: colors.muted },
   status: { fontSize: 12, fontWeight: "600" },
   track: {
     height: 4,
     borderRadius: 4,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: colors.background,
     overflow: "hidden",
   },
   hint: {

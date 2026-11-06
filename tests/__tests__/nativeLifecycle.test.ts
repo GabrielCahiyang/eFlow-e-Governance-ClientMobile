@@ -11,6 +11,7 @@ function nativeRuntime(legacyGlobalEvents = false) {
   const changes: Array<(state: string) => void> = [];
   const native = {
     Platform: { OS: "android" },
+    LogBox: { ignoreLogs() {} },
     AppState: {
       currentState: "active",
       addEventListener: (_type: string, callback: (state: string) => void) => {
@@ -21,6 +22,7 @@ function nativeRuntime(legacyGlobalEvents = false) {
     Linking: { openURL() {} },
   };
   const context = vm.createContext({
+    __DEV__: true,
     console,
     URL,
     setTimeout,
@@ -54,6 +56,7 @@ function nativeRuntime(legacyGlobalEvents = false) {
   }
   modules["./events"] = load("events.ts");
   modules["./timers"] = load("timers.ts");
+  modules["./developmentFeedback"] = load("developmentFeedback.ts");
   load("bootstrap.ts");
   const runtime = load("webRuntime.ts");
   if (legacyGlobalEvents) {

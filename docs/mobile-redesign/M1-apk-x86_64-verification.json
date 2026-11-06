@@ -1,0 +1,47 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M1\\eFlow-Mobile-M1-QA-x86_64.apk",
+  "versionCode": 6,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6278344,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "ae68797394be1e5e2c7d666315846bedd53d7f71aff7b47693388f0af68c6531",
+  "bytes": 63301620,
+  "versionName": "1.0.0",
+  "abis": [
+    "x86_64"
+  ],
+  "buildType": "release",
+  "signatureVerified": true,
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "signingContext": "Local Android debug certificate used by Expo generated release configuration, for QA",
+  "embeddedBundleSha256": "6fd3acc6b1478b9497f4b1296c23b40e158e296ed0d7e2ceb134031f107c8aa6",
+  "m1SourcesMatched": [
+    "src/app/features/navigation/MobileNavigator.tsx",
+    "src/app/features/navigation/mobileScope.ts",
+    "src/app/features/navigation/MoreScreen.tsx",
+    "src/app/features/workspaces/WorkspaceProvider.tsx",
+    "src/app/components/ui/SelectionSheet.tsx",
+    "src/app/components/ui/theme.ts"
+  ],
+  "localGatewayQa": true,
+  "normalExportsEmbedLocalGateway": false,
+  "credentialFilesPackaged": false,
+  "authenticatedWorkflow": "PARTIAL: restored bplo.head@gmail.com (head, LEDIPO), read-only M1 navigation and workspace QA",
+  "personalAcceptance": "PENDING",
+  "releaseCredentialAudit": "VERIFIED",
+  "installation": "VERIFIED on emulator-5556",
+  "launch": "VERIFIED cold launch",
+  "freshSignIn": "BLOCKED: dedicated account provisioning deferred",
+  "finalDeviceSmoke": [
+    "restored Head Home and Office context",
+    "workspace chooser and visible Close at half height",
+    "dismissed chooser without changing context"
+  ]
+}

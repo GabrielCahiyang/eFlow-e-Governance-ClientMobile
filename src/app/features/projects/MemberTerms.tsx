@@ -103,11 +103,11 @@ function Editor({
       </Button>
       {locked && (
         <Notice>
-          The original terms and request ID are retained for retry. If you
-          close, refresh the current membership before making another change.
+          Your previous attempt is saved. Check the current membership before
+          trying a different change.
         </Notice>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

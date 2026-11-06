@@ -1,5 +1,7 @@
 # eFlow Mobile build and QA — 28 October 2026
 
+> Historical build/QA record from another environment. Current product scope and fresh results are in [mobile-redesign](mobile-redesign/README.md) and [M0 personal QA](mobile-redesign/M0-personal-qa.md). Old APK paths and browser/device receipts do not establish current-build acceptance.
+
 **Current Android APK:** [standalone build 3](../artifacts/eFlow-android-standalone-v3.apk). The native `document` lifecycle crash is fixed and Expo's development launcher remains removed; native assembly, signature and actual-APK checks passed. Current source validation: 86 tests / 35 suites, TypeScript/Metro checks and Android/iOS exports passed. See [build-3 report](NATIVE_DOCUMENT_CRASH_2026-10-28.md). Earlier artifacts and test counts below are historical.
 
 This receipt covers the React Native project in EflowMobile. The complete one-to-one port is **not finished**. See [PORTING_STATUS.md](PORTING_STATUS.md) for implementation gaps and [MOTION_PARITY.md](MOTION_PARITY.md) for presentation acceptance.

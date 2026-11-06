@@ -1,3 +1,4 @@
+import { colors } from "../theme";
 import { StyleSheet, useWindowDimensions } from "react-native";
 import { View } from "../Primitives";
 import { SkeletonBlock, SkeletonPulse } from "./Skeleton";
@@ -84,8 +85,8 @@ const s = StyleSheet.create({
     padding: 20,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: "row",

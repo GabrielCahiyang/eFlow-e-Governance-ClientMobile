@@ -1,0 +1,434 @@
+{
+  "id": "M0-2026-11-04-working-tree",
+  "at": "2026-11-04T03:41:36.568Z",
+  "timezone": "Asia/Singapore",
+  "mobile": {
+    "remote": "https://github.com/GabrielCahiyang/eFlow-e-Governance-ClientMobile",
+    "branch": "main",
+    "head": "6d4f19fc1829e9470d8dca2de524a2041b93521d",
+    "initialDirtyFiles": [
+      "package-lock.json"
+    ],
+    "initialDiffStat": "package-lock.json: 0 insertions, 90 deletions (optional-platform libc metadata)",
+    "preservedLockfileSha256": "534949216a0cd9e0902738f3aee24b71338d7060c18b019ed428755508036a22",
+    "entryPatchSha256": "44e9b9a7107bafb055f51c3036bc58ba77b287da8c490baabe61037359c74b28",
+    "runtimeFileCount": 1073,
+    "runtimeTreeSha256": "6daa07ae21ff88a6e38fd9112eb580baa6f9505217ee2d87f23e337cf7bc4409",
+    "excludedTrackedGeneratedBuildFiles": 353,
+    "runtimeTreeMethod": "SHA256 of lexically sorted repository path + NUL + exact-byte file SHA256 + LF, restricted to tracked src/assets/modules/plugins and root runtime/config/package files, excluding generated android/build, .gradle and .cxx outputs; full per-file hashes in ignored artifacts/M0/runtime-hashes.json. Ignored public environment configuration is recorded separately.",
+    "runtimeChangedTrackedFiles": []
+  },
+  "canonicalWeb": {
+    "repository": "https://github.com/GabrielCahiyang/eFlow-e-Governance-Client",
+    "head": "b8d9fd8a7195b50fe7446b45092c9528586b0778",
+    "method": "git ls-remote HEAD; selected exact-ref files via GitHub connector. No web changes; full clone did not complete.",
+    "files": [
+      {
+        "file": "src/app/components/Layout/coreWorkflowNavigation.tsx",
+        "canonicalGitBlob": "ab59ccadd4331cc6205705a617cdd4a09a152533",
+        "normalizedSha256": "e78c6fee5b760db87b04b621455cdab91879292d467502ab68c866f6e31d6269",
+        "native": null,
+        "normalizedNativeMatch": null
+      },
+      {
+        "file": "src/styles/globals.css",
+        "canonicalGitBlob": "8ae6efe7086c464114bcb38f5f2273d37c18faf9",
+        "normalizedSha256": "9d55a5fa71bb55a6733fd7175bd4d2f568760e5adede9212ff594ad97c6046f6",
+        "native": null,
+        "normalizedNativeMatch": null
+      },
+      {
+        "file": "src/styles/foundation-tokens.css",
+        "canonicalGitBlob": "e8f9615d06f3d03c88eabf9e43373ea837e38143",
+        "normalizedSha256": "bf06954a028efcd6b5d6dcf8f46cd9f65c67c1db3eabb2f671494f73ff8dd434",
+        "native": null,
+        "normalizedNativeMatch": null
+      },
+      {
+        "file": "src/styles/default_theme.css",
+        "canonicalGitBlob": "00b47c71164a12567b076aceff49120d6cf3216d",
+        "normalizedSha256": "6964895c7e4b01a7a06beddc846e9348758ca777b02c1ecd1b447f8084388a36",
+        "native": null,
+        "normalizedNativeMatch": null
+      },
+      {
+        "file": "src/app/shared/motion/motionTokens.ts",
+        "canonicalGitBlob": "d921e0c2e40cf23b3f56f6fc6e23c1e99c9e1dbc",
+        "normalizedSha256": "c46020bada5a8b97d9c63f2b122778d1c9e832cb6125ae211ab48471346ec34a",
+        "native": "src/core/web/app/shared/motion/motionTokens.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/pages/Login/motion.ts",
+        "canonicalGitBlob": "37c5832fc892714e6bf391c9a354a17be79c7e02",
+        "normalizedSha256": "733ff7366a3f0d30f6a5b9743cf677ad0ce5ed2ad7a021053e9777d7617c3ccc",
+        "native": "src/core/web/pages/Login/motion.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/pages/Login/components/EFlowMark.tsx",
+        "canonicalGitBlob": "2700d9778060a2bddab04184d6cb73407cbc430f",
+        "normalizedSha256": "4357164c68418a117d818bb90bdd0e745fa1abb101d519ed88d0b6bc05ad0772",
+        "native": null,
+        "normalizedNativeMatch": null
+      },
+      {
+        "file": "src/app/features/nested-work/selectors/capabilities.ts",
+        "canonicalGitBlob": "678a586fa94a80354b85326a232dbb981b81a163",
+        "normalizedSha256": "31d69a63463c95c30be28ba93621b3b1ee43558276abd862b8feb05c44b25846",
+        "native": "src/core/web/app/features/nested-work/selectors/capabilities.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/nested-work/services/workTreeService.ts",
+        "canonicalGitBlob": "59da6f3b70eb756537a198a26c1a23cbb176588e",
+        "normalizedSha256": "3e17c3de4cf3bd03f20987d0762966a49424454294104fddbe67ca880b564296",
+        "native": "src/core/web/app/features/nested-work/services/workTreeService.ts",
+        "normalizedNativeMatch": false
+      },
+      {
+        "file": "src/app/features/personal-work/services/workFeedService.ts",
+        "canonicalGitBlob": "50334845dadf5036b2c7aa77290e217b55c448e1",
+        "normalizedSha256": "116172feb3ba300ab505578f13e13e2f8082c8a891875d6fed59eb76e0ae72c1",
+        "native": "src/core/web/app/features/personal-work/services/workFeedService.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/budget/services/independentReviewService.ts",
+        "canonicalGitBlob": "6cf3422cf25b9fe5864ac5640958afe5eec3b4dd",
+        "normalizedSha256": "03b9d0e40461dc34b6dd188f4467e132dcdb30c3fe6e78141aec3e815783ee44",
+        "native": "src/core/web/app/features/budget/services/independentReviewService.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/tasks/services/taskService.ts",
+        "canonicalGitBlob": "ca4843290f5f56b0e558719c48b0bf1376cd2899",
+        "normalizedSha256": "97f752f065724f1f70f02bf017c92394d1c43ac7de3394866c6ad0748906bf75",
+        "native": "src/core/web/app/features/tasks/services/taskService.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/tasks/services/taskReviewLifecycleService.ts",
+        "canonicalGitBlob": "a0260f8eb480c71df2b77663364e9e79cd1bb5d6",
+        "normalizedSha256": "d1f87ba0da3c2617bb882eadadf8ec98c252e450f1541fb26b2074a93a5fd462",
+        "native": "src/core/web/app/features/tasks/services/taskReviewLifecycleService.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/project-table/selectors.ts",
+        "canonicalGitBlob": "e406acdcc0063b96f096f096c0b8e0a831cac96e",
+        "normalizedSha256": "581e43b32324484f545ce57c55525da43d52fa7193bbddda3c666234e8500776",
+        "native": "src/core/web/app/features/project-table/selectors.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/subtasks/services/subtaskWorkflowService.ts",
+        "canonicalGitBlob": "21a9d5aba9387771e62060839f6f3d1b171e8922",
+        "normalizedSha256": "1c4c84167ce6070eaa32ab242dbc36993486ea8105178c0c6e3008da60140ccc",
+        "native": "src/core/web/app/features/subtasks/services/subtaskWorkflowService.ts",
+        "normalizedNativeMatch": false
+      },
+      {
+        "file": "src/app/features/navigation/navigationPermissions.ts",
+        "canonicalGitBlob": "a8d87c3832eb7e4c137759f2b3a2c14c04612b86",
+        "normalizedSha256": "a46c70ced0e627e4727b56888d5af6ed2a7a18e7be8475fafca68d85e7ca2a3c",
+        "native": "src/core/web/app/features/navigation/navigationPermissions.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/budget/financialReceipts.ts",
+        "canonicalGitBlob": "810bf78ac226378699f88c666dd1e6a34f9435a1",
+        "normalizedSha256": "7f0e2b6053ed4d1655e98a903deb37d2674a820535321f0e8eb26b2b56562ab4",
+        "native": "src/core/web/app/features/budget/financialReceipts.ts",
+        "normalizedNativeMatch": true
+      },
+      {
+        "file": "src/app/features/budget/services/budgetService.ts",
+        "canonicalGitBlob": "a5f4e3378704cb6d260bff4f6897de9431ecfbd1",
+        "normalizedSha256": "56afd75146c54f895d1c444c9f8b83a6eb80bd04ebb172777aeced1aac7d3e25",
+        "native": "src/core/web/app/features/budget/services/budgetService.ts",
+        "normalizedNativeMatch": true
+      }
+    ]
+  },
+  "routes": [
+    "overview",
+    "personal_work",
+    "projects",
+    "project",
+    "task",
+    "tasks",
+    "subtasks",
+    "reviews",
+    "budget",
+    "financial_reviews",
+    "accounting_overview",
+    "accounting_releases",
+    "accounting_journal",
+    "accounting_audit",
+    "accounting_budgets",
+    "team",
+    "office_team",
+    "identity",
+    "intelligence",
+    "reports",
+    "deadlines",
+    "history",
+    "performance",
+    "announcements",
+    "inbox",
+    "notifications",
+    "messages",
+    "profile",
+    "settings",
+    "users",
+    "org_tree",
+    "permissions",
+    "audit",
+    "administration",
+    "migration",
+    "help",
+    "live",
+    "invitation",
+    "activation",
+    "personal_project"
+  ],
+  "verification": {
+    "check": {
+      "status": "VERIFIED",
+      "metroExclusionChecks": 9
+    },
+    "jest": {
+      "status": "VERIFIED",
+      "suitesPassed": 37,
+      "suitesTotal": 37,
+      "testsPassed": 90,
+      "testsTotal": 90
+    },
+    "exports": {
+      "android": [
+        {
+          "file": "dist/android/_expo/static/js/android/index-e8e6a98611e817d7d068175e86ae5bad.hbc",
+          "sha256": "dc290251a035c57b45be6b7ad6e48b196377a3f7cea1ab15a8090527e7d4c2b4",
+          "bytes": 7469575
+        }
+      ],
+      "ios": [
+        {
+          "file": "dist/ios/_expo/static/js/ios/index-db7e0817a82a2248f7827396d5af2bd9.hbc",
+          "sha256": "e196c9d85929ce8db2ae4496d1a7d944c1a9836c46ee4ee25998c67e197521c7",
+          "bytes": 7451841
+        }
+      ]
+    },
+    "credentialAudit": {
+      "status": "VERIFIED",
+      "productionBundles": 3,
+      "developmentCredentialLiteralsFound": 0
+    },
+    "androidNative": {
+      "status": "VERIFIED",
+      "prebuild": "VERIFIED",
+      "assemble": "VERIFIED",
+      "log": "artifacts/M0/assemble-release-final.log",
+      "apk": {
+        "apk": "artifacts/M0/eFlow-Mobile-M0-QA-arm64.apk",
+        "versionCode": 5,
+        "debuggable": false,
+        "launchActivity": "com.eflow.mobile.MainActivity",
+        "developmentLauncherPackaged": false,
+        "embeddedBundleBytes": 6107852,
+        "startupSourcesMatched": [
+          "src/app/features/app-shell/AppRoot.tsx",
+          "src/app/features/authentication/LoginScreen.tsx",
+          "src/platform/bootstrap.ts",
+          "src/platform/webRuntime.ts"
+        ],
+        "sha256": "99dd47a3f563a3e0fad18332ad169d87d8710820d093c86b327821b65bb6c38b",
+        "bytes": 56167806,
+        "at": "2026-11-04T03:08:52.100026+00:00",
+        "sourceBaseline": "M0-2026-11-04-working-tree",
+        "versionName": "1.0.0",
+        "abis": [
+          "arm64-v8a"
+        ],
+        "buildType": "release",
+        "embeddedBundleSha256": "b04f20d562374404de93e8b1e6e07e7a153857ad64b45ba78d907a1a46360966",
+        "signatureVerified": true,
+        "signingContext": "Local Android debug certificate used by generated release configuration; QA only",
+        "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+        "environmentOrSigningKeyFilesPackaged": false,
+        "installation": "NOT TESTED",
+        "launch": "NOT TESTED",
+        "authenticatedWorkflows": "NOT TESTED",
+        "personalAcceptance": "PENDING"
+      },
+      "workflow": "NOT TESTED",
+      "earlierAttempt": "Google Maven AndroidX activity 1.8.1 AAR read timeout; cached retry succeeded"
+    },
+    "androidEmulator": {
+      "status": "VERIFIED",
+      "prebuild": "VERIFIED",
+      "assemble": "VERIFIED",
+      "log": "artifacts/M0/assemble-emulator-x86_64.log",
+      "apk": {
+        "apk": "artifacts/M0/eFlow-Mobile-M0-QA-x86_64.apk",
+        "versionCode": 5,
+        "debuggable": false,
+        "launchActivity": "com.eflow.mobile.MainActivity",
+        "developmentLauncherPackaged": false,
+        "embeddedBundleBytes": 6107852,
+        "startupSourcesMatched": [
+          "src/app/features/app-shell/AppRoot.tsx",
+          "src/app/features/authentication/LoginScreen.tsx",
+          "src/platform/bootstrap.ts",
+          "src/platform/webRuntime.ts"
+        ],
+        "sha256": "edb3e2e18917e47283cf8d0e0224bcb9c15fe6cee6be4797ef75a3f1d9354c92",
+        "bytes": 60856325,
+        "at": "2026-11-04T03:37:18.876972+00:00",
+        "sourceBaseline": "M0-2026-11-04-working-tree",
+        "versionName": "1.0.0",
+        "abis": [
+          "x86_64"
+        ],
+        "buildType": "release",
+        "embeddedBundleSha256": "b04f20d562374404de93e8b1e6e07e7a153857ad64b45ba78d907a1a46360966",
+        "signatureVerified": true,
+        "signingContext": "Local Android debug certificate used by generated release configuration; QA only",
+        "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+        "environmentOrSigningKeyFilesPackaged": false,
+        "installation": "VERIFIED on eFlow_M0_QA emulator",
+        "launch": "VERIFIED: native login rendered and app remained foreground",
+        "authenticatedWorkflows": "NOT TESTED",
+        "personalAcceptance": "PENDING",
+        "testedAt": "2026-11-04T03:41:17.776082+00:00",
+        "emulator": {
+          "avd": "eFlow_M0_QA",
+          "serial": "emulator-5556",
+          "androidVersion": "16",
+          "api": 36,
+          "apkAbi": "x86_64",
+          "graphics": "swiftshader",
+          "dataPartition": "12G",
+          "processIdAtCheck": "2586"
+        },
+        "credentialAudit": "Embedded Hermes bundle SHA-256 exactly matches previously audited M0 ARM64 APK bundle",
+        "screenshot": {
+          "path": "artifacts/M0/emulator-android16-login.png",
+          "sha256": "29f368e8fb2b0b7e1f596d948ea8182dd74c86a48720a4fc25b84e9615c57bf9"
+        }
+      },
+      "workflow": "NOT TESTED",
+      "purpose": "Native x86_64 emulator build after ARM64 translation failed to load libreactnative.so",
+      "installation": "VERIFIED",
+      "launch": "VERIFIED: login screen"
+    },
+    "iosNative": {
+      "status": "BLOCKED",
+      "reason": "Windows host; Mac/Xcode and simulator/device unavailable"
+    },
+    "publicBackendConfiguration": {
+      "status": "PREPARED / CONNECTION NOT TESTED",
+      "absentAtEntry": true,
+      "source": "Selected public VITE_SUPABASE_URL and publishable client key from existing local web .env; all other values excluded",
+      "target": "ixnfphgjyelhckjwjkdv",
+      "kind": "publishable client key",
+      "configurationSha256": "19ac84626a28d6f3289ea1cd65d7296dd509b70cee1ee28e53330022b32f64c5",
+      "privateValuesCopied": false,
+      "hostedConnectionVerified": false
+    },
+    "hostedCapabilities": "NOT TESTED",
+    "personalAcceptance": "PENDING"
+  },
+  "documents": [
+    {
+      "file": ".gitignore",
+      "sha256": "940dc8b085fdf8b3d93cd4aed5bb50f3387e46f64079fab6d910acbe1d14f3de"
+    },
+    {
+      "file": "AGENTS.md",
+      "sha256": "07d7f7d54d590bceb1766fb4b44fae43266b0b7e407fe9386e00011c9ad35bd3"
+    },
+    {
+      "file": "README.md",
+      "sha256": "ce8a6ca0d66930b20b2599d99a11a9125bb99fc3efe4135539d2325cf682d0a0"
+    },
+    {
+      "file": "docs/MANUAL_MOBILE_VERIFICATION.md",
+      "sha256": "82b8c45e53ba73d0dd72267986dc06c4c319430df4d5d16fa3c4889c3c0c2e15"
+    },
+    {
+      "file": "docs/MOBILE_CATCHUP_SLICE.md",
+      "sha256": "02cbd1f01e0b3d05cfbde342080f0285fca13e5e785a2121bd519cca2c48b990"
+    },
+    {
+      "file": "docs/MOTION_PARITY.md",
+      "sha256": "aff0dc7b1cd6c99021a927451ad04165b59406d1f5dfd028208b64f5a3484d30"
+    },
+    {
+      "file": "docs/NATIVE_BUILD_AND_QA.md",
+      "sha256": "f609a593e6049a94203d461a66d73503b2aa6c17863141b56f9797c591d10421"
+    },
+    {
+      "file": "docs/PORTING_STATUS.md",
+      "sha256": "6b9f5fae0bf933b302d1ae2d25c28c6b67d7fe42183b9c069090990433cd4624"
+    },
+    {
+      "file": "docs/REMAINING_PARITY_IMPLEMENTATION_2026-10-28.md",
+      "sha256": "543dd46a4750dd851c69e11f54eabbee8572da6bc6cf5b3ee88dcd2b8294b5c9"
+    },
+    {
+      "file": "docs/mobile-redesign/M0-apk-verification.json",
+      "sha256": "ed8248a3e641601352513924dd23142e531629db797cebdc97d99e92488ed4ed"
+    },
+    {
+      "file": "docs/mobile-redesign/M0-emulator-apk-verification.json",
+      "sha256": "75bd877a97f8cd13b29e5556e2dd9b2c51d04994f2973609434f77e3f02eec96"
+    },
+    {
+      "file": "docs/mobile-redesign/M0-emulator-qa.md",
+      "sha256": "6b3c8ecfe9b8af2e71af54595e8a062aef03a7613dd7d8c7437f2e770a99cf7c"
+    },
+    {
+      "file": "docs/mobile-redesign/M0-personal-qa.md",
+      "sha256": "50e26966341003c7c56072bdec413db5169cbbd5ee33a122a303b5ec9efb0617"
+    },
+    {
+      "file": "docs/mobile-redesign/M0-release-audit.json",
+      "sha256": "b435dc2f604eafb28623cbdd85d75d893dc9386ac50a0b3ba3e9b39bb4e997c6"
+    },
+    {
+      "file": "docs/mobile-redesign/README.md",
+      "sha256": "2b5dd1f3ce5c3afd075da44532fe654862ac281c0a43959622011ca09646fdb0"
+    },
+    {
+      "file": "docs/mobile-redesign/design-system.md",
+      "sha256": "62932dced9815879695af3935efe8bfce1125dea1956824c0c3bf42d45d6d5df"
+    },
+    {
+      "file": "docs/mobile-redesign/implementation-plan.md",
+      "sha256": "f293d00f892564ebd7a145cfa6724d38d0f55bbb9d5e8f02c92688207cffbad3"
+    },
+    {
+      "file": "docs/mobile-redesign/mobile-feature-scope.md",
+      "sha256": "e5151c6c4dddcf70fb09d41fc7b2e73c61dac18426e83cffd230ba6159d3f4c3"
+    },
+    {
+      "file": "docs/mobile-redesign/phase-progress.md",
+      "sha256": "e5b0dd58cca7c9062ea07c9b734ea8245b0bfd2b0e0060ca934c9ec331c2e373"
+    },
+    {
+      "file": "docs/mobile-redesign/route-migration-map.md",
+      "sha256": "a53259afda1c322adeca614af979a1a8b077450c7629de38205a2466552987fb"
+    },
+    {
+      "file": "docs/mobile-redesign/source-comparison.md",
+      "sha256": "75b192fc457b89342aefdb015f2e77c07141e776844aa107faab5fee36512bb0"
+    },
+    {
+      "file": "docs/mobile-redesign/test-plan.md",
+      "sha256": "098b9a524a48072f9d5c7964acccb99b3accf15f14f7272e4e0416b3dfecce91"
+    }
+  ]
+}

@@ -1,7 +1,9 @@
+import { colors } from "../../components/ui/theme";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useEffect } from "react";
-import {StyleSheet} from "react-native";
-import {View} from '../../components/ui/Primitives';
+import { StyleSheet } from "react-native";
+import { View } from "../../components/ui/Primitives";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   cancelAnimation,
@@ -23,6 +25,7 @@ export function LoadingScreen({
 }: {
   label?: string;
 }) {
+  const palette = useTheme();
   const { reduced, active } = useMotionPreferences();
   const progress = useSharedValue(0);
   useEffect(() => {
@@ -59,7 +62,7 @@ export function LoadingScreen({
         <View style={s.track}>
           <Animated.View style={[{ height: 3 }, sweep]}>
             <LinearGradient
-              colors={["#0073ea", "#0c8c88"]}
+              colors={[palette.blue, palette.primary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{ flex: 1, borderRadius: 8 }}
@@ -86,7 +89,7 @@ const s = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: -0.6,
     lineHeight: 31.2,
-    color: "#182b35",
+    color: colors.text,
     marginTop: 18,
     marginBottom: 24,
     textAlign: "center",
@@ -96,6 +99,6 @@ const s = StyleSheet.create({
     height: 3,
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#dce7ee",
+    backgroundColor: colors.primarySoft,
   },
 });

@@ -8,54 +8,85 @@ import {
 } from "react-native";
 import { ScrollView, View } from "./Primitives";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
-import Inbox from "lucide-react-native/icons/inbox";
+import { EmptyIllustration, type EmptyKind } from "./EmptyIllustration";
 import { colors } from "./theme";
 import { Button } from "./Button";
-import { ViewLoadingState } from "./loading/ViewLoadingState";
+import {
+  ViewLoadingState,
+  type LoadingLayout,
+} from "./loading/ViewLoadingState";
+import { useTheme } from "./Appearance";
+import { usePullRefresh } from "../../shared/usePullRefresh";
+import {
+  userErrorMessage,
+  type FeedbackContext,
+} from "../../shared/userMessages";
 export function Screen({
   title,
   description,
   actions,
   children,
   onRefresh,
-  refreshing,
   style,
+  compact = false,
+  footer,
 }: {
   title?: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
-  onRefresh?: () => void;
-  refreshing?: boolean;
+  onRefresh?: () => Promise<unknown>;
   style?: StyleProp<ViewStyle>;
+  compact?: boolean;
+  footer?: ReactNode;
 }) {
+  const palette = useTheme();
+  const pull = usePullRefresh(onRefresh);
   return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={[s.content, style]}
-      refreshControl={
-        onRefresh ? (
-          <RefreshControl
-            refreshing={!!refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        ) : undefined
-      }
-    >
-      {!!title && (
-        <View style={s.header}>
-          <View style={s.heading}>
-            <Text accessibilityRole="header" style={s.title}>
-              {title}
-            </Text>
-            {!!description && <Text style={s.description}>{description}</Text>}
+    <View style={{ flex: 1, backgroundColor: palette.background }}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        style={{ flex: 1, backgroundColor: palette.background }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          s.content,
+          compact && s.compact,
+          { backgroundColor: palette.background },
+          style,
+        ]}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={pull.refreshing}
+              onRefresh={pull.refresh}
+              tintColor={palette.primary}
+            />
+          ) : undefined
+        }
+      >
+        {!!title && (
+          <View style={s.header}>
+            <View style={s.heading}>
+              <Text
+                accessibilityRole="header"
+                style={[s.title, compact && s.compactTitle]}
+              >
+                {title}
+              </Text>
+              {!!description && (
+                <Text style={s.description}>{description}</Text>
+              )}
+            </View>
+            {actions}
           </View>
-          {actions}
-        </View>
-      )}
-      {children}
-    </ScrollView>
+        )}
+        {!!pull.error && (
+          <ErrorState error={pull.error} retry={() => void pull.refresh()} />
+        )}
+        {children}
+      </ScrollView>
+      {footer}
+    </View>
   );
 }
 export function Card({
@@ -79,28 +110,30 @@ export function Card({
   );
 }
 export function Loading({
-  label = "Getting things done",
+  label = "Loading content",
+  layout = "navigation",
+  rows,
 }: {
   label?: string;
+  layout?: LoadingLayout;
+  rows?: number;
 }) {
-  return <ViewLoadingState label={label} />;
+  return <ViewLoadingState label={label} layout={layout} rows={rows} />;
 }
 export function ErrorState({
   error,
   retry,
+  context = "load",
 }: {
   error: unknown;
   retry?: () => void;
+  context?: FeedbackContext;
 }) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "This view could not load. Please try again.";
+  const palette = useTheme();
+  const message = userErrorMessage(error, context);
   return (
     <View accessibilityRole="alert" style={s.error}>
-      <AlertCircle size={20} color={colors.danger} />
+      <AlertCircle size={20} color={palette.danger} />
       <Text style={s.errorText}>{message}</Text>
       {!!retry && (
         <Button variant="outline" onPress={retry}>
@@ -114,17 +147,44 @@ export function Empty({
   title = "Nothing here yet",
   description,
   action,
+  compact = false,
+  kind = "work",
 }: {
   title?: string;
   description?: string;
   action?: ReactNode;
+  compact?: boolean;
+  kind?: EmptyKind;
 }) {
+  const palette = useTheme();
   return (
-    <View style={s.empty}>
-      <Inbox color={colors.primary} size={34} />
-      <Text style={s.cardTitle}>{title}</Text>
+    <View
+      style={[
+        compact ? s.compactEmpty : s.empty,
+        { backgroundColor: "transparent" },
+      ]}
+    >
+      <EmptyIllustration kind={kind} compact={compact} />
+      <Text
+        accessibilityRole="header"
+        style={[
+          s.cardTitle,
+          {
+            textAlign: "center",
+            color: palette.text,
+            fontSize: compact ? 16 : 20,
+          },
+        ]}
+      >
+        {title}
+      </Text>
       {!!description && (
-        <Text style={[s.description, { textAlign: "center" }]}>
+        <Text
+          style={[
+            s.description,
+            { textAlign: "center", maxWidth: 340, color: palette.mutedLabel },
+          ]}
+        >
           {description}
         </Text>
       )}
@@ -171,20 +231,29 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
     flexWrap: "wrap",
   },
+  compact: { gap: 10, paddingTop: 10, paddingBottom: 24 },
+  compactTitle: { fontSize: 21, lineHeight: 28 },
+  compactEmpty: { gap: 8, paddingVertical: 12, alignItems: "center" },
   heading: { flex: 1, minWidth: 190, gap: 6 },
-  title: { fontSize: 25, fontWeight: "700", color: colors.text },
+  title: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "600",
+    color: colors.text,
+  },
   description: { fontSize: 13, lineHeight: 20, color: colors.muted },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 10,
     padding: 16,
     gap: 12,
   },
   cardTitle: { fontSize: 17, fontWeight: "600", color: colors.text },
   empty: {
-    padding: 28,
+    paddingHorizontal: 16,
+    paddingVertical: 32,
     gap: 14,
     justifyContent: "center",
     alignItems: "center",

@@ -462,7 +462,7 @@ export function ProjectSetupSheet({
           )}
         </>
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

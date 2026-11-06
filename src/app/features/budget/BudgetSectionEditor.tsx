@@ -6,6 +6,7 @@ import {
 import { useState } from "react";
 import { View } from "../../components/ui/Primitives";
 import {
+  colors,
   Button,
   Card,
   Choice,
@@ -79,7 +80,7 @@ export function BudgetSectionEditor({
               gap: 12,
               marginLeft: depth ? 12 : 0,
               borderLeftWidth: depth ? 2 : 0,
-              borderColor: "#d7dfdf",
+              borderColor: colors.border,
               paddingLeft: depth ? 10 : 0,
             }}
           >

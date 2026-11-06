@@ -435,11 +435,11 @@ export function OfficePettyCash({ office }: { office: string }) {
               )}
             </>
           )}
-          {!!action.error && <ErrorState error={action.error} />}
+          {!!action.error && <ErrorState context="action" error={action.error} />}
         </Sheet>
       )}
       {!edit && !pending && !!action.error && (
-        <ErrorState error={action.error} />
+        <ErrorState context="action" error={action.error} />
       )}
     </Card>
   );

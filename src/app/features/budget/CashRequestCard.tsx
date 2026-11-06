@@ -26,7 +26,6 @@ import {
   decidePettyCashRequest,
   decidePettyCashLeaderReview,
   recordAccountingRelease,
-  overrideAccountingPettyCashReleaseSchedule,
 } from "../../../core/web/app/features/budget/services/budgetService";
 import type {
   DepartmentBudgetBundle,
@@ -37,6 +36,7 @@ import { SettlementPanel } from "./SettlementPanel";
 import { useFinancialAction } from "./useFinancialCommand";
 import { FinancialCancelled } from "./financialReceipt";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
+import { cashRequestReference } from "./mobileFinanceScope";
 export function CashRequestCard({
   request,
   bundle,
@@ -54,7 +54,7 @@ export function CashRequestCard({
     readAction = useAction();
   const [receipts, setReceipts] = useState(false),
     [operation, setOperation] = useState<
-      "cancel" | "approve" | "reject" | "release" | "override"
+      "cancel" | "approve" | "reject" | "release"
     >(),
     [reason, setReason] = useState(""),
     [method, setMethod] = useState<"cash" | "cheque">("cash"),
@@ -117,6 +117,7 @@ export function CashRequestCard({
   const decide = () =>
     action.run(async () => {
       if (!operation) return;
+      if (readOnly) throw new Error("Refresh to verify current cash request access.");
       if (operation !== "release" && !reason.trim())
         throw new Error("Record a reason for this decision.");
       if (operation === "cancel")
@@ -146,10 +147,13 @@ export function CashRequestCard({
           );
       }
       if (operation === "release") {
+        const release = releases.find((item) => item.id === releaseId);
+        if (!accounting || release?.status !== "scheduled")
+          throw new Error("This release is no longer available to record.");
         if (
           !(await confirmAction(
             "Record cash release?",
-            `${peso(releases.find((r) => r.id === releaseId)?.amount || 0)} · ${method === "cheque" ? "Cheque " + cheque : "Cash"}. Record this only after the actual handover.`,
+            `${peso(release.amount)} · ${method === "cheque" ? "Cheque " + cheque : "Cash"}. Record this only after the actual handover.`,
             "Record release",
           ))
         )
@@ -160,19 +164,12 @@ export function CashRequestCard({
           chequeNumber: cheque || undefined,
         });
       }
-      if (operation === "override")
-        await overrideAccountingPettyCashReleaseSchedule({
-          releaseId,
-          reason,
-          method,
-          chequeNumber: cheque || undefined,
-        });
       setOperation(undefined);
       setReason("");
       await onSaved();
     }, "Financial action recorded.");
   return (
-    <Card title={`FR-${String(request.requestNumber).padStart(5, "0")}`}>
+    <Card title={cashRequestReference(request.requestNumber)}>
       <Status value={request.status} />
       <Text style={{ color: colors.text, lineHeight: 21 }}>
         {request.purpose}
@@ -228,26 +225,15 @@ export function CashRequestCard({
           <Status value={release.status} />
           <Row>
             {!!(!readOnly && accounting && release.status === "scheduled") && (
-              <>
-                <Button
-                  variant="outline"
-                  onPress={() => {
-                    setReleaseId(release.id);
-                    setOperation("release");
-                  }}
-                >
-                  Record cash release
-                </Button>
-                <Button
-                  variant="outline"
-                  onPress={() => {
-                    setReleaseId(release.id);
-                    setOperation("override");
-                  }}
-                >
-                  Override schedule
-                </Button>
-              </>
+              <Button
+                variant="outline"
+                onPress={() => {
+                  setReleaseId(release.id);
+                  setOperation("release");
+                }}
+              >
+                Record cash release
+              </Button>
             )}
             {!!(
               !readOnly &&
@@ -340,7 +326,7 @@ export function CashRequestCard({
           onSaved={onSaved}
         />
       )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       {!!readAction.error && <ErrorState error={readAction.error} />}
       {!!action.notice && (
         <Text style={{ color: colors.success }}>{action.notice}</Text>
@@ -360,21 +346,19 @@ export function CashRequestCard({
             ? "Withdraw cash request"
             : operation === "release"
               ? "Record cash release"
-              : operation === "override"
-                ? "Override release schedule"
-                : operation === "reject"
+              : operation === "reject"
                   ? "Reject cash request"
                   : "Authorize cash request"
         }
         onClose={() => setOperation(undefined)}
         busy={action.busy}
         footer={
-          <Button busy={action.busy} onPress={() => void decide()}>
+          <Button busy={action.busy} disabled={readOnly} onPress={() => void decide()}>
             Confirm action
           </Button>
         }
       >
-        {!!["release", "override"].includes(operation || "") && (
+        {operation === "release" && (
           <>
             <Choice
               label="Release method"
@@ -402,7 +386,7 @@ export function CashRequestCard({
             multiline
           />
         )}
-        {!!action.error && <ErrorState error={action.error} />}
+        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     </Card>
   );

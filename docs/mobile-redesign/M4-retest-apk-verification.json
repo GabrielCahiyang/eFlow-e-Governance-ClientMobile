@@ -1,0 +1,76 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M4-retest\\eFlow-Mobile-M4-Retest-QA-arm64-x86_64.apk",
+  "versionCode": 10,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5237480,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "b343f25a726bc48bdb017c7d6c5c543e7cb8a1a62eced0f2dc11198de95153f2",
+  "bytes": 98815777,
+  "versionName": "1.0.0",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "buildType": "release",
+  "signatureVerified": true,
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "signingContext": "Local Android debug certificate used by Expo generated release configuration, for QA",
+  "embeddedBundleSha256": "ba3cf71142c5f0ee31d4e0757fda8afa50865f9c30eb96bf9af99bc925d96c4b",
+  "m4SourcesMatched": [
+    "src/app/features/app-shell/NativeWorkspace.tsx",
+    "src/app/features/communication/announcementReads.ts",
+    "src/app/features/office-team/officeTeamReads.ts",
+    "src/platform/evidenceFiles.ts",
+    "src/app/features/tasks/EvidencePicker.tsx",
+    "src/app/features/tasks/EvidenceAttachment.tsx",
+    "src/app/features/tasks/taskEvidence.ts",
+    "src/app/features/tasks/TaskEvidenceSheet.tsx",
+    "src/app/features/tasks/TaskReviewPanel.tsx",
+    "src/app/features/tasks/reviewAccess.ts",
+    "src/app/features/tasks/TaskActivity.tsx",
+    "src/app/features/tasks/SubtaskCompletionSheet.tsx",
+    "src/app/features/tasks/OfficeSubitemActivity.tsx",
+    "src/app/features/notifications/ActionInbox.tsx",
+    "src/app/features/communication/ChatScreen.tsx",
+    "src/app/features/communication/AnnouncementsScreen.tsx",
+    "src/app/features/office-team/OfficeAttention.tsx",
+    "src/app/features/office-team/OfficeTeamScreen.tsx",
+    "src/app/features/dashboard/OverviewScreen.tsx"
+  ],
+  "localGatewayQa": true,
+  "normalExportsEmbedLocalGateway": false,
+  "credentialFilesPackaged": false,
+  "authenticatedWorkflow": "VERIFIED_READ_ONLY_RESTORED_HEAD",
+  "personalAcceptance": "PENDING",
+  "cameraPermissionPackaged": true,
+  "freshSignIn": "BLOCKED",
+  "emulator": {
+    "serial": "emulator-5556",
+    "api": 36,
+    "abi": "x86_64",
+    "actor": "bplo.head@gmail.com",
+    "serverRole": "head",
+    "office": "LEDIPO",
+    "installedVersionCode": 10,
+    "coldLaunch": true,
+    "verified": [
+      "Announce policy-specific unavailable state",
+      "Office Team gateway unavailable state",
+      "Office attention",
+      "Task Activity and task conversation Back",
+      "Dark mode with 150% font and Android animator duration disabled"
+    ],
+    "blocked": [
+      "Announcement reads and receipt writes under hosted 42P17",
+      "Office roster and fresh login without gateway",
+      "Live workflows without approved fixtures"
+    ]
+  }
+}

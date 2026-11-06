@@ -1,0 +1,48 @@
+{
+  "apk": "artifacts/M0/eFlow-Mobile-M0-QA-x86_64.apk",
+  "versionCode": 5,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6107852,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts"
+  ],
+  "sha256": "edb3e2e18917e47283cf8d0e0224bcb9c15fe6cee6be4797ef75a3f1d9354c92",
+  "bytes": 60856325,
+  "at": "2026-11-04T03:37:18.876972+00:00",
+  "sourceBaseline": "M0-2026-11-04-working-tree",
+  "versionName": "1.0.0",
+  "abis": [
+    "x86_64"
+  ],
+  "buildType": "release",
+  "embeddedBundleSha256": "b04f20d562374404de93e8b1e6e07e7a153857ad64b45ba78d907a1a46360966",
+  "signatureVerified": true,
+  "signingContext": "Local Android debug certificate used by generated release configuration; QA only",
+  "signerCertificateSha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
+  "environmentOrSigningKeyFilesPackaged": false,
+  "installation": "VERIFIED on eFlow_M0_QA emulator",
+  "launch": "VERIFIED: native login rendered and app remained foreground",
+  "authenticatedWorkflows": "NOT TESTED",
+  "personalAcceptance": "PENDING",
+  "testedAt": "2026-11-04T03:41:17.776082+00:00",
+  "emulator": {
+    "avd": "eFlow_M0_QA",
+    "serial": "emulator-5556",
+    "androidVersion": "16",
+    "api": 36,
+    "apkAbi": "x86_64",
+    "graphics": "swiftshader",
+    "dataPartition": "12G",
+    "processIdAtCheck": "2586"
+  },
+  "credentialAudit": "Embedded Hermes bundle SHA-256 exactly matches previously audited M0 ARM64 APK bundle",
+  "screenshot": {
+    "path": "artifacts/M0/emulator-android16-login.png",
+    "sha256": "29f368e8fb2b0b7e1f596d948ea8182dd74c86a48720a4fc25b84e9615c57bf9"
+  }
+}

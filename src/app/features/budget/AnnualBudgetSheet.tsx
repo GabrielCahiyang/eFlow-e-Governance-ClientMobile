@@ -243,7 +243,7 @@ export function AnnualBudgetSheet({
               Save and lock budget
             </Button>
           )}
-          {!!financial.error && <ErrorState error={financial.error} />}
+          {!!financial.error && <ErrorState context="action" error={financial.error} />}
           {!!validationError && <ErrorState error={validationError} />}
         </>
       }

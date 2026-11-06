@@ -114,7 +114,7 @@ test("leaving Help stops speech and does not let the old stage overwrite the new
   });
   expect(result.current.stage).toBe("idle");
 });
-test("a failed answer keeps the user question and exposes the actual service error", async () => {
+test("a failed answer keeps the user question and shows a safe recovery message", async () => {
   jest
     .mocked(askNativeHelp)
     .mockRejectedValue(new Error("Help service unavailable"));
@@ -123,7 +123,7 @@ test("a failed answer keeps the user question and exposes the actual service err
     await result.current.send("How do approvals work?");
   });
   expect(result.current.messages).toHaveLength(1);
-  expect(result.current.error).toBe("Help service unavailable");
+  expect(result.current.error).toBe("We couldn't load this information. Please try again.");
   expect(result.current.busy).toBe(false);
 });
 test("Live selects the Live model path and keeps the microphone audio session through synthesis", async () => {

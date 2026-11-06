@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NetInfo from "@react-native-community/netinfo";
 import { rememberSession } from "../../../platform/authStorage";
-import { signInWithAccountProtection } from "../../../core/web/app/features/authentication/services/accountLogin";
+import { signInOnMobile } from "./mobileSignIn";
 import { validateLoginFields } from "../../../core/web/app/features/authentication/services/loginValidation";
 import type { QuickLoginAccount } from "../../../core/web/app/shared/quickLoginAccounts";
 import type { MarkState } from "../../components/brand/EFlowMark";
+import { loginErrorMessage } from "./loginError";
 export function useNativeLogin() {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
@@ -18,6 +19,13 @@ export function useNativeLogin() {
     [scenarios, setScenarios] = useState<readonly QuickLoginAccount[]>(),
     [selected, setSelected] = useState("");
   const pending = useRef(false);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (!busy) return;
+    const timer = setTimeout(() => setSlow(true), 8_000);
+    return () => clearTimeout(timer);
+  }, [busy]);
   const signIn = async (loginEmail = email, loginPassword = password) => {
     if (pending.current) return;
     const invalid = validateLoginFields(loginEmail, loginPassword);
@@ -31,18 +39,14 @@ export function useNativeLogin() {
     setError("");
     try {
       const net = await NetInfo.fetch();
-      if (net.isConnected === false)
+      if (net.isConnected === false || net.isInternetReachable === false)
         throw new Error(
           "No network connection. Check your internet connection.",
         );
       await rememberSession(remember);
-      await signInWithAccountProtection(loginEmail, loginPassword);
+      await signInOnMobile(loginEmail, loginPassword);
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Unable to sign in right now. Please try again.",
-      );
+      setError(loginErrorMessage(e));
       setShake((old) => old + 1);
     } finally {
       pending.current = false;
@@ -75,6 +79,7 @@ export function useNativeLogin() {
     remember,
     setRemember,
     busy,
+    slow,
     error,
     setError,
     errors,

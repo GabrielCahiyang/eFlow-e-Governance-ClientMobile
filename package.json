@@ -5,6 +5,7 @@
   "dependencies": {
     "@config-plugins/react-native-webrtc": "15.0.2",
     "@expo-google-fonts/figtree": "0.4.1",
+    "@expo/ui": "58.0.23",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.2.1",
     "@react-native-community/netinfo": "12.0.1",
@@ -67,8 +68,9 @@
     "test": "jest --runInBand",
     "sync:presentation": "node scripts/sync-presentation.mjs",
     "sync:core": "node scripts/sync-web-core.mjs && node scripts/adapt-native-core.mjs",
-    "build:android": "expo export --platform android --output-dir dist/android --max-workers 2",
-    "build:ios": "expo export --platform ios --output-dir dist/ios --max-workers 2",
+    "verify:sign-in": "node scripts/verify-mobile-sign-in-config.mjs",
+    "build:android": "npm run verify:sign-in && expo export --platform android --output-dir dist/android --max-workers 2",
+    "build:ios": "npm run verify:sign-in && expo export --platform ios --output-dir dist/ios --max-workers 2",
     "build": "npm run build:android && npm run build:ios",
     "verify:release": "node scripts/verify-native-release.mjs"
   },

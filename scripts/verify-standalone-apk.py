@@ -25,7 +25,7 @@ with zipfile.ZipFile(apk) as archive:
  if code!=native.read_bytes():raise RuntimeError('APK contains a different app bundle than the current release output')
  source_map=json.loads((root/'android/app/build/generated/sourcemaps/react/release/index.android.bundle.map').read_text(encoding='utf-8'))
  checked=[]
- for file in ['src/app/features/app-shell/AppRoot.tsx','src/app/features/authentication/LoginScreen.tsx','src/platform/bootstrap.ts','src/platform/webRuntime.ts']:
+ for file in ['src/app/features/app-shell/AppRoot.tsx','src/app/features/authentication/LoginScreen.tsx','src/platform/bootstrap.ts','src/platform/webRuntime.ts','src/platform/config.ts','src/app/features/authentication/mobileSignIn.ts']:
   index=next((i for i,name in enumerate(source_map['sources']) if name.replace('\\','/').endswith('/'+file)),None)
   if index is None or source_map['sourcesContent'][index]!=(root/file).read_bytes().decode('utf-8'):raise RuntimeError('Bundled eFlow startup/login source is missing or stale')
   checked.append(file)

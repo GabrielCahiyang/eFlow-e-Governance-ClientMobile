@@ -1,4 +1,5 @@
 import {
+  useCallback,
   createContext,
   useContext,
   useEffect,
@@ -15,63 +16,125 @@ import type {
   WorkspaceSnapshot,
 } from "../../../core/web/app/features/workspaces/types";
 import { useAuth } from "../authentication";
-import { useFacts } from "../../shared/useFacts";
+import { isMobileRole } from "../../shared/mobileRoles";
 type Context = {
   workspaces: Workspace[];
   selected?: WorkspaceSnapshot;
   loading: boolean;
   error?: Error;
-  select: (id: string) => Promise<void>;
+  select: (id: string) => Promise<WorkspaceSnapshot | undefined>;
   refresh: () => Promise<void>;
 };
 const WorkspaceContext = createContext<Context | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
-  const data = useFacts(
-    "workspace-list:" + profile?.id,
-    listWorkspaces,
-    !!profile && profile.role !== "admin",
-  );
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState<WorkspaceSnapshot>(),
     [error, setError] = useState<Error>(),
-    [loading, setLoading] = useState(false);
+    [loading, setLoading] = useState(true);
   const generation = useRef(0),
-    currentSelection = useRef<string | undefined>(undefined);
+    currentSelection = useRef<string | undefined>(undefined),
+    authorized = useRef<Workspace[]>([]);
+  const loadSelection = useCallback(
+    async (id: string, token: number, list: Workspace[]) => {
+      try {
+        if (
+          !list.some(
+            (workspace) => workspace.id === id && workspace.state === "active",
+          )
+        )
+          throw new Error(
+            "This workspace is not in your current authorized workspace list.",
+          );
+        const snapshot = await selectWorkspace(id);
+        if (token === generation.current) {
+          if (
+            snapshot.workspace.id !== id ||
+            !list.some(
+              (workspace) =>
+                workspace.id === id &&
+                workspace.kind === snapshot.workspace.kind,
+            )
+          )
+            throw new Error("Could not verify the selected workspace context.");
+          setSelected(snapshot);
+          return snapshot;
+        }
+      } catch (e) {
+        if (token === generation.current)
+          setError(
+            e instanceof Error
+              ? e
+              : new Error("Could not verify workspace access."),
+          );
+      } finally {
+        if (token === generation.current) setLoading(false);
+      }
+    },
+    [],
+  );
   const select = async (id: string) => {
-    const switching = currentSelection.current !== id;
     const token = ++generation.current;
     currentSelection.current = id;
     setLoading(true);
     setError(undefined);
-    if (switching) setSelected(undefined);
-    try {
-      const snapshot = await selectWorkspace(id);
-      if (token === generation.current) setSelected(snapshot);
-    } catch (e) {
-      if (token === generation.current) setError(e as Error);
-    } finally {
-      if (token === generation.current) setLoading(false);
-    }
+    setSelected(undefined);
+    return loadSelection(id, token, authorized.current);
   };
-  useEffect(() => {
-    if (!selected && data.data?.length) {
-      const initial =
-        data.data.find((w) => w.office_id === profile?.org_id) || data.data[0];
-      void select(initial.id);
+  const refresh = useCallback(async () => {
+    const token = ++generation.current;
+    setLoading(true);
+    setError(undefined);
+    setSelected(undefined);
+    authorized.current = [];
+    setWorkspaces([]);
+    if (!profile || !isMobileRole(profile.role)) {
+      setLoading(false);
+      return;
     }
-  }, [data.data, profile?.id]);
+    try {
+      const list = (await listWorkspaces()).filter(
+        (workspace) => workspace.state === "active",
+      );
+      if (token !== generation.current) return;
+      authorized.current = list;
+      setWorkspaces(list);
+      const id =
+        currentSelection.current ||
+        list.find((workspace) => workspace.office_id === profile.org_id)?.id ||
+        list[0]?.id;
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      currentSelection.current = id;
+      await loadSelection(id, token, list);
+    } catch (e) {
+      if (token === generation.current) {
+        setError(
+          e instanceof Error
+            ? e
+            : new Error("Could not verify workspace access."),
+        );
+        setLoading(false);
+      }
+    }
+  }, [profile?.id, profile?.role, profile?.org_id, loadSelection]);
+  useEffect(() => {
+    void refresh();
+    return () => {
+      ++generation.current;
+    };
+  }, [refresh]);
   return (
     <WorkspaceContext.Provider
       value={{
-        workspaces: data.data || [],
+        workspaces,
         selected,
-        loading: loading || data.loading,
-        error: error || data.error,
+        loading,
+        error,
         select,
-        refresh: async () => {
-          await data.refresh();
-          if (currentSelection.current) await select(currentSelection.current);
-        },
+        refresh,
       }}
     >
       {children}

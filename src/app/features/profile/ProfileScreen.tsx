@@ -10,7 +10,6 @@ import {
   Row,
   Screen,
   Tabs,
-  Toggle,
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
@@ -20,7 +19,6 @@ import {
   getProfileAvatarUrl,
   updateOwnProfile,
   replaceProfileAvatar,
-  updateEmailPreference,
 } from "../../../core/web/app/services/userSettingsService";
 import { ProfessionalProfile } from "./ProfessionalProfile";
 export function ProfileScreen() {
@@ -33,17 +31,13 @@ export function ProfileScreen() {
     () => getProfileAvatarUrl(profile?.avatar_path),
   );
   return (
-    <Screen
-      title="Profile"
-      description="Your account and professional information."
-    >
+    <Screen compact>
       <Tabs
         value={view}
         onChange={setView}
         items={[
           { id: "account", label: "Account" },
           { id: "professional", label: "Professional Profile" },
-          { id: "notifications", label: "Notifications" },
         ]}
       />
       {!!(view === "account") && (
@@ -113,25 +107,7 @@ export function ProfileScreen() {
       {!!(view === "professional" && !!profile) && (
         <ProfessionalProfile userId={profile.id} />
       )}
-      {!!(view === "notifications") && (
-        <Card title="Email notifications">
-          <Toggle
-            label="Receive eFlow notifications by email"
-            value={profile?.email_notifications_enabled !== false}
-            disabled={action.busy}
-            onChange={(enabled) =>
-              void action.run(async () => {
-                await updateEmailPreference(profile!.id, enabled);
-                await refresh();
-              })
-            }
-          />
-          <Notice>
-            In-app workflow alerts remain available in your Inbox.
-          </Notice>
-        </Card>
-      )}
-      {!!action.error && <ErrorState error={action.error} />}
+      {!!action.error && <ErrorState context="action" error={action.error} />}
       {!!action.notice && <Notice>{action.notice}</Notice>}
     </Screen>
   );

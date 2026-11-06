@@ -4,11 +4,13 @@ import {
   type StyleProp,
   type ViewStyle,
   type TextStyle,
+  Pressable as NativePressable,
 } from "react-native";
-import { Pressable, View } from "./Primitives";
+import { View } from "./Primitives";
 import type { ReactNode } from "react";
-import { colors } from "./theme";
+import { radius } from "./theme";
 import { BusyIndicator } from "./BusyIndicator";
+import { useTheme } from "./Appearance";
 export function Button({
   children,
   onPress,
@@ -32,14 +34,17 @@ export function Button({
   accessibilityLabel?: string;
   textStyle?: StyleProp<TextStyle>;
 }) {
+  const palette = useTheme();
   const foreground =
-    variant === "primary" || variant === "danger"
-      ? "#fff"
-      : variant === "ghost"
-        ? colors.primary
-        : colors.text;
+    variant === "primary"
+      ? palette.onPrimary
+      : variant === "danger"
+        ? palette.onDanger
+        : variant === "ghost"
+          ? palette.primary
+          : palette.text;
   return (
-    <Pressable
+    <NativePressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: !!disabled || !!busy, busy: !!busy }}
@@ -48,13 +53,18 @@ export function Button({
       onLongPress={onLongPress}
       style={({ pressed }) => [
         s.button,
-        variant === "primary"
-          ? s.primary
-          : variant === "danger"
-            ? s.danger
-            : variant === "outline"
-              ? s.outline
-              : s.ghost,
+        {
+          backgroundColor:
+            variant === "primary"
+              ? palette.primary
+              : variant === "danger"
+                ? palette.danger
+                : variant === "outline"
+                  ? palette.surface
+                  : "transparent",
+          borderWidth: variant === "outline" ? 1 : 0,
+          borderColor: palette.border,
+        },
         (disabled || busy) && s.disabled,
         pressed && s.pressed,
         style,
@@ -62,7 +72,7 @@ export function Button({
     >
       {busy ? <BusyIndicator color={foreground} /> : icon}
       <Text style={[s.text, { color: foreground }, textStyle]}>{children}</Text>
-    </Pressable>
+    </NativePressable>
   );
 }
 export const Row = ({
@@ -74,8 +84,8 @@ export const Row = ({
 }) => <View style={[s.row, style]}>{children}</View>;
 const s = StyleSheet.create({
   button: {
-    minHeight: 46,
-    borderRadius: 10,
+    minHeight: 48,
+    borderRadius: radius.control,
     paddingHorizontal: 15,
     paddingVertical: 11,
     flexDirection: "row",
@@ -84,14 +94,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 1,
   },
-  primary: { backgroundColor: colors.primary },
-  danger: { backgroundColor: colors.danger },
-  outline: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  ghost: { backgroundColor: "transparent" },
   text: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.8 },
