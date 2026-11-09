@@ -7,12 +7,22 @@ import {
 } from "@testing-library/react-native";
 import { MobileNavigator } from "../MobileNavigator";
 const mockOffice = {
-  workspace: { id: "office-a", kind: "office", name: "Planning Office", state: "active" },
+  workspace: {
+    id: "office-a",
+    kind: "office",
+    name: "Planning Office",
+    state: "active",
+  },
   projects: [{ id: "project-a" }],
 };
 let mockRole = "head";
 const mockPersonal = {
-  workspace: { id: "personal-b", kind: "personal", name: "Personal QA", state: "active" },
+  workspace: {
+    id: "personal-b",
+    kind: "personal",
+    name: "Personal QA",
+    state: "active",
+  },
   projects: [{ id: "project-b" }],
 };
 const mockWorkspace = {
@@ -32,6 +42,9 @@ jest.mock("../../authentication", () => ({
 }));
 jest.mock("../../workspaces", () => ({ useWorkspace: () => mockWorkspace }));
 jest.mock("../../notifications", () => ({ usePushInbox: () => {} }));
+jest.mock("../../communication", () => ({
+  useConversationDirectory: () => ({ data: [] }),
+}));
 jest.mock("../../../components/brand/EFlowMark", () => ({
   EFlowMark: () => null,
 }));
@@ -105,11 +118,21 @@ beforeEach(() => {
 
 test("Home toolbar profile opens within Home and Back restores Home", async () => {
   await render(<MobileNavigator />);
-  await fireEvent.press(screen.getByRole("button", { name: "Open profile for QA Head" }));
-  await waitFor(() => expect(screen.getByText("Body profile")).toBeOnTheScreen());
-  expect(screen.getByRole("tab", { name: "Home" }).props.accessibilityState.selected).toBe(true);
-  await fireEvent.press(screen.getByRole("button", { name: "Back to previous" }));
-  await waitFor(() => expect(screen.getByText("Body overview")).toBeOnTheScreen());
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Open profile for QA Head" }),
+  );
+  await waitFor(() =>
+    expect(screen.getByText("Body profile")).toBeOnTheScreen(),
+  );
+  expect(
+    screen.getByRole("tab", { name: "Home" }).props.accessibilityState.selected,
+  ).toBe(true);
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Back to previous" }),
+  );
+  await waitFor(() =>
+    expect(screen.getByText("Body overview")).toBeOnTheScreen(),
+  );
 });
 
 test("an explicit link to an unvisited tab keeps that tab's root available for Back", async () => {
@@ -152,7 +175,9 @@ test("a child opened from Home retains Home selection; Projects and More are sta
   );
   await fireEvent.press(screen.getByRole("tab", { name: "More" }));
   await waitFor(() => expect(screen.getByText("QA Head")).toBeOnTheScreen());
-  await fireEvent.press(screen.getByRole("button", { name: "Account & settings" }));
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Account & settings" }),
+  );
   await waitFor(() =>
     expect(screen.getByText("Body settings")).toBeOnTheScreen(),
   );
@@ -196,7 +221,9 @@ test.each(["head", "member", "accounting_staff"])(
         .selected,
     ).toBe(true);
     await fireEvent.press(screen.getByRole("tab", { name: "More" }));
-    await fireEvent.press(screen.getByRole("button", { name: "Account & settings" }));
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Account & settings" }),
+    );
     await waitFor(() =>
       expect(screen.getByText("Body settings")).toBeOnTheScreen(),
     );

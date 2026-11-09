@@ -268,6 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearDisplayCache("access");
       void requestRefresh(true);
     };
+    let subscribed = false;
     const channel = createPostgresChannel("native-access-" + user.id)
       .on(
         "postgres_changes",
@@ -294,7 +295,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { event: "*", schema: "public", table: "role_permissions" },
         accessChanged,
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          if (subscribed) accessChanged();
+          subscribed = true;
+        }
+      });
+    const fallback = setInterval(() => {
+      if (
+        appState.current === "active" &&
+        verifiedProfile.current?.employee_id === `GUEST-${user.id}`
+      )
+        void requestRefresh(true);
+    }, 60_000);
     const app = AppState.addEventListener("change", (state) => {
       appState.current = state;
       if (state === "background") {
@@ -308,6 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => {
+      clearInterval(fallback);
       app.remove();
       void supabase.removeChannel(channel);
     };

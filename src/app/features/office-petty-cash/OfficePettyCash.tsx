@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Linking } from "react-native";
+import { useEffect, useState } from "react";
+import { AppState, Linking } from "react-native";
 import {
   Button,
   Card,
@@ -21,6 +21,7 @@ import { chooseFiles } from "../../../platform/files";
 import { draftStore } from "../../../platform/draftStore";
 import { getPhilippineCalendarDate } from "../../../core/web/app/shared/calendarDates";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
+import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 
 const labels = {
   request: "Request petty cash",
@@ -51,6 +52,9 @@ type Request = {
   spent: number;
   status: string;
   receipts: Omit<Receipt, "amount">[];
+  canSettle?: boolean;
+  settlementBlocked?: boolean;
+  headNotified?: boolean;
 };
 type Snapshot = {
   available: number;
@@ -63,8 +67,15 @@ type Command = { key: string; action: Kind; data: Record<string, unknown> };
 const money = (s: string) => (/^\d+(?:\.\d{1,2})?$/.test(s) ? Number(s) : 0);
 const formats = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 
-export function OfficePettyCash({ office }: { office: string }) {
+export function OfficePettyCash({
+  office,
+  requestId,
+}: {
+  office: string;
+  requestId?: string;
+}) {
   const { profile, organization } = useAuth();
+  const assertAccess = useAccountActionAccess();
   const actor = profile?.id || "";
   const ownOffice = profile?.org_id === office;
   const head =
@@ -91,6 +102,20 @@ export function OfficePettyCash({ office }: { office: string }) {
     () => draftStore.get<Command>(actor, scope),
     !!office && !!actor,
   );
+  useEffect(() => {
+    if (!office || !actor) return;
+    const refresh = () => {
+      if (AppState.currentState === "active") void facts.refresh();
+    };
+    const foreground = AppState.addEventListener("change", (state) => {
+      if (state === "active") refresh();
+    });
+    const fallback = setInterval(refresh, 30_000);
+    return () => {
+      foreground.remove();
+      clearInterval(fallback);
+    };
+  }, [office, actor, facts.refresh]);
   const action = useAction();
   const [edit, setEdit] = useState<{ kind: Kind; request?: Request }>();
   const [amount, setAmount] = useState(""),
@@ -112,7 +137,9 @@ export function OfficePettyCash({ office }: { office: string }) {
       old.map((r, j) => (i === j ? { ...r, ...fields } : r)),
     );
   async function execute(cmd: Command) {
+    assertAccess(actor);
     await draftStore.set(actor, scope, cmd);
+    assertAccess(actor);
     const { error } = await supabase.rpc("office_petty_cash_command", {
       p_office: office,
       p_key: cmd.key,
@@ -221,67 +248,88 @@ export function OfficePettyCash({ office }: { office: string }) {
               value={peso(data.replenishable)}
             />
           )}
-          {!pending && !recovery.loading && !recovery.error && ownOffice && (
-            <Row>
-              <Button onPress={() => start("request")}>{labels.request}</Button>
-              {accounting && data.replenishable > 0 && (
-                <Button variant="outline" onPress={() => start("replenish")}>
-                  {labels.replenish}
+          {!requestId &&
+            !pending &&
+            !recovery.loading &&
+            !recovery.error &&
+            ownOffice && (
+              <Row>
+                <Button onPress={() => start("request")}>
+                  {labels.request}
                 </Button>
-              )}
-            </Row>
+                {accounting && data.replenishable > 0 && (
+                  <Button variant="outline" onPress={() => start("replenish")}>
+                    {labels.replenish}
+                  </Button>
+                )}
+              </Row>
+            )}
+          {requestId && !data.requests.some((r) => r.id === requestId) && (
+            <Notice>This petty cash request is unavailable.</Notice>
           )}
-          {data.requests.map((r) => (
-            <Card key={r.id} title={r.purpose}>
-              <LabelValue label={r.requesterName} value={peso(r.amount)} />
-              <Notice>{r.status.replace(/_/g, " ")}</Notice>
-              {r.receipts.map((receipt, i) => (
-                <Button
-                  key={receipt.path}
-                  variant="outline"
-                  onPress={() =>
-                    void action.run(async () => {
-                      const { data, error } = await supabase.storage
-                        .from("office-petty-receipts")
-                        .createSignedUrl(receipt.path, 60);
-                      if (error) throw new Error(error.message);
-                      await Linking.openURL(data.signedUrl);
-                    })
-                  }
-                >
-                  View receipt {i + 1}
-                </Button>
-              ))}
-              {!pending && !recovery.loading && !recovery.error && (
-                <Row>
-                  {actor === r.requester &&
-                    ["pending", "approved"].includes(r.status) &&
-                    commandButton("cancel", r)}
-                  {head &&
-                    actor !== r.requester &&
-                    r.status === "pending" && [
-                      commandButton("approve", r),
-                      commandButton("reject", r),
-                    ]}
-                  {accounting &&
-                    r.status === "approved" &&
-                    commandButton("release", r)}
-                  {actor === r.requester &&
-                    r.status === "released" &&
-                    commandButton("receipts", r)}
-                  {head &&
-                    actor !== r.requester &&
-                    r.status === "receipt_review" && [
-                      commandButton("endorse", r),
-                      commandButton("return_receipts", r),
-                    ]}
-                  {accounting &&
-                    r.status === "receipt_approved" &&
-                    commandButton("settle", r)}
-                </Row>
-              )}
-            </Card>
-          ))}
+          {data.requests
+            .filter((r) => !requestId || r.id === requestId)
+            .map((r) => (
+              <Card key={r.id} title={r.purpose}>
+                <LabelValue label={r.requesterName} value={peso(r.amount)} />
+                <Notice>{r.status.replace(/_/g, " ")}</Notice>
+                {r.settlementBlocked && (
+                  <Notice>
+                    {r.headNotified
+                      ? "Automatically escalated to the Head. "
+                      : ""}
+                    No eligible Accounting Officer is available. Staff cannot
+                    settle their own petty cash.
+                  </Notice>
+                )}
+                {r.receipts.map((receipt, i) => (
+                  <Button
+                    key={receipt.path}
+                    variant="outline"
+                    onPress={() =>
+                      void action.run(async () => {
+                        const { data, error } = await supabase.storage
+                          .from("office-petty-receipts")
+                          .createSignedUrl(receipt.path, 60);
+                        if (error) throw new Error(error.message);
+                        await Linking.openURL(data.signedUrl);
+                      })
+                    }
+                  >
+                    View receipt {i + 1}
+                  </Button>
+                ))}
+                {!pending && !recovery.loading && !recovery.error && (
+                  <Row>
+                    {actor === r.requester &&
+                      ["pending", "approved"].includes(r.status) &&
+                      commandButton("cancel", r)}
+                    {head &&
+                      actor !== r.requester &&
+                      r.status === "pending" && [
+                        commandButton("approve", r),
+                        commandButton("reject", r),
+                      ]}
+                    {accounting &&
+                      r.status === "approved" &&
+                      commandButton("release", r)}
+                    {actor === r.requester &&
+                      r.status === "released" &&
+                      commandButton("receipts", r)}
+                    {head &&
+                      actor !== r.requester &&
+                      r.status === "receipt_review" && [
+                        commandButton("endorse", r),
+                        commandButton("return_receipts", r),
+                      ]}
+                    {accounting &&
+                      r.canSettle === true &&
+                      r.status === "receipt_approved" &&
+                      commandButton("settle", r)}
+                  </Row>
+                )}
+              </Card>
+            ))}
         </>
       )}
       {!!(edit || pending) && (
@@ -435,7 +483,9 @@ export function OfficePettyCash({ office }: { office: string }) {
               )}
             </>
           )}
-          {!!action.error && <ErrorState context="action" error={action.error} />}
+          {!!action.error && (
+            <ErrorState context="action" error={action.error} />
+          )}
         </Sheet>
       )}
       {!edit && !pending && !!action.error && (

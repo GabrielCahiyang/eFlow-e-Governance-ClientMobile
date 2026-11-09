@@ -26,20 +26,19 @@ jest.mock("../../../../platform/draftStore", () => ({
 jest.mock("../../../../platform/webRuntime", () => ({
   nativeWindow: { dispatchEvent: jest.fn() },
 }));
+jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
 jest.mock("../../../shared/confirm", () => ({ confirmAction: jest.fn() }));
 
 test("selection and camera failure are local, then a confirmed submission resumes the same draft after interruption", async () => {
-  jest
-    .mocked(chooseFiles)
-    .mockResolvedValueOnce([
-      {
-        uri: "file:///safe.pdf",
-        name: "safe.pdf",
-        type: "application/pdf",
-        size: 4,
-        arrayBuffer: async () => new ArrayBuffer(4),
-      },
-    ]);
+  jest.mocked(chooseFiles).mockResolvedValueOnce([
+    {
+      uri: "file:///safe.pdf",
+      name: "safe.pdf",
+      type: "application/pdf",
+      size: 4,
+      arrayBuffer: async () => new ArrayBuffer(4),
+    },
+  ]);
   jest
     .mocked(captureEvidencePhoto)
     .mockRejectedValueOnce(new Error("Allow camera access or choose a file."));
@@ -81,7 +80,11 @@ test("selection and camera failure are local, then a confirmed submission resume
     screen.getByRole("button", { name: "Submit for review" }),
   );
   await waitFor(() =>
-    expect(screen.getByText("The upload stopped before it finished. Check and resume your submission.")).toBeOnTheScreen(),
+    expect(
+      screen.getByText(
+        "The upload stopped before it finished. Check and resume your submission.",
+      ),
+    ).toBeOnTheScreen(),
   );
   const request = jest.mocked(sendTaskEvidence).mock.calls[0][0].request;
   expect(request.files.map((file) => file.name)).toEqual(["safe.pdf"]);

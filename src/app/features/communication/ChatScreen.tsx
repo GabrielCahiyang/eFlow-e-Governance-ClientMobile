@@ -19,20 +19,35 @@ import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
-import { fetchAllProfiles } from "../../../core/web/lib/supabaseService";
 import { draftStore } from "../../../platform/draftStore";
+import { chooseFiles } from "../../../platform/files";
+import { nativeWindow } from "../../../platform/webRuntime";
+import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 import type { AppRoute, Navigate } from "../../shared/routes";
 import {
   loadChannels,
   loadMessages,
   sendChat,
-  getOrCreateDirectChannel,
+  listChatPeople,
+  openDirectConversation,
+  readConversation,
+  setMessagePin,
+  toggleMessageReaction,
   type Message,
 } from "./services";
-import { mergeMessages, isMessageDraft } from "./messageHistory";
+import {
+  mergeMessages,
+  isMessageDraft,
+  type MessageDraft,
+} from "./messageHistory";
 import { NavigationRow } from "../../components/ui/NavigationRow";
-import { fetchProjectTasks } from "../projects/services";
 import { filterConversationContext } from "./conversationContext";
+import { ChatImage, chatImageTypes, uploadChatImage } from "./chatImages";
+import { ConversationInfo } from "./ConversationInfo";
+import {
+  conversationDirectoryChanged,
+  useConversationDirectory,
+} from "./useConversationDirectory";
 export function ChatScreen({
   navigate,
   route,
@@ -43,37 +58,47 @@ export function ChatScreen({
   const { profile } = useAuth();
   const palette = useTheme();
   const actor = profile!.id;
+  const assertAccess = useAccountActionAccess();
   const contextual = !!(route.projectId || route.taskId);
   const [draft, setDraft] = useState("");
   const [newChat, setNewChat] = useState(false);
   const [recipient, setRecipient] = useState("");
-  const [pending, setPending] = useState<{ id: string; text: string }>();
+  const [query, setQuery] = useState("");
+  const [personQuery, setPersonQuery] = useState("");
+  const [info, setInfo] = useState(false);
+  const [pending, setPending] = useState<MessageDraft>();
+  const [image, setImage] =
+    useState<Awaited<ReturnType<typeof chooseFiles>>[number]>();
   const action = useAction();
-  const readChannels = async () => {
-    const [available, tasks] = await Promise.all([
-      loadChannels(actor),
-      route.projectId && !route.taskId
-        ? fetchProjectTasks(route.projectId)
-        : Promise.resolve([]),
-    ]);
-    return filterConversationContext(
-      available,
-      route.taskId,
-      route.projectId ? new Set(tasks.map((task) => task.id)) : undefined,
-    );
-  };
-  const channels = useFacts(
-    "chat-channels:" + [actor, route.projectId, route.taskId].join(":"),
-    readChannels,
+  const channels = useConversationDirectory(actor);
+  const available = filterConversationContext(
+    channels.data || [],
+    route.taskId,
+    undefined,
+    route.projectId,
+  );
+  const matching = available.filter((item) =>
+    [item.name, item.projectTitle, item.lastMessage].some((value) =>
+      value?.toLowerCase().includes(query.trim().toLowerCase()),
+    ),
   );
   const channel = channels.error
     ? undefined
     : route.id
-      ? channels.data?.find((item) => item.id === route.id)
+      ? available.find((item) => item.id === route.id)
       : route.taskId
-        ? channels.data?.[0]
-        : undefined;
-  const people = useFacts("chat-directory:" + actor, fetchAllProfiles, newChat);
+        ? available[0]
+        : route.projectId
+          ? available.find(
+              (item) =>
+                item.kind === "project" && item.projectId === route.projectId,
+            )
+          : undefined;
+  const people = useFacts(
+    "chat-directory:" + actor,
+    () => listChatPeople(),
+    newChat,
+  );
   const messages = useFacts(
     "chat-messages:" + actor + ":" + channel?.id,
     () => loadMessages(channel!.id),
@@ -106,7 +131,7 @@ export function ChatScreen({
         throw new Error(
           "This saved message is unreadable. Verify its original send before continuing.",
         );
-      return saved as { id: string; text: string } | null;
+      return saved as MessageDraft | null;
     },
     !!channel,
   );
@@ -114,6 +139,8 @@ export function ChatScreen({
   useEffect(() => {
     setDraft("");
     setPending(undefined);
+    setImage(undefined);
+    setInfo(false);
     if (!channel) return;
     const live = createPostgresChannel("native-chat:" + channel.id)
       .on(
@@ -148,7 +175,9 @@ export function ChatScreen({
           void messages.refresh();
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void messages.refresh();
+      });
     return () => {
       void supabase.removeChannel(live);
     };
@@ -159,18 +188,34 @@ export function ChatScreen({
       const session = await supabase.auth.getSession();
       if (session.error || session.data.session?.user.id !== actor)
         throw new Error("Sign in again.");
-      if (!(await readChannels()).some((item) => item.id === channel.id))
+      if (!(await loadChannels()).some((item) => item.id === channel.id))
         throw new Error(
           "This conversation is no longer available to your account.",
         );
-      const item = original || { id: crypto.randomUUID(), text: draft };
-      if (!item.text.trim()) return;
+      assertAccess(actor);
+      const item = original || {
+        id: crypto.randomUUID(),
+        text: draft,
+        imagePath: image
+          ? await uploadChatImage(channel.id, actor, image)
+          : undefined,
+      };
+      if (!item.text.trim() && !item.imagePath) return;
       await draftStore.set(actor, "chat:" + channel.id, item);
       setPending(item);
-      await sendChat(item.id, channel.id, actor, profile!.full_name, item.text);
+      assertAccess(actor);
+      await sendChat(
+        item.id,
+        channel.id,
+        actor,
+        profile!.full_name,
+        item.text,
+        item.imagePath,
+      );
       await draftStore.remove(actor, "chat:" + channel.id);
       setPending(undefined);
       setDraft("");
+      setImage(undefined);
       await Promise.all([
         messages.refresh(),
         channels.refresh(),
@@ -209,22 +254,46 @@ export function ChatScreen({
                 multiline
                 maxLength={5000}
               />
+              {!original && (
+                <Button
+                  variant="outline"
+                  disabled={action.busy}
+                  onPress={() =>
+                    void action.run(async () => {
+                      if (image) {
+                        setImage(undefined);
+                        return;
+                      }
+                      const [chosen] = await chooseFiles(chatImageTypes);
+                      if (chosen) setImage(chosen);
+                    })
+                  }
+                >
+                  {image ? `Remove ${image.name}` : "Attach image"}
+                </Button>
+              )}
               <Button
                 busy={action.busy}
                 disabled={
-                  channels.loading ||
-                  messages.loading ||
+                  (channels.loading && !channels.data) ||
+                  (messages.loading && !messages.data) ||
                   !!messages.error ||
                   recovery.loading ||
                   !!recovery.error ||
-                  !(original?.text || draft).trim()
+                  !(
+                    (original?.text || draft).trim() ||
+                    original?.imagePath ||
+                    image
+                  )
                 }
                 onPress={() => void send()}
               >
                 {original ? "Retry original message" : "Send message"}
               </Button>
               {!!recovery.error && <ErrorState error={recovery.error} />}
-              {!!action.error && <ErrorState context="action" error={action.error} />}
+              {!!action.error && (
+                <ErrorState context="action" error={action.error} />
+              )}
             </View>
           )
         }
@@ -241,21 +310,30 @@ export function ChatScreen({
             ? route.taskId
               ? "Conversation linked to this task."
               : route.projectId
-                ? "Authorized task conversations in this project."
-                : "Task, Office and direct conversations."
+                ? "Conversations for this project."
+                : "Project, task, Office and direct conversations."
             : undefined
         }
-        onRefresh={() =>
-          channel ? messages.refresh() : channels.refresh()
-        }
+        onRefresh={() => (channel ? messages.refresh() : channels.refresh())}
         actions={
-          !channel && !contextual && !route.id ? (
+          channel ? (
+            <Button variant="outline" onPress={() => setInfo(true)}>
+              Conversation info
+            </Button>
+          ) : !contextual && !route.id ? (
             <Button disabled={action.busy} onPress={() => setNewChat(true)}>
               New conversation
             </Button>
           ) : undefined
         }
       >
+        {!channel && !contextual && !route.id && (
+          <Field
+            label="Search conversations"
+            value={query}
+            onChangeText={setQuery}
+          />
+        )}
         {!channel ? (
           channels.error ? (
             <ErrorState
@@ -264,15 +342,19 @@ export function ChatScreen({
             />
           ) : !channels.data ? (
             <Loading label="Loading conversations" layout="navigation" />
-          ) : route.id || route.taskId ? (
+          ) : route.id || route.taskId || route.projectId ? (
             <Empty
               title="Conversation unavailable"
               description="This account has no authorized conversation at this location."
             />
-          ) : !channels.data.length ? (
+          ) : !matching.length ? (
             <Empty
               kind="messages"
-              title="No conversations yet"
+              title={
+                query.trim()
+                  ? "No matching conversations"
+                  : "No conversations yet"
+              }
               description="Your authorized direct, Office and task conversations appear here."
               action={
                 !contextual && !route.id ? (
@@ -283,16 +365,32 @@ export function ChatScreen({
               }
             />
           ) : (
-            channels.data.map((item) => (
+            matching.map((item) => (
               <NavigationRow
                 key={item.id}
                 title={item.name}
+                icon={
+                  item.unread ? (
+                    <View
+                      accessibilityLabel="Unread"
+                      style={{
+                        backgroundColor: palette.primary,
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                      }}
+                    />
+                  ) : undefined
+                }
                 description={
-                  item.kind === "direct"
+                  item.lastMessage ||
+                  (item.kind === "direct"
                     ? "Direct"
                     : item.kind === "org"
                       ? "Office"
-                      : "Task"
+                      : item.kind === "project"
+                        ? "Project"
+                        : "Task")
                 }
                 onPress={() =>
                   navigate({
@@ -314,11 +412,21 @@ export function ChatScreen({
                   navigate({
                     name: "task",
                     id: channel.taskId,
-                    projectId: route.projectId,
+                    projectId: channel.projectId || route.projectId,
                   })
                 }
               >
                 Open task
+              </Button>
+            )}
+            {!channel.taskId && !!channel.projectId && (
+              <Button
+                variant="outline"
+                onPress={() =>
+                  navigate({ name: "project", id: channel.projectId })
+                }
+              >
+                Open project
               </Button>
             )}
             {!!shown.length &&
@@ -363,25 +471,92 @@ export function ChatScreen({
                 <View
                   key={message.id}
                   style={{
-                    gap: 4,
-                    paddingVertical: 8,
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderColor: palette.border,
+                    gap: 5,
+                    padding: 12,
+                    borderRadius: 16,
+                    width: "88%",
+                    alignSelf:
+                      message.sender_id === actor ? "flex-end" : "flex-start",
+                    backgroundColor:
+                      message.sender_id === actor
+                        ? palette.primarySoft
+                        : palette.surface,
                   }}
                 >
                   <Text style={{ fontWeight: "600" }}>
                     {message.sender_name}
                   </Text>
                   <Text selectable>{message.content}</Text>
+                  {!!message.image_path && (
+                    <ChatImage actor={actor} path={message.image_path} />
+                  )}
                   <Text style={{ color: palette.mutedLabel, fontSize: 12 }}>
                     {dateLabel(message.created_at)}
                   </Text>
+                  <View
+                    style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}
+                  >
+                    <Button
+                      variant="outline"
+                      onPress={() =>
+                        void action.run(async () => {
+                          assertAccess(actor);
+                          await toggleMessageReaction(message.id, "👍");
+                          await messages.refresh();
+                        })
+                      }
+                    >
+                      👍{" "}
+                      {Object.keys(message.reaction_users?.["👍"] || {}).length}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onPress={() =>
+                        void action.run(async () => {
+                          assertAccess(actor);
+                          await setMessagePin(message.id, !message.pinned_at);
+                          await messages.refresh();
+                        })
+                      }
+                    >
+                      {message.pinned_at ? "Unpin" : "Pin"}
+                    </Button>
+                  </View>
                 </View>
               ))
             )}
+            {channel.unread && !messages.error && !!messages.data?.length && (
+              <Button
+                variant="outline"
+                onPress={() =>
+                  void action.run(async () => {
+                    assertAccess(actor);
+                    await readConversation(
+                      channel.id,
+                      messages.data!.at(-1)!.created_at,
+                    );
+                    nativeWindow.dispatchEvent({
+                      type: conversationDirectoryChanged,
+                    });
+                    await channels.refresh();
+                  })
+                }
+              >
+                Mark conversation read
+              </Button>
+            )}
+            <ConversationInfo
+              actor={actor}
+              channel={channel}
+              messages={shown}
+              open={info}
+              onClose={() => setInfo(false)}
+            />
           </>
         )}
-        {!channel && !!action.error && <ErrorState context="action" error={action.error} />}
+        {!channel && !!action.error && (
+          <ErrorState context="action" error={action.error} />
+        )}
         <Sheet
           open={newChat}
           title="New conversation"
@@ -396,13 +571,15 @@ export function ChatScreen({
                   const session = await supabase.auth.getSession();
                   if (session.error || session.data.session?.user.id !== actor)
                     throw new Error("Sign in again.");
-                  const id = await getOrCreateDirectChannel(actor, recipient);
+                  assertAccess(actor);
+                  const id = await openDirectConversation(recipient);
                   await channels.refresh();
                   navigate({
                     name: "messages",
                     id,
-                    title: people.data?.find((p) => p.id === recipient)
-                      ?.full_name,
+                    title:
+                      people.data?.find((p) => p.id === recipient)?.name ||
+                      undefined,
                   });
                   setNewChat(false);
                 })
@@ -415,16 +592,27 @@ export function ChatScreen({
           {people.error ? (
             <ErrorState error={people.error} />
           ) : (
-            <Choice
-              label="Colleague"
-              value={recipient}
-              onChange={setRecipient}
-              options={(people.data || [])
-                .filter(
-                  (p) => p.id !== actor && p.is_active && p.role !== "admin",
-                )
-                .map((p) => ({ value: p.id, label: p.full_name }))}
-            />
+            <>
+              <Field
+                label="Search people"
+                value={personQuery}
+                onChangeText={setPersonQuery}
+              />
+              <Choice
+                label="Colleague"
+                value={recipient}
+                onChange={setRecipient}
+                options={(people.data || [])
+                  .filter(
+                    (p) =>
+                      p.id !== actor &&
+                      (p.name || "")
+                        .toLowerCase()
+                        .includes(personQuery.trim().toLowerCase()),
+                  )
+                  .map((p) => ({ value: p.id, label: p.name || "Colleague" }))}
+              />
+            </>
           )}
         </Sheet>
       </Screen>

@@ -102,6 +102,7 @@ export function useFinancialAction(
     run: (
       operation: () => Promise<unknown>,
       message = "Financial action recorded.",
-    ) => action.run(fingerprint, operation, undefined, message),
+      refresh?: () => Promise<void>,
+    ) => action.run(fingerprint, operation, refresh, message),
   };
 }

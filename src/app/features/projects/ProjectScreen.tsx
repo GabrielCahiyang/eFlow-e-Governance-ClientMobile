@@ -426,6 +426,7 @@ export function ProjectScreen({
             <ProjectFundingSummary
               key={profile?.id + ":" + id}
               projectId={id}
+              showCloseout={profile?.role === "head" && !closed}
               onManageFunding={() =>
                 navigate({
                   name: "project",

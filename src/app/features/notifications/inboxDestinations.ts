@@ -8,6 +8,18 @@ export function inboxUpdateRoute(
   role: string,
 ): AppRoute | undefined {
   if (!isMobileRole(role)) return;
+  if (
+    item.financialRecordType === "settlement_staffing" ||
+    item.financialRecordType === "office_petty_cash_staffing"
+  )
+    return role === "head" && item.financialRecordId
+      ? {
+          name: "financial_reviews",
+          recordId: item.financialRecordId,
+          recordType: item.financialRecordType,
+          financialOfficeId: item.orgId,
+        }
+      : undefined;
   const resolved =
     resolveNotificationDestination(item, role) ||
     (role === "accounting_staff"

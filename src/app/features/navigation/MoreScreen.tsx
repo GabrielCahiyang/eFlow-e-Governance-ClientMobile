@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import MessageCircle from "lucide-react-native/icons/message-circle";
+import Wallet from "lucide-react-native/icons/wallet";
 import Megaphone from "lucide-react-native/icons/megaphone";
 import Settings from "lucide-react-native/icons/settings";
 import LogOut from "lucide-react-native/icons/log-out";
@@ -9,6 +10,7 @@ import { Screen, ErrorState, Button } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
 import { useAuth } from "../authentication";
+import { useConversationDirectory } from "../communication";
 import type { Navigate, AppRoute } from "../../shared/routes";
 import { canOpenNativeSection } from "./nativeNavigation";
 
@@ -17,6 +19,9 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     palette = useTheme(),
     [error, setError] = useState<Error>(),
     [busy, setBusy] = useState(false);
+  const chats = useConversationDirectory(profile?.id || "");
+  const unreadMessages =
+    !chats.error && chats.data?.some((chat) => chat.unread);
 
   const entries: {
     title: string;
@@ -42,6 +47,21 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
       tileBg: palette.blueSoft,
       tileColor: palette.blue,
     },
+    ...(profile?.org_id
+      ? [
+          {
+            title: "Office petty cash",
+            subtitle: "Separate Office fund and receipt requests",
+            route: {
+              name: "financial_reviews" as const,
+              recordType: "office_petty_cash",
+            },
+            Icon: Wallet,
+            tileBg: palette.primarySoft,
+            tileColor: palette.primary,
+          },
+        ]
+      : []),
     {
       title: "Account & settings",
       subtitle: "Security, appearance & workspace preferences",
@@ -96,7 +116,11 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
             <Pressable
               key={title}
               accessibilityRole="button"
-              accessibilityLabel={title}
+              accessibilityLabel={
+                route.name === "messages" && unreadMessages
+                  ? "Messages, unread"
+                  : title
+              }
               onPress={() => navigate(route)}
               style={({ pressed }) => ({
                 flexDirection: "row",
@@ -148,6 +172,16 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
                   {subtitle}
                 </Text>
               </View>
+              {route.name === "messages" && unreadMessages && (
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: palette.primary,
+                  }}
+                />
+              )}
               <ChevronRight size={18} color={palette.mutedLabel} />
             </Pressable>
           ))}
@@ -172,4 +206,3 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     </Screen>
   );
 }
-

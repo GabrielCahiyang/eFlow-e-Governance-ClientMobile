@@ -60,3 +60,30 @@ test("a lost send reply is checked by identity and the second fixture participan
   mockActor = "unrelated";
   await expect(loadMessages("qa-thread")).resolves.toEqual([]);
 });
+
+test("an image-only message uses the same private image and message identity on retry", async () => {
+  const image = "qa-thread/worker/photo.png";
+  const before = mockInsert.mock.calls.length;
+  await expect(
+    sendChat("image-message", "qa-thread", "worker", "QA Worker", "", image),
+  ).rejects.toThrow("Reply lost");
+  await sendChat(
+    "image-message",
+    "qa-thread",
+    "worker",
+    "QA Worker",
+    "",
+    image,
+  );
+  expect(mockInsert).toHaveBeenCalledTimes(before + 1);
+  await expect(
+    sendChat(
+      "image-message",
+      "qa-thread",
+      "worker",
+      "QA Worker",
+      "",
+      "qa-thread/worker/other.png",
+    ),
+  ).rejects.toThrow("original message receipt");
+});

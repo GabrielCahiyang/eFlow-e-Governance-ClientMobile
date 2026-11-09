@@ -8,6 +8,24 @@ import type {
   WorkEditorFields,
 } from "../../../core/web/app/features/nested-work/types/editor";
 import { sameWorkEditorScope } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
+
+export async function recoverWorkRequest(rootId: string, request: WorkRequest) {
+  const [{ supabase }, { fetchWorkTree, saveWorkTree }] = await Promise.all([
+    import("../../../platform/supabase"),
+    import("../../../core/web/app/features/nested-work/services/workTreeService"),
+  ]);
+  const { data, error } = await supabase.rpc("nw_work_command_receipt", {
+    p_root: rootId,
+    p_request: request.id,
+    p_command: request.command,
+    p_payload: request.payload,
+  });
+  if (error) throw new Error(error.message);
+  if (data === true) return fetchWorkTree(rootId);
+  if (data !== false)
+    throw new Error("The original work receipt could not be verified.");
+  return saveWorkTree(rootId, request);
+}
 export interface NativeWorkRecovery {
   baseline: WorkEditorBaseline;
   fields: WorkEditorFields;

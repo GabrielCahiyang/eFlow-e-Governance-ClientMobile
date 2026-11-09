@@ -1,13 +1,14 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { SettlementPanel } from "../SettlementPanel";
-import type { IndependentReviewContext } from "../../../../core/web/app/features/budget/services/independentReviewService";
+import type { SettlementReview } from "../staffingEscalation";
 import type {
   PettyCashRequest,
   PettyCashLiquidation,
 } from "../../../../core/web/app/features/budget/types";
 
-let mockContext: IndependentReviewContext | undefined;
+let mockContext: SettlementReview | undefined;
+let mockRole = "accounting_staff";
 let mockLoading = false;
 let mockError: Error | undefined;
 const mockRun = jest.fn();
@@ -15,11 +16,12 @@ const mockRun = jest.fn();
 jest.mock("../../authentication", () => ({
   useAuth: () => ({
     profile: {
-      id: "accounting-a",
-      role: "accounting_staff",
+      id: mockRole === "head" ? "head-a" : "accounting-a",
+      role: mockRole,
       org_id: "office-a",
+      is_active: true,
     },
-    organization: { id: "office-a" },
+    organization: { id: "office-a", head_user_id: "head-a" },
     can: () => true,
   }),
 }));
@@ -71,6 +73,7 @@ const renderPanel = () => (
 );
 
 beforeEach(() => {
+  mockRole = "accounting_staff";
   mockLoading = false;
   mockError = undefined;
   mockRun.mockClear();
@@ -88,9 +91,39 @@ beforeEach(() => {
   };
 });
 
+test("the appointed Head gets the server-authorized fallback posting action", async () => {
+  mockRole = "head";
+  mockContext!.headEscalationFingerprint = "current-package";
+  mockContext!.headCanPostSettlement = true;
+  await render(renderPanel());
+  await fireEvent.changeText(
+    screen.getByLabelText("Review note"),
+    "Verified receipts and returned cash.",
+  );
+  expect(
+    screen.getByRole("button", { name: "Approve and post settlement" }),
+  ).toBeEnabled();
+  expect(
+    screen.queryByRole("button", { name: /^Settle and post$/ }),
+  ).toBeNull();
+});
+
+test("a notified conflicted Accounting Officer gets the escalation status and no posting action", async () => {
+  mockContext!.headAlertStatus = "notified";
+  await render(renderPanel());
+  expect(
+    screen.getByText(/Automatically escalated to the Head/),
+  ).toBeOnTheScreen();
+  expect(
+    screen.queryByRole("button", { name: /post settlement|settle and post/i }),
+  ).toBeNull();
+});
+
 test("a blocked package has one clear warning and no unusable review-note form", async () => {
   await render(renderPanel());
-  expect(screen.getAllByText(/An independent Accounting Officer must be assigned/)).toHaveLength(1);
+  expect(
+    screen.getAllByText(/An independent Accounting Officer must be assigned/),
+  ).toHaveLength(1);
   expect(screen.queryByText(/^Independent review is required/)).toBeNull();
   expect(screen.queryByText(/^No independent eligible settler/)).toBeNull();
   expect(
@@ -131,7 +164,9 @@ test("the draft survives temporary loss of available review actions", async () =
   mockLoading = false;
   mockError = new Error("Review capabilities unavailable");
   await result.rerender(renderPanel());
-  expect(screen.getByText("We couldn't load this information. Please try again.")).toBeOnTheScreen();
+  expect(
+    screen.getByText("We couldn't load this information. Please try again."),
+  ).toBeOnTheScreen();
   expect(screen.queryByLabelText("Review note")).toBeNull();
   mockError = undefined;
   mockContext = {

@@ -1,16 +1,16 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml:2:13-83
-INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml:2:13-83
+ADDED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml:2:13-83
+INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml:2:13-83
 	package
-		INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml
+		INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml
 	xmlns:android
-		ADDED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml:2:23-81
+		ADDED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml:2:23-81
 uses-sdk
-INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml reason: use-sdk injection requested
-INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml
-INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml
+INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml reason: use-sdk injection requested
+INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml
+INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml
 	android:targetSdkVersion
-		INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml
+		INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml
 	android:minSdkVersion
-		INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest11266927803853125173.xml
+		INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pdf\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest3836691744130180091.xml

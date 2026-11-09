@@ -20,6 +20,7 @@ import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
 import {
   isNativeWorkRecovery,
+  recoverWorkRequest,
   workRecoveryCanDiscard,
   type NativeWorkRecovery,
 } from "./workRecovery";
@@ -29,6 +30,7 @@ import {
   workEditorCapability,
   workEditorDateError,
   workEditorDirty,
+  sameWorkEditorScope,
 } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
 import {
   captureStaffingBaseline,
@@ -118,7 +120,7 @@ export function WorkEditorSheet(
               disabled={!workEditorReceiptRetryAllowed(data, context)}
               onPress={() =>
                 void action.run(async () => {
-                  const receipt = await saveWorkTree(
+                  const receipt = await recoverWorkRequest(
                     data.root.id,
                     saved.request,
                   );
@@ -171,7 +173,7 @@ export function WorkEditorSheet(
   return <WorkEditorForm {...props} />;
 }
 function WorkEditorForm({
-  data,
+  data: initialData,
   edit,
   onClose,
   onSaved,
@@ -186,15 +188,19 @@ function WorkEditorForm({
   recovered?: NativeWorkRecovery;
 }) {
   const { profile } = useAuth();
-  const baseline = useRef(
-      recovered?.baseline ||
+  const [data, setData] = useState(initialData);
+  const [newer, setNewer] = useState<WorkTreeSnapshot>();
+  const [committed, setCommitted] = useState(false);
+  const [baseline, setBaseline] = useState(
+      () =>
+        recovered?.baseline ||
         captureWorkEditorBaseline(
           data,
           edit,
           profile?.id || null,
           crypto.randomUUID(),
         ),
-    ).current,
+    ),
     staffing = useRef(
       captureStaffingBaseline(data, edit.root ? null : edit.node?.id || null, {
         actorId: profile?.id || null,
@@ -244,7 +250,9 @@ function WorkEditorForm({
   };
   const save = () =>
     action.run(async () => {
+      if (committed) return;
       if (!profile) throw new Error("Sign in again.");
+      const wasPending = !!request.current;
       if (!request.current) {
         if (edit.command === "review") {
           if (!fields.note.trim())
@@ -262,7 +270,6 @@ function WorkEditorForm({
         const latest = await fetchWorkTree(data.root.id);
         if (
           readOnly ||
-          latest.revision !== baseline.revision ||
           latest.root.project !== context.projectId ||
           latest.root.office !== context.officeId ||
           latest.root.kind !== context.kind
@@ -270,6 +277,12 @@ function WorkEditorForm({
           throw new Error(
             "Work access or revision changed. Reopen the editor and review the current work.",
           );
+        if (latest.revision !== baseline.revision) {
+          if (edit.command === "edit") setNewer(latest);
+          throw new Error(
+            "Work changed. Review the latest details before saving your draft.",
+          );
+        }
         if (
           edit.command === "review" &&
           (!baseline.nodeId ||
@@ -341,15 +354,88 @@ function WorkEditorForm({
           baseline,
         });
       }
-      const receipt = await saveWorkTree(data.root.id, request.current);
+      let receipt: WorkTreeSnapshot;
+      try {
+        receipt = wasPending
+          ? await recoverWorkRequest(data.root.id, request.current)
+          : await saveWorkTree(data.root.id, request.current);
+      } catch (error) {
+        if (edit.command === "edit" && workRecoveryCanDiscard(error)) {
+          const latest = await fetchWorkTree(data.root.id);
+          if (latest.revision !== baseline.revision) setNewer(latest);
+        }
+        throw error;
+      }
       await draftStore.remove(profile.id, "work." + data.root.id);
       request.current = undefined;
-      await onSaved(receipt);
-      onClose();
+      setCommitted(true);
+      try {
+        await onSaved(receipt);
+        onClose();
+      } catch {
+        // The receipt was confirmed. A read failure cannot make the command retryable.
+      }
+    });
+  const reviewLatest = () =>
+    action.run(async () => {
+      if (!profile || !newer || readOnly) return;
+      const latest = await fetchWorkTree(data.root.id);
+      const latestNode = latest.nodes.find(
+        (item) => item.id === baseline.nodeId,
+      );
+      const nextScope = {
+        ...context,
+        projectId: latest.root.project,
+        officeId: latest.root.office,
+        kind: latest.root.kind,
+        revision: latest.revision,
+      };
+      const nextBaseline = captureWorkEditorBaseline(
+        latest,
+        { ...edit, node: latestNode },
+        profile.id,
+        baseline.createdId,
+      );
+      if (
+        !latestNode ||
+        !sameWorkEditorScope(baseline, nextScope) ||
+        !workEditorCapability(latest, nextBaseline, nextScope).allowed
+      )
+        throw new Error("You no longer have access to edit this subitem.");
+      if (
+        !(await confirmAction(
+          "Review latest subitem details",
+          `Current title: ${latestNode.title}\nCurrent due date: ${latestNode.due_date || "None"}\nYour edited fields will stay in the draft for review.`,
+          "Keep draft",
+        ))
+      )
+        return;
+      if (request.current)
+        await draftStore.remove(profile.id, "work." + data.root.id);
+      request.current = undefined;
+      setFields({
+        ...nextBaseline.fields,
+        title:
+          fields.title === baseline.fields.title
+            ? nextBaseline.fields.title
+            : fields.title,
+        due:
+          fields.due === baseline.fields.due
+            ? nextBaseline.fields.due
+            : fields.due,
+        standalone:
+          fields.standalone === baseline.fields.standalone
+            ? nextBaseline.fields.standalone
+            : fields.standalone,
+        note: fields.note,
+      });
+      setData(latest);
+      setBaseline(nextBaseline);
+      setNewer(undefined);
     });
   const close = async () => {
     if (action.busy) return;
-    if (request.current || workEditorDirty(baseline, fields)) {
+    if (!committed && (request.current || workEditorDirty(baseline, fields))) {
       if (
         !(await confirmAction(
           "Leave these work changes?",
@@ -373,15 +459,27 @@ function WorkEditorForm({
       onClose={() => void close()}
       busy={action.busy}
       footer={
-        <Button busy={action.busy} onPress={() => void save()}>
-          {request.current
-            ? "Retry same request"
-            : edit.command === "delete"
-              ? "Delete subitem"
-              : "Save changes"}
+        <Button
+          busy={action.busy}
+          onPress={() =>
+            void (committed ? onClose() : newer ? reviewLatest() : save())
+          }
+        >
+          {committed
+            ? "Done"
+            : newer
+              ? "Review latest details"
+              : request.current
+                ? "Retry same request"
+                : edit.command === "delete"
+                  ? "Delete subitem"
+                  : "Save changes"}
         </Button>
       }
     >
+      {committed && (
+        <Notice>Work saved. The latest view could not refresh.</Notice>
+      )}
       {!!request.current && (
         <Notice>
           The original request is retained. Retry checks its receipt and does

@@ -4,6 +4,7 @@ import { validateLoginFields } from "../../../core/web/app/features/authenticati
 import { loginStyles as s } from "./loginStyles";
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   useWindowDimensions,
 } from "react-native";
@@ -25,12 +26,17 @@ import { Text } from "../../components/ui/Typography";
 import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { EFlowMark } from "../../components/brand/EFlowMark";
 import { ErrorShake, MotionView } from "../../shared/motion";
-import { configurationError } from "../../../platform/config";
+import { backendConfig, configurationError } from "../../../platform/config";
+import { webHandoffUrl } from "../../../platform/webHandoff";
 
 export function LoginScreen() {
   const palette = useTheme();
   const { isDark } = useAppearance();
   const linkColor = palette.blue;
+  const walkthroughUrl = webHandoffUrl(
+    { name: "walkthrough" },
+    backendConfig.webOrigin,
+  );
   const { width } = useWindowDimensions(),
     wide = width >= 1200,
     small = width < 768;
@@ -266,6 +272,19 @@ export function LoginScreen() {
                       : "Log in"}
                 </Button>
               </MotionView>
+              {!recovery && !!walkthroughUrl && (
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onPress={() => {
+                    void Linking.openURL(walkthroughUrl).catch(() =>
+                      setNotice("Could not open the eFlow Web walkthroughs."),
+                    );
+                  }}
+                >
+                  Watch the eFlow Web walkthroughs
+                </Button>
+              )}
               {!!(__DEV__ && !recovery) && (
                 <MotionView kind="login" index={5}>
                   <Button

@@ -1,4 +1,5 @@
-import { Linking } from "react-native";
+import { AppState, Linking } from "react-native";
+import { useEffect } from "react";
 import {
   Card,
   Button,
@@ -16,42 +17,98 @@ import { useAction } from "../../shared/useAction";
 import { getAssignedIndependentReviews } from "../../../core/web/app/features/budget/services/independentReviewService";
 import { createReceiptSignedUrl } from "../../../core/web/app/features/budget/services/budgetService";
 import { SettlementPanel } from "./SettlementPanel";
+import { getStaffingReviewPackage } from "./staffingEscalation";
+import { createPostgresChannel } from "../../shared/postgresChannel";
+import { supabase } from "../../../platform/supabase";
 export function FinancialReviewsScreen({
   recordId,
-}: { recordId?: string } = {}) {
-  const { profile } = useAuth(),
-    facts = useFacts("assigned-review-packages:" + profile!.id, () =>
-      getAssignedIndependentReviews(profile!.id),
+  recordType,
+}: { recordId?: string; recordType?: string } = {}) {
+  const { profile, organization } = useAuth();
+  const staffing = recordType === "settlement_staffing";
+  const actor = profile?.id;
+  const office = profile?.org_id;
+  const facts = useFacts(
+      `assigned-review-packages:${actor}:${office}:${staffing ? recordId : "assigned"}`,
+      async () => {
+        if (staffing) {
+          const pack = await getStaffingReviewPackage(recordId!, office!);
+          return pack ? [{ ...pack, context: null }] : [];
+        }
+        return getAssignedIndependentReviews(actor!);
+      },
+      !!actor &&
+        (!staffing || !!(recordId && office && profile?.role === "head")),
     ),
     action = useAction();
+  useEffect(() => {
+    if (!actor || (staffing && profile?.role !== "head")) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      if (timer || AppState.currentState !== "active") return;
+      timer = setTimeout(() => {
+        timer = undefined;
+        void facts.refresh();
+      }, 250);
+    };
+    const channel = createPostgresChannel(`native-financial-reviews:${actor}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "petty_cash_liquidations",
+          ...(staffing ? { filter: `id=eq.${recordId}` } : {}),
+        },
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "liquidation_independent_reviews",
+          ...(staffing ? { filter: `liquidation_id=eq.${recordId}` } : {}),
+        },
+        refresh,
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") refresh();
+      });
+    const app = AppState.addEventListener("change", (state) => {
+      if (state === "active") refresh();
+    });
+    const fallback = setInterval(refresh, 30_000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(fallback);
+      app.remove();
+      void supabase.removeChannel(channel);
+    };
+  }, [actor, facts.refresh, profile?.role, recordId, staffing]);
   const packages = facts.data?.filter(
     (pack) =>
       !recordId ||
       pack.liquidation.id === recordId ||
-      pack.context.review?.id === recordId,
+      pack.context?.review?.id === recordId,
   );
   return (
     <Screen
-      title="Assigned financial reviews"
-      onRefresh={() => facts.refresh()}
-
+      title={staffing ? "Escalated settlement" : "Assigned financial reviews"}
     >
-      <Notice>
-        These packages are assigned to you. Review approval does not grant
-        settlement or journal-posting permission.
-      </Notice>
+      {!staffing && (
+        <Notice>
+          These packages are assigned to you. Review approval does not grant
+          settlement or journal-posting permission.
+        </Notice>
+      )}
       {facts.error ? (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
-      ) : !facts.data ? (
+      ) : facts.loading && !facts.data ? (
         <Loading label="Loading assigned review packages" layout="review" />
       ) : !packages?.length ? (
         <Empty
           kind="finance"
-          action={
-            <Button variant="outline" onPress={() => void facts.refresh()}>
-              Refresh assigned reviews
-            </Button>
-          }
           title={
             recordId
               ? "This assigned review is no longer available"
@@ -62,6 +119,13 @@ export function FinancialReviewsScreen({
         packages.map((pack) => (
           <Card key={pack.liquidation.id} title={pack.request.purpose}>
             <LabelValue label="Request" value={pack.request.requestNumber} />
+            {staffing && organization?.name && <LabelValue label="Office" value={organization.name} />}
+            {"year" in pack && (
+              <LabelValue label="Fiscal year" value={String(pack.year)} />
+            )}
+            {pack.request.status === "settled" && (
+              <Notice>Settlement posted.</Notice>
+            )}
             <LabelValue
               label="Actual spent"
               value={peso(pack.liquidation.declaredSpent)}

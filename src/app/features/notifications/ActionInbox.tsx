@@ -43,6 +43,7 @@ import {
 } from "../../../core/web/app/services/notificationService";
 import { normalizeWorkUpdateNotification } from "../../../core/web/app/shared/notificationWorkCopy";
 import { inboxUpdateRoute } from "./inboxDestinations";
+import { getActionableSettlementEscalations } from "../budget";
 import type { AppRoute, Navigate } from "../../shared/routes";
 
 type Decision = {
@@ -77,6 +78,22 @@ export function ActionInbox({
     true,
     { actor, select: (data) => data.map((item) => ({ ...item })) },
   );
+  const staffingAlerts =
+    profile?.role === "head" && !updates.error
+      ? (updates.data || []).filter(
+          (item) =>
+            item.financialRecordType === "settlement_staffing" &&
+            item.financialRecordId,
+        )
+      : [];
+  const staffingIds = [
+    ...new Set(staffingAlerts.map((item) => item.financialRecordId!)),
+  ].sort();
+  const escalations = useFacts(
+    `inbox-staffing:${actor}:${profile?.org_id}:${staffingIds.join(",")}`,
+    () => getActionableSettlementEscalations(staffingIds),
+    staffingIds.length > 0,
+  );
   const [filter, setFilter] = useState<Filter>(
     initialView === "decisions" ? "decisions" : "all",
   );
@@ -89,6 +106,7 @@ export function ActionInbox({
     Promise.all([
       tasks.refresh(),
       finance.refresh(),
+      escalations.refresh(),
       updates.refresh(),
       work.refresh(),
     ]);
@@ -100,6 +118,7 @@ export function ActionInbox({
         void Promise.all([
           tasks.refresh(),
           finance.refresh(),
+          escalations.refresh(),
           force ? updates.refresh() : updates.refreshIfStale(),
         ]);
     };
@@ -131,6 +150,7 @@ export function ActionInbox({
     actor,
     tasks.refresh,
     finance.refresh,
+    escalations.refresh,
     updates.refresh,
     updates.refreshIfStale,
   ]);
@@ -217,6 +237,19 @@ export function ActionInbox({
         context: "Independent financial review",
         route: { name: "financial_reviews", id: pack.liquidation.id },
       });
+  }
+  if (!escalations.error) {
+    for (const item of staffingAlerts) {
+      if (!escalations.data?.includes(item.financialRecordId!)) continue;
+      const route = inboxUpdateRoute(item, profile!.role);
+      if (!route) continue;
+      decisions.push({
+        key: "settlement-staffing:" + item.financialRecordId,
+        title: "Escalated settlement",
+        context: "Review and record the Head decision",
+        route,
+      });
+    }
   }
   const assigned = [
     ...new Map(decisions.map((item) => [item.key, item])).values(),

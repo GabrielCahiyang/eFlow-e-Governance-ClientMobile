@@ -18,11 +18,17 @@ import { FinancialCancelled } from "./financialReceipt";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
+import { useAccountActionAccess } from "../../shared/AccountActionAccess";
+import { nativeWindow } from "../../../platform/webRuntime";
 import {
-  getIndependentReview,
+  approveStaffingEscalation,
+  getSettlementReview,
+  headSettlementAction,
+  settlementAllowsAccountingPosting,
+} from "./staffingEscalation";
+import {
   routeIndependentReview,
   decideIndependentReview,
-  independentReviewAllowsPosting,
 } from "../../../core/web/app/features/budget/services/independentReviewService";
 import {
   decidePettyCashLiquidation,
@@ -30,6 +36,7 @@ import {
   decidePettyCashLiquidationLeaderReview,
 } from "../../../core/web/app/features/budget/services/budgetService";
 import { isLiquidationLate } from "../../../core/web/app/features/budget/selectors/cashWorkflowRules";
+import { financialFailureIsUncertain } from "../../../core/web/app/features/budget/financialReceipts";
 import type {
   PettyCashLiquidation,
   PettyCashRequest,
@@ -44,13 +51,14 @@ export function SettlementPanel({
   onSaved: () => Promise<void>;
 }) {
   const { profile, can, organization } = useAuth();
+  const assertAccess = useAccountActionAccess();
   const palette = useTheme();
   const [reason, setReason] = useState(""),
     [reviewer, setReviewer] = useState("");
   const pending = liquidation.status === "pending_department_settlement";
   const independent = useFacts(
     `independent:${profile?.id}:${liquidation.id}:${liquidation.version}`,
-    () => getIndependentReview(liquidation.id),
+    () => getSettlementReview(liquidation.id),
     pending,
   );
   const late =
@@ -64,6 +72,20 @@ export function SettlementPanel({
   const accounting =
     profile?.role === "accounting_staff" &&
     can("navigation.accounting_releases");
+  const currentReview = independent.error ? undefined : independent.data;
+  const headAction =
+    head && pending
+      ? headSettlementAction(currentReview, liquidation.version)
+      : undefined;
+  const escalation = useFinancialAction(
+    profile?.id || "",
+    `settlement-escalation:${liquidation.id}:${liquidation.version}`,
+    JSON.stringify([
+      currentReview?.headEscalationFingerprint,
+      headAction,
+      reason.trim(),
+    ]),
+  );
   const action = useFinancialAction(
     profile?.id || "",
     `settlement:${liquidation.id}:${JSON.stringify([liquidation.version, liquidation.status, liquidation.departmentDecidedAt, independent.data?.review?.id, independent.data?.review?.status])}`,
@@ -77,61 +99,123 @@ export function SettlementPanel({
     ]),
   );
   const refresh = async () => {
-    await onSaved();
-    await independent.refresh();
+    nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
+    await Promise.all([onSaved(), independent.refresh()]);
   };
   const settle = (approve: boolean) =>
-    action.run(async () => {
-      if (!reason.trim())
-        throw new Error("A review note or required correction is required.");
-      if (!profile) throw new Error("Sign in again.");
-      if (leader) {
-        await decidePettyCashLiquidationLeaderReview(
-          liquidation.id,
-          approve,
-          reason,
-        );
-      } else if (head && late) {
-        await authorizeLateLiquidation(liquidation.id, approve, reason);
-      } else {
-        const current = await getIndependentReview(liquidation.id);
-        if (!accounting || !independentReviewAllowsPosting(current, profile.id))
-          throw new Error(
-            "Independent review and current Accounting settlement authority are required.",
+    action.run(
+      async () => {
+        if (!reason.trim())
+          throw new Error("A review note or required correction is required.");
+        if (!profile) throw new Error("Sign in again.");
+        if (leader) {
+          await decidePettyCashLiquidationLeaderReview(
+            liquidation.id,
+            approve,
+            reason,
           );
+        } else if (head && late) {
+          await authorizeLateLiquidation(liquidation.id, approve, reason);
+        } else {
+          const current = await getSettlementReview(liquidation.id);
+          if (
+            !accounting ||
+            !settlementAllowsAccountingPosting(current, profile.id)
+          )
+            throw new Error(
+              "Independent review and current Accounting settlement authority are required.",
+            );
+          if (
+            approve &&
+            !(await confirmAction(
+              "Settle and post journals?",
+              "Verify receipts and any returned cash. This records the settlement and balanced journal entries.",
+              "Settle and post",
+            ))
+          )
+            throw new FinancialCancelled();
+          await decidePettyCashLiquidation(liquidation.id, approve, reason);
+        }
+      },
+      "Receipt decision recorded.",
+      refresh,
+    );
+  const approveEscalation = () =>
+    escalation.run(
+      async () => {
+        if (!profile || !headAction || !reason.trim())
+          throw new FinancialCancelled(
+            "Current Head approval and a review note are required.",
+          );
+        const posts = headAction === "post";
         if (
-          approve &&
           !(await confirmAction(
-            "Settle and post journals?",
-            "Verify receipts and any returned cash. This records the settlement and balanced journal entries.",
-            "Settle and post",
+            posts
+              ? "Approve and post settlement?"
+              : "Approve escalated review?",
+            posts
+              ? "Verify the receipts and any returned cash before posting."
+              : "Accounting will still need to post settlement.",
+            posts ? "Approve and post" : "Approve review",
           ))
         )
           throw new FinancialCancelled();
-        await decidePettyCashLiquidation(liquidation.id, approve, reason);
-      }
-      await refresh();
-    }, "Receipt decision recorded.");
-  const settlementBlocked = pending && independent.data?.eligibleSettlers === 0;
+        const fresh = await getSettlementReview(liquidation.id);
+        if (
+          headSettlementAction(fresh, liquidation.version) !== headAction ||
+          fresh.headEscalationFingerprint !==
+            currentReview?.headEscalationFingerprint
+        )
+          throw new FinancialCancelled(
+            "The review changed. Check the current package before deciding.",
+          );
+        assertAccess(profile.id);
+        const commandId = crypto.randomUUID();
+        try {
+          await approveStaffingEscalation(fresh, reason.trim(), commandId);
+        } catch (error) {
+          if (!financialFailureIsUncertain(error)) throw error;
+          const recorded = await getSettlementReview(liquidation.id).catch(
+            () => undefined,
+          );
+          if (
+            recorded?.version !== fresh.version ||
+            !(headAction === "post"
+              ? recorded.headSettlementPosted === true
+              : recorded.headEscalationCommandId === commandId)
+          )
+            throw error;
+        }
+      },
+      "Head decision recorded.",
+      refresh,
+    );
+  const settlementBlocked = pending && currentReview?.eligibleSettlers === 0;
   // Reuse the existing action visibility conditions for the shared note editor.
   // A blocked settlement must not hide a separately authorized review action.
   const canRouteReview = !!(
-    independent.data?.required &&
+    !headAction &&
+    currentReview?.required &&
     accounting &&
-    independent.data.candidates.length > 0
+    currentReview.candidates.length > 0
   );
   const canReview = !!(
-    independent.data?.required && independent.data.canReview
+    !headAction &&
+    currentReview?.required &&
+    currentReview.canReview
   );
   const showSettlementActions = !!(
-    leader ||
-    (head && late) ||
-    (accounting &&
-      independent.data &&
-      independentReviewAllowsPosting(independent.data, profile!.id) &&
-      !late)
+    !headAction &&
+    (leader ||
+      (head && late) ||
+      (accounting &&
+        currentReview &&
+        settlementAllowsAccountingPosting(currentReview, profile!.id) &&
+        !late))
   );
-  const showReviewForm = canRouteReview || canReview || showSettlementActions;
+  const showReviewForm =
+    headAction || canRouteReview || canReview || showSettlementActions;
+  const saving = action.busy || escalation.busy;
   if (!leader && !pending) return null;
   return (
     <Card title="Receipt review and settlement">
@@ -156,15 +240,24 @@ export function SettlementPanel({
           retry={() => void independent.refresh()}
         />
       )}
-      {settlementBlocked && (
-        <ErrorState
-          error={
-            new Error(
-              "Settlement blocked. An independent Accounting Officer is required. Receipt endorsement or review approval does not settle the advance or grant journal-posting permission. Resolve the appointment through the authorized Office workflow.",
-            )
-          }
-        />
+      {settlementBlocked && currentReview?.headAlertStatus === "notified" && (
+        <Notice>
+          Automatically escalated to the Head. No eligible Accounting Officer is
+          available. Staff cannot settle cash they requested, received or
+          reviewed.
+        </Notice>
       )}
+      {settlementBlocked &&
+        currentReview?.headAlertStatus !== "notified" &&
+        !headAction && (
+          <ErrorState
+            error={
+              new Error(
+                "Settlement blocked. An independent Accounting Officer is required. Receipt endorsement or review approval does not settle the advance or grant journal-posting permission. Resolve the appointment through the authorized Office workflow.",
+              )
+            }
+          />
+        )}
       {!!(independent.data?.required && !settlementBlocked) && (
         <Notice>
           Independent review is required. Review approval does not grant
@@ -200,12 +293,23 @@ export function SettlementPanel({
             accessibilityHint="Required before requesting review or recording a decision."
             multiline
             numberOfLines={4}
-            editable={!action.busy}
+            editable={!saving}
             style={{ minHeight: 104 }}
           />
           <Text style={{ fontSize: 13, color: palette.muted }}>
             Required before requesting review or recording a decision.
           </Text>
+          {headAction && (
+            <Button
+              busy={escalation.busy}
+              disabled={saving || !reason.trim()}
+              onPress={() => void approveEscalation()}
+            >
+              {headAction === "post"
+                ? "Approve and post settlement"
+                : "Approve escalated review"}
+            </Button>
+          )}
           {canRouteReview && (
             <>
               <Choice
@@ -299,6 +403,12 @@ export function SettlementPanel({
         </View>
       )}
       {!!action.error && <ErrorState context="action" error={action.error} />}
+      {!!escalation.error && (
+        <ErrorState context="action" error={escalation.error} />
+      )}
+      {!!escalation.notice && (
+        <Text style={{ color: colors.success }}>{escalation.notice}</Text>
+      )}
       {!!action.notice && (
         <Text style={{ color: colors.success }}>{action.notice}</Text>
       )}

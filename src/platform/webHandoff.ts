@@ -1,5 +1,6 @@
 import type { AppRoute } from "../app/shared/routes";
 const paths: Record<string, string> = {
+  walkthrough: "/",
   identity: "identity-and-access",
   intelligence: "team-intelligence",
   reports: "reports",
@@ -35,6 +36,8 @@ export function webHandoffUrl(
     const fundingSetup = route.view === "funding_configuration";
     const taskOutsideProject =
       fundingSetup && route.name === "task" && !route.projectId;
+    if (route.name === "walkthrough")
+      return new URL("/", origin.origin).toString();
     const url = new URL(
       "/" + (taskOutsideProject ? paths.budget : paths[route.name]),
       origin.origin,

@@ -7,7 +7,7 @@
 5-->INJECTED
 6
 7    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-7-->C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:70-136
-7-->C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:87-133
+7-->C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:70-136
+7-->C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:87-133
 8
 9</manifest>

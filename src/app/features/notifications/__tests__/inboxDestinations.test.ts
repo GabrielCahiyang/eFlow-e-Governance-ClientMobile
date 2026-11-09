@@ -56,3 +56,18 @@ test("task decisions and financial records retain distinct destinations", () => 
     ),
   ).toEqual({ name: "financial_reviews", id: "review-id" });
 });
+
+test("a staffing escalation opens the exact settlement for the Head only", () => {
+  const notice = {
+    ...update,
+    financialRecordId: "liquidation-a",
+    financialRecordType: "settlement_staffing",
+  };
+  expect(inboxUpdateRoute(notice, "head")).toEqual({
+    name: "financial_reviews",
+    recordId: "liquidation-a",
+    recordType: "settlement_staffing",
+  });
+  expect(inboxUpdateRoute(notice, "accounting_staff")).toBeUndefined();
+  expect(inboxUpdateRoute(notice, "member")).toBeUndefined();
+});

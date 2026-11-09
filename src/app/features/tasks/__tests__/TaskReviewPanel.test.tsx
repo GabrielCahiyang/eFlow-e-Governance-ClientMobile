@@ -1,4 +1,5 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
+import { AppState } from "react-native";
 import {
   fireEvent,
   render,
@@ -18,6 +19,11 @@ import type { ReviewSubmission } from "../../../../core/web/app/features/reviews
 
 let mockActor = "reviewer";
 let mockCurrent: Task;
+beforeEach(() => {
+  jest
+    .spyOn(AppState, "addEventListener")
+    .mockReturnValue({ remove: jest.fn() });
+});
 jest.mock("../../authentication", () => ({
   useAuth: () => ({ profile: { id: mockActor, role: "member" } }),
 }));
@@ -42,6 +48,11 @@ jest.mock(
 );
 jest.mock("../../../../platform/supabase", () => ({
   supabase: {
+    channel: () => {
+      const channel = { on: () => channel, subscribe: () => channel };
+      return channel;
+    },
+    removeChannel: async () => "ok",
     from: () => {
       const q = {
         select: () => q,
@@ -93,16 +104,14 @@ test.each([true, false])(
     const onSaved = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const reason = approve ? "" : "Recheck the fixture note";
     jest.mocked(verifyTask).mockImplementationOnce(async () => {
-      jest
-        .mocked(fetchTaskSubmissions)
-        .mockResolvedValue([
-          {
-            ...pending,
-            status: approve ? "approved" : "changes_requested",
-            decidedBy: "reviewer",
-            decisionFeedback: reason,
-          },
-        ]);
+      jest.mocked(fetchTaskSubmissions).mockResolvedValue([
+        {
+          ...pending,
+          status: approve ? "approved" : "changes_requested",
+          decidedBy: "reviewer",
+          decisionFeedback: reason,
+        },
+      ]);
     });
     await render(
       <TaskReviewPanel
@@ -153,16 +162,14 @@ test("the original worker can read the returned feedback but cannot decide their
     ).toBeOnTheScreen(),
   );
   expect(screen.queryByRole("button", { name: "Approve work" })).toBeNull();
-  jest
-    .mocked(fetchTaskSubmissions)
-    .mockResolvedValue([
-      {
-        ...pending,
-        status: "changes_requested",
-        decisionFeedback: "Recheck the fixture note",
-        decidedByName: "QA reviewer",
-      },
-    ]);
+  jest.mocked(fetchTaskSubmissions).mockResolvedValue([
+    {
+      ...pending,
+      status: "changes_requested",
+      decisionFeedback: "Recheck the fixture note",
+      decidedByName: "QA reviewer",
+    },
+  ]);
   await view.rerender(
     <TaskReviewPanel
       task={{ ...workerTask, updatedAt: 20, status: "changes_requested" }}

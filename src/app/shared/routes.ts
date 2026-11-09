@@ -35,6 +35,7 @@ export type RouteName =
   | "administration"
   | "migration"
   | "help"
+  | "walkthrough"
   | "live"
   | "invitation"
   | "activation"

@@ -14,6 +14,7 @@ import { ProfileScreen } from "../profile";
 import { SettingsScreen } from "../settings";
 import { OverviewScreen } from "../dashboard";
 import { OfficeBudgetScreen, FinancialReviewsScreen } from "../budget";
+import { OfficePettyCash } from "../office-petty-cash";
 import {
   accountingView,
   officeFinanceRoutes,
@@ -67,9 +68,26 @@ export function MobileContent({
     content = <ChatScreen navigate={navigate} route={current} />;
   else if (current.name === "announcements") content = <AnnouncementsScreen />;
   else if (current.name === "financial_reviews")
-    content = (
-      <FinancialReviewsScreen recordId={current.recordId || current.id} />
-    );
+    content =
+      (current.recordType === "office_petty_cash" ||
+        (current.recordType === "office_petty_cash_staffing" &&
+          profile?.role === "head")) &&
+      profile?.org_id &&
+      (!current.financialOfficeId ||
+        current.financialOfficeId === profile.org_id) ? (
+        <Screen title="Office petty cash">
+          <OfficePettyCash
+            office={profile.org_id}
+            requestId={current.recordId}
+          />
+        </Screen>
+      ) : (
+        <FinancialReviewsScreen
+          key={current.recordId || current.id}
+          recordId={current.recordId || current.id}
+          recordType={current.recordType}
+        />
+      );
   else if (officeFinanceRoutes.includes(current.name)) {
     const view = accountingView(
       current.view ??

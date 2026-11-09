@@ -19,10 +19,13 @@ import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
 import {
+  fetchTaskApprovalCashBlockers,
+  useCashRequestUpdates,
+} from "../budget";
+import {
   fetchTaskSubmissions,
   fetchSubmissionAttachments,
 } from "../../../core/web/app/features/reviews/services/reviewService";
-import { fetchTaskCashBlockers } from "../../../core/web/app/features/budget/services/taskCashClearanceService";
 import { verifyTask } from "../../../core/web/app/features/tasks/services/taskService";
 import { rowToTask } from "../../../core/web/app/features/tasks/services/taskMapper";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
@@ -69,9 +72,10 @@ export function TaskReviewPanel({
     independentReviewAllowed(task, selected, profile?.id, profile?.role);
   const clearance = useFacts(
     "cash-clearance:" + scope,
-    () => fetchTaskCashBlockers(task.id),
+    () => fetchTaskApprovalCashBlockers(task.id),
     mayReview,
   );
+  useCashRequestUpdates(task.id, mayReview, clearance.refresh);
 
   const decide = (approve: boolean) =>
     action.run(async () => {
@@ -90,7 +94,7 @@ export function TaskReviewPanel({
       )
         return;
       await assertEvidenceActor(profile.id);
-      if (approve && (await fetchTaskCashBlockers(task.id)).length)
+      if (approve && (await fetchTaskApprovalCashBlockers(task.id)).length)
         throw new Error("Settle all outstanding task cash before approval.");
       const { data, error } = await supabase
         .from("tasks")
