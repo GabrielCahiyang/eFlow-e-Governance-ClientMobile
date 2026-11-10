@@ -2,6 +2,51 @@ import { buildWorkDisplayTree } from "../../../core/web/app/features/nested-work
 import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
 import type { AppRoute } from "../../shared/routes";
+import { completionPercent } from "../../shared/completion";
+
+export function branchCompletion(
+  tree: WorkTreeSnapshot,
+  status: string,
+  nodeId: string | null = null,
+) {
+  const children = tree.nodes.filter(
+    (node) =>
+      node.task_id === tree.root.id && node.parent_subtask_id === nodeId,
+  );
+  const completed = children.filter(
+    (node) => node.status === "completed",
+  ).length;
+  return {
+    completed,
+    total: children.length,
+    percent: completionPercent(completed, children.length, status),
+  };
+}
+
+export function defaultSubtaskLead(tree: WorkTreeSnapshot) {
+  return (
+    tree.people.find(
+      (person) => person.id === tree.root.lead && person.eligible !== false,
+    )?.id || ""
+  );
+}
+
+export function isSubtaskContributor(
+  tree: WorkTreeSnapshot,
+  nodeId: string,
+  actorId: string | null,
+) {
+  const node = tree.nodes.find(
+    (item) => item.id === nodeId && item.task_id === tree.root.id,
+  );
+  return (
+    !!actorId &&
+    !!node &&
+    node.lead_id !== actorId &&
+    (!Array.isArray(node.assigned_to_ids) ||
+      node.assigned_to_ids.includes(actorId))
+  );
+}
 
 export function branchRows(tree: WorkTreeSnapshot, focus?: string) {
   const display = buildWorkDisplayTree(
@@ -63,6 +108,7 @@ export function completionMode(
   if (
     !node ||
     !actorId ||
+    isSubtaskContributor(tree, nodeId, actorId) ||
     !["todo", "in_progress", "changes_requested"].includes(node.status)
   )
     return;

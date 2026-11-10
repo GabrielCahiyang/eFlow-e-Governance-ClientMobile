@@ -74,7 +74,7 @@ export function TaskFundingCard({
 
   return (
     <>
-      <Card title={subtaskId ? "Subitem funding" : "Task funding"}>
+      <Card title={subtaskId ? "Subtask funding" : "Task funding"}>
         {!!funding.error && (
           <ErrorState
             error={funding.error}
@@ -96,7 +96,7 @@ export function TaskFundingCard({
             />
             {!!context.cap && (
               <LabelValue
-                label="Subitem funding cap"
+                label="Subtask funding cap"
                 value={peso(context.cap.amount)}
               />
             )}
@@ -138,13 +138,13 @@ export function TaskFundingCard({
           <Empty
             kind="finance"
             compact
-            title="This record belongs to a subitem"
+            title="This record belongs to a subtask"
             action={
               <Button
                 variant="outline"
                 onPress={() => onOpenLinkedSubitem(linkedSubitem)}
               >
-                Open linked subitem funding
+                Open linked subtask funding
               </Button>
             }
           />

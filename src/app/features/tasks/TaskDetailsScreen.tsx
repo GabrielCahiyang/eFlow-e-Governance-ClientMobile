@@ -14,6 +14,7 @@ import {
   Row,
   Screen,
   Status,
+  dateLabel,
 } from "../../components/ui";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
@@ -41,6 +42,8 @@ import { TaskActivity } from "./TaskActivity";
 import { WorkTreePanel } from "./WorkTreePanel";
 import { WorkEditorSheet } from "./WorkEditorSheet";
 import { NavigationRow } from "../../components/ui/NavigationRow";
+import { branchCompletion } from "./branchInspector";
+import { contributorReviewUnavailable } from "../../shared/userMessages";
 export function TaskDetailsScreen({
   id,
   projectId,
@@ -150,7 +153,11 @@ export function TaskDetailsScreen({
       isAppointedOfficeHead(profile, organization ? [organization] : []) &&
       profile?.org_id === task.orgId,
     participant = getTaskTeamMemberIds(task).includes(profile?.id || ""),
-    lead = getTaskLeadId(task) === profile?.id;
+    lead = !!profile?.id && getTaskLeadId(task) === profile.id;
+  const completion =
+    tree.data && !tree.error
+      ? branchCompletion(tree.data, task.status)
+      : undefined;
   const context = tree.data
     ? {
         actorId: profile?.id || null,
@@ -193,13 +200,12 @@ export function TaskDetailsScreen({
     const { latest, actorId } = await verifyCurrentTask();
     const status = latest.status;
     const allowed =
-      mode === "submit"
-        ? getTaskLeadId(latest) === actorId &&
-          ["todo", "in_progress", "changes_requested"].includes(status)
-        : getTaskTeamMemberIds(latest).includes(actorId) &&
-          (mode === "start"
-            ? ["todo", "changes_requested"].includes(status)
-            : status === "in_progress");
+      getTaskLeadId(latest) === actorId &&
+      (mode === "submit"
+        ? ["todo", "in_progress", "changes_requested"].includes(status)
+        : mode === "start"
+          ? ["todo", "changes_requested"].includes(status)
+          : status === "in_progress");
     if (!allowed)
       throw new Error(
         "Current task status or responsibility no longer allows this action.",
@@ -235,7 +241,7 @@ export function TaskDetailsScreen({
                 nodeId: linkedNodeId,
                 recordId: financialRecordId,
                 view: "budget",
-                title: "Subitem funding",
+                title: "Subtask funding",
               })
           : undefined
       }
@@ -263,7 +269,7 @@ export function TaskDetailsScreen({
   if (initialView === "budget" && (nodeId || financialRecordId))
     return (
       <Screen
-        title={branch?.title || (nodeId ? "Subitem funding" : task.title)}
+        title={branch?.title || (nodeId ? "Subtask funding" : task.title)}
         description={nodeId ? task.title : "Cash request details"}
       >
         {funding}
@@ -289,22 +295,47 @@ export function TaskDetailsScreen({
         <Row>
           <Status value={task.status} />
           <Status value={task.priority || "normal"} />
-          <Text>
-            {task.percentComplete ?? (task.status === "completed" ? 100 : 0)}%
-          </Text>
           <DeadlineBadge
             value={task.deadline || task.dueDate}
             status={task.status}
           />
         </Row>
       )}
+      {overview && (
+        <>
+          <LabelValue
+            label="Start date"
+            value={
+              task.startDate ? dateLabel(task.startDate + "T12:00:00") : "—"
+            }
+          />
+          <LabelValue
+            label="Progress"
+            value={
+              completion
+                ? completion.total
+                  ? `${completion.completed}/${completion.total} complete · ${completion.percent}%`
+                  : `${completion.percent}%`
+                : tree.loading
+                  ? "Loading…"
+                  : "Unavailable"
+            }
+          />
+        </>
+      )}
       {readOnly && <Notice>This work is read-only.</Notice>}
       {!!(view === "details") && (
         <>
+          {!readOnly &&
+            participant &&
+            !lead &&
+            ["todo", "in_progress", "changes_requested"].includes(
+              task.status,
+            ) && <Notice>{contributorReviewUnavailable}</Notice>}
           <Row>
             {!!(
               !readOnly &&
-              participant &&
+              lead &&
               ["todo", "changes_requested"].includes(task.status)
             ) && (
               <Button
@@ -320,7 +351,7 @@ export function TaskDetailsScreen({
                 {task.status === "todo" ? "Start work" : "Resume work"}
               </Button>
             )}
-            {!!(!readOnly && participant && task.status === "in_progress") && (
+            {!!(!readOnly && lead && task.status === "in_progress") && (
               <Button
                 variant="outline"
                 onPress={() => setExecution("progress")}
@@ -337,7 +368,7 @@ export function TaskDetailsScreen({
                 disabled={evidence.loading || !!evidence.error}
                 onPress={() => setExecution("submit")}
               >
-                Submit finished work
+                Mark as complete
               </Button>
             )}
           </Row>
@@ -355,7 +386,7 @@ export function TaskDetailsScreen({
             focusNodeId={nodeId}
           />
         ) : (
-          <Loading label="Loading subitems" layout="tree" />
+          <Loading label="Loading subtasks" layout="tree" />
         ))}
       {overview && (
         <Card title="Details and records">

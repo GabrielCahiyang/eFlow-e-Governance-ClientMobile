@@ -11,6 +11,7 @@ export function NavigationRow({
   selected,
   onPress,
   disabled = false,
+  accessibilityHint,
 }: {
   title: string;
   description?: string;
@@ -18,12 +19,14 @@ export function NavigationRow({
   selected?: boolean;
   onPress: () => void;
   disabled?: boolean;
+  accessibilityHint?: string;
 }) {
   const palette = useTheme();
   return (
     <Pressable
       accessibilityRole={selected === undefined ? "button" : "radio"}
       accessibilityLabel={title}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{
         disabled,
         ...(selected === undefined ? {} : { checked: selected }),

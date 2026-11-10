@@ -1,6 +1,9 @@
 /** Public feedback only. Never interpolate a transport, database or provider error. */
 export class PublicMessageError extends Error {}
+export const contributorReviewUnavailable =
+  "Work updates that need your Lead’s approval are currently unavailable on mobile.";
 export const feedback = {
+  invalidCredentials: "Email or password is incorrect.",
   load: "We couldn't load this information. Please try again.",
   action:
     "We couldn't confirm your changes. Refresh this page and check before trying again.",
@@ -18,6 +21,7 @@ export const feedback = {
 } as const;
 export type FeedbackContext = "load" | "action";
 const known = new Map<string, string>([
+  [contributorReviewUnavailable, contributorReviewUnavailable],
   [
     "Allow camera access",
     "Allow camera access in device settings, or choose a file instead.",
@@ -27,19 +31,15 @@ const known = new Map<string, string>([
     "The upload stopped before it finished. Check and resume your submission.",
   ],
   [
-    "This subitem is outside the linked project context.",
-    "This subitem doesn't belong to the selected project. Return to Projects to open it.",
-  ],
-  [
-    "Admin access is available in eFlow Web only. The mobile app supports Head, Member and Accounting Staff accounts.",
-    "Admin access is available in eFlow Web only. The mobile app supports Head, Member and Accounting Staff accounts.",
+    "This subtask is outside the linked project context.",
+    "This subtask doesn't belong to the selected project. Return to Projects to open it.",
   ],
   [
     "Settlement blocked. An independent Accounting Officer is required. Receipt endorsement or review approval does not settle the advance or grant journal-posting permission. Resolve the appointment through the authorized Office workflow.",
     "An independent Accounting Officer must be assigned before this advance can be settled. Review approval alone does not complete settlement. Contact your Office Head.",
   ],
   [
-    "Work access or revision changed. Reopen this subitem and review the current work.",
+    "Work access or revision changed. Reopen this subtask and review the current work.",
     feedback.changed,
   ],
   ["The submission outcome could not be confirmed.", feedback.action],
@@ -139,9 +139,8 @@ export function userErrorMessage(
   if (/camera.*(?:access|permission)|(?:access|permission).*camera/i.test(text))
     return "Allow camera access in device settings, or choose a file instead.";
   if (item?.name === "AccountSignInError") {
-    if (item.status === 401) return "Email or password is incorrect.";
-    if (item.status === 423)
-      return "Your account is locked. Contact your Office support team for help.";
+    if (item.status === 401 || item.status === 423)
+      return feedback.invalidCredentials;
     if (item.status === 403)
       return "Please confirm your email or contact your Office support team for help signing in.";
     if (item.status === 429)

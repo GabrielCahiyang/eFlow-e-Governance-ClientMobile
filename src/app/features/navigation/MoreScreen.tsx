@@ -6,6 +6,7 @@ import Megaphone from "lucide-react-native/icons/megaphone";
 import Settings from "lucide-react-native/icons/settings";
 import LogOut from "lucide-react-native/icons/log-out";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
+import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
 import { Screen, ErrorState, Button } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
@@ -31,6 +32,14 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     tileBg: string;
     tileColor: string;
   }[] = [
+    {
+      title: "Reviews",
+      subtitle: "Work and financial decisions assigned to you",
+      route: { name: "inbox", view: "decisions", title: "Reviews" },
+      Icon: ClipboardCheck,
+      tileBg: palette.primarySoft,
+      tileColor: palette.primary,
+    },
     {
       title: "Messages",
       subtitle: "Team chat & direct conversations",

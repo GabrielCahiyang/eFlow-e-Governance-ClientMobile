@@ -18,7 +18,7 @@ export function WorkRowItem({
   ]
     .filter(Boolean)
     .join(" · ");
-  const tag = row.kind.endsWith("node") ? row.rootTitle || "Subitem" : null;
+  const tag = row.kind.endsWith("node") ? row.rootTitle || "Subtask" : null;
 
   return (
     <MondayTableRow

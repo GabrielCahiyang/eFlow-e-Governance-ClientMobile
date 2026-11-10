@@ -1,14 +1,17 @@
 import { FilterChip } from "../../components/ui/FilterChip";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { useTheme } from "../../components/ui/Appearance";
-import { NavigationRow } from "../../components/ui/NavigationRow";
+import {
+  FolderPullArea,
+  RefreshSectionList,
+} from "../../components/ui/FolderRefresh";
 import { useState } from "react";
-import { SectionList, Pressable, View } from "react-native";
-import Folder from "lucide-react-native/icons/folder";
+import { Pressable, View, useWindowDimensions } from "react-native";
 import Star from "lucide-react-native/icons/star";
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
 import { usePullRefresh } from "../../shared/usePullRefresh";
+import { useSnapshotPage } from "../../shared/useSnapshotPage";
 import type { Navigate } from "../../shared/routes";
 import {
   Button,
@@ -18,6 +21,10 @@ import {
   SearchField,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
+import {
+  ProjectDirectoryCells,
+  projectDirectoryWidths,
+} from "./ProjectTableCells";
 import { projectSections } from "./mobileProjects";
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -42,6 +49,11 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const workspace = useWorkspace();
   const pull = usePullRefresh(workspace.refresh);
   const palette = useTheme();
+  const { width } = useWindowDimensions();
+  const [viewport, setViewport] = useState(0);
+  const widths = projectDirectoryWidths(
+    Math.max(120, (viewport || width) - 32 - 48),
+  );
   const current = workspace.selected;
   const projects = current?.projects ?? [];
   const key = `eflow:navigation:v1:${profile?.id}:${current?.workspace.id}:recent-projects`;
@@ -64,89 +76,92 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   ];
   const [opened, setOpened] = useState<{ key: string; ids: string[] }>();
   const recent = opened?.key === key ? opened.ids : recentProjects(key);
-  const sections =
+  const matches =
     current && !workspace.error
       ? projectSections(projects, preferences.favorites, recent, search, status)
       : [];
-  return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <SectionList
-        sections={sections}
-        keyExtractor={(project) => project.id}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: 16 }}
-        stickySectionHeadersEnabled={false}
-        refreshing={pull.refreshing}
-        onRefresh={pull.refresh}
-        ListHeaderComponent={
-          <View style={{ gap: 12, marginBottom: 12 }}>
-            {!!pull.error && (
-              <ErrorState
-                error={pull.error}
-                retry={() => void pull.refresh()}
+  const total = matches.reduce(
+    (count, section) => count + section.data.length,
+    0,
+  );
+  const page = useSnapshotPage(
+    JSON.stringify([key, search.trim().toLowerCase(), status]),
+    total,
+  );
+  let remaining = page.limit;
+  const sections = matches.flatMap((section) => {
+    if (!remaining) return [];
+    const data = section.data.slice(0, remaining);
+    remaining -= data.length;
+    return [{ ...section, data, total: section.data.length }];
+  });
+  const list = (
+    <RefreshSectionList
+      sections={sections}
+      onEndReached={page.onEndReached}
+      onEndReachedThreshold={0.5}
+      keyExtractor={(project) => project.id}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ padding: 16 }}
+      stickySectionHeadersEnabled={false}
+      ListHeaderComponent={
+        <View style={{ gap: 12, marginBottom: 12 }}>
+          {!!pull.error && (
+            <ErrorState error={pull.error} retry={() => void pull.refresh()} />
+          )}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <SearchField
+                value={search}
+                onChange={setSearch}
+                placeholder="Search projects"
+              />
+            </View>
+            <FilterChip
+              label="Filter"
+              icon
+              onPress={() => setFilterOpen(true)}
+              selected={status !== "current"}
+              accessibilityLabel="Filter projects"
+            />
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
+            <FilterChip
+              label={
+                statuses.find((item) => item.id === status)?.title ||
+                "Current projects"
+              }
+              selected
+              onPress={() => setFilterOpen(true)}
+              accessibilityLabel={`Project status: ${statuses.find((item) => item.id === status)?.title}`}
+            />
+            {(status !== "current" || search) && (
+              <FilterChip
+                label="Clear filters"
+                onPress={() => {
+                  setStatus("current");
+                  setSearch("");
+                }}
               />
             )}
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ color: palette.mutedLabel, fontSize: 13 }}
             >
-              <View style={{ flex: 1 }}>
-                <SearchField
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Search projects"
-                />
-              </View>
-              <FilterChip
-                label="Filter"
-                icon
-                onPress={() => setFilterOpen(true)}
-                selected={status !== "current"}
-                accessibilityLabel="Filter projects"
-              />
-            </View>
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: 8,
-                alignItems: "center",
-              }}
-            >
-              <FilterChip
-                label={
-                  statuses.find((item) => item.id === status)?.title ||
-                  "Current projects"
-                }
-                selected
-                onPress={() => setFilterOpen(true)}
-                accessibilityLabel={`Project status: ${statuses.find((item) => item.id === status)?.title}`}
-              />
-              {(status !== "current" || search) && (
-                <FilterChip
-                  label="Clear filters"
-                  onPress={() => {
-                    setStatus("current");
-                    setSearch("");
-                  }}
-                />
-              )}
-              <Text
-                accessibilityLiveRegion="polite"
-                style={{ color: palette.mutedLabel, fontSize: 13 }}
-              >
-                {
-                  new Set(
-                    sections.flatMap((section) =>
-                      section.data.map((item) => item.id),
-                    ),
-                  ).size
-                }{" "}
-                projects
-              </Text>
-            </View>
+              {total} {total === 1 ? "project" : "projects"}
+            </Text>
           </View>
-        }
-        renderSectionHeader={({ section }) => (
+        </View>
+      }
+      renderSectionHeader={({ section }) => (
+        <View>
           <View
             style={{
               flexDirection: "row",
@@ -189,122 +204,111 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                   color: palette.primary,
                 }}
               >
-                {section.data.length}
+                {section.total}
               </Text>
             </View>
           </View>
-        )}
-        renderItem={({ item }) => (
-          <View
+          <ProjectDirectoryCells widths={widths} />
+        </View>
+      )}
+      renderItem={({ item }) => (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "stretch",
+            backgroundColor: palette.surface,
+          }}
+        >
+          <ProjectDirectoryCells
+            project={item}
+            widths={widths}
+            onOpen={() => {
+              const ids = [
+                item.id,
+                ...recent.filter((id) => id !== item.id),
+              ].slice(0, 5);
+              setOpened({ key, ids });
+              nativeWindow.localStorage.setItem(key, JSON.stringify(ids));
+              navigate({
+                name: item.kind === "personal" ? "personal_project" : "project",
+                id: item.id,
+                title: item.title,
+              });
+            }}
+          />
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel={`Favorite ${item.title}`}
+            accessibilityState={{
+              checked: preferences.favorites.has(item.id),
+            }}
+            onPress={() => preferences.toggle(item.id)}
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: palette.surface,
-              borderRadius: 14,
-              borderWidth: 1,
+              width: 48,
+              minHeight: 48,
+              borderBottomWidth: 0.5,
               borderColor: palette.border,
-              marginBottom: 8,
-              overflow: "hidden",
-              elevation: 1,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 4,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            <View style={{ flex: 1 }}>
-              <NavigationRow
-                title={item.title}
-                description={[
-                  item.status.replaceAll("_", " "),
-                  item.shortcut &&
-                    (item.kind === "personal"
-                      ? "Personal shortcut"
-                      : "Office shortcut"),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                icon={<Folder size={20} color={palette.primary} />}
-                onPress={() => {
-                  const ids = [
-                    item.id,
-                    ...recent.filter((id) => id !== item.id),
-                  ].slice(0, 5);
-                  setOpened({ key, ids });
-                  nativeWindow.localStorage.setItem(key, JSON.stringify(ids));
-                  navigate({
-                    name:
-                      item.kind === "personal" ? "personal_project" : "project",
-                    id: item.id,
-                    title: item.title,
-                  });
-                }}
-              />
-            </View>
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityLabel={`Favorite ${item.title}`}
-              accessibilityState={{
-                checked: preferences.favorites.has(item.id),
-              }}
-              onPress={() => preferences.toggle(item.id)}
-              style={{
-                minWidth: 48,
-                minHeight: 48,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Star
-                size={21}
-                color={palette.primary}
-                fill={
-                  preferences.favorites.has(item.id)
-                    ? palette.primary
-                    : "transparent"
-                }
-              />
-            </Pressable>
-          </View>
-        )}
-        ListEmptyComponent={
-          workspace.error ? (
-            <ErrorState
-              error={workspace.error}
-              retry={() => void workspace.refresh()}
-            />
-          ) : !current && workspace.loading ? (
-            <Loading label="Loading projects" layout="projects" />
-          ) : (
-            <Empty
-              kind="projects"
-              title="No projects match"
-              description={
-                current
-                  ? "Try another name or status."
-                  : "Choose an available workspace to see projects."
-              }
-              action={
-                current && (search || status !== "current") ? (
-                  <Button
-                    variant="outline"
-                    onPress={() => {
-                      setSearch("");
-                      setStatus("current");
-                    }}
-                  >
-                    Clear filters
-                  </Button>
-                ) : (
-                  <Button onPress={() => void workspace.refresh()}>
-                    Refresh projects
-                  </Button>
-                )
+            <Star
+              size={21}
+              color={palette.primary}
+              fill={
+                preferences.favorites.has(item.id)
+                  ? palette.primary
+                  : "transparent"
               }
             />
-          )
-        }
-      />
+          </Pressable>
+        </View>
+      )}
+      ListEmptyComponent={
+        workspace.error ? (
+          <ErrorState
+            error={workspace.error}
+            retry={() => void workspace.refresh()}
+          />
+        ) : !current && workspace.loading ? (
+          <Loading label="Loading projects" layout="projects" />
+        ) : (
+          <Empty
+            kind="projects"
+            title="No projects match"
+            description={
+              current
+                ? "Try another name or status."
+                : "Choose an available workspace to see projects."
+            }
+            action={
+              current && (search || status !== "current") ? (
+                <Button
+                  variant="outline"
+                  onPress={() => {
+                    setSearch("");
+                    setStatus("current");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              ) : (
+                <Button onPress={() => void workspace.refresh()}>
+                  Refresh projects
+                </Button>
+              )
+            }
+          />
+        )
+      }
+    />
+  );
+  return (
+    <View
+      style={{ flex: 1, backgroundColor: palette.background }}
+      onLayout={(event) => setViewport(event.nativeEvent.layout.width)}
+    >
+      <FolderPullArea pull={pull}>{list}</FolderPullArea>
       <SelectionSheet
         open={filterOpen}
         title="Filter projects"

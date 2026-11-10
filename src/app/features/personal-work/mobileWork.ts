@@ -11,6 +11,21 @@ export const workGroups = [
 ] as const;
 export type WorkGroup = (typeof workGroups)[number];
 
+export function matchesWorkSearch(row: WorkRow, needle: string) {
+  return (
+    !needle ||
+    [
+      row.title,
+      row.projectTitle,
+      row.workspaceName,
+      row.officeName,
+      row.rootTitle,
+      row.workContext?.pathLabel,
+      row.relation,
+    ].some((value) => value?.toLocaleLowerCase().includes(needle))
+  );
+}
+
 export function workGroup(row: WorkRow, now: Date): WorkGroup {
   if (["completed", "done"].includes(row.status)) return "Completed";
   if (row.history || row.status === "cancelled") return "Other history";
@@ -38,19 +53,7 @@ export function groupAssignedWork(
       !["for_review", "submitted"].includes(row.status)
     )
       continue;
-    if (
-      needle &&
-      ![
-        row.title,
-        row.projectTitle,
-        row.workspaceName,
-        row.officeName,
-        row.rootTitle,
-        row.workContext?.pathLabel,
-        row.relation,
-      ].some((value) => value?.toLocaleLowerCase().includes(needle))
-    )
-      continue;
+    if (!matchesWorkSearch(row, needle)) continue;
     groups.get(group)!.push(row);
   }
   return [...groups].map(([title, data]) => ({

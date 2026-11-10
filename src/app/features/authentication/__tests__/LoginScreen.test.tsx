@@ -142,13 +142,11 @@ test.each([
   },
 );
 
-test("server lockout decisions remain visible and are not retried", async () => {
-  const message =
-    "Your account is locked. Contact your Office support team for help.";
+test.each([401, 423])("sign-in rejection %i uses the same credentials message and does not retry", async (status) => {
   jest.mocked(signInWithAccountProtection).mockRejectedValueOnce(
-    Object.assign(new Error(message), {
+    Object.assign(new Error("Account sign-in rejected"), {
       name: "AccountSignInError",
-      status: 423,
+      status,
     }),
   );
   await render(
@@ -162,7 +160,11 @@ test("server lockout decisions remain visible and are not retried", async () => 
   );
   await fireEvent.changeText(screen.getByLabelText("Password"), "test-only");
   await fireEvent.press(screen.getByRole("button", { name: "Log in" }));
-  await waitFor(() => expect(screen.getByText(message)).toBeOnTheScreen());
+  await waitFor(() =>
+    expect(screen.getByText("Email or password is incorrect.")).toBeOnTheScreen(),
+  );
+  expect(screen.getByText("Couldn't sign in")).toBeOnTheScreen();
+  expect(screen.getByRole("button", { name: "Log in" })).toBeEnabled();
   expect(signInWithAccountProtection).toHaveBeenCalledTimes(1);
 });
 

@@ -1,7 +1,7 @@
 import { expect, jest, test } from "@jest/globals";
 import { render, fireEvent } from "@testing-library/react-native";
 import * as Reanimated from "react-native-reanimated";
-import { Empty } from "../Screen";
+import { Empty, ErrorState } from "../Screen";
 import { Button } from "../Button";
 import {
   ViewLoadingState,
@@ -90,4 +90,37 @@ test("all retained loading layouts expose one busy region without placeholder ac
     expect(view.queryAllByRole("button")).toHaveLength(0);
     await view.unmount();
   }
+});
+
+test("ErrorState pairs contextual titles with public messages and invokes its compact Retry action", async () => {
+  const retry = jest.fn();
+  const view = await render(
+    <ErrorState
+      error={new TypeError("Network request failed")}
+      retry={retry}
+    />,
+  );
+  expect(view.getByRole("alert")).toBeOnTheScreen();
+  expect(view.getByText("Connection unavailable")).toBeOnTheScreen();
+  expect(
+    view.getByText(
+      "We couldn't connect. Check your internet connection and try again.",
+    ),
+  ).toBeOnTheScreen();
+  await fireEvent.press(view.getByRole("button", { name: "Retry" }));
+  expect(retry).toHaveBeenCalledTimes(1);
+
+  await view.rerender(
+    <ErrorState error="Enter a work note." context="action" />,
+  );
+  expect(view.getByText("Check your details")).toBeOnTheScreen();
+  expect(view.getByText("Enter a work note.")).toBeOnTheScreen();
+  expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
+
+  await view.rerender(
+    <ErrorState error="The submission outcome could not be confirmed." context="action" />,
+  );
+  expect(view.getByText("Check before retrying")).toBeOnTheScreen();
+  expect(view.getByText(/Refresh this page and check before trying again/)).toBeOnTheScreen();
+  expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
 });

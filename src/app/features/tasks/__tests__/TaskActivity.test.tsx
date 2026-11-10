@@ -41,8 +41,8 @@ test("Activity formats stored event codes and preserves the original notes", asy
       verifyDiscussion={async () => {}}
     />,
   );
-  expect(await view.findByText("Subitem Progress")).toBeOnTheScreen();
-  expect(view.getByText("Subitem Completed")).toBeOnTheScreen();
+  expect(await view.findByText("Subtask Progress")).toBeOnTheScreen();
+  expect(view.getByText("Subtask Completed")).toBeOnTheScreen();
   expect(view.getByText("For Review")).toBeOnTheScreen();
   expect(view.getByText("Created")).toBeOnTheScreen();
   expect(view.getByText("update 1")).toBeOnTheScreen();

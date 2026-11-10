@@ -8,7 +8,11 @@ import {
   type AccountActionAccess,
 } from "../../shared/AccountActionAccess";
 import { readWithTimeout } from "../../shared/readTimeout";
-import { isConnectionFailure } from "../../shared/userMessages";
+import {
+  feedback,
+  isConnectionFailure,
+  PublicMessageError,
+} from "../../shared/userMessages";
 import {
   createContext,
   useCallback,
@@ -24,7 +28,7 @@ import { supabase } from "../../../platform/supabase";
 import { unregisterPushBeforeSignOut } from "../../../platform/push";
 import { resetAuthCaches } from "../../../core/web/app/shared/authCacheReset";
 import { normalizeUserRole } from "../../../core/web/app/shared/roles";
-import { isMobileRole, MOBILE_ROLE_NOTICE } from "../../shared/mobileRoles";
+import { isMobileRole } from "../../shared/mobileRoles";
 import { resolvePermissions } from "../../../core/web/app/features/permissions/selectors";
 import type { UserProfile, Organization } from "../../../core/web/app/types";
 
@@ -110,12 +114,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .eq("id", actor.id)
               .single();
             if (result.error) throw result.error;
+            const role = normalizeUserRole(result.data.role);
+            if (!isMobileRole(role))
+              throw new PublicMessageError(feedback.invalidCredentials);
             if (!result.data.is_active)
               throw new Error(
                 "This account is inactive. Contact your Office Head or Admin.",
               );
-            const role = normalizeUserRole(result.data.role);
-            if (!isMobileRole(role)) throw new Error(MOBILE_ROLE_NOTICE);
             const [defaults, overrides, org] = await Promise.all([
               supabase.from("role_permissions").select("*").eq("role", role),
               supabase

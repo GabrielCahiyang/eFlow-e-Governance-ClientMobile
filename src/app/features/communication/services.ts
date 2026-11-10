@@ -101,7 +101,12 @@ export async function toggleMessageReaction(messageId: string, emoji: string) {
   if (error) throw new Error(error.message);
 }
 
-export async function loadMessages(channel: string, before?: Message) {
+const messagePageSize = 50;
+export async function loadMessages(
+  channel: string,
+  before?: Message,
+  signal?: AbortSignal,
+) {
   let query = supabase
     .from("chat_messages")
     .select(
@@ -110,19 +115,26 @@ export async function loadMessages(channel: string, before?: Message) {
     .eq("channel_id", channel)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false });
+  if (signal) query.abortSignal(signal);
   if (before) {
     if (
-      !/^[0-9a-f-]{36}$/i.test(before.id) ||
-      !Number.isFinite(Date.parse(before.created_at))
+      !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(before.id) ||
+      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d\d:\d\d)$/.test(
+        before.created_at,
+      )
     )
       throw new Error("Invalid message cursor. Refresh the conversation.");
     query = query.or(
       `created_at.lt.${before.created_at},and(created_at.eq.${before.created_at},id.lt.${before.id})`,
     );
   }
-  const r = await query.limit(before ? 100 : 300);
+  const r = await query.limit(messagePageSize + 1);
   if (r.error) throw r.error;
-  return (r.data || []).reverse() as Message[];
+  const rows = r.data || [];
+  return {
+    rows: rows.slice(0, messagePageSize).reverse() as Message[],
+    hasOlder: rows.length > messagePageSize,
+  };
 }
 export async function sendChat(
   id: string,

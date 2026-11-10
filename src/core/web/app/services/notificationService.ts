@@ -26,7 +26,7 @@ export interface Notification {
     read: boolean;
     createdAt: number;
 }
-function rowToNotif(row: Record<string, unknown>): Notification {
+export function rowToNotif(row: Record<string, unknown>): Notification {
     return {
         id: row.id as string,
         type: (row.type as NotificationType) || 'assignment',

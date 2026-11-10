@@ -5,5 +5,3 @@ export function isMobileRole(role: unknown) {
     (mobileRoles as readonly string[]).includes(role)
   );
 }
-export const MOBILE_ROLE_NOTICE =
-  "Admin access is available in eFlow Web only. The mobile app supports Head, Member and Accounting Staff accounts.";

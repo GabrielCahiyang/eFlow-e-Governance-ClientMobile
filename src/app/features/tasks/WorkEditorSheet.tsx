@@ -53,7 +53,12 @@ import type {
   WorkEditorFields,
 } from "../../../core/web/app/features/nested-work/types/editor";
 import { draftStore } from "../../../platform/draftStore";
-import { personalReviewAllowed } from "./branchInspector";
+import {
+  defaultSubtaskLead,
+  isSubtaskContributor,
+  personalReviewAllowed,
+} from "./branchInspector";
+import { contributorReviewUnavailable } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
 import { workEditorReceiptRetryAllowed } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
 export function WorkEditorSheet(
@@ -123,6 +128,7 @@ export function WorkEditorSheet(
                   const receipt = await recoverWorkRequest(
                     data.root.id,
                     saved.request,
+                    profile!.id,
                   );
                   await draftStore.remove(profile!.id, "work." + data.root.id);
                   await props.onSaved(receipt);
@@ -214,6 +220,10 @@ function WorkEditorForm({
     ).current;
   const [fields, setFields] = useState<WorkEditorFields>(() => ({
     ...(recovered?.fields || baseline.fields),
+    lead:
+      !recovered && edit.command === "create"
+        ? defaultSubtaskLead(data)
+        : (recovered?.fields || baseline.fields).lead,
     people: [...(recovered?.fields || baseline.fields).people],
     order: [...(recovered?.fields || baseline.fields).order],
   }));
@@ -260,9 +270,9 @@ function WorkEditorForm({
           const approve = fields.progress === 100;
           if (
             !(await confirmAction(
-              approve ? "Approve this subitem?" : "Return this subitem?",
+              approve ? "Approve this subtask?" : "Return this subtask?",
               fields.note.trim(),
-              approve ? "Approve subitem" : "Request changes",
+              approve ? "Approve subtask" : "Request changes",
             ))
           )
             return;
@@ -283,6 +293,12 @@ function WorkEditorForm({
             "Work changed. Review the latest details before saving your draft.",
           );
         }
+        if (
+          (edit.command === "progress" || edit.command === "submit") &&
+          baseline.nodeId &&
+          isSubtaskContributor(latest, baseline.nodeId, profile.id)
+        )
+          throw new Error(contributorReviewUnavailable);
         if (
           edit.command === "review" &&
           (!baseline.nodeId ||
@@ -357,7 +373,7 @@ function WorkEditorForm({
       let receipt: WorkTreeSnapshot;
       try {
         receipt = wasPending
-          ? await recoverWorkRequest(data.root.id, request.current)
+          ? await recoverWorkRequest(data.root.id, request.current, profile.id)
           : await saveWorkTree(data.root.id, request.current);
       } catch (error) {
         if (edit.command === "edit" && workRecoveryCanDiscard(error)) {
@@ -401,10 +417,10 @@ function WorkEditorForm({
         !sameWorkEditorScope(baseline, nextScope) ||
         !workEditorCapability(latest, nextBaseline, nextScope).allowed
       )
-        throw new Error("You no longer have access to edit this subitem.");
+        throw new Error("You no longer have access to edit this subtask.");
       if (
         !(await confirmAction(
-          "Review latest subitem details",
+          "Review latest subtask details",
           `Current title: ${latestNode.title}\nCurrent due date: ${latestNode.due_date || "None"}\nYour edited fields will stay in the draft for review.`,
           "Keep draft",
         ))
@@ -453,7 +469,7 @@ function WorkEditorForm({
       title={
         edit.root
           ? "Task lead and contributors"
-          : `${edit.command === "create" ? "Add subitem" : edit.command === "staff" ? "Choose people" : edit.command === "review" ? "Review subitem" : edit.command === "order" ? "Reorder subitems" : edit.command === "move" ? "Move subitem" : edit.command === "delete" ? "Delete subitem" : "Update subitem"}`
+          : `${edit.command === "create" ? "Add subtask" : edit.command === "staff" ? "Choose people" : edit.command === "review" ? "Review subtask" : edit.command === "order" ? "Reorder subtasks" : edit.command === "move" ? "Move subtask" : edit.command === "delete" ? "Delete subtask" : "Update subtask"}`
       }
       description={node?.title}
       onClose={() => void close()}
@@ -472,7 +488,7 @@ function WorkEditorForm({
               : request.current
                 ? "Retry same request"
                 : edit.command === "delete"
-                  ? "Delete subitem"
+                  ? "Delete subtask"
                   : "Save changes"}
         </Button>
       }
@@ -494,6 +510,9 @@ function WorkEditorForm({
             onChangeText={(v) => update("title", v)}
             editable={!request.current && !action.busy}
           />
+          {edit.command === "create" && (
+            <Notice>Subtask start dates are currently unavailable.</Notice>
+          )}
           <DateField
             label="Due date"
             value={fields.due}
@@ -554,7 +573,7 @@ function WorkEditorForm({
         fields.order.map((id, index) => (
           <Row key={id}>
             <Text style={{ flex: 1, color: colors.text }}>
-              {data.nodes.find((n) => n.id === id)?.title || "Subitem"}
+              {data.nodes.find((n) => n.id === id)?.title || "Subtask"}
             </Text>
             <Button
               variant="outline"

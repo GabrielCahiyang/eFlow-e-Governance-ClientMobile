@@ -75,7 +75,7 @@ export function TaskActivity({
           .filter((item) => item.kind === "activity")
           .map((item) => ({
             id: "event:" + item.id,
-            title: words(item.action.replace(/^subtask_/, "subitem_")),
+            title: words(item.action.replace(/^subitem_/, "subtask_")),
             author: item.userName,
             date: item.timestamp,
             body: item.details,
@@ -135,7 +135,9 @@ export function TaskActivity({
           >
             Post comment
           </Button>
-          {!!action.error && <ErrorState context="action" error={action.error} />}
+          {!!action.error && (
+            <ErrorState context="action" error={action.error} />
+          )}
           {sendPending && !!action.error && (
             <>
               <Notice>

@@ -81,9 +81,9 @@ export function MemberWork({
           ))
         )}
       </Card>
-      <Card title="Delegated subitems">
+      <Card title="Delegated subtasks">
         {!nested.length ? (
-          <Empty title="No delegated subitems" />
+          <Empty title="No delegated subtasks" />
         ) : (
           nested.map((item) => (
             <Card key={item.id} title={item.title}>
@@ -103,7 +103,7 @@ export function MemberWork({
                   })
                 }
               >
-                Open subitem
+                Open subtask
               </Button>
             </Card>
           ))

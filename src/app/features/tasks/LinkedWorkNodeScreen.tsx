@@ -15,6 +15,7 @@ import {
 } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { rowToSubtask } from "../../../core/web/app/features/subtasks";
 import { WorkTreePanel } from "./WorkTreePanel";
+import { OfficeSubitemActivity } from "./OfficeSubitemActivity";
 import type { AppRoute, Navigate } from "../../shared/routes";
 
 export function LinkedWorkNodeScreen({
@@ -33,7 +34,7 @@ export function LinkedWorkNodeScreen({
     "linked-node:" + [actor, rootId, nodeId, projectId].join(":"),
     async () => {
       if (!rootId || !nodeId)
-        throw new Error("This link is missing its task or subitem ID.");
+        throw new Error("This link is missing its task or subtask ID.");
       try {
         const tree = await fetchWorkTree(rootId);
         if (
@@ -41,7 +42,7 @@ export function LinkedWorkNodeScreen({
           (projectId && tree.root.project !== projectId)
         )
           throw new Error(
-            "This subitem is outside the linked project context.",
+            "This subtask is outside the linked project context.",
           );
         return {
           tree,
@@ -78,14 +79,13 @@ export function LinkedWorkNodeScreen({
   return (
     <Screen
       compact
-      title={data?.node?.title || data?.legacy?.title || "Linked subitem"}
+      title={data?.node?.title || data?.legacy?.title || "Linked subtask"}
       onRefresh={() => facts.refresh()}
-
     >
       {facts.error ? (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       ) : !data ? (
-        <Loading label="Loading linked subitem" layout="task" />
+        <Loading label="Loading linked subtask" layout="task" />
       ) : data.tree && data.node ? (
         <WorkTreePanel
           data={data.tree}
@@ -101,16 +101,17 @@ export function LinkedWorkNodeScreen({
           <Status value={data.legacy.status} />
           <LabelValue
             label="Progress"
-            value={data.legacy.percentComplete + "%"}
+            value={data.legacy.status === "completed" ? "100%" : "Unavailable"}
           />
-          <Empty
-            title="Subitem details available"
-            description="Refresh this subitem to check which actions are available to you."
+          <OfficeSubitemActivity
+            rootId={rootId}
+            nodeId={data.legacy.id}
+            actorId={actor || null}
           />
         </>
       ) : (
         <Empty
-          title="This subitem is no longer available"
+          title="This subtask is no longer available"
           description="The linked task or branch may have changed, or access may have been withdrawn."
         />
       )}

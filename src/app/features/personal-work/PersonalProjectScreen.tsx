@@ -10,6 +10,7 @@ import {
   Notice,
   Row,
   Screen,
+  SearchField,
   Status,
   Tabs,
 } from "../../components/ui";
@@ -19,6 +20,7 @@ import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
 import { ProjectFiles, ProjectActivity } from "../projects";
 import { useFacts } from "../../shared/useFacts";
+import { useSnapshotPage } from "../../shared/useSnapshotPage";
 import type { Navigate } from "../../shared/routes";
 import { fetchPersonalProject } from "../../../core/web/app/features/workspaces/services/workspaceService";
 import type { PersonalTask } from "../../../core/web/app/features/workspaces/types";
@@ -26,6 +28,9 @@ import { usePersonalActions } from "./usePersonalActions";
 import { PersonalTaskSheet } from "./PersonalTaskSheet";
 import { PersonalNestedWork } from "./PersonalNestedWork";
 import { nativeWindow } from "../../../platform/webRuntime";
+import { branchCompletion } from "../tasks/branchInspector";
+import { completionPercent } from "../../shared/completion";
+import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
 export function PersonalProjectScreen({
   id,
   navigate,
@@ -42,7 +47,7 @@ export function PersonalProjectScreen({
     );
   const action = usePersonalActions(profile?.id || "", id, async () => {
     nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
-    await Promise.all([facts.refresh(), workspace.refresh()]);
+    await Promise.all([facts.refresh(), workspace.refresh(), tree.refresh()]);
   });
   useEffect(() => {
     const poll = setInterval(() => void facts.refresh(), 15000),
@@ -55,6 +60,7 @@ export function PersonalProjectScreen({
     };
   }, [facts.refresh]);
   const [view, setView] = useState("tasks"),
+    [search, setSearch] = useState(""),
     [editor, setEditor] = useState<{
       mode: "create" | "staff" | "progress" | "submit" | "review";
       task?: PersonalTask;
@@ -91,16 +97,81 @@ export function PersonalProjectScreen({
     });
   const name = (id: string | null) =>
     data?.members.find((member) => member.user_id === id)?.name || "Unassigned";
+  const task = initialTaskId
+    ? data?.tasks.find((item) => item.id === initialTaskId)
+    : undefined;
+  const tree = useFacts(
+    `personal-tree:${profile?.id}:${id}:${task?.id}`,
+    async () => {
+      const snapshot = await fetchWorkTree(task!.id);
+      if (snapshot.root.kind !== "personal" || snapshot.root.project !== id)
+        throw new Error("The task hierarchy could not be verified.");
+      return snapshot;
+    },
+    !!task && !facts.error,
+  );
+  const taskCompletion =
+    tree.data && !tree.error && task
+      ? branchCompletion(tree.data, task.status)
+      : undefined;
+  const projectCompleted =
+    data?.tasks.filter((item) => item.status === "done").length ?? 0;
+  const browseTasks =
+    !!data && !facts.error && view === "tasks" && !initialTaskId;
+  const needle = search.trim().toLowerCase();
+  const matchingTasks = browseTasks
+    ? data.tasks.filter(
+        (task) => !needle || task.title.toLowerCase().includes(needle),
+      )
+    : [];
+  const page = useSnapshotPage(
+    JSON.stringify([profile?.id, id, needle]),
+    matchingTasks.length,
+  );
   return (
-    <Screen
+    <Screen<PersonalTask>
       compact
-      title={
-        data?.tasks.find((task) => task.id === initialTaskId)?.title ||
-        data?.project.title ||
-        "Personal project"
-      }
+      title={task?.title || data?.project.title || "Personal project"}
       description="Personal workspace"
-      onRefresh={() => facts.refresh()}
+      onRefresh={async () => {
+        await Promise.all([facts.refresh(), tree.refresh()]);
+      }}
+      list={
+        browseTasks
+          ? {
+              data: matchingTasks.slice(0, page.limit),
+              keyExtractor: (task) => task.id,
+              onEndReached: page.onEndReached,
+              renderItem: ({ item: task }) => (
+                <NavigationRow
+                  title={task.title}
+                  description={`${task.status.replaceAll("_", " ")} · ${name(task.lead_id)}`}
+                  onPress={() =>
+                    navigate({
+                      name: "personal_project",
+                      id,
+                      taskId: task.id,
+                      title: task.title,
+                    })
+                  }
+                />
+              ),
+              ListFooterComponent: owner ? (
+                <NavigationRow
+                  title="Project closeout on eFlow Web"
+                  onPress={() =>
+                    navigate({
+                      name: "personal_project",
+                      id,
+                      view: "closeout",
+                      title: "Project closeout",
+                    })
+                  }
+                />
+              ) : undefined,
+            }
+          : undefined
+      }
 
       actions={
         owner && active && !initialTaskId ? (
@@ -124,16 +195,22 @@ export function PersonalProjectScreen({
             <Text>Owner: {name(data.owner)}</Text>
           </Row>
           {!initialTaskId && (
-            <Tabs
-              value={view}
-              onChange={setView}
-              items={[
-                { id: "tasks", label: "Tasks" },
-                { id: "members", label: "People" },
-                { id: "files", label: "Project files" },
-                { id: "activity", label: "Activity history" },
-              ]}
-            />
+            <>
+              <LabelValue
+                label="Tasks completed"
+                value={`${projectCompleted} of ${data.tasks.length} · ${completionPercent(projectCompleted, data.tasks.length, data.project.status)}%`}
+              />
+              <Tabs
+                value={view}
+                onChange={setView}
+                items={[
+                  { id: "tasks", label: "Tasks" },
+                  { id: "members", label: "People" },
+                  { id: "files", label: "Project files" },
+                  { id: "activity", label: "Activity history" },
+                ]}
+              />
+            </>
           )}
           {!!action.error && (
             <ErrorState context="action" error={action.error} />
@@ -166,157 +243,155 @@ export function PersonalProjectScreen({
           )}
           {!!(view === "tasks") && (
             <>
-              {!data.tasks.length && (
+              {browseTasks && (
+                <>
+                  <SearchField
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search personal tasks"
+                  />
+                  <Text accessibilityLiveRegion="polite">
+                    {matchingTasks.length}{" "}
+                    {matchingTasks.length === 1 ? "task" : "tasks"}
+                  </Text>
+                </>
+              )}
+              {browseTasks && !data.tasks.length && (
                 <Empty kind="work" title="No personal tasks yet" />
               )}
-              {initialTaskId &&
-                !data.tasks.some((task) => task.id === initialTaskId) && (
-                  <Empty title="This personal task is no longer available" />
+              {browseTasks &&
+                !!needle &&
+                !!data.tasks.length &&
+                !matchingTasks.length && (
+                  <Empty
+                    kind="work"
+                    title="No personal tasks match"
+                    action={
+                      <Button variant="outline" onPress={() => setSearch("")}>
+                        Clear search
+                      </Button>
+                    }
+                  />
                 )}
-              {data.tasks
-                .filter((task) => !initialTaskId || task.id === initialTaskId)
-                .map((task) =>
-                  !initialTaskId ? (
-                    <NavigationRow
-                      key={task.id}
-                      title={task.title}
-                      description={`${task.status.replaceAll("_", " ")} · ${name(task.lead_id)} · ${task.progress}%`}
+              {initialTaskId && !task && (
+                <Empty title="This personal task is no longer available" />
+              )}
+              {task && (
+                <Card key={task.id} title={task.title}>
+                  <Row>
+                    <Status value={task.status} />
+                  </Row>
+                  <LabelValue
+                    label="Progress"
+                    value={
+                      taskCompletion
+                        ? taskCompletion.total
+                          ? `${taskCompletion.completed}/${taskCompletion.total} complete · ${taskCompletion.percent}%`
+                          : `${taskCompletion.percent}%`
+                        : tree.loading
+                          ? "Loading…"
+                          : "Unavailable"
+                    }
+                  />
+                  <LabelValue label="Lead" value={name(task.lead_id)} />
+                  <LabelValue
+                    label="Review"
+                    value={
+                      task.reviewer_id
+                        ? name(task.reviewer_id)
+                        : "No review required"
+                    }
+                  />
+                  {!!task.note && <Text selectable>{task.note}</Text>}
+                  {!!task.review_note && <Notice>{task.review_note}</Notice>}
+                  {!!(active && eligible) && (
+                    <Row>
+                      {!!(
+                        task.lead_id === profile?.id &&
+                        ["todo", "in_progress"].includes(task.status)
+                      ) && (
+                        <>
+                          <Button
+                            variant="outline"
+                            disabled={blocked}
+                            onPress={() =>
+                              setEditor({ mode: "progress", task })
+                            }
+                          >
+                            Record progress
+                          </Button>
+                          <Button
+                            disabled={blocked}
+                            onPress={() => setEditor({ mode: "submit", task })}
+                          >
+                            {task.reviewer_id
+                              ? "Submit for review"
+                              : "Mark done"}
+                          </Button>
+                        </>
+                      )}
+                      {!!(
+                        task.reviewer_id === profile?.id &&
+                        task.lead_id !== profile?.id &&
+                        task.status === "submitted"
+                      ) && (
+                        <Button
+                          disabled={blocked}
+                          onPress={() => setEditor({ mode: "review", task })}
+                        >
+                          Review work
+                        </Button>
+                      )}
+                      {!!(owner && task.status !== "done") && (
+                        <Button
+                          variant="outline"
+                          disabled={blocked}
+                          onPress={() => setEditor({ mode: "staff", task })}
+                        >
+                          Choose people
+                        </Button>
+                      )}
+                    </Row>
+                  )}
+                  <Row>
+                    <Button
+                      variant="ghost"
                       onPress={() =>
-                        navigate({
-                          name: "personal_project",
-                          id,
-                          taskId: task.id,
-                          title: task.title,
+                        setFileTask(fileTask === task.id ? undefined : task.id)
+                      }
+                    >
+                      Task files
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onPress={() =>
+                        setExpanded((previous) => {
+                          const next = new Set(previous);
+                          next.has(task.id)
+                            ? next.delete(task.id)
+                            : next.add(task.id);
+                          return next;
                         })
                       }
+                    >
+                      {expanded.has(task.id) ? "Hide" : "Show"} subtasks
+                    </Button>
+                  </Row>
+                  {!!(fileTask === task.id) && (
+                    <ProjectFiles
+                      projectId={id}
+                      taskId={task.id}
+                      onManage={manageFiles}
                     />
-                  ) : (
-                    <Card key={task.id} title={task.title}>
-                      <Row>
-                        <Status value={task.status} />
-                        <Text>{task.progress}%</Text>
-                      </Row>
-                      <LabelValue label="Lead" value={name(task.lead_id)} />
-                      <LabelValue
-                        label="Review"
-                        value={
-                          task.reviewer_id
-                            ? name(task.reviewer_id)
-                            : "No review required"
-                        }
-                      />
-                      {!!task.note && <Text selectable>{task.note}</Text>}
-                      {!!task.review_note && (
-                        <Notice>{task.review_note}</Notice>
-                      )}
-                      {!!(active && eligible) && (
-                        <Row>
-                          {!!(
-                            task.lead_id === profile?.id &&
-                            ["todo", "in_progress"].includes(task.status)
-                          ) && (
-                            <>
-                              <Button
-                                variant="outline"
-                                disabled={blocked}
-                                onPress={() =>
-                                  setEditor({ mode: "progress", task })
-                                }
-                              >
-                                Record progress
-                              </Button>
-                              <Button
-                                disabled={blocked}
-                                onPress={() =>
-                                  setEditor({ mode: "submit", task })
-                                }
-                              >
-                                {task.reviewer_id
-                                  ? "Submit for review"
-                                  : "Mark done"}
-                              </Button>
-                            </>
-                          )}
-                          {!!(
-                            task.reviewer_id === profile?.id &&
-                            task.lead_id !== profile?.id &&
-                            task.status === "submitted"
-                          ) && (
-                            <Button
-                              disabled={blocked}
-                              onPress={() =>
-                                setEditor({ mode: "review", task })
-                              }
-                            >
-                              Review work
-                            </Button>
-                          )}
-                          {!!(owner && task.status !== "done") && (
-                            <Button
-                              variant="outline"
-                              disabled={blocked}
-                              onPress={() => setEditor({ mode: "staff", task })}
-                            >
-                              Choose people
-                            </Button>
-                          )}
-                        </Row>
-                      )}
-                      <Row>
-                        <Button
-                          variant="ghost"
-                          onPress={() =>
-                            setFileTask(
-                              fileTask === task.id ? undefined : task.id,
-                            )
-                          }
-                        >
-                          Task files
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          onPress={() =>
-                            setExpanded((previous) => {
-                              const next = new Set(previous);
-                              next.has(task.id)
-                                ? next.delete(task.id)
-                                : next.add(task.id);
-                              return next;
-                            })
-                          }
-                        >
-                          {expanded.has(task.id) ? "Hide" : "Show"} subitems
-                        </Button>
-                      </Row>
-                      {!!(fileTask === task.id) && (
-                        <ProjectFiles
-                          projectId={id}
-                          taskId={task.id}
-                          onManage={manageFiles}
-                        />
-                      )}
-                      {!!expanded.has(task.id) && (
-                        <PersonalNestedWork
-                          root={task.id}
-                          navigate={navigate}
-                          readOnly={!active || !eligible || facts.loading}
-                        />
-                      )}
-                    </Card>
-                  ),
-                )}
-              {owner && !initialTaskId && (
-                <NavigationRow
-                  title="Project closeout on eFlow Web"
-                  onPress={() =>
-                    navigate({
-                      name: "personal_project",
-                      id,
-                      view: "closeout",
-                      title: "Project closeout",
-                    })
-                  }
-                />
+                  )}
+                  {!!expanded.has(task.id) && (
+                    <PersonalNestedWork
+                      tree={tree}
+                      navigate={navigate}
+                      readOnly={!active || !eligible || facts.loading}
+                    />
+                  )}
+                </Card>
               )}
             </>
           )}

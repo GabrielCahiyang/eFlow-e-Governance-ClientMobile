@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image } from "react-native";
+import { Image, type ImageStyle, type StyleProp } from "react-native";
 import { supabase } from "../../../platform/supabase";
 import type { PickedFile } from "../../../platform/files";
 import { useFacts } from "../../shared/useFacts";
@@ -34,7 +34,17 @@ export async function uploadChatImage(
   return path;
 }
 
-export function ChatImage({ actor, path }: { actor: string; path: string }) {
+export function ChatImage({
+  actor,
+  path,
+  style,
+  resizeMode = "contain",
+}: {
+  actor: string;
+  path: string;
+  style?: StyleProp<ImageStyle>;
+  resizeMode?: "contain" | "cover";
+}) {
   const [failedUrl, setFailedUrl] = useState<string>();
   const image = useFacts(`chat-image:${actor}:${path}`, async () => {
     const { data, error } = await supabase.storage
@@ -57,8 +67,8 @@ export function ChatImage({ actor, path }: { actor: string; path: string }) {
     <Image
       accessibilityLabel="Image attachment"
       source={{ uri: image.data }}
-      resizeMode="contain"
-      style={{ width: "100%", height: 200, borderRadius: 12 }}
+      resizeMode={resizeMode}
+      style={[{ width: "100%", height: 200, borderRadius: 12 }, style]}
       onError={() => setFailedUrl(image.data)}
     />
   ) : null;

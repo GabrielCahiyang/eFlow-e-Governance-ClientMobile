@@ -239,32 +239,30 @@ export function TaskReviewPanel({
             maxLength={5000}
             multiline
           />
-          <Row>
-            <Button
-              busy={action.busy}
-              disabled={
-                attempted === selected?.id ||
-                clearance.loading ||
-                !!clearance.error ||
-                !clearance.data ||
-                clearance.data.length > 0 ||
-                attachments.loading ||
-                !!attachments.error
-              }
-              onPress={() => void decide(true)}
-            >
-              Approve work
-            </Button>
-            <Button
-              variant="outline"
-              disabled={
-                action.busy || attempted === selected?.id || !feedback.trim()
-              }
-              onPress={() => void decide(false)}
-            >
-              Request changes
-            </Button>
-          </Row>
+          <Button
+            busy={action.busy}
+            disabled={
+              attempted === selected?.id ||
+              clearance.loading ||
+              !!clearance.error ||
+              !clearance.data ||
+              clearance.data.length > 0 ||
+              attachments.loading ||
+              !!attachments.error
+            }
+            onPress={() => void decide(true)}
+          >
+            Approve work
+          </Button>
+          <Button
+            variant="outline"
+            disabled={
+              action.busy || attempted === selected?.id || !feedback.trim()
+            }
+            onPress={() => void decide(false)}
+          >
+            Request changes
+          </Button>
         </Card>
       )}
       {!!action.error && <ErrorState context="action" error={action.error} />}

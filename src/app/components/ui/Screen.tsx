@@ -1,27 +1,37 @@
 import { Text } from "./Typography";
 import type { ReactNode } from "react";
 import {
-  RefreshControl,
   StyleSheet,
+  type FlatListProps,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { ScrollView, View } from "./Primitives";
+import Animated from "react-native-reanimated";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
+import ClockAlert from "lucide-react-native/icons/clock-alert";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import ShieldAlert from "lucide-react-native/icons/shield-alert";
+import WifiOff from "lucide-react-native/icons/wifi-off";
 import { EmptyIllustration, type EmptyKind } from "./EmptyIllustration";
-import { colors } from "./theme";
+import { colors, withOpacity } from "./theme";
 import { Button } from "./Button";
 import {
   ViewLoadingState,
   type LoadingLayout,
 } from "./loading/ViewLoadingState";
-import { useTheme } from "./Appearance";
+import { useAppearance, useTheme } from "./Appearance";
 import { usePullRefresh } from "../../shared/usePullRefresh";
+import { FolderPullArea, RefreshFlatList } from "./FolderRefresh";
 import {
+  feedback,
   userErrorMessage,
   type FeedbackContext,
 } from "../../shared/userMessages";
-export function Screen({
+
+const RefreshScreenScroll = Animated.createAnimatedComponent(ScrollView);
+
+export function Screen<T = never>({
   title,
   description,
   actions,
@@ -30,6 +40,7 @@ export function Screen({
   style,
   compact = false,
   footer,
+  list,
 }: {
   title?: string;
   description?: string;
@@ -39,52 +50,70 @@ export function Screen({
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
   footer?: ReactNode;
+  list?: Pick<
+    FlatListProps<T>,
+    | "data"
+    | "keyExtractor"
+    | "renderItem"
+    | "onEndReached"
+    | "ListFooterComponent"
+  >;
 }) {
   const palette = useTheme();
   const pull = usePullRefresh(onRefresh);
+  const ContentScroll = onRefresh ? RefreshScreenScroll : ScrollView;
+  const scrollProps = {
+    contentInsetAdjustmentBehavior: "automatic" as const,
+    style: { flex: 1, backgroundColor: palette.background },
+    keyboardShouldPersistTaps: "handled" as const,
+    contentContainerStyle: [
+      s.content,
+      compact && s.compact,
+      { backgroundColor: palette.background },
+      style,
+    ],
+  };
+  const header = (
+    <>
+      {!!title && (
+        <View style={s.header}>
+          <View style={s.heading}>
+            <Text
+              accessibilityRole="header"
+              style={[s.title, compact && s.compactTitle]}
+            >
+              {title}
+            </Text>
+            {!!description && <Text style={s.description}>{description}</Text>}
+          </View>
+          {actions}
+        </View>
+      )}
+      {!!pull.error && (
+        <ErrorState error={pull.error} retry={() => void pull.refresh()} />
+      )}
+      {children}
+    </>
+  );
+  const scroll = list ? (
+    <RefreshFlatList
+      {...scrollProps}
+      {...list}
+      onEndReachedThreshold={0.5}
+      ListHeaderComponent={
+        <View style={{ gap: compact ? 10 : 16 }}>{header}</View>
+      }
+    />
+  ) : (
+    <ContentScroll {...scrollProps}>{header}</ContentScroll>
+  );
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={{ flex: 1, backgroundColor: palette.background }}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          s.content,
-          compact && s.compact,
-          { backgroundColor: palette.background },
-          style,
-        ]}
-        refreshControl={
-          onRefresh ? (
-            <RefreshControl
-              refreshing={pull.refreshing}
-              onRefresh={pull.refresh}
-              tintColor={palette.primary}
-            />
-          ) : undefined
-        }
-      >
-        {!!title && (
-          <View style={s.header}>
-            <View style={s.heading}>
-              <Text
-                accessibilityRole="header"
-                style={[s.title, compact && s.compactTitle]}
-              >
-                {title}
-              </Text>
-              {!!description && (
-                <Text style={s.description}>{description}</Text>
-              )}
-            </View>
-            {actions}
-          </View>
-        )}
-        {!!pull.error && (
-          <ErrorState error={pull.error} retry={() => void pull.refresh()} />
-        )}
-        {children}
-      </ScrollView>
+      {onRefresh ? (
+        <FolderPullArea pull={pull}>{scroll}</FolderPullArea>
+      ) : (
+        scroll
+      )}
       {footer}
     </View>
   );
@@ -120,6 +149,39 @@ export function Loading({
 }) {
   return <ViewLoadingState label={label} layout={layout} rows={rows} />;
 }
+function errorMeta(message: string, context: FeedbackContext) {
+  if (message === feedback.invalidCredentials)
+    return { title: "Couldn't sign in", Icon: ShieldAlert };
+  if (/couldn't connect|internet connection|offline/i.test(message))
+    return { title: "Connection unavailable", Icon: WifiOff };
+  if (/longer than expected|timed? out/i.test(message))
+    return { title: "Request timed out", Icon: ClockAlert };
+  if (message === feedback.session)
+    return { title: "Session expired", Icon: ShieldAlert };
+  if (
+    /don't have access|permission|Web only|inactive|locked|no longer available/i.test(
+      message,
+    )
+  )
+    return { title: "Access notice", Icon: ShieldAlert };
+  if (/already saved|changes were saved/i.test(message))
+    return { title: "Changes saved", Icon: AlertCircle };
+  if (/couldn't confirm/i.test(message))
+    return { title: "Check before retrying", Icon: AlertCircle };
+  if (/has changed/i.test(message))
+    return { title: "Item updated", Icon: AlertCircle };
+  if (/the upload stopped before/i.test(message))
+    return { title: "Upload interrupted", Icon: AlertCircle };
+  if (
+    /^(?:Enter|Choose|Record|Explain|Describe|Use|Passwords|Progress|Actual spending|Attach|Title|Task name|A work note|A review note|Needed-by|Allow camera)\b/i.test(
+      message,
+    )
+  )
+    return { title: "Check your details", Icon: AlertCircle };
+  if (context === "action")
+    return { title: "Couldn't complete this", Icon: AlertCircle };
+  return { title: "Unable to load", Icon: AlertCircle };
+}
 export function ErrorState({
   error,
   retry,
@@ -130,16 +192,56 @@ export function ErrorState({
   context?: FeedbackContext;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   const message = userErrorMessage(error, context);
+  const { title, Icon } = errorMeta(message, context);
   return (
-    <View accessibilityRole="alert" style={s.error}>
-      <AlertCircle size={20} color={palette.danger} />
-      <Text style={s.errorText}>{message}</Text>
-      {!!retry && (
-        <Button variant="outline" onPress={retry}>
-          Retry
-        </Button>
-      )}
+    <View
+      style={[
+        s.error,
+        {
+          backgroundColor: isDark ? "#1d1a30" : "#fffafb",
+          borderColor: withOpacity(palette.danger, isDark ? 0.32 : 0.2),
+          borderLeftColor: palette.danger,
+        },
+      ]}
+    >
+      <View
+        accessible={false}
+        style={[
+          s.errorBadge,
+          {
+            backgroundColor: palette.dangerSoft,
+            borderColor: withOpacity(palette.danger, isDark ? 0.35 : 0.16),
+          },
+        ]}
+      >
+        <Icon size={18} color={palette.danger} />
+      </View>
+      <View style={s.errorBody}>
+        <View accessible accessibilityRole="alert" style={s.errorCopy}>
+          <Text style={[s.errorTitle, { color: palette.text }]}>{title}</Text>
+          <Text style={[s.errorText, { color: palette.muted }]}>{message}</Text>
+        </View>
+        {!!retry && (
+          <Button
+            variant="outline"
+            accessibilityLabel="Retry"
+            onPress={retry}
+            icon={<RotateCcw size={14} color={palette.text} />}
+            style={[
+              s.errorRetry,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.border,
+              },
+            ]}
+            textStyle={[s.errorRetryText, { color: palette.text }]}
+          >
+            Retry
+          </Button>
+        )}
+      </View>
     </View>
   );
 }
@@ -260,14 +362,53 @@ const s = StyleSheet.create({
     flexGrow: 1,
   },
   error: {
-    padding: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 14,
     gap: 12,
     borderWidth: 1,
-    borderColor: "#f2b8c2",
-    borderRadius: 12,
-    backgroundColor: colors.dangerSoft,
+    borderLeftWidth: 4,
+    borderRadius: 14,
   },
-  errorText: { color: colors.danger, fontSize: 14, lineHeight: 21 },
+  errorBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  errorBody: {
+    flex: 1,
+    gap: 3,
+    alignItems: "flex-start",
+  },
+  errorCopy: {
+    gap: 3,
+    alignSelf: "stretch",
+  },
+  errorTitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "700",
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  errorRetry: {
+    marginTop: 7,
+    minHeight: 38,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
+  errorRetryText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
   labelValue: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -283,7 +424,7 @@ const s = StyleSheet.create({
   },
   notice: {
     backgroundColor: colors.primarySoft,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 14,
   },
 });

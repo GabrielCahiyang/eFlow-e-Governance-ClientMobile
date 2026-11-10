@@ -8,8 +8,14 @@ import type {
   WorkEditorFields,
 } from "../../../core/web/app/features/nested-work/types/editor";
 import { sameWorkEditorScope } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
+import { isSubtaskContributor } from "./branchInspector";
+import { contributorReviewUnavailable } from "../../shared/userMessages";
 
-export async function recoverWorkRequest(rootId: string, request: WorkRequest) {
+export async function recoverWorkRequest(
+  rootId: string,
+  request: WorkRequest,
+  actorId: string,
+) {
   const [{ supabase }, { fetchWorkTree, saveWorkTree }] = await Promise.all([
     import("../../../platform/supabase"),
     import("../../../core/web/app/features/nested-work/services/workTreeService"),
@@ -24,6 +30,25 @@ export async function recoverWorkRequest(rootId: string, request: WorkRequest) {
   if (data === true) return fetchWorkTree(rootId);
   if (data !== false)
     throw new Error("The original work receipt could not be verified.");
+  if (request.command === "progress" || request.command === "submit") {
+    const latest = await fetchWorkTree(rootId);
+    const nodeId = request.payload.id;
+    if (
+      typeof nodeId !== "string" ||
+      !latest.nodes.some(
+        (node) => node.id === nodeId && node.task_id === rootId,
+      )
+    )
+      throw new WorkRequestFailure(
+        "confirmed_failure",
+        "The original subtask is unavailable.",
+      );
+    if (isSubtaskContributor(latest, nodeId, actorId))
+      throw new WorkRequestFailure(
+        "confirmed_failure",
+        contributorReviewUnavailable,
+      );
+  }
   return saveWorkTree(rootId, request);
 }
 export interface NativeWorkRecovery {

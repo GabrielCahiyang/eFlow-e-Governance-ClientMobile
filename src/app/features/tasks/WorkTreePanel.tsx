@@ -19,11 +19,14 @@ import { SubtaskCompletionSheet } from "./SubtaskCompletionSheet";
 import { WorkEditorSheet } from "./WorkEditorSheet";
 import {
   branchRows,
+  branchCompletion,
   completionMode,
+  isSubtaskContributor,
   personalReviewAllowed,
   workNodeRoute,
   workScope,
 } from "./branchInspector";
+import { contributorReviewUnavailable } from "../../shared/userMessages";
 import {
   selectNodeWorkCapability,
   selectRootWorkCapability,
@@ -52,7 +55,6 @@ export function WorkTreePanel({
   const [edit, setEdit] = useState<WorkEdit>();
   const [completion, setCompletion] = useState<{ id: string; title: string }>();
   const [menu, setMenu] = useState(false);
-  const [showActivity, setShowActivity] = useState(false);
   const [officeUpdate, setOfficeUpdate] = useState<string>();
   const { focused, children } = branchRows(data, focusNodeId);
   const node =
@@ -65,6 +67,9 @@ export function WorkTreePanel({
     !!node && selectNodeWorkCapability(data, node.id, action, context).allowed;
   const actions: { id: string; title: string; edit: WorkEdit }[] = [];
   const finish = node && completionMode(data, node.id, actor, readOnly);
+  const contributor = !!node && isSubtaskContributor(data, node.id, actor);
+  const completionSummary =
+    node && branchCompletion(data, node.status, node.id);
   if (node) {
     if (can("appoint_lead") || can("manage_contributors"))
       actions.push({
@@ -75,13 +80,13 @@ export function WorkTreePanel({
     if (can("create_child"))
       actions.push({
         id: "create",
-        title: "Add child",
+        title: "Add child subtask",
         edit: { command: "create", parent: node.id },
       });
     if (personalReviewAllowed(data, node.id, actor, readOnly)) {
       actions.push({
         id: "review",
-        title: "Review subitem",
+        title: "Review subtask",
         edit: { command: "review", node },
       });
     }
@@ -89,7 +94,7 @@ export function WorkTreePanel({
     if (selectRootWorkCapability(data, "create_child", context).allowed)
       actions.push({
         id: "create",
-        title: "Add subitem",
+        title: "Add subtask",
         edit: { command: "create" },
       });
   }
@@ -97,25 +102,31 @@ export function WorkTreePanel({
     nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
     await onSaved(receipt);
   };
-  if (focusNodeId && (!node || !focused))
+  if (focusNodeId && !node)
     return (
-      <Notice>This subitem is no longer available in this work tree.</Notice>
+      <Notice>This subtask is no longer available in this work tree.</Notice>
     );
   return (
     <>
-      {node && focused && (
-        <Card title="Subitem details">
-          <Text>{`Level ${node.depth || focused.depth} · ${focused.pathLabel}`}</Text>
+      {node && (
+        <Card>
           <Row>
             <Status value={node.status} />
           </Row>
-          <LabelValue label="Progress" value={`${node.percent_complete}%`} />
+          <LabelValue
+            label="Progress"
+            value={
+              completionSummary?.total
+                ? `${completionSummary.completed}/${completionSummary.total} complete · ${completionSummary.percent}%`
+                : `${completionSummary?.percent}%`
+            }
+          />
           <LabelValue
             label="Due date"
             value={dateLabel(node.due_date || undefined)}
           />
           <LabelValue
-            label="Subitem Lead"
+            label="Subtask Lead"
             value={
               data.people.find((p) => p.id === node.lead_id)?.name ||
               "Needs assignment"
@@ -141,8 +152,11 @@ export function WorkTreePanel({
               this work is closed.
             </Notice>
           )}
+          {contributor && !readOnly && node.status !== "completed" && (
+            <Notice>{contributorReviewUnavailable}</Notice>
+          )}
           <Row>
-            {can("execute") && (
+            {!contributor && can("execute") && (
               <Button
                 variant="outline"
                 onPress={() => {
@@ -155,7 +169,7 @@ export function WorkTreePanel({
             )}
             {finish === "direct" && (
               <Button variant="outline" onPress={() => setCompletion(node)}>
-                Mark complete
+                Mark as complete
               </Button>
             )}
             {finish === "review" && (
@@ -169,58 +183,53 @@ export function WorkTreePanel({
           </Row>
         </Card>
       )}
-      {node && data.root.kind === "office" && (
-        <>
-          <Button
-            variant="outline"
-            onPress={() =>
-              navigate({
-                ...workNodeRoute(data, node.id, node.title),
-                view: "budget",
-              })
-            }
-          >
-            Open subitem funding
-          </Button>
-          <Button
-            variant="outline"
-            onPress={() => setShowActivity(!showActivity)}
-          >
-            {showActivity ? "Hide subitem activity" : "Show subitem activity"}
-          </Button>
-          {showActivity && (
-            <OfficeSubitemActivity
-              tree={data}
-              nodeId={node.id}
-              actorId={actor}
-            />
-          )}
-        </>
+      {node && (
+        <OfficeSubitemActivity
+          key={node.id}
+          tree={data}
+          nodeId={node.id}
+          actorId={actor}
+        />
       )}
-      <Card title={node ? "Child subitems" : "Subitems"}>
-        {!!actions.length && (
-          <Button variant="outline" onPress={() => setMenu(true)}>
-            {node ? "Branch actions" : "Subitem actions"}
-          </Button>
-        )}
-        {children.length ? (
-          children.map((child) => {
-            const record = data.nodes.find((item) => item.id === child.id)!;
-            return (
-              <NavigationRow
-                key={child.id}
-                title={child.title}
-                description={`Level ${record.depth || child.depth} · ${record.status.replaceAll("_", " ")} · ${record.percent_complete}%`}
-                onPress={() =>
-                  navigate(workNodeRoute(data, child.id, child.title))
-                }
-              />
-            );
-          })
-        ) : (
-          <Text>No child subitems.</Text>
-        )}
-      </Card>
+      {node && data.root.kind === "office" && (
+        <Button
+          variant="outline"
+          onPress={() =>
+            navigate({
+              ...workNodeRoute(data, node.id, node.title),
+              view: "budget",
+            })
+          }
+        >
+          Open subtask funding
+        </Button>
+      )}
+      {(!node || actions.length > 0 || children.length > 0) && (
+        <Card title={node ? "Child subtasks" : "Subtasks"}>
+          {!!actions.length && (
+            <Button variant="outline" onPress={() => setMenu(true)}>
+              {node ? "Branch actions" : "Subtask actions"}
+            </Button>
+          )}
+          {children.length ? (
+            children.map((child) => {
+              const record = data.nodes.find((item) => item.id === child.id)!;
+              return (
+                <NavigationRow
+                  key={child.id}
+                  title={child.title}
+                  description={`${record.status.replaceAll("_", " ")} · ${branchCompletion(data, record.status, record.id).percent}%`}
+                  onPress={() =>
+                    navigate(workNodeRoute(data, child.id, child.title))
+                  }
+                />
+              );
+            })
+          ) : (
+            <Text>No child subtasks.</Text>
+          )}
+        </Card>
+      )}
       {(can("edit_details") ||
         can("move") ||
         can("order_children") ||
@@ -241,7 +250,7 @@ export function WorkTreePanel({
       )}
       <SelectionSheet
         open={menu && !!actions.length}
-        title={node ? "Branch actions" : "Subitem actions"}
+        title={node ? "Branch actions" : "Subtask actions"}
         options={actions}
         onClose={() => setMenu(false)}
         onSelect={(id) => {

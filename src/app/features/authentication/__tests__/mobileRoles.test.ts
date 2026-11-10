@@ -1,5 +1,5 @@
 import { test, expect } from "@jest/globals";
-import { isMobileRole, MOBILE_ROLE_NOTICE } from "../../../shared/mobileRoles";
+import { isMobileRole } from "../../../shared/mobileRoles";
 import { normalizeUserRole } from "../../../../core/web/app/shared/roles";
 test("mobile allows operational roles but rejects current and legacy Admin identities", () => {
   for (const role of ["head", "member", "accounting_staff"])
@@ -8,5 +8,4 @@ test("mobile allows operational roles but rejects current and legacy Admin ident
     expect(isMobileRole(normalizeUserRole(role))).toBe(false);
   for (const role of ["", null, undefined, "root"])
     expect(isMobileRole(role)).toBe(false);
-  expect(MOBILE_ROLE_NOTICE).toContain("eFlow Web only");
 });

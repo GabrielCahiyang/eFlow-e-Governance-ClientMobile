@@ -1,13 +1,12 @@
 import { useTheme } from "../../components/ui/Appearance";
+import {
+  FolderPullArea,
+  RefreshSectionList,
+} from "../../components/ui/FolderRefresh";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { NavigationRow } from "../../components/ui/NavigationRow";
-import { useEffect, useState } from "react";
-import {
-  Pressable,
-  SectionList,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Pressable, View, useWindowDimensions } from "react-native";
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -37,7 +36,8 @@ import { useFacts } from "../../shared/useFacts";
 import { usePullRefresh } from "../../shared/usePullRefresh";
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
-import { fetchProject, fetchProjectTasks } from "./services";
+import { fetchProject, fetchProjectCompletion } from "./services";
+import { useProjectTaskPages } from "./useProjectTaskPages";
 import { fetchProjectGroups } from "../../../core/web/app/features/project-table/services/workspaceService";
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -47,6 +47,8 @@ import { ProjectFiles } from "./ProjectFiles";
 import { ProjectOffices } from "./ProjectOffices";
 import { ProjectFundingSummary } from "./ProjectFundingSummary";
 import { taskSections, type ProjectWorkView } from "./mobileProjects";
+import { completionPercent } from "../../shared/completion";
+import { fetchProjectTaskFinance } from "./projectTaskFinance";
 import {
   ProjectTableCells,
   ProjectTableLoading,
@@ -59,6 +61,11 @@ const views = [
   { id: "board", label: "Board" },
   { id: "calendar", label: "Agenda" },
 ];
+const pageGutter = 16;
+const taskDateLabel = (value: string) => {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value + "T00:00:00" : value;
+  return Number.isFinite(Date.parse(date)) ? dateLabel(date) : value;
+};
 const tools = [
   { id: "people", title: "Project people" },
   { id: "messages", title: "Project conversations" },
@@ -79,38 +86,98 @@ export function ProjectScreen({
   navigate: Navigate;
   initialView?: string;
 }) {
-  const { profile, organization } = useAuth();
+  const { profile } = useAuth();
   const workspace = useWorkspace();
   const palette = useTheme();
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const [measuredWidth, setMeasuredWidth] = useState(0);
-  const facts = useFacts("project:" + profile?.id + ":" + id, async () => {
-    const [project, tasks, groups] = await Promise.all([
-      fetchProject(id),
-      fetchProjectTasks(id),
-      fetchProjectGroups(id),
-    ]);
-    return { project, tasks, groups };
-  });
-  const pull = usePullRefresh(facts.refresh);
+  const scope = JSON.stringify([
+    profile?.id,
+    workspace.selected?.workspace.id,
+    id,
+  ]);
+  const facts = useFacts(
+    "project:" + scope,
+    async () => {
+      const [project, groups] = await Promise.all([
+        fetchProject(id),
+        fetchProjectGroups(id),
+      ]);
+      return { project, groups };
+    },
+    !!profile?.id,
+  );
   const [view, setView] = useState(initialView || "tasks");
   const [menu, setMenu] = useState(false);
   const [people, setPeople] = useState(false);
   const [query, setQuery] = useState("");
-  const main = !views.some((item) => item.id === view && item.id !== "tasks");
+  const [serverSearch, setServerSearch] = useState("");
+  const workView: ProjectWorkView =
+    view === "board" || view === "calendar" ? view : "tasks";
+  const main = workView === "tasks";
+  const auxiliary = ["offices", "files", "funding"].includes(view);
+  const closed = ["completed", "archived"].includes(
+    facts.data?.project.status ?? "",
+  );
+  const needle = query.trim().toLowerCase();
+  useEffect(() => {
+    if (needle === serverSearch) return;
+    const timer = setTimeout(() => setServerSearch(needle), needle ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [needle, serverSearch]);
+  const searchPending = needle !== serverSearch;
+  const projectReady = !!facts.data && !facts.error;
+  const pages = useProjectTaskPages({
+    scope,
+    project: id,
+    view: workView,
+    groups: facts.data?.groups ?? [],
+    includeArchived: closed,
+    search: serverSearch,
+    enabled: projectReady && !auxiliary,
+  });
+  const totals = useFacts(
+    "project-totals:" + scope + ":" + closed,
+    () => fetchProjectCompletion(id, closed),
+    projectReady,
+  );
+  const financeTaskIds = pages.tasks.map((task) => task.id);
+  const finance = useFacts(
+    JSON.stringify(["project-table-finance", scope, financeTaskIds]),
+    () => fetchProjectTaskFinance(financeTaskIds),
+    projectReady &&
+      main &&
+      !auxiliary &&
+      !searchPending &&
+      !pages.error &&
+      !!financeTaskIds.length,
+  );
+  const refresh = useCallback(async () => {
+    await Promise.all([
+      facts.refresh(),
+      pages.refresh(),
+      totals.refresh(),
+      finance.refresh(),
+    ]);
+  }, [facts.refresh, pages.refresh, totals.refresh, finance.refresh]);
+  const latestRefresh = useRef(refresh);
+  latestRefresh.current = refresh;
+  const pull = usePullRefresh(refresh);
   const viewport = measuredWidth || windowWidth;
-  const widths = projectTableWidths(viewport - 32, fontScale);
+  const tableViewport = Math.max(0, viewport - 2 * pageGutter);
+  const widths = projectTableWidths(tableViewport, fontScale);
+  const tableWidth = projectTableWidth(widths);
   const offsetX = useSharedValue(0);
   const trackHorizontal = useAnimatedScrollHandler((event) => {
     offsetX.set(Math.max(0, event.contentOffset.x));
   });
-  // Keep project controls and group names in view while the cells pan together.
+  // Counter the horizontal scroll for the controls, group names and Task column.
   const pinned = useAnimatedStyle(() => ({
     transform: [{ translateX: offsetX.get() }],
   }));
   useEffect(() => {
     offsetX.set(0);
-  }, [view, id, offsetX]);
+  }, [view, id, projectReady, offsetX]);
   const favorites = useNavigationFavorites(
     profile?.id || "",
     workspace.selected?.workspace.id || "",
@@ -118,20 +185,20 @@ export function ProjectScreen({
     !!workspace.selected,
   );
   useEffect(() => {
-    const refresh = () => void facts.refresh();
-    const unsubscribe = netProjectUpdates(id, refresh);
-    nativeWindow.addEventListener("eflow:work-updated", refresh);
+    const onChange = () => void latestRefresh.current();
+    const unsubscribe = netProjectUpdates(id, onChange);
+    nativeWindow.addEventListener("eflow:work-updated", onChange);
     return () => {
       unsubscribe();
-      nativeWindow.removeEventListener("eflow:work-updated", refresh);
+      nativeWindow.removeEventListener("eflow:work-updated", onChange);
     };
-  }, [id, facts.refresh]);
+  }, [id]);
 
   if (facts.error || !facts.data) {
     return (
       <Screen title="Project">
         {facts.error ? (
-          <ErrorState error={facts.error} retry={() => void facts.refresh()} />
+          <ErrorState error={facts.error} retry={() => void refresh()} />
         ) : main ? (
           <ProjectTableLoading widths={widths} />
         ) : (
@@ -141,31 +208,20 @@ export function ProjectScreen({
     );
   }
 
-  const { project, tasks, groups } = facts.data;
-  const closed = ["completed", "archived"].includes(project.status);
-  const work = tasks.filter((task) => closed || !task.archivedAt);
-  const required = work.filter((task) => task.status !== "cancelled");
-  const completed = required.filter(
-    (task) => task.status === "completed",
-  ).length;
-  const percent = required.length
-    ? Math.round((completed * 100) / required.length)
+  const { project, groups } = facts.data;
+  const completion = totals.error ? undefined : totals.data;
+  const percent = completion
+    ? completionPercent(
+        completion.completed,
+        completion.required,
+        project.status,
+      )
     : 0;
-  const needle = query.trim().toLowerCase();
-  const filtered = work.filter(
-    (task) =>
-      [task.title, task.description, task.assigneeName].some((value) =>
-        value?.toLowerCase().includes(needle),
-      ) || !needle,
-  );
   const sections = taskSections(
-    filtered,
+    searchPending || pages.error ? [] : pages.tasks,
     groups,
-    views.some((item) => item.id === view)
-      ? (view as ProjectWorkView)
-      : "tasks",
+    workView,
   );
-  const auxiliary = ["offices", "files", "funding"].includes(view);
   const hasTable = main && sections.length > 0;
   const accents = new Map(groups.map((group) => [group.id, group.color]));
   const header = (
@@ -208,27 +264,35 @@ export function ProjectScreen({
         </Row>
         <LabelValue
           label="Tasks completed"
-          value={`${completed} of ${required.length} · ${percent}%`}
+          value={
+            completion
+              ? `${completion.completed} of ${completion.required} · ${percent}%`
+              : totals.error
+                ? "Unavailable"
+                : "Loading…"
+          }
         />
-        <View
-          accessibilityRole="progressbar"
-          accessibilityLabel="Project task completion"
-          accessibilityValue={{ min: 0, max: 100, now: percent }}
-          style={{
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: palette.border,
-          }}
-        >
+        {completion && (
           <View
+            accessibilityRole="progressbar"
+            accessibilityLabel="Project task completion"
+            accessibilityValue={{ min: 0, max: 100, now: percent }}
             style={{
-              width: `${percent}%`,
               height: 6,
               borderRadius: 3,
-              backgroundColor: palette.primary,
+              backgroundColor: palette.border,
             }}
-          />
-        </View>
+          >
+            <View
+              style={{
+                width: `${percent}%`,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: palette.primary,
+              }}
+            />
+          </View>
+        )}
         {!!project.targetDate && (
           <LabelValue
             label="Target date"
@@ -260,19 +324,32 @@ export function ProjectScreen({
   );
 
   const list = (
-    <SectionList
+    <RefreshSectionList
       nestedScrollEnabled
       contentInsetAdjustmentBehavior="automatic"
       sections={sections}
       keyExtractor={(task) => task.id}
+      onEndReached={
+        !searchPending && !pages.error && pages.next
+          ? () => void pages.loadMore()
+          : undefined
+      }
+      onEndReachedThreshold={0.5}
       ListHeaderComponent={
         main ? (
-          <Animated.View style={[{ width: viewport - 32 }, pinned]}>
+          <Animated.View style={[{ width: tableViewport }, pinned]}>
             {header}
             {!!sections.length && (
               <Text style={{ color: palette.mutedLabel, fontSize: 12 }}>
-                Swipe across the table to see more columns.
+                Swipe for more columns. Task names stay in view. Actual expense
+                uses settled cash visible to your account.
               </Text>
+            )}
+            {!!finance.error && (
+              <ErrorState
+                error="Task budget and expense amounts are unavailable."
+                retry={() => void finance.refresh()}
+              />
             )}
           </Animated.View>
         ) : (
@@ -280,36 +357,82 @@ export function ProjectScreen({
         )
       }
       ListEmptyComponent={
-        <Animated.View style={main && [{ width: viewport - 32 }, pinned]}>
-          <Empty
-            kind="work"
-            description={
-              needle
-                ? "Try a different task name or clear your search."
-                : "Authorized tasks will appear here when work is assigned to this project."
-            }
-            action={
-              needle ? (
-                <Button variant="outline" onPress={() => setQuery("")}>
-                  Clear search
-                </Button>
-              ) : (
-                <Button variant="outline" onPress={() => void pull.refresh()}>
-                  Refresh project
-                </Button>
-              )
-            }
-            title={
-              needle ? "No tasks match this search" : "No tasks in this project"
-            }
-          />
+        <Animated.View style={main && [{ width: tableViewport }, pinned]}>
+          {searchPending || (pages.loading && !pages.data) ? (
+            <Loading
+              label={
+                needle ? "Searching project tasks" : "Loading project tasks"
+              }
+              layout="project"
+            />
+          ) : pages.error ? (
+            <ErrorState
+              error={pages.error}
+              retry={() => void pages.refresh()}
+            />
+          ) : (
+            <Empty
+              kind="work"
+              description={
+                needle
+                  ? "Try a different task name or clear your search."
+                  : "Authorized tasks will appear here when work is assigned to this project."
+              }
+              action={
+                needle ? (
+                  <Button variant="outline" onPress={() => setQuery("")}>
+                    Clear search
+                  </Button>
+                ) : (
+                  <Button variant="outline" onPress={() => void pull.refresh()}>
+                    Refresh project
+                  </Button>
+                )
+              }
+              title={
+                needle
+                  ? "No tasks match this search"
+                  : "No tasks in this project"
+              }
+            />
+          )}
         </Animated.View>
       }
-      refreshing={pull.refreshing}
-      onRefresh={pull.refresh}
+      ListFooterComponent={
+        !searchPending && pages.next && !pages.error ? (
+          <Animated.View
+            style={[
+              {
+                minHeight: 44,
+                justifyContent: "center",
+                alignItems: "center",
+              },
+              main && [{ width: tableViewport }, pinned],
+            ]}
+          >
+            {pages.moreError ? (
+              <ErrorState
+                error="Couldn't load more tasks."
+                retry={() => void pages.loadMore(true)}
+              />
+            ) : pages.loadingMore ? (
+              <Text
+                accessibilityRole="progressbar"
+                accessibilityLiveRegion="polite"
+                style={{ color: palette.mutedLabel }}
+              >
+                Loading more tasks…
+              </Text>
+            ) : null}
+          </Animated.View>
+        ) : undefined
+      }
       stickySectionHeadersEnabled={false}
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ padding: 16 }}
+      contentContainerStyle={{
+        paddingVertical: pageGutter,
+        paddingHorizontal: main ? 0 : pageGutter,
+      }}
       renderSectionHeader={({ section }) => {
         const accent = (main && accents.get(section.key)) || palette.primary;
         return (
@@ -323,7 +446,7 @@ export function ProjectScreen({
                   paddingTop: 16,
                   paddingBottom: 8,
                 },
-                main && [{ width: viewport - 32 }, pinned],
+                main && [{ width: tableViewport }, pinned],
               ]}
             >
               <View
@@ -344,7 +467,9 @@ export function ProjectScreen({
                 }}
               >
                 {view === "calendar" && section.key
-                  ? dateLabel(section.key + "T00:00:00")
+                  ? /^\d{4}-\d{2}-\d{2}$/.test(section.key)
+                    ? taskDateLabel(section.key)
+                    : section.title
                   : section.title}
               </Text>
               <Text
@@ -355,9 +480,16 @@ export function ProjectScreen({
                 }}
               >
                 {section.data.length}
+                {pages.next ? " loaded" : ""}
               </Text>
             </Animated.View>
-            {main && <ProjectTableCells widths={widths} accent={accent} />}
+            {main && (
+              <ProjectTableCells
+                widths={widths}
+                accent={accent}
+                pinStyle={pinned}
+              />
+            )}
           </View>
         );
       }}
@@ -375,11 +507,8 @@ export function ProjectScreen({
               widths={widths}
               accent={accents.get(section.key) || palette.primary}
               task={item}
-              office={
-                organization?.id === item.orgId
-                  ? organization?.name || item.department
-                  : item.department
-              }
+              pinStyle={pinned}
+              financial={finance.error ? undefined : finance.data?.get(item.id)}
               onOpen={open}
             />
           );
@@ -388,7 +517,7 @@ export function ProjectScreen({
           <MondayTableRow
             title={item.title}
             status={item.status}
-            due={due ? dateLabel(due) : null}
+            due={due ? taskDateLabel(due) : null}
             assignee={item.assigneeName || null}
             isLast={index === section.data.length - 1}
             onPress={open}
@@ -404,7 +533,7 @@ export function ProjectScreen({
       onLayout={(event) => setMeasuredWidth(event.nativeEvent.layout.width)}
     >
       {auxiliary ? (
-        <Screen compact onRefresh={facts.refresh}>
+        <Screen compact onRefresh={refresh}>
           {header}
           {view === "offices" && (
             <ProjectOffices project={project} canManage={false} />
@@ -438,28 +567,38 @@ export function ProjectScreen({
             />
           )}
         </Screen>
-      ) : main ? (
-        <Animated.ScrollView
-          horizontal
-          nestedScrollEnabled
-          directionalLockEnabled
-          bounces={false}
-          scrollEnabled={hasTable && projectTableWidth(widths) + 32 > viewport}
-          keyboardShouldPersistTaps="handled"
-          onScroll={trackHorizontal}
-          scrollEventThrottle={16}
-        >
-          <View
-            style={{
-              // Keep the scroll bounds stable when search temporarily hides every row.
-              width: projectTableWidth(widths) + 32,
-            }}
-          >
-            {list}
-          </View>
-        </Animated.ScrollView>
       ) : (
-        list
+        <FolderPullArea
+          pull={pull}
+          frame={
+            main
+              ? (scroll) => (
+                  <Animated.ScrollView
+                    style={{ marginHorizontal: pageGutter }}
+                    horizontal
+                    nestedScrollEnabled
+                    directionalLockEnabled
+                    bounces={false}
+                    scrollEnabled={hasTable && tableWidth > tableViewport}
+                    keyboardShouldPersistTaps="handled"
+                    onScroll={trackHorizontal}
+                    scrollEventThrottle={16}
+                  >
+                    <View
+                      style={{
+                        // Keep the scroll bounds stable when search temporarily hides every row.
+                        width: tableWidth,
+                      }}
+                    >
+                      {scroll}
+                    </View>
+                  </Animated.ScrollView>
+                )
+              : undefined
+          }
+        >
+          {list}
+        </FolderPullArea>
       )}
       <SelectionSheet
         open={menu}

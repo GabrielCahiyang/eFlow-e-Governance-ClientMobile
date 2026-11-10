@@ -49,7 +49,10 @@ export const workStatuses = [
   ["completed", "Completed"],
   ["cancelled", "Cancelled"],
 ] as const;
-const due = (task: Task) => task.deadline || task.dueDate;
+export const agendaDay = (deadline?: string, dueDate?: string) =>
+  (deadline || dueDate)?.slice(0, 10) || "";
+export const compareAgendaDays = (a: string, b: string) =>
+  a === b ? 0 : !a ? 1 : !b ? -1 : a.localeCompare(b);
 
 export function taskSections(
   tasks: Task[],
@@ -64,7 +67,7 @@ export function taskSections(
       view === "board"
         ? task.status
         : view === "calendar"
-          ? due(task)?.slice(0, 10) || ""
+          ? agendaDay(task.deadline, task.dueDate)
           : task.groupId && groupIds.has(task.groupId)
             ? task.groupId
             : !task.groupId && defaultGroup
@@ -79,7 +82,7 @@ export function taskSections(
       ? workStatuses.map(([id, label]) => [id, label])
       : view === "calendar"
         ? [...buckets.keys()]
-            .sort((a, b) => (a || "9999").localeCompare(b || "9999"))
+            .sort(compareAgendaDays)
             .map((day) => [day, day || "No due date"])
         : [
             ...groups.map((group): [string, string] => [group.id, group.title]),

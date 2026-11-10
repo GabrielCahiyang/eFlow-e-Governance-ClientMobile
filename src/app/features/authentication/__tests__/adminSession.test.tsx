@@ -58,7 +58,7 @@ test("restoring a legacy Admin session fails closed before loading permissions o
   );
   await waitFor(() =>
     expect(
-      screen.getByText(/Admin access is available in eFlow Web only/),
+      screen.getByText("Email or password is incorrect."),
     ).toBeOnTheScreen(),
   );
   expect(supabase.from).toHaveBeenCalledTimes(1);

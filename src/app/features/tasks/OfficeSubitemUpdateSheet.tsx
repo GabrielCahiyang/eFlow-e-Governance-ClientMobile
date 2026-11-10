@@ -12,7 +12,8 @@ import { saveSubtaskWorkUpdate } from "../../../core/web/app/features/subtasks/s
 import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
-import { workScope } from "./branchInspector";
+import { isSubtaskContributor, workScope } from "./branchInspector";
+import { contributorReviewUnavailable } from "../../shared/userMessages";
 
 export function OfficeSubitemUpdateSheet({
   tree,
@@ -58,9 +59,11 @@ export function OfficeSubitemUpdateSheet({
         ).allowed
       ) {
         throw new Error(
-          "Work access or revision changed. Reopen this subitem and review the current work.",
+          "Work access or revision changed. Reopen this subtask and review the current work.",
         );
       }
+      if (isSubtaskContributor(latest, nodeId, actorId))
+        throw new Error(contributorReviewUnavailable);
       setAttempted(true);
       await saveSubtaskWorkUpdate({
         subtaskId: nodeId,
@@ -75,7 +78,7 @@ export function OfficeSubitemUpdateSheet({
   return (
     <Sheet
       open
-      title="Update subitem work"
+      title="Update subtask work"
       busy={action.busy}
       onClose={onClose}
       footer={
@@ -122,7 +125,7 @@ export function OfficeSubitemUpdateSheet({
       {!!action.error && <ErrorState context="action" error={action.error} />}
       {attempted && !!action.error && (
         <Notice>
-          Close this sheet and refresh the subitem before trying again. Check
+          Close this sheet and refresh the subtask before trying again. Check
           activity to see whether the update was recorded.
         </Notice>
       )}

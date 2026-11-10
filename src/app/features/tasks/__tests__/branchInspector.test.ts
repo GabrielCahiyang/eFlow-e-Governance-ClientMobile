@@ -8,8 +8,11 @@ import {
   selectNodeWorkCapability,
 } from "../../../../core/web/app/features/nested-work/selectors/capabilities";
 import {
+  branchCompletion,
   branchRows,
   completionMode,
+  defaultSubtaskLead,
+  isSubtaskContributor,
   personalReviewAllowed,
   workNodeRoute,
   workScope,
@@ -61,6 +64,55 @@ const tree = (
   can_transfer: false,
   leaf_total: 0,
   leaf_completed: 0,
+});
+
+test("completion counts direct accepted children and uses the leaf status when there are no children", () => {
+  const data = tree([
+    node(1, null, { status: "completed" }),
+    node(1, null, { id: "two", status: "completed" }),
+    node(1, null, { id: "three", status: "for_review", percent_complete: 100 }),
+    node(2, "three", { status: "completed" }),
+    node(2, "three", {
+      id: "pending-child",
+      status: "for_review",
+      percent_complete: 100,
+    }),
+    node(1, null, { id: "other-root", task_id: "other", status: "completed" }),
+  ]);
+  expect(branchCompletion(data, "in_progress")).toEqual({
+    completed: 2,
+    total: 3,
+    percent: 67,
+  });
+  expect(branchCompletion(data, "for_review", "three")).toEqual({
+    completed: 1,
+    total: 2,
+    percent: 50,
+  });
+  expect(branchCompletion(data, "for_review", "pending-child").percent).toBe(0);
+  expect(branchCompletion(data, "completed", "n2").percent).toBe(100);
+});
+
+test("an assigned contributor cannot use the direct completion path even if also the Task Lead", () => {
+  const data = tree([
+    node(1, null, {
+      assigned_to_ids: ["lead", "root-lead"],
+      capabilities: { execute: allowed },
+    }),
+  ]);
+  rememberWorkCapabilityContext(data, "root-lead");
+  expect(isSubtaskContributor(data, "n1", "root-lead")).toBe(true);
+  expect(isSubtaskContributor(data, "n1", "lead")).toBe(false);
+  expect(completionMode(data, "n1", "root-lead")).toBeUndefined();
+});
+
+test("subtask creation defaults to the eligible Task Lead and leaves unavailable appointments blank", () => {
+  const data = tree([node(1, null)]);
+  expect(defaultSubtaskLead(data)).toBe("");
+  data.people = [{ id: "root-lead", name: "Task Lead", eligible: true }];
+  expect(defaultSubtaskLead(data)).toBe("root-lead");
+  data.people[0].eligible = false;
+  expect(defaultSubtaskLead(data)).toBe("");
 });
 
 test("drills through eight exact child links and excludes siblings and another root", () => {

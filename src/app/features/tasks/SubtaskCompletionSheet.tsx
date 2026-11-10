@@ -69,7 +69,7 @@ export function SubtaskCompletionSheet({
           completionMode(tree, node.id, actorId) !== "direct"
         )
           throw new Error(
-            "Current access does not permit direct completion of this subitem.",
+            "Current access does not permit direct completion of this subtask.",
           );
       }
       if (!attempt) {

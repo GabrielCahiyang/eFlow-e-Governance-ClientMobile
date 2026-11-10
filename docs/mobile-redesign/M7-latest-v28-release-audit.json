@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-09T11:55:25.027Z",
+  "method": "Exact Hermes string-table entries; quoted literals for JavaScript. Numeric substrings are not credential matches.",
+  "platforms": [
+    "android",
+    "ios"
+  ],
+  "bundles": [
+    "dist/android/_expo/static/js/android/index-b75e4f056804b7bd1d52f6db3ac7a409.hbc",
+    "dist/ios/_expo/static/js/ios/index-b1724d70935d07261a79eaacd7894246.hbc",
+    "C:/Users/james/projects/eFlow-e-Governance-ClientMobile/artifacts/embedded-android-v28.hbc"
+  ],
+  "developmentAccountLiteralCount": 6,
+  "developmentAccountLiteralsFound": 0
+}

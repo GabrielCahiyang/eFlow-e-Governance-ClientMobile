@@ -1,18 +1,21 @@
 import { ErrorState, Loading } from "../../components/ui";
-import { useFacts } from "../../shared/useFacts";
 import { WorkTreePanel } from "../tasks";
-import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
+import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
 import type { Navigate } from "../../shared/routes";
 export function PersonalNestedWork({
-  root,
+  tree,
   readOnly,
   navigate,
 }: {
-  root: string;
+  tree: {
+    data?: WorkTreeSnapshot;
+    loading: boolean;
+    error?: Error;
+    refresh: () => Promise<void>;
+  };
   readOnly: boolean;
   navigate: Navigate;
 }) {
-  const tree = useFacts("personal-tree:" + root, () => fetchWorkTree(root));
   return tree.error ? (
     <ErrorState error={tree.error} retry={() => void tree.refresh()} />
   ) : tree.data ? (
@@ -25,6 +28,6 @@ export function PersonalNestedWork({
       }}
     />
   ) : (
-    <Loading label="Loading subitems" layout="tree" />
+    <Loading label="Loading subtasks" layout="tree" />
   );
 }

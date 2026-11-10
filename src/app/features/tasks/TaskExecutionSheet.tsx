@@ -93,7 +93,7 @@ export function TaskExecutionSheet({
           void action.run(async () => setFiles(await chooseFiles("*/*", false)))
         }
       >
-        Attach evidence
+        Attach evidence (optional)
       </Button>
       {files.map((file) => (
         <LabelValue

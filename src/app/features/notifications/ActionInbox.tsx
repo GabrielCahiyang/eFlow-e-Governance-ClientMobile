@@ -1,13 +1,7 @@
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
 import { useEffect, useRef, useState } from "react";
-import {
-  AppState,
-  Pressable,
-  ScrollView,
-  SectionList,
-  View,
-} from "react-native";
+import { AppState, Pressable, ScrollView, View } from "react-native";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import {
   Button,
@@ -20,6 +14,10 @@ import {
 
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useTheme } from "../../components/ui/Appearance";
+import {
+  FolderPullArea,
+  RefreshSectionList,
+} from "../../components/ui/FolderRefresh";
 import { Text } from "../../components/ui/Typography";
 import { radius, space } from "../../components/ui/theme";
 import { useAuth } from "../authentication";
@@ -37,12 +35,12 @@ import { personalReviewAllowed } from "../tasks/branchInspector";
 import { nativeWindow } from "../../../platform/webRuntime";
 import { getAssignedIndependentReviews } from "../../../core/web/app/features/budget/services/independentReviewService";
 import {
-  fetchRecentNotifications,
   markRecentNotificationRead,
   type Notification,
 } from "../../../core/web/app/services/notificationService";
 import { normalizeWorkUpdateNotification } from "../../../core/web/app/shared/notificationWorkCopy";
 import { inboxUpdateRoute } from "./inboxDestinations";
+import { useInboxUpdatePages } from "./useInboxUpdatePages";
 import { getActionableSettlementEscalations } from "../budget";
 import type { AppRoute, Navigate } from "../../shared/routes";
 
@@ -54,7 +52,7 @@ type Decision = {
 };
 type Entry =
   { key: string; decision: Decision } | { key: string; update: Notification };
-type Filter = "all" | "decisions" | "unread";
+type Filter = "all" | "unread";
 
 export function ActionInbox({
   navigate,
@@ -67,20 +65,25 @@ export function ActionInbox({
   const assertAccess = useAccountActionAccess();
   const actor = profile!.id;
   const palette = useTheme();
+  const reviews = initialView === "decisions";
   const work = useMobileWorkFeed();
-  const tasks = useTaskFacts("inbox-decisions");
-  const finance = useFacts("inbox-independent-reviews:" + actor, () =>
-    getAssignedIndependentReviews(actor),
+  const tasks = useTaskFacts("inbox-decisions", reviews);
+  const finance = useFacts(
+    "inbox-independent-reviews:" + actor,
+    () => getAssignedIndependentReviews(actor),
+    reviews,
   );
-  const updates = useFacts(
-    "inbox-updates:" + actor,
-    () => fetchRecentNotifications(actor),
-    true,
-    { actor, select: (data) => data.map((item) => ({ ...item })) },
+  const [filter, setFilter] = useState<Filter>("all");
+  const updates = useInboxUpdatePages(
+    actor,
+    false,
+    !reviews || profile?.role === "head",
   );
+  const unreadUpdates = useInboxUpdatePages(actor, true, filter === "unread");
+  const feed = filter === "unread" ? unreadUpdates : updates;
   const staffingAlerts =
-    profile?.role === "head" && !updates.error
-      ? (updates.data || []).filter(
+    reviews && profile?.role === "head" && !updates.error
+      ? (updates.data?.items || []).filter(
           (item) =>
             item.financialRecordType === "settlement_staffing" &&
             item.financialRecordId,
@@ -94,9 +97,6 @@ export function ActionInbox({
     () => getActionableSettlementEscalations(staffingIds),
     staffingIds.length > 0,
   );
-  const [filter, setFilter] = useState<Filter>(
-    initialView === "decisions" ? "decisions" : "all",
-  );
   const [filterOpen, setFilterOpen] = useState(false);
   const [confirmedRead, setConfirmedRead] = useState<Set<string>>(new Set());
   const [marking, setMarking] = useState<string>();
@@ -108,9 +108,14 @@ export function ActionInbox({
       finance.refresh(),
       escalations.refresh(),
       updates.refresh(),
-      work.refresh(),
+      unreadUpdates.refresh(),
+      ...(reviews ? [work.refresh()] : []),
     ]);
-  const pull = usePullRefresh(refresh);
+  const pull = usePullRefresh(async () => {
+    updates.discardHistory();
+    unreadUpdates.discardHistory();
+    await refresh();
+  });
 
   useEffect(() => {
     const refreshInbox = (force = true) => {
@@ -120,6 +125,7 @@ export function ActionInbox({
           finance.refresh(),
           escalations.refresh(),
           force ? updates.refresh() : updates.refreshIfStale(),
+          force ? unreadUpdates.refresh() : unreadUpdates.refreshIfStale(),
         ]);
     };
     const channel = createPostgresChannel("native-inbox:" + actor)
@@ -131,7 +137,21 @@ export function ActionInbox({
           table: "notifications",
           filter: "user_id=eq." + actor,
         },
-        () => refreshInbox(),
+        (event) => {
+          const row = event.new;
+          if (
+            "user_id" in row &&
+            row.user_id === actor &&
+            row.read === true &&
+            typeof row.id === "string"
+          ) {
+            const id = row.id;
+            setConfirmedRead((previous) =>
+              previous.has(id) ? previous : new Set(previous).add(id),
+            );
+          }
+          refreshInbox();
+        },
       )
       .subscribe();
     const workChanged = () => refreshInbox();
@@ -153,13 +173,16 @@ export function ActionInbox({
     escalations.refresh,
     updates.refresh,
     updates.refreshIfStale,
+    unreadUpdates.refresh,
+    unreadUpdates.refreshIfStale,
   ]);
 
-  const rootTasks = tasks.error
-    ? []
-    : (tasks.data || []).filter(
-        (task) => task.latestSubmission?.submitterId !== actor,
-      );
+  const rootTasks =
+    !reviews || tasks.error
+      ? []
+      : (tasks.data || []).filter(
+          (task) => task.latestSubmission?.submitterId !== actor,
+        );
   const decisions: Decision[] = personalReviewActions(
     rootTasks,
     [],
@@ -169,7 +192,7 @@ export function ActionInbox({
     key: item.key,
     title: item.title,
     context:
-      (item.entityId ? "Subitem review · " : "Task review · ") + item.context,
+      (item.entityId ? "Subtask review · " : "Task review · ") + item.context,
     route: {
       name: "task",
       id: item.taskId,
@@ -181,7 +204,7 @@ export function ActionInbox({
         ?.latestSubmission?.id,
     },
   }));
-  if (!work.error) {
+  if (reviews && !work.error) {
     for (const row of work.data?.rows || []) {
       if (
         row.kind === "personal-node" &&
@@ -194,7 +217,7 @@ export function ActionInbox({
         decisions.push({
           key: "personal-node-review:" + row.id,
           title: row.title,
-          context: "Personal subitem review · " + row.projectTitle,
+          context: "Personal subtask review · " + row.projectTitle,
           route: workDestination(row),
         });
         continue;
@@ -254,35 +277,45 @@ export function ActionInbox({
   const assigned = [
     ...new Map(decisions.map((item) => [item.key, item])).values(),
   ];
-  const recent = (updates.data || []).map((item) =>
-    confirmedRead.has(item.id) ? { ...item, read: true } : item,
-  );
-  const unread = recent.filter((item) => !item.read);
-  const sections: { title: string; data: Entry[] }[] = [];
-  if (filter !== "unread" && assigned.length)
+  const updatesForView = feed.items
+    .map((item) =>
+      confirmedRead.has(item.id) ? { ...item, read: true } : item,
+    )
+    .filter((item) => filter !== "unread" || !item.read);
+  const sections: { key: string; title: string; data: Entry[] }[] = [];
+  if (reviews && assigned.length)
     sections.push({
-      title: "Assigned decisions",
+      key: "decisions",
+      title: "Awaiting your review",
       data: assigned.map((decision) => ({ key: decision.key, decision })),
     });
-  if (filter !== "decisions" && (filter === "unread" ? unread : recent).length)
+  if (!reviews && updatesForView.length)
     sections.push({
-      title: filter === "unread" ? "Unread updates" : "Recent updates",
-      data: (filter === "unread" ? unread : recent).map((update) => ({
+      key: filter === "unread" ? "unread" : "updates",
+      title: filter === "unread" ? "Unread updates" : "Updates",
+      data: updatesForView.map((update) => ({
         key: "update:" + update.id,
         update,
       })),
     });
 
-  const sources = [tasks, finance, updates, work];
+  const sources = reviews ? [tasks, finance, work] : [feed];
   const initial = sources.some((source) => source.loading && !source.data);
-  const issues = [
-    tasks.error && "Task decisions could not load.",
-    finance.error &&
-      "Assigned financial reviews couldn't load. Please try again.",
-    updates.error && "Updates could not refresh.",
-    (work.error || work.data?.issues.length || work.data?.unavailable.length) &&
-      "Some assigned decisions couldn't load. Please try again.",
-  ].filter(Boolean);
+  const issues = (
+    reviews
+      ? [
+          tasks.error && "Task reviews could not load.",
+          finance.error &&
+            "Assigned financial reviews couldn't load. Please try again.",
+          (work.error ||
+            work.data?.issues.length ||
+            work.data?.unavailable.length) &&
+            "Some reviews couldn't load. Please try again.",
+          (updates.error || escalations.error) &&
+            "Settlement alerts could not load.",
+        ]
+      : [feed.error && "Updates could not refresh."]
+  ).filter(Boolean);
   const markRead = async (item: Notification) => {
     if (pending.current || item.read) return;
     pending.current = item.id;
@@ -292,7 +325,7 @@ export function ActionInbox({
       assertAccess(actor);
       await markRecentNotificationRead(actor, item.id);
       setConfirmedRead((previous) => new Set(previous).add(item.id));
-      await updates.refresh();
+      await Promise.all([updates.refresh(), unreadUpdates.refresh()]);
     } catch (error) {
       setMarkError(
         error instanceof Error
@@ -305,53 +338,54 @@ export function ActionInbox({
     }
   };
 
-  return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <SectionList
-        style={{ backgroundColor: palette.background }}
-        sections={sections}
-        keyExtractor={(item) => item.key}
-        contentContainerStyle={{
-          flexGrow: 1,
-          padding: space.lg,
-          gap: space.sm,
-        }}
-        stickySectionHeadersEnabled={false}
-        keyboardShouldPersistTaps="handled"
-        refreshing={pull.refreshing}
-        onRefresh={pull.refresh}
-        ListHeaderComponent={
-          <View style={{ gap: space.md, marginBottom: space.xs }}>
-            {!!pull.error && (
-              <ErrorState
-                error={pull.error}
-                retry={() => void pull.refresh()}
-              />
-            )}
-            <DisplayUpdateNotice
-              visible={!!updates.data && updates.stale}
-              loading={updates.loading}
-            />
-            {/* Monday Header (Image 3) */}
-            <View
+  const list = (
+    <RefreshSectionList
+      style={{ backgroundColor: palette.background }}
+      sections={sections}
+      keyExtractor={(item) => item.key}
+      onEndReached={
+        !reviews && feed.hasMore && !feed.moreError
+          ? () => void feed.loadMore()
+          : undefined
+      }
+      onEndReachedThreshold={0.5}
+      contentContainerStyle={{
+        flexGrow: 1,
+        padding: space.lg,
+        gap: space.sm,
+      }}
+      stickySectionHeadersEnabled={false}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={
+        <View style={{ gap: space.md, marginBottom: space.xs }}>
+          {!!pull.error && (
+            <ErrorState error={pull.error} retry={() => void pull.refresh()} />
+          )}
+          <DisplayUpdateNotice
+            visible={!reviews && !!feed.data && feed.stale}
+            loading={feed.loading}
+          />
+          {/* Monday Header (Image 3) */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingTop: 4,
+            }}
+          >
+            <Text
+              accessibilityRole="header"
               style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingTop: 4,
+                fontSize: 24,
+                fontWeight: "700",
+                color: palette.text,
               }}
             >
-              <Text
-                accessibilityRole="header"
-                style={{
-                  fontSize: 24,
-                  fontWeight: "700",
-                  color: palette.text,
-                }}
-              >
-                Notifications
-              </Text>
+              {reviews ? "Reviews" : "Notifications"}
+            </Text>
 
+            {!reviews && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Filter inbox"
@@ -371,9 +405,11 @@ export function ActionInbox({
               >
                 <SlidersHorizontal size={18} color={palette.text} />
               </Pressable>
-            </View>
+            )}
+          </View>
 
-            {/* Horizontal Filter Pills (Monday Image 3) */}
+          {/* Horizontal Filter Pills (Monday Image 3) */}
+          {!reviews && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -430,202 +466,194 @@ export function ActionInbox({
                   Unread
                 </Text>
               </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Assigned decisions"
-                onPress={() => setFilter("decisions")}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 7,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor:
-                    filter === "decisions" ? palette.primary : palette.border,
-                  backgroundColor:
-                    filter === "decisions"
-                      ? palette.primarySoft
-                      : palette.surface,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: filter === "decisions" ? "700" : "500",
-                    color:
-                      filter === "decisions" ? palette.primary : palette.text,
-                  }}
-                >
-                  Decisions
-                </Text>
-              </Pressable>
             </ScrollView>
+          )}
 
-            {!!issues.length && (
-              <ErrorState
-                error={issues.join("\n")}
-                retry={() => void refresh()}
-              />
-            )}
-            {!!markError && <ErrorState error={markError} />}
-          </View>
-        }
-        renderSectionHeader={({ section }) => (
+          {!!issues.length && (
+            <ErrorState
+              error={issues.join("\n")}
+              retry={() => void refresh()}
+            />
+          )}
+          {!!markError && <ErrorState error={markError} />}
+        </View>
+      }
+      renderSectionHeader={({ section }) => (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingTop: space.sm,
+            paddingBottom: 4,
+          }}
+        >
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              paddingTop: space.sm,
-              paddingBottom: 4,
+              width: 6,
+              height: 16,
+              borderRadius: 3,
+              backgroundColor: palette.primary,
+            }}
+          />
+          <Text
+            accessibilityRole="header"
+            style={{
+              fontWeight: "700",
+              fontSize: 16,
+              color: palette.text,
             }}
           >
-            <View
-              style={{
-                width: 6,
-                height: 16,
-                borderRadius: 3,
-                backgroundColor: palette.primary,
-              }}
-            />
-            <Text
-              accessibilityRole="header"
-              style={{
-                fontWeight: "700",
-                fontSize: 16,
-                color: palette.text,
-              }}
-            >
-              {section.title}
-            </Text>
-          </View>
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: space.sm }} />}
-        renderItem={({ item }) => {
-          if ("decision" in item)
-            return (
-              <View
-                style={{
-                  borderRadius: 14,
-                  overflow: "hidden",
-                  borderWidth: 1,
-                  borderColor: palette.border,
-                  backgroundColor: palette.surface,
-                }}
-              >
-                <NavigationRow
-                  title={item.decision.title}
-                  description={item.decision.context}
-                  onPress={() => navigate(item.decision.route)}
-                />
-              </View>
-            );
-          const update = item.update;
-          const copy = normalizeWorkUpdateNotification(update);
-          const target = inboxUpdateRoute(update, profile!.role);
+            {section.title}
+          </Text>
+        </View>
+      )}
+      ItemSeparatorComponent={() => <View style={{ height: space.sm }} />}
+      renderItem={({ item }) => {
+        if ("decision" in item)
           return (
             <View
               style={{
-                padding: space.md,
-                gap: space.xs,
                 borderRadius: 14,
+                overflow: "hidden",
                 borderWidth: 1,
-                borderColor: update.read ? palette.border : palette.primary,
-                backgroundColor: update.read
-                  ? palette.surface
-                  : palette.primarySoft,
-                elevation: 1,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 4,
+                borderColor: palette.border,
+                backgroundColor: palette.surface,
               }}
             >
-              <Row>
-                <Status value={update.read ? "Read" : "Unread"} />
-                <Text style={{ color: palette.mutedLabel, fontSize: 13 }}>
-                  {dateLabel(update.createdAt)}
-                </Text>
-              </Row>
-              <Text
-                style={{
-                  fontWeight: "700",
-                  fontSize: 15,
-                  color: palette.text,
-                }}
-              >
-                {copy.title}
-              </Text>
-              <Text style={{ color: palette.text, lineHeight: 20 }}>
-                {copy.message}
-              </Text>
-              {!!update.reason && (
-                <Text style={{ color: palette.muted }}>{update.reason}</Text>
-              )}
-              <Row>
-                {target && (
-                  <Button variant="ghost" onPress={() => navigate(target)}>
-                    Open related item
-                  </Button>
-                )}
-                {!update.read && (
-                  <Button
-                    variant="ghost"
-                    busy={marking === update.id}
-                    disabled={!!marking}
-                    onPress={() => void markRead(update)}
-                  >
-                    Mark read
-                  </Button>
-                )}
-              </Row>
+              <NavigationRow
+                title={item.decision.title}
+                description={item.decision.context}
+                onPress={() => navigate(item.decision.route)}
+              />
             </View>
           );
-        }}
-        ListEmptyComponent={
-          initial ? (
-            <FeedSkeleton
-              label="Loading your Inbox"
-              layout={filter === "decisions" ? "navigation" : "inbox"}
-            />
-          ) : issues.length ? (
-            <Empty
-              compact
-              kind="inbox"
-              title="No items loaded for this view"
-              description="Retry to check the unavailable sources."
-            />
-          ) : (
-            <Empty
-              kind="inbox"
-              title="You're all caught up"
-              description={
-                filter === "decisions"
-                  ? "No decisions assigned to you"
-                  : filter === "unread"
-                    ? "No unread updates"
-                    : "Your work updates and assigned decisions will appear here."
-              }
-              action={
-                <Button onPress={() => void refresh()}>Refresh updates</Button>
-              }
-            />
-          )
-        }
-      />
+        const update = item.update;
+        const copy = normalizeWorkUpdateNotification(update);
+        const target = inboxUpdateRoute(update, profile!.role);
+        return (
+          <View
+            style={{
+              padding: space.md,
+              gap: space.xs,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: update.read ? palette.border : palette.primary,
+              backgroundColor: update.read
+                ? palette.surface
+                : palette.primarySoft,
+              elevation: 1,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04,
+              shadowRadius: 4,
+            }}
+          >
+            <Row>
+              <Status value={update.read ? "Read" : "Unread"} />
+              <Text style={{ color: palette.mutedLabel, fontSize: 13 }}>
+                {dateLabel(update.createdAt)}
+              </Text>
+            </Row>
+            <Text
+              style={{
+                fontWeight: "700",
+                fontSize: 15,
+                color: palette.text,
+              }}
+            >
+              {copy.title}
+            </Text>
+            <Text style={{ color: palette.text, lineHeight: 20 }}>
+              {copy.message}
+            </Text>
+            {!!update.reason && (
+              <Text style={{ color: palette.muted }}>{update.reason}</Text>
+            )}
+            <Row>
+              {target && (
+                <Button variant="ghost" onPress={() => navigate(target)}>
+                  Open related item
+                </Button>
+              )}
+              {!update.read && (
+                <Button
+                  variant="ghost"
+                  busy={marking === update.id}
+                  disabled={!!marking}
+                  onPress={() => void markRead(update)}
+                >
+                  Mark read
+                </Button>
+              )}
+            </Row>
+          </View>
+        );
+      }}
+      ListEmptyComponent={
+        initial || (!reviews && feed.hasMore && !feed.moreError) ? (
+          <FeedSkeleton
+            label="Loading your Inbox"
+            layout={reviews ? "navigation" : "inbox"}
+          />
+        ) : issues.length || (!reviews && feed.moreError) ? (
+          <Empty
+            compact
+            kind="inbox"
+            title="No items loaded for this view"
+            description="Retry to check the unavailable sources."
+          />
+        ) : (
+          <Empty
+            kind="inbox"
+            title="You're all caught up"
+            description={
+              reviews
+                ? "No reviews assigned to you"
+                : filter === "unread"
+                  ? "No unread updates"
+                  : "Your work updates will appear here."
+            }
+            action={
+              <Button onPress={() => void refresh()}>
+                {reviews ? "Refresh reviews" : "Refresh updates"}
+              </Button>
+            }
+          />
+        )
+      }
+      ListFooterComponent={
+        !reviews && feed.hasMore ? (
+          <View style={{ minHeight: 44, justifyContent: "center" }}>
+            {feed.moreError ? (
+              <ErrorState
+                error={feed.moreError}
+                retry={() => void feed.loadMore(true)}
+              />
+            ) : feed.loadingMore ? (
+              <Text
+                accessibilityRole="progressbar"
+                accessibilityLiveRegion="polite"
+                style={{ color: palette.mutedLabel, textAlign: "center" }}
+              >
+                Loading more updates…
+              </Text>
+            ) : null}
+          </View>
+        ) : undefined
+      }
+    />
+  );
+  return (
+    <View style={{ flex: 1, backgroundColor: palette.background }}>
+      <FolderPullArea pull={pull}>{list}</FolderPullArea>
       <SelectionSheet
         open={filterOpen}
         title="Filter Inbox"
-        description="Unread counts cover the 50 most recent updates."
         value={filter}
         options={[
           { id: "all", title: "All" },
-          {
-            id: "decisions",
-            title: "Decisions",
-            description: String(assigned.length),
-          },
-          { id: "unread", title: "Unread", description: String(unread.length) },
+          { id: "unread", title: "Unread" },
         ]}
         onClose={() => setFilterOpen(false)}
         onSelect={(value) => {

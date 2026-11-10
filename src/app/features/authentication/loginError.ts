@@ -8,11 +8,10 @@ export function loginErrorMessage(error: unknown): string {
   if (item?.name === "AccountSignInError") {
     switch (item.status) {
       case 401:
-        return "Email or password is incorrect.";
+      case 423:
+        return feedback.invalidCredentials;
       case 403:
         return "Please confirm your email or contact your Office support team for help signing in.";
-      case 423:
-        return "Your account is locked. Contact your Office support team for help.";
       case 429:
         return "Please wait a moment before trying to sign in again.";
     }

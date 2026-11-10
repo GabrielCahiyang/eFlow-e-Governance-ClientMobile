@@ -265,11 +265,7 @@ export function LoginScreen() {
                     ) : undefined
                   }
                 >
-                  {recovery
-                    ? "Send recovery link"
-                    : error.includes("locked")
-                      ? "Try signing in again"
-                      : "Log in"}
+                  {recovery ? "Send recovery link" : "Log in"}
                 </Button>
               </MotionView>
               {!recovery && !!walkthroughUrl && (

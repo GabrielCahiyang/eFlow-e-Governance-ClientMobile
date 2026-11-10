@@ -72,6 +72,12 @@ edit("app/features/project-access/services/accessService.ts", (s) =>
     "(process.env.EXPO_PUBLIC_WEB_ORIGIN || '')",
   ),
 );
+// The native Inbox pages authorized rows using the canonical notification mapper.
+edit("app/services/notificationService.ts", (source) => {
+  if (!/^(?:export )?function rowToNotif\(/m.test(source))
+    throw new Error("Notification mapper declaration changed.");
+  return source.replace(/^function rowToNotif\(/m, "export function rowToNotif(");
+});
 const walk = (p) =>
   fs
     .readdirSync(p, { withFileTypes: true })

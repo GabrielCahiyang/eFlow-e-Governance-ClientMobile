@@ -5,15 +5,15 @@ import { useFacts } from "../../shared/useFacts";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
 import { fetchVisibleTasks } from "./services";
-export function useTaskFacts(scope: string) {
+export function useTaskFacts(scope: string, enabled = true) {
   const { profile } = useAuth();
   const facts = useFacts(
     `tasks:${scope}:${profile?.id}`,
     fetchVisibleTasks,
-    !!profile,
+    !!profile && enabled,
   );
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !enabled) return;
     const channel = createPostgresChannel(
       "native-task-facts:" + scope + ":" + profile.id,
     )
@@ -30,6 +30,6 @@ export function useTaskFacts(scope: string) {
       app.remove();
       void supabase.removeChannel(channel);
     };
-  }, [scope, profile?.id]);
+  }, [scope, profile?.id, enabled]);
   return facts;
 }

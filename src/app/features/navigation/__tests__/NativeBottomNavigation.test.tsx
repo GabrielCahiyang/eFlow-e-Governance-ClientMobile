@@ -41,23 +41,59 @@ test("Admin has no operational mobile navigation even with an apparent selected 
   expect(screen.queryAllByRole("tab")).toHaveLength(0);
 });
 
-test("pointer hover and selection use the same rounded highlight without filling the tap area", async () => {
+test("first layout and later renders position the disc on the selected non-Home tab", async () => {
+  const onSelect = jest.fn();
+  const screen = await render(
+    <NativeBottomNavigation role="head" selected="inbox" onSelect={onSelect} />,
+  );
+  await fireEvent(screen.getByTestId("tab-track"), "layout", {
+    nativeEvent: { layout: { width: 350 } },
+  });
+  expect(screen.getByTestId("tab-selection-indicator")).toHaveStyle({
+    transform: [{ translateX: 219 }],
+  });
+  await screen.rerender(
+    <NativeBottomNavigation
+      role="head"
+      selected="inbox"
+      onSelect={jest.fn()}
+    />,
+  );
+  expect(screen.getByTestId("tab-selection-indicator")).toHaveStyle({
+    transform: [{ translateX: 219 }],
+  });
+});
+
+test("one selection disc follows the selected tab and resizes with the bar", async () => {
   const onSelect = jest.fn();
   const screen = await render(
     <NativeBottomNavigation role="head" selected="home" onSelect={onSelect} />,
   );
   const tab = screen.getByRole("tab", { name: "Projects" });
   expect(StyleSheet.flatten(tab.props.style).backgroundColor).toBeUndefined();
-  expect(screen.getByTestId("tab-highlight-projects")).toHaveStyle({
-    borderRadius: 15,
-    opacity: 0,
+  const resize = async (width: number) =>
+    fireEvent(screen.getByTestId("tab-track"), "layout", {
+      nativeEvent: { layout: { width } },
+    });
+  const indicator = () => screen.getByTestId("tab-selection-indicator");
+  await resize(350);
+  expect(indicator()).toHaveStyle({
+    borderRadius: 26,
+    transform: [{ translateX: 9 }],
   });
 
   await fireEvent(tab, "hoverIn");
-  expect(screen.getByTestId("tab-highlight-projects")).toHaveStyle({
-    borderRadius: 15,
+  expect(screen.getByTestId("tab-preview-projects")).toHaveStyle({
     opacity: 0.55,
   });
+  expect(indicator()).toHaveStyle({ transform: [{ translateX: 9 }] });
+  expect(screen.getByTestId("tab-selected-icon-home")).toHaveStyle({
+    opacity: 1,
+  });
+  expect(screen.getByTestId("tab-selected-icon-projects")).toHaveStyle({
+    opacity: 0,
+  });
+
   await screen.rerender(
     <NativeBottomNavigation
       role="head"
@@ -65,10 +101,25 @@ test("pointer hover and selection use the same rounded highlight without filling
       onSelect={onSelect}
     />,
   );
-  await fireEvent(screen.getByRole("tab", { name: "Projects" }), "hoverOut");
-  expect(screen.getByTestId("tab-highlight-projects")).toHaveStyle({
-    borderRadius: 15,
+  expect(screen.getAllByTestId("tab-selection-indicator")).toHaveLength(1);
+  expect(
+    screen.getByRole("tab", { name: "Projects" }).props.accessibilityState
+      .selected,
+  ).toBe(true);
+  expect(screen.getByTestId("tab-preview-projects")).toHaveStyle({
+    opacity: 0,
+  });
+
+  // Resize re-renders the styles after the shared selection effect in Jest.
+  await resize(260);
+  expect(screen.getByTestId("tab-selected-icon-home")).toHaveStyle({
+    opacity: 0,
+  });
+  expect(screen.getByTestId("tab-selected-icon-projects")).toHaveStyle({
     opacity: 1,
   });
-  expect(screen.getByTestId("tab-highlight-home")).toHaveStyle({ opacity: 0 });
+  expect(indicator()).toHaveStyle({
+    borderRadius: 24,
+    transform: [{ translateX: 106 }],
+  });
 });

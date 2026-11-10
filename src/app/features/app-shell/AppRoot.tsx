@@ -21,6 +21,7 @@ import { NativeWorkspace } from "./NativeWorkspace";
 import { ShareLanding } from "../projects";
 import type { AppRoute } from "../../shared/routes";
 import { BackgroundAccessStatus } from "./BackgroundAccessStatus";
+import { feedback } from "../../shared/userMessages";
 export function AppRoot() {
   const [attempt, setAttempt] = useState(0);
   return (
@@ -91,17 +92,19 @@ function SessionContent() {
       />
     );
   if (loading && !profile) return <LoadingScreen />;
-  if (error)
+  if (error) {
+    const denied = error.message === feedback.invalidCredentials;
     return (
       <SafeAreaView style={{ flex: 1 }}>
-        <Screen title="Check your account access">
-          <ErrorState error={error} retry={() => void refresh()} />
+        <Screen title={denied ? "Sign in to eFlow" : "Check your account access"}>
+          <ErrorState error={error} retry={denied ? undefined : () => void refresh()} />
           <Button variant="outline" onPress={() => void signOut()}>
             Back to sign in
           </Button>
         </Screen>
       </SafeAreaView>
     );
+  }
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>

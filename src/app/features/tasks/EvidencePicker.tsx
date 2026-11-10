@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { Button, LabelValue, Notice, Row } from "../../components/ui";
+import { Text } from "../../components/ui/Typography";
 import { chooseFiles } from "../../../platform/files";
 import {
   captureEvidencePhoto,
@@ -40,6 +41,7 @@ export function EvidencePicker({
     });
   return (
     <>
+      <Text style={{ fontWeight: "600" }}>Evidence (optional)</Text>
       <Notice>
         Choose supported images, PDF, Word or Excel files. Up to {maxCount}{" "}
         {maxCount === 1 ? "file" : "files"}, 25 MB each.

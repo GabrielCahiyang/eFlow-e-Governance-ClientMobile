@@ -38,6 +38,8 @@ const snapshot = (revision: number) =>
       {
         id: "node",
         task_id: "root",
+        lead_id: "member",
+        assigned_to_ids: ["member"],
         capabilities: { execute: { allowed: true, reason_code: null } },
       },
     ],
@@ -68,9 +70,7 @@ test("Office subitem update checks revision and current actor scope before sendi
     screen.getByRole("button", { name: "Save work update" }),
   );
   await waitFor(() =>
-    expect(
-      screen.getByText(/This item has changed/),
-    ).toBeOnTheScreen(),
+    expect(screen.getByText(/This item has changed/)).toBeOnTheScreen(),
   );
   expect(saveSubtaskWorkUpdate).not.toHaveBeenCalled();
 
@@ -89,4 +89,32 @@ test("Office subitem update checks revision and current actor scope before sendi
     }),
   );
   expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+test("a current execute grant does not send a contributor update that needs approval", async () => {
+  const tree = snapshot(4);
+  tree.nodes[0].lead_id = "branch-lead";
+  tree.nodes[0].assigned_to_ids = ["branch-lead", "member"];
+  rememberWorkCapabilityContext(tree, "member");
+  jest.mocked(fetchWorkTree).mockResolvedValue(tree);
+  await render(
+    <OfficeSubitemUpdateSheet
+      tree={tree}
+      nodeId="node"
+      actorId="member"
+      readOnly={false}
+      onSaved={async () => {}}
+      onClose={jest.fn()}
+    />,
+  );
+  await fireEvent.changeText(screen.getByLabelText("Work note"), "Draft");
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Save work update" }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByText(/Work updates that need your Lead/),
+    ).toBeOnTheScreen(),
+  );
+  expect(saveSubtaskWorkUpdate).not.toHaveBeenCalled();
 });

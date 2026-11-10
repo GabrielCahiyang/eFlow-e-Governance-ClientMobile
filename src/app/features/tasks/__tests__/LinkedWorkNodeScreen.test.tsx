@@ -73,7 +73,9 @@ test("a mismatched project or a missing branch never opens another row", async (
   );
   await waitFor(() =>
     expect(
-      screen.getByText("This subitem doesn't belong to the selected project. Return to Projects to open it."),
+      screen.getByText(
+        "This subtask doesn't belong to the selected project. Return to Projects to open it.",
+      ),
     ).toBeOnTheScreen(),
   );
   await view.rerender(
@@ -89,7 +91,7 @@ test("a mismatched project or a missing branch never opens another row", async (
   );
   await waitFor(() =>
     expect(
-      screen.getByText("This subitem is no longer available"),
+      screen.getByText("This subtask is no longer available"),
     ).toBeOnTheScreen(),
   );
   expect(screen.queryByText(/Focused branch/)).toBeNull();

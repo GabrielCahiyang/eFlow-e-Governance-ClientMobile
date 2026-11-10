@@ -1,4 +1,13 @@
 import { jest } from "@jest/globals";
+import type { ReactNode } from "react";
+
+require("react-native-gesture-handler/jestSetup");
+jest.mock("react-native-gesture-handler", () => ({
+  ...jest.requireActual<typeof import("react-native-gesture-handler")>(
+    "react-native-gesture-handler",
+  ),
+  GestureDetector: ({ children }: { children: ReactNode }) => children,
+}));
 jest.mock("react-native-worklets", () =>
   require("react-native-worklets/src/mock"),
 );

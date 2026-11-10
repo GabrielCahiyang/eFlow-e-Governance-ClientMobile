@@ -88,7 +88,7 @@ export function ContributionPanel({
               value={String(row.approvedTasks)}
             />
             <LabelValue
-              label="Approved subitems"
+              label="Approved subtasks"
               value={String(row.approvedSubtasks)}
             />
             <LabelValue

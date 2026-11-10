@@ -33,7 +33,8 @@ import { useWorkspaceFavorites } from "../workspaces/useWorkspaceFavorites";
 import { ProfileToolbarTitle } from "./ProfileToolbarTitle";
 import { EFlowMark } from "../../components/brand/EFlowMark";
 import { useMotionPreferences } from "../../shared/motion";
-import { isMobileRole, MOBILE_ROLE_NOTICE } from "../../shared/mobileRoles";
+import { isMobileRole } from "../../shared/mobileRoles";
+import { feedback } from "../../shared/userMessages";
 import type { AppRoute, Navigate, PrimaryTab } from "../../shared/routes";
 import { MobileContent } from "../app-shell/MobileContent";
 import { NativeBottomNavigation } from "./NativeBottomNavigation";
@@ -74,6 +75,12 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     tab: initialTab,
     route: initialRoute,
   });
+  const selectedWorkspaceId = workspace.selected?.workspace.id;
+  const [navigationWorkspaceId, setNavigationWorkspaceId] =
+    useState(selectedWorkspaceId);
+  // Access is rechecked independently of the tab and stack state.
+  if (selectedWorkspaceId && selectedWorkspaceId !== navigationWorkspaceId)
+    setNavigationWorkspaceId(selectedWorkspaceId);
   const location = useRef(resume),
     pendingPush = useRef(false),
     [chooser, setChooser] = useState(false);
@@ -97,7 +104,7 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
   if (!isMobileRole(role))
     return (
       <Screen title="Mobile access unavailable">
-        <ErrorState error={MOBILE_ROLE_NOTICE} />
+        <ErrorState error={feedback.invalidCredentials} />
         <Button onPress={() => void signOut()}>Back to sign in</Button>
       </Screen>
     );
@@ -148,9 +155,7 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     >
       <View style={{ flex: 1, backgroundColor: palette.background }}>
         <NavigationContainer
-          key={
-            profile!.id + ":" + (workspace.selected?.workspace.id || "pending")
-          }
+          key={profile!.id + ":" + (navigationWorkspaceId || "pending")}
           ref={navigation}
           theme={theme}
           initialState={initialState}
@@ -176,21 +181,41 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
               animation: "none",
               lazy: true,
             }}
-            tabBar={({ state, navigation: tabs }) => (
-              <NativeBottomNavigation
-                role={role}
-                selected={state.routes[state.index].name as PrimaryTab}
-                onSelect={(tab) => {
-                  const event = tabs.emit({
-                    type: "tabPress",
-                    target: state.routes.find((route) => route.name === tab)
-                      ?.key,
-                    canPreventDefault: true,
-                  });
-                  if (!event.defaultPrevented) tabs.navigate(tab);
-                }}
-              />
-            )}
+            tabBar={({ state, navigation: tabs }) => {
+              // An open conversation is a focused task: hide the tab bar so
+              // the composer owns the bottom edge (Messenger/WhatsApp style).
+              const stack = state.routes[state.index].state;
+              const top = stack?.routes[stack.index ?? stack.routes.length - 1];
+              const params = top?.params as
+                | {
+                    name?: string;
+                    id?: string;
+                    taskId?: string;
+                    projectId?: string;
+                  }
+                | undefined;
+              if (
+                top?.name === "Destination" &&
+                params?.name === "messages" &&
+                (params.id || params.taskId || params.projectId)
+              )
+                return null;
+              return (
+                <NativeBottomNavigation
+                  role={role}
+                  selected={state.routes[state.index].name as PrimaryTab}
+                  onSelect={(tab) => {
+                    const event = tabs.emit({
+                      type: "tabPress",
+                      target: state.routes.find((route) => route.name === tab)
+                        ?.key,
+                      canPreventDefault: true,
+                    });
+                    if (!event.defaultPrevented) tabs.navigate(tab);
+                  }}
+                />
+              );
+            }}
           >
             {primaryTabs(role).map((tab) => (
               <Tabs.Screen key={tab} name={tab}>
@@ -237,7 +262,7 @@ function WorkspaceButton() {
         gap: 5,
         paddingHorizontal: 8,
         borderRadius: 8,
-        backgroundColor: pressed ? palette.primarySoft : palette.background,
+        backgroundColor: pressed ? palette.primarySoft : palette.surface,
       })}
     >
       <Icon size={16} color={palette.primary} />
@@ -274,7 +299,8 @@ function MobileTabStack({ tab }: { tab: PrimaryTab }) {
       <Stack.Navigator
         initialRouteName="Root"
         screenOptions={{
-          headerStyle: { backgroundColor: palette.surface },
+          headerStyle: { backgroundColor: palette.background },
+          headerShadowVisible: false,
           headerTintColor: palette.primary,
           headerTitleStyle: { fontFamily: "Figtree_600SemiBold", fontSize: 19 },
           contentStyle: { backgroundColor: palette.background },

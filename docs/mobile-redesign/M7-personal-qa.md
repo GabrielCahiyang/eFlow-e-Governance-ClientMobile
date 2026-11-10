@@ -2,7 +2,45 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
-## Latest standalone APK — build 26: Navigation clearance and Activity labels
+## Latest standalone APK — build 41
+
+[Download Android APK 41](../../artifacts/M7/eFlow-Mobile-M7-Subtasks-Projects-v41-arm64-x86_64.apk). It uses the same QA certificate as build 40 and supports upgrades with existing app data. [Changes and role-by-role checklist](#subtasks-project-tables-and-role-priorities).
+
+## Previous standalone APK — build 32: Lottie folder and stable tab highlight
+
+[Download Android APK 32](../../artifacts/M7/eFlow-Mobile-M7-Latest-v32-arm64-x86_64.apk). The refresh indicator uses a bundled LottieFiles folder, and the selected tab stays in place during workspace rechecks.
+
+[Personal steps and verification](M7-lottie-refresh-qa.md).
+
+## Previous standalone APK — build 31: Folder replaces the system spinner
+
+[Download Android APK 31](../../artifacts/M7/eFlow-Mobile-M7-Latest-v31-arm64-x86_64.apk). The folder is the pull-to-refresh indicator from the initial drag through loading. It appears above the content as the list moves down, leaving the My Work cards visible.
+
+[Personal steps and Android emulator evidence](M7-folder-refresh-replacement-qa.md).
+
+## Previous standalone APK — build 30: Folder pull-to-refresh
+
+[Download Android APK 30](../../artifacts/M7/eFlow-Mobile-M7-Latest-v30-arm64-x86_64.apk). Pull and release on a refreshable screen to see the eFlow folder. The page moves while the refresh runs and stays still with Reduce Motion.
+
+Test Home, My Work, Inbox and Projects, then repeat after panning the project table sideways. [Personal steps and Android emulator evidence](M7-folder-refresh-qa.md).
+
+## Previous standalone APK — build 29: Sliding tab highlight and filled icons
+
+[Download Android APK 29](../../artifacts/M7/eFlow-Mobile-M7-Latest-v29-arm64-x86_64.apk). The circular highlight glides between tabs while the selected icon fills and settles. Inbox adds a short bell ring. Reduce Motion gives immediate selection feedback.
+
+Tap adjacent and distant tabs, then repeat quickly and with Reduce Motion enabled. [Motion QA checklist](M7-navbar-motion-qa.md).
+
+## Previous standalone APK — build 28: Pinned Task column and navigation polish
+
+[Download Android APK 28](../../artifacts/M7/eFlow-Mobile-M7-Latest-v28-arm64-x86_64.apk). Main table keeps the Task column visible while the other columns scroll. The toolbar blends into the page, Home Workspaces matches Recently visited, and bottom tab icons respond to presses and selection.
+
+With an authorized account, open Main table and swipe to Office, tap a pinned task, check both Home themes, and switch tabs with and without Reduce Motion. [Screenshots and personal checklist](M7-pinned-table-and-navigation-qa.md).
+
+## Previous standalone APK — build 27: Web catch-up
+
+[Build 27 changes and verification](M7-web-catch-up-2026-11-09.md).
+
+## Previous standalone APK — build 26: Navigation clearance and Activity labels
 
 [Download Android APK 26](../../artifacts/M7/eFlow-Mobile-M7-Latest-v26-arm64-x86_64.apk). The navigation bar has its own space across all tabs and their detail screens. Task Activity displays capitalized headings with “Subitem” terminology. Funding setup has a compact web handoff.
 
@@ -76,7 +114,7 @@ Use the [step-by-step resume/cache checklist](M7-resume-cache-qa.md). You can do
 | Head and Member navigation | Home, My Work, Inbox, Projects and More | Same destinations |
 | Accounting Staff navigation | My Work, Inbox, Accounting, Projects and More | Same destinations and finance scope |
 | Task, project and account experience | Focused inspectors, authorized records, compact lists and contextual web handoffs | Same screens and navigation entries. An older finance notice can open the exact linked subitem funding record when the authorized task data confirms a unique match. |
-| Android packaging | M6 QA build 12 | M7 tethered QA build 14 and phone build 26, ARM64 and x86_64 |
+| Android packaging | M6 QA build 12 | M7 tethered QA build 14 and phone build 29, ARM64 and x86_64 |
 
 M7 makes zero feature-scope changes. No mobile screen or navigation entry was removed. The initial M7 workflow fix was a contextual recovery action for older financial notices; subsequent sign-in repairs are recorded below. Build 13 reproduced the defect. Build 14 contains the fix. The app searches its existing authorized data for the exact request, release or liquidation within the linked task. Ambiguous, unrelated or unavailable records remain unavailable. [M6 before/after inventory](M6-personal-qa.md)
 
@@ -284,6 +322,75 @@ The general read-only and display captures below are from build 13. The affected
 | Member and Accounting Staff, second Office and depth-eight live fixtures | **BLOCKED** by missing approved sessions and test data. No live Accounting screenshot. Automated route and authority coverage is separate. |
 | Evidence upload, review, messaging, finance writes | **BLOCKED** pending dedicated actor/fixture and backend prerequisites. No production write was performed. |
 | Physical Android and native iOS | Physical Android **NOT TESTED** by the agent. Native iOS build and device workflows **BLOCKED** on Windows. Personal acceptance is pending. |
+
+## Office Main table pagination
+
+Build 34 adds automatic task paging to the Office project Main table. See [the before-and-after inventory and personal QA checklist](M7-main-table-pagination-qa.md).
+
+## Inbox update pagination
+
+Build 35 loads older Inbox updates as you scroll. See [the before-and-after inventory and personal QA checklist](M7-inbox-pagination-qa.md).
+
+## Chat history pagination
+
+Build 36 loads older chat messages as you scroll up. See [the before-and-after inventory and personal QA checklist](M7-chat-pagination-qa.md).
+
+## My Work scroll paging
+
+Build 37 reveals My Work assignments in batches from the authorized snapshot. See [the personal QA checklist and network paging prerequisite](M7-my-work-pagination-qa.md).
+
+## Office Board and Agenda paging
+
+Build 38 pages Board by status and Agenda by date. See [the verification and personal QA checklist](M7-board-agenda-pagination-qa.md).
+
+## Projects directory and Personal task paging
+
+Build 39 pages the Projects directory in both workspace types and the Tasks tab inside Personal projects. See [the personal QA checklist and network paging prerequisite](M7-project-directory-personal-pagination-qa.md).
+
+## Sign-in and alert wording
+
+Build 40 shows **Couldn't sign in** and **Email or password is incorrect.** for rejected credentials, account lockout responses, and a confirmed role outside mobile access. The sign-in service does not identify the role when it returns a lockout, so the same wording applies to every locked account. The sign-in button stays labeled **Log in**. A restored Admin session offers **Back to sign in** and does not open a workspace.
+
+Shared alerts now use **Check your details** for form guidance, **Check before retrying** for an unconfirmed result, and more specific headings when an item changed, an upload stopped, or changes were already saved. Before repeating any unconfirmed operation, refresh and check the record.
+
+| Personal check | Expected result | Status |
+| --- | --- | --- |
+| Approved Head, Member or Accounting Staff with a known good account | On Android and iOS, check the sign-in form and confirm valid credentials reach the workspace. If an approved negative test is available, make one deliberate invalid attempt and check the generic message. | NOT TESTED on a personal device |
+| Local mock lockout or restored Admin fixture | Generic credentials message. No workspace access and no automatic retry. Do not use live Admin credentials or deliberately lock an account. | Covered by automated checks |
+| Approved Member with a safe task draft | Open a form that requires a work note and leave it empty. Verify **Check your details** and the instruction about the missing note. Check legibility in both themes and with large text and TalkBack or VoiceOver. Use a local fixture for the uncertain-result alert. | NOT TESTED on a personal device |
+
+## Subtasks, project tables and role priorities
+
+11 November 2026, Asia/Singapore. Personal acceptance is pending.
+
+TypeScript and nine Metro checks passed. All 274 tests in 84 suites passed. Android and iOS production Hermes exports passed separately. The credential audit passed on both exports and the APK's embedded bundle. [Credential audit](M7-subtasks-projects-v41-release-audit.json)
+
+Android release compilation, ARM64/x86_64 packaging, signature and source checks passed. The non-debuggable APK upgraded the isolated `eFlow_M7_Resume_QA` emulator from build 39 and cold-launched to the dark sign-in screen on Android API 36/x86_64. No signed-in actor or role was verified on this build. [APK verification](../STANDALONE_V41_APK_VERIFICATION.json)
+
+Native iOS compilation and device workflows require Xcode and an iOS device or simulator.
+
+- Mobile uses **Subtask** in the affected screens. Task details and the project Main table show the existing task start date. New subtasks preselect the Task Lead when the current directory lists that person as eligible.
+- Subtask details open directly to a chronological Activity timeline with history, decisions and evidence. Project percentages count completed tasks. Task and subtask details count completed direct children. A leaf uses its own completion status. A record under review contributes zero completed items.
+- Projects uses the Main table's row and header styles with Project, Status and Type columns. The Main table replaces Office with Budget and Actual expense and keeps the Task column pinned. Budget sums approved root allocations. Actual expense sums settled cash visible to the account, including authorized records for the task's subtasks. A dash means no amount was available to display.
+- Head Home shows up to three current projects in the selected workspace, prioritizing projects on hold and then active projects. Member Home shows up to three open assignments in the selected workspace, with overdue and due-today work first. Accounting Staff has Accounting in the bottom navigation and can open Reviews from More. Notifications offers All and Unread updates.
+
+| Personal check | Account and fixture | Expected result |
+| --- | --- | --- |
+| Home and Projects | Approved Head in an Office with active, on-hold and completed projects. Approved Member with assignments in two workspaces. | Check project status and percentage, workspace isolation, table headers, search, favorites, scroll paging and Back. Member Home should prioritize due work in the selected workspace. |
+| Main table and task details | Approved Head or task Lead with a dated task and authorized approved allocations and settled expenses. | Start date is readable in both screens. Swipe across the table and confirm the task name stays pinned. Compare the authorized amounts with the same records on eFlow Web. |
+| Subtask activity and progress | Approved Task Lead, with two completed and one pending-review subtask under a task. Include a nested subtask with historical activity and evidence. | The task shows 67%. Open the nested subtask and confirm the Activity timeline is visible immediately. Verify authors, times, decisions and evidence, then check Back returns to the same branch. |
+| Creation and completion | Approved Task Lead on a dedicated writable fixture, and a different approved reviewer. | Check that the eligible Task Lead is selected in Add subtask. Verify the Evidence (optional) label and Mark as complete button. The root task continues to require its independent reviewer. Open Reviews in More and confirm both review buttons fit. |
+| Contributor boundary | Approved Member contributor and a separate eligible Subtask Lead. Use a second Office for cross-Office routing when available. | Mobile shows that Lead approval is unavailable and prevents contributor execution from writing changes. Read the same task, subtask and project afterward to verify their status and completion. The Lead can still use existing authorized actions. |
+| Accounting and Notifications | Approved Accounting Staff and a safe assigned review. | Accounting is a main tab. More opens the assigned review queue. Notifications shows All and Unread and opens authorized links to their exact records. |
+
+For each supported scenario, check Android and iOS separately in both themes with increased font size, TalkBack or VoiceOver, reduced motion and the keyboard open where applicable. Use only approved role accounts and dedicated fixtures. Fresh role sign-in, signed-in device workflows and personal acceptance are pending unless documented in the platform evidence below.
+
+### Shared backend prerequisites
+
+Verified against authoritative eFlow Web Git revision `4ff217b84e3e8128555ffc87f0514253cd576399`. The hosted target is `ixnfphgjyelhckjwjkdv`.
+
+- **Subtask start date and today default — integration blocked.** The Office and Personal subtask records and the `r7_work_command` and `nw_work_command` create payload accept a due date. The shared contract needs a persisted date on both subtask record types, create validation and calendar default semantics, and projection through `r7_work_tree`. The mobile form reports the unavailable field while retaining supported creation.
+- **Contributor submission and nearest-Lead approval — integration blocked.** `save_subtask_work_update` applies state and history immediately. The existing root progress/status and Personal nested-work commands also lack a pending change stage for every contributor execution action. The shared contract needs revision- and actor-scoped pending submissions, authorized nearest eligible Lead routing, a decision and notification surface, and atomic application of accepted changes with receipt recovery. Keep existing self-review, ancestor fallback, descendant completion and Responsible Office Head root-review checks. Mobile blocks the direct contributor execution paths, including retries of uncommitted Personal nested work. Existing finance and independent-review authorities continue to use their own contracts.
 
 ## Integration dependencies
 

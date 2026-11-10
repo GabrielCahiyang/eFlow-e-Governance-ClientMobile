@@ -27,9 +27,9 @@ const mockPersonal = {
 };
 const mockWorkspace = {
   workspaces: [mockOffice.workspace, mockPersonal.workspace],
-  selected: mockOffice,
+  selected: mockOffice as typeof mockOffice | undefined,
   loading: false,
-  error: undefined,
+  error: undefined as Error | undefined,
   select: jest.fn(),
   refresh: jest.fn(),
 };
@@ -109,11 +109,50 @@ jest.mock("../../app-shell/MobileContent", () => {
 beforeEach(() => {
   mockRole = "head";
   mockWorkspace.selected = mockOffice;
+  mockWorkspace.loading = false;
+  mockWorkspace.error = undefined;
   mockWorkspace.select.mockImplementation(async (...args: unknown[]) => {
     const selected = args[0] === "personal-b" ? mockPersonal : mockOffice;
     mockWorkspace.selected = selected;
     return selected;
   });
+});
+
+test("refresh keeps the same navigation bar and project destination while access is rechecked", async () => {
+  const view = await render(<MobileNavigator />);
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Open project in Projects" }),
+  );
+  expect(screen.getByText("Body project")).toBeOnTheScreen();
+  const bar = screen.getByTestId("native-bottom-navigation");
+
+  mockWorkspace.selected = undefined;
+  mockWorkspace.loading = true;
+  await view.rerender(<MobileNavigator />);
+  expect(screen.getByTestId("native-bottom-navigation")).toBe(bar);
+  expect(
+    screen.getByRole("tab", { name: "Projects", selected: true }),
+  ).toBeOnTheScreen();
+  expect(screen.queryByText("Body project")).toBeNull();
+
+  mockWorkspace.loading = false;
+  mockWorkspace.error = new Error("Connection unavailable");
+  await view.rerender(<MobileNavigator />);
+  expect(screen.getByTestId("native-bottom-navigation")).toBe(bar);
+  expect(
+    screen.getByRole("tab", { name: "Projects", selected: true }),
+  ).toBeOnTheScreen();
+  expect(screen.queryByText("Body project")).toBeNull();
+
+  mockWorkspace.selected = mockOffice;
+  mockWorkspace.error = undefined;
+  await view.rerender(<MobileNavigator />);
+  expect(screen.getByTestId("native-bottom-navigation")).toBe(bar);
+  expect(screen.getByText("Body project")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Back to previous" }),
+  );
+  expect(screen.getByText("Body projects")).toBeOnTheScreen();
 });
 
 test("Home toolbar profile opens within Home and Back restores Home", async () => {
