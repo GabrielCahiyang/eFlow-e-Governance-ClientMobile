@@ -10,18 +10,21 @@ import {
   ErrorState,
   LabelValue,
   Loading,
+  Notice,
   Screen,
   SearchField,
 } from "../../components/ui";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { retryTransientRead } from "../../shared/retryTransientRead";
 import type { Navigate } from "../../shared/routes";
 import { supabase } from "../../../platform/supabase";
 import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/constants";
 import { officeFinancialSummary } from "./officeFinancialSummary";
 import { budgetReportRead } from "../../../core/web/app/features/budget/services/budgetReportReads";
-import { useBudget } from "./useBudget";
+import { readOfficeCashRequest } from "./focusedSubtaskFunding";
+import { useCashRequestUpdates } from "./useCashRequestUpdates";
 import { CashRequestCard } from "./CashRequestCard";
 import { financialOffices } from "./financialScope";
 import {
@@ -29,6 +32,7 @@ import {
   accountingRequestVisible,
   cashRequestAmount,
   cashRequestReference,
+  cashWorkflowStages,
 } from "./mobileFinanceScope";
 
 export function OfficeBudgetScreen({
@@ -65,18 +69,28 @@ export function OfficeBudgetScreen({
       ? (!scopes.error ? otherOffice?.id : undefined) || ""
       : profile?.org_id || "";
   const officeName = otherOffice?.name || organization?.name || "Office";
-  const detail = useBudget(view === "requests" && recordId ? orgId : "", year);
+  const detail = useFacts(
+    JSON.stringify(["office-cash-request", profile?.id, orgId, year, recordId]),
+    () =>
+      retryTransientRead(() => readOfficeCashRequest(orgId, year, recordId!)),
+    view === "requests" &&
+      !!recordId &&
+      !!orgId &&
+      !!profile &&
+      can("navigation.accounting_releases"),
+  );
   const years = useFacts(
     `budget-years:${profile?.id}:${orgId}`,
-    async () => {
-      const { data, error } = await supabase
-        .from("department_fiscal_budgets")
-        .select("id,fiscal_year")
-        .eq("org_id", orgId)
-        .order("fiscal_year", { ascending: false });
-      if (error) throw new Error(error.message);
-      return data;
-    },
+    () =>
+      retryTransientRead(async () => {
+        const { data, error } = await supabase
+          .from("department_fiscal_budgets")
+          .select("id,fiscal_year")
+          .eq("org_id", orgId)
+          .order("fiscal_year", { ascending: false });
+        if (error) throw error;
+        return data;
+      }),
     !!orgId && view === "requests" && !recordId,
   );
   const fiscalBudgetId = years.data?.find(
@@ -85,17 +99,27 @@ export function OfficeBudgetScreen({
   const queue = useFacts(
     `mobile-cash-queue:${profile?.id}:${orgId}:${fiscalBudgetId}`,
     async () => {
-      const result = await budgetReportRead(() =>
-        supabase
-          .from("petty_cash_requests")
-          .select(
-            "id,request_number,purpose,status,requested_amount,approved_amount,released_amount,actual_spent",
-            { count: "exact" },
-          )
-          .eq("fiscal_budget_id", fiscalBudgetId!)
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: true }),
-      );
+      const result = await budgetReportRead(() => ({
+        range: (from, to) =>
+          retryTransientRead(async () => {
+            const page = await supabase
+              .from("petty_cash_requests")
+              .select(
+                "id,request_number,purpose,status,requested_amount,approved_amount,released_amount,actual_spent",
+                { count: "exact" },
+              )
+              .eq("fiscal_budget_id", fiscalBudgetId!)
+              .order("created_at", { ascending: false })
+              .order("id", { ascending: true })
+              .range(from, to);
+            if (page.error)
+              throw Object.assign(new Error(page.error.message), {
+                status: page.status,
+                code: page.error.code,
+              });
+            return page;
+          }),
+      }));
       if (result.error) throw new Error(result.error.message);
       return (result.data || []).map((row) => ({
         id: String(row.id),
@@ -119,6 +143,7 @@ export function OfficeBudgetScreen({
     !!orgId && view === "overview",
   );
   const [search, setSearch] = useState("");
+  const [showStages, setShowStages] = useState(false);
   const data = detail.data;
   const requests = (queue.error || years.error ? [] : queue.data || []).filter(
     (request) =>
@@ -150,16 +175,15 @@ export function OfficeBudgetScreen({
     },
     !!activeRequest?.taskId && can("navigation.projects"),
   );
+  useCashRequestUpdates(
+    activeRequest?.taskId || "",
+    !!activeRequest && focused,
+    detail.refresh,
+    activeRequest?.subtaskId,
+  );
   return (
     <Screen
       compact
-      title={
-        view === "requests"
-          ? "Requests & releases"
-          : accounting
-            ? "Accounting"
-            : "Office Budget"
-      }
       description={orgId ? `${officeName} · FY ${year}` : `FY ${year}`}
       onRefresh={() => {
         if (view === "overview") return summary.refresh();
@@ -225,17 +249,24 @@ export function OfficeBudgetScreen({
           ) : summary.data ? (
             <>
               <LabelValue
+                stacked
                 label="Approved appropriation"
                 value={recordedPeso(summary.data.approved)}
               />
               <LabelValue
-                label="Settled spending"
+                stacked
+                label="Settled expenditure"
                 value={recordedPeso(summary.data.settled)}
               />
               <LabelValue
-                label="Available Office Budget"
+                stacked
+                label="Available Office budget"
                 value={recordedPeso(summary.data.available)}
               />
+              <Notice>
+                The available budget is the approved appropriation less budget
+                holds and active commitments.
+              </Notice>
             </>
           ) : summary.loading ? (
             <Loading label="Loading Office summary" layout="summary" />
@@ -270,7 +301,7 @@ export function OfficeBudgetScreen({
             )}
           {!recordId && !!years.error && (
             <ErrorState
-              error="Fiscal years could not be loaded."
+              error={years.error}
               retry={() => void years.refresh()}
             />
           )}
@@ -339,6 +370,37 @@ export function OfficeBudgetScreen({
             <Loading label="Loading cash requests" layout="navigation" />
           ) : (
             <>
+              {queue.data && !queue.error && !years.error && (
+                <>
+                  <Button
+                    variant="outline"
+                    onPress={() => setShowStages((value) => !value)}
+                  >
+                    {showStages ? "Hide request stages" : "View request stages"}
+                  </Button>
+                  {showStages && (
+                    <Card title="Requests by stage">
+                      {cashWorkflowStages.map(([label, statuses]) => (
+                        <LabelValue
+                          key={label}
+                          label={label}
+                          value={
+                            queue.data!.filter((row) =>
+                              (statuses as readonly string[]).includes(
+                                row.status,
+                              ),
+                            ).length
+                          }
+                        />
+                      ))}
+                      <Notice>
+                        Counts include all requests visible in this Office and
+                        fiscal year.
+                      </Notice>
+                    </Card>
+                  )}
+                </>
+              )}
               <SearchField
                 value={search}
                 onChange={setSearch}

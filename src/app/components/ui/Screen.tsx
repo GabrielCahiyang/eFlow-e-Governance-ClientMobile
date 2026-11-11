@@ -297,15 +297,26 @@ export function Empty({
 export function LabelValue({
   label,
   value,
+  stacked = false,
 }: {
   label: string;
   value: ReactNode;
+  stacked?: boolean;
 }) {
   return (
-    <View style={s.labelValue}>
-      <Text style={s.description}>{label}</Text>
+    <View style={stacked ? s.stackedValue : s.labelValue}>
+      <Text style={[s.description, !stacked && { flexShrink: 1 }]}>
+        {label}
+      </Text>
       {typeof value === "string" || typeof value === "number" ? (
-        <Text style={s.value}>{value}</Text>
+        <Text
+          style={[
+            s.value,
+            stacked && { textAlign: "left", alignSelf: "stretch" },
+          ]}
+        >
+          {value}
+        </Text>
       ) : (
         value
       )}
@@ -414,7 +425,9 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 16,
+    flexWrap: "wrap",
   },
+  stackedValue: { gap: 2, alignItems: "flex-start" },
   value: {
     color: colors.text,
     fontSize: 14,

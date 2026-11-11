@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-11T09:03:21.021Z",
+  "method": "Exact Hermes string-table entries; quoted literals for JavaScript. Numeric substrings are not credential matches.",
+  "platforms": [
+    "android",
+    "ios"
+  ],
+  "bundles": [
+    "dist/android/_expo/static/js/android/index-b8a507512ac2f590099eaad3d3839576.hbc",
+    "dist/ios/_expo/static/js/ios/index-a3c26ddb61e390e049cb893884b11681.hbc",
+    "artifacts/embedded-android-v43.hbc"
+  ],
+  "developmentAccountLiteralCount": 6,
+  "developmentAccountLiteralsFound": 0
+}

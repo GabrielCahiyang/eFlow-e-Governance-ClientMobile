@@ -1,0 +1,18 @@
+{
+  "apk": "artifacts/M7/eFlow-Mobile-M7-Stabilization-v43-arm64-x86_64.apk",
+  "versionCode": 43,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5175784,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "45f4f2227d763ea4bcf04bb65eb14b62ddf3e051b06d8167df0e2e44dcbb6d54",
+  "bytes": 99017809
+}

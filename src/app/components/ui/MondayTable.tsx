@@ -25,12 +25,22 @@ export function MondayTableSection({
     <View style={styles.sectionContainer}>
       <View style={styles.sectionHeader}>
         <View style={[styles.accentBar, { backgroundColor: barColor }]} />
-        <Text accessibilityRole="header" style={[styles.sectionTitle, { color: palette.text }]}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.sectionTitle, { color: palette.text }]}
+        >
           {title}
         </Text>
         {typeof count === "number" && (
-          <View style={[styles.countBadge, { backgroundColor: palette.primarySoft }]}>
-            <Text style={[styles.countText, { color: palette.primary }]}>{count}</Text>
+          <View
+            style={[
+              styles.countBadge,
+              { backgroundColor: palette.primarySoft },
+            ]}
+          >
+            <Text style={[styles.countText, { color: palette.primary }]}>
+              {count}
+            </Text>
           </View>
         )}
       </View>
@@ -90,18 +100,26 @@ export function MondayTableRow({
       <View style={[styles.stripe, { backgroundColor: accent }]} />
       <View style={styles.content}>
         <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: palette.text }]} numberOfLines={2}>
-            {title}
-          </Text>
+          <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
           {!!tag && (
-            <View style={[styles.tagBadge, { backgroundColor: palette.background, borderColor: palette.border }]}>
-              <Text style={[styles.tagText, { color: palette.mutedLabel }]}>{tag}</Text>
+            <View
+              style={[
+                styles.tagBadge,
+                {
+                  backgroundColor: palette.background,
+                  borderColor: palette.border,
+                },
+              ]}
+            >
+              <Text style={[styles.tagText, { color: palette.mutedLabel }]}>
+                {tag}
+              </Text>
             </View>
           )}
         </View>
 
         {!!context && (
-          <Text style={[styles.context, { color: palette.mutedLabel }]} numberOfLines={1}>
+          <Text style={[styles.context, { color: palette.mutedLabel }]}>
             {context}
           </Text>
         )}
@@ -110,16 +128,37 @@ export function MondayTableRow({
           <Status value={status} variant="monday" />
 
           {!!due && (
-            <View style={[styles.chip, { backgroundColor: palette.background, borderColor: palette.border }]}>
+            <View
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: palette.background,
+                  borderColor: palette.border,
+                },
+              ]}
+            >
               <Calendar size={12} color={palette.mutedLabel} />
-              <Text style={[styles.chipText, { color: palette.mutedLabel }]}>{due}</Text>
+              <Text style={[styles.chipText, { color: palette.mutedLabel }]}>
+                {due}
+              </Text>
             </View>
           )}
 
           {!!assignee && (
-            <View style={[styles.chip, { backgroundColor: palette.background, borderColor: palette.border }]}>
+            <View
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: palette.background,
+                  borderColor: palette.border,
+                },
+              ]}
+            >
               <User size={12} color={palette.mutedLabel} />
-              <Text style={[styles.chipText, { color: palette.text }]} numberOfLines={1}>
+              <Text
+                style={[styles.chipText, { color: palette.text }]}
+                numberOfLines={1}
+              >
                 {assignee}
               </Text>
             </View>
@@ -127,7 +166,9 @@ export function MondayTableRow({
         </View>
 
         {!!blocker && (
-          <Text style={[styles.blocker, { color: palette.warning }]}>{blocker}</Text>
+          <Text style={[styles.blocker, { color: palette.warning }]}>
+            {blocker}
+          </Text>
         )}
       </View>
 
@@ -193,17 +234,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
+    alignItems: "flex-start",
+    gap: 4,
   },
   title: {
     fontSize: 15,
     fontWeight: "600",
-    flex: 1,
   },
   tagBadge: {
+    maxWidth: "100%",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -225,6 +264,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   chip: {
+    maxWidth: "100%",
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -234,6 +274,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: {
+    flexShrink: 1,
     fontSize: 12,
     lineHeight: 16,
   },

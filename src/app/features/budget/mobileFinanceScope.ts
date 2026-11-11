@@ -62,7 +62,7 @@ export function cashRequestAmount(
   > & { status: string },
 ) {
   if (request.status === "settled")
-    return { label: "Settled expense", value: request.actualSpent };
+    return { label: "Settled expenditure", value: request.actualSpent };
   if (
     cashReleasedStatuses.has(request.status) ||
     (request.releasedAmount ?? 0) > 0
@@ -154,3 +154,32 @@ export function linkedFundingSubitem(
   );
   return matches.length === 1 ? matches[0].subtaskId : undefined;
 }
+
+export const reviewStatuses = [
+  "liquidation_submitted",
+  "pending_leader_liquidation_review",
+  "pending_department_settlement",
+];
+export const authorizedStatuses = [
+  "approved",
+  "scheduled_for_release",
+  "partially_released",
+];
+const requestedStatuses = [
+  "pending",
+  "pending_leader_review",
+  "pending_department_approval",
+];
+export const releasedStatuses = [
+  "released",
+  "liquidation_draft",
+  "overdue_liquidation",
+  "changes_requested",
+];
+export const cashWorkflowStages = [
+  ["Requested", requestedStatuses],
+  ["Authorized or partly released", authorizedStatuses],
+  ["Released or awaiting receipts", releasedStatuses],
+  ["Under receipt review", reviewStatuses],
+  ["Settled", ["settled"]],
+] as const;

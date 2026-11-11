@@ -74,7 +74,14 @@ export function useFacts<T>(
           loading: false,
           stale: !!old.data,
           error:
-            e instanceof Error ? e : new Error("Could not load this view."),
+            e instanceof Error
+              ? e
+              : e &&
+                  typeof e === "object" &&
+                  "message" in e &&
+                  typeof e.message === "string"
+                ? Object.assign(new Error(e.message), { cause: e })
+                : new Error("Could not load this view."),
         }));
     }
   }, [key, enabled]);

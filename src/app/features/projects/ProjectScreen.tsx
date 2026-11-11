@@ -33,6 +33,7 @@ import {
 import { Text } from "../../components/ui/Typography";
 import type { Navigate } from "../../shared/routes";
 import { useFacts } from "../../shared/useFacts";
+import { retryTransientRead } from "../../shared/retryTransientRead";
 import { usePullRefresh } from "../../shared/usePullRefresh";
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
@@ -98,13 +99,7 @@ export function ProjectScreen({
   ]);
   const facts = useFacts(
     "project:" + scope,
-    async () => {
-      const [project, groups] = await Promise.all([
-        fetchProject(id),
-        fetchProjectGroups(id),
-      ]);
-      return { project, groups };
-    },
+    () => retryTransientRead(() => fetchProject(id)),
     !!profile?.id,
   );
   const [view, setView] = useState(initialView || "tasks");
@@ -116,9 +111,7 @@ export function ProjectScreen({
     view === "board" || view === "calendar" ? view : "tasks";
   const main = workView === "tasks";
   const auxiliary = ["offices", "files", "funding"].includes(view);
-  const closed = ["completed", "archived"].includes(
-    facts.data?.project.status ?? "",
-  );
+  const closed = ["completed", "archived"].includes(facts.data?.status ?? "");
   const needle = query.trim().toLowerCase();
   useEffect(() => {
     if (needle === serverSearch) return;
@@ -127,14 +120,23 @@ export function ProjectScreen({
   }, [needle, serverSearch]);
   const searchPending = needle !== serverSearch;
   const projectReady = !!facts.data && !facts.error;
+  const groupFacts = useFacts(
+    "project-groups:" + scope,
+    () => fetchProjectGroups(id),
+    projectReady && main && !auxiliary,
+  );
+  const groups = groupFacts.error ? [] : (groupFacts.data ?? []);
   const pages = useProjectTaskPages({
     scope,
     project: id,
     view: workView,
-    groups: facts.data?.groups ?? [],
+    groups,
     includeArchived: closed,
     search: serverSearch,
-    enabled: projectReady && !auxiliary,
+    enabled:
+      projectReady &&
+      !auxiliary &&
+      (!main || (!!groupFacts.data && !groupFacts.error)),
   });
   const totals = useFacts(
     "project-totals:" + scope + ":" + closed,
@@ -155,11 +157,18 @@ export function ProjectScreen({
   const refresh = useCallback(async () => {
     await Promise.all([
       facts.refresh(),
+      groupFacts.refresh(),
       pages.refresh(),
       totals.refresh(),
       finance.refresh(),
     ]);
-  }, [facts.refresh, pages.refresh, totals.refresh, finance.refresh]);
+  }, [
+    facts.refresh,
+    groupFacts.refresh,
+    pages.refresh,
+    totals.refresh,
+    finance.refresh,
+  ]);
   const latestRefresh = useRef(refresh);
   latestRefresh.current = refresh;
   const pull = usePullRefresh(refresh);
@@ -198,7 +207,7 @@ export function ProjectScreen({
     return (
       <Screen title="Project">
         {facts.error ? (
-          <ErrorState error={facts.error} retry={() => void refresh()} />
+          <ErrorState error={facts.error} retry={() => void facts.refresh()} />
         ) : main ? (
           <ProjectTableLoading widths={widths} />
         ) : (
@@ -208,7 +217,7 @@ export function ProjectScreen({
     );
   }
 
-  const { project, groups } = facts.data;
+  const project = facts.data;
   const completion = totals.error ? undefined : totals.data;
   const percent = completion
     ? completionPercent(
@@ -226,6 +235,15 @@ export function ProjectScreen({
   const accents = new Map(groups.map((group) => [group.id, group.color]));
   const header = (
     <View style={{ gap: 12, marginBottom: 8 }}>
+      {main && !auxiliary && groupFacts.error && (
+        <ErrorState
+          error={groupFacts.error}
+          retry={() => void groupFacts.refresh()}
+        />
+      )}
+      {main && !auxiliary && groupFacts.loading && !groupFacts.data && (
+        <Loading label="Loading task groups" layout="summary" />
+      )}
       {!!pull.error && <ErrorState error={pull.error} retry={pull.refresh} />}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
         <Text
@@ -358,46 +376,51 @@ export function ProjectScreen({
         )
       }
       ListEmptyComponent={
-        <Animated.View style={main && [{ width: tableViewport }, pinned]}>
-          {searchPending || (pages.loading && !pages.data) ? (
-            <Loading
-              label={
-                needle ? "Searching project tasks" : "Loading project tasks"
-              }
-              layout="project"
-            />
-          ) : pages.error ? (
-            <ErrorState
-              error={pages.error}
-              retry={() => void pages.refresh()}
-            />
-          ) : (
-            <Empty
-              kind="work"
-              description={
-                needle
-                  ? "Try a different task name or clear your search."
-                  : "Authorized tasks will appear here when work is assigned to this project."
-              }
-              action={
-                needle ? (
-                  <Button variant="outline" onPress={() => setQuery("")}>
-                    Clear search
-                  </Button>
-                ) : (
-                  <Button variant="outline" onPress={() => void pull.refresh()}>
-                    Refresh project
-                  </Button>
-                )
-              }
-              title={
-                needle
-                  ? "No tasks match this search"
-                  : "No tasks in this project"
-              }
-            />
-          )}
-        </Animated.View>
+        main && (!groupFacts.data || groupFacts.error) ? undefined : (
+          <Animated.View style={main && [{ width: tableViewport }, pinned]}>
+            {searchPending || (pages.loading && !pages.data) ? (
+              <Loading
+                label={
+                  needle ? "Searching project tasks" : "Loading project tasks"
+                }
+                layout="project"
+              />
+            ) : pages.error ? (
+              <ErrorState
+                error={pages.error}
+                retry={() => void pages.refresh()}
+              />
+            ) : (
+              <Empty
+                kind="work"
+                description={
+                  needle
+                    ? "Try a different task name or clear your search."
+                    : "Authorized tasks will appear here when work is assigned to this project."
+                }
+                action={
+                  needle ? (
+                    <Button variant="outline" onPress={() => setQuery("")}>
+                      Clear search
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onPress={() => void pull.refresh()}
+                    >
+                      Refresh project
+                    </Button>
+                  )
+                }
+                title={
+                  needle
+                    ? "No tasks match this search"
+                    : "No tasks in this project"
+                }
+              />
+            )}
+          </Animated.View>
+        )
       }
       ListFooterComponent={
         !searchPending && pages.next && !pages.error ? (
@@ -471,7 +494,9 @@ export function ProjectScreen({
                   ? /^\d{4}-\d{2}-\d{2}$/.test(section.key)
                     ? taskDateLabel(section.key)
                     : section.title
-                  : section.title}
+                  : main
+                    ? `Group: ${section.title}`
+                    : section.title}
               </Text>
               <Text
                 style={{

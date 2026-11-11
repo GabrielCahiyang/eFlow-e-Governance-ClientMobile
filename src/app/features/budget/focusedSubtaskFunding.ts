@@ -6,7 +6,9 @@ import {
   mapReceipt,
   mapRelease,
   mapRequest,
+  mapAllocationLine,
 } from "../../../core/web/app/features/budget/services/budgetMappers";
+import { fetchBudgetSections } from "../../../core/web/app/features/budget/services/budgetSectionService";
 import type {
   DepartmentBudgetBundle,
   TaskFundingContext,
@@ -75,7 +77,66 @@ export async function readFocusedSubtaskFunding(
     limit != null && Number.isFinite(Number(limit))
       ? { perReceiptLimit: Number(limit) }
       : null;
-  base.requests = requests.map(mapRequest);
+  return readCashRequestRelations({
+    ...base,
+    requests: requests.map(mapRequest),
+  });
+}
+
+export async function readOfficeCashRequest(
+  office: string,
+  year: number,
+  id: string,
+): Promise<FocusedBundle | null> {
+  const fiscal = await supabase
+    .from("department_fiscal_budgets")
+    .select("id,per_receipt_limit,petty_cash_request_limit")
+    .eq("org_id", office)
+    .eq("fiscal_year", year)
+    .maybeSingle();
+  if (fiscal.error) throw fiscal.error;
+  if (!fiscal.data?.id) return null;
+  const record = await supabase
+    .from("petty_cash_requests")
+    .select("*")
+    .eq("id", id)
+    .eq("fiscal_budget_id", fiscal.data.id)
+    .maybeSingle();
+  if (record.error) throw record.error;
+  if (!record.data) return null;
+  const request = mapRequest(record.data);
+  const canHaveNewReceipts = [
+    "released",
+    "changes_requested",
+    "overdue_liquidation",
+  ].includes(request.status);
+  const [sections, lines] = await Promise.all([
+    canHaveNewReceipts ? fetchBudgetSections(office, year) : undefined,
+    canHaveNewReceipts
+      ? budgetReportRead(() =>
+          supabase
+            .from("work_budget_allocation_lines")
+            .select("*", { count: "exact" })
+            .eq("allocation_id", request.allocationId)
+            .order("position")
+            .order("id"),
+        )
+      : undefined,
+  ]);
+  if (lines?.error) throw lines.error;
+  const limit =
+    fiscal.data.per_receipt_limit ?? fiscal.data.petty_cash_request_limit;
+  return readCashRequestRelations({
+    requests: [request],
+    releases: [],
+    liquidations: [],
+    summary: limit == null ? null : { perReceiptLimit: Number(limit) },
+    itemizedCashAvailable: sections?.itemizedCashAvailable,
+    allocationLines: (lines?.data ?? []).map(mapAllocationLine),
+  });
+}
+
+async function readCashRequestRelations(base: FocusedBundle) {
   const ids = base.requests.map((request) => request.id);
   if (!ids.length) return base;
   const [releases, liquidations, fundingLines] = await Promise.all([
@@ -101,7 +162,7 @@ export async function readFocusedSubtaskFunding(
       ids,
       "submitted_at",
     ),
-    context.supportsItemizedCash
+    base.itemizedCashAvailable
       ? budgetReportRead(
           (keys) =>
             supabase

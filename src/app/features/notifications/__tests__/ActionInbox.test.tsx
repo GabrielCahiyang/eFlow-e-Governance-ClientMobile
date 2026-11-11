@@ -109,9 +109,7 @@ test("notifications skip review sources and change read state only after a confi
   expect(
     screen.queryByRole("button", { name: "Assigned decisions" }),
   ).toBeNull();
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Open related item" }),
-  );
+  await fireEvent.press(screen.getByRole("button", { name: "View subtask" }));
   expect(navigate).toHaveBeenCalledWith(
     expect.objectContaining({
       id: "root",
@@ -130,7 +128,7 @@ test("notifications skip review sources and change read state only after a confi
   await waitFor(() =>
     expect(screen.queryByRole("button", { name: "Mark read" })).toBeNull(),
   );
-  expect(screen.getByText("Read")).toBeOnTheScreen();
+  expect(screen.getByText("Permit assignment")).toBeOnTheScreen();
   expect(markRecentNotificationRead).toHaveBeenLastCalledWith(
     "actor",
     "update",
@@ -221,7 +219,11 @@ test("older updates append on scroll, retry without duplicates, and survive a re
   await fireEvent.press(
     screen.getAllByRole("button", { name: "Mark read" })[1],
   );
-  expect(await screen.findByText("Read")).toBeOnTheScreen();
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: "Mark read" })).toHaveLength(
+      1,
+    ),
+  );
   expect(screen.getByText("Older update")).toBeOnTheScreen();
   await fireEvent.press(
     screen.getByRole("button", { name: "Unread notifications" }),

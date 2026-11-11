@@ -66,7 +66,7 @@ export function BudgetOverview({ data }: { data: DepartmentBudgetBundle }) {
           value={peso(summary.committedAmount)}
         />
         <LabelValue
-          label="Actual settled spending"
+          label="Settled expenditure"
           value={peso(summary.spentAmount)}
         />
         <LabelValue

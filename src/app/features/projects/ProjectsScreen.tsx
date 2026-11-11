@@ -6,7 +6,7 @@ import {
   RefreshSectionList,
 } from "../../components/ui/FolderRefresh";
 import { useState } from "react";
-import { Pressable, View, useWindowDimensions } from "react-native";
+import { Pressable, View } from "react-native";
 import Star from "lucide-react-native/icons/star";
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
@@ -21,10 +21,7 @@ import {
   SearchField,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
-import {
-  ProjectDirectoryCells,
-  projectDirectoryWidths,
-} from "./ProjectTableCells";
+import { NavigationRow } from "../../components/ui/NavigationRow";
 import { projectSections } from "./mobileProjects";
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
 import { statusLabel } from "../../shared/statusLabels";
@@ -34,11 +31,6 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const workspace = useWorkspace();
   const pull = usePullRefresh(workspace.refresh);
   const palette = useTheme();
-  const { width } = useWindowDimensions();
-  const [viewport, setViewport] = useState(0);
-  const widths = projectDirectoryWidths(
-    Math.max(120, (viewport || width) - 32 - 48),
-  );
   const current = workspace.selected;
   const projects = current?.projects ?? [];
   const key = `eflow:navigation:v1:${profile?.id}:${current?.workspace.id}`;
@@ -191,7 +183,6 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               </Text>
             </View>
           </View>
-          <ProjectDirectoryCells widths={widths} />
         </View>
       )}
       renderItem={({ item }) => (
@@ -202,17 +193,26 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
             backgroundColor: palette.surface,
           }}
         >
-          <ProjectDirectoryCells
-            project={item}
-            widths={widths}
-            onOpen={() => {
-              navigate({
-                name: item.kind === "personal" ? "personal_project" : "project",
-                id: item.id,
-                title: item.title,
-              });
-            }}
-          />
+          <View style={{ flex: 1 }}>
+            <NavigationRow
+              title={item.title}
+              description={[
+                item.kind === "office" ? "Office" : "Personal",
+                item.shortcut && "Shortcut",
+                statusLabel(item.status),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              onPress={() => {
+                navigate({
+                  name:
+                    item.kind === "personal" ? "personal_project" : "project",
+                  id: item.id,
+                  title: item.title,
+                });
+              }}
+            />
+          </View>
           <Pressable
             accessibilityRole="checkbox"
             accessibilityLabel={`Favorite ${item.title}`}
@@ -289,10 +289,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
     />
   );
   return (
-    <View
-      style={{ flex: 1, backgroundColor: palette.background }}
-      onLayout={(event) => setViewport(event.nativeEvent.layout.width)}
-    >
+    <View style={{ flex: 1, backgroundColor: palette.background }}>
       <FolderPullArea pull={pull}>{list}</FolderPullArea>
       <SelectionSheet
         open={filterOpen}

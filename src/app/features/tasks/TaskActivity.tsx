@@ -46,6 +46,7 @@ export function TaskActivity({
     taskId,
     !!profile?.id,
   );
+  const [editing, setEditing] = useState(false);
   const [comment, setComment] = useState("");
   const [sendPending, setSendPending] = useState(false);
   const action = useAction();
@@ -62,7 +63,7 @@ export function TaskActivity({
           .filter((item) => !item.deletedAt)
           .map((item) => ({
             id: "comment:" + item.id,
-            title: "Comment",
+            title: "Work note",
             actor: item.authorName,
             time: item.createdAt,
             body: <Text selectable>{item.body}</Text>,
@@ -238,14 +239,24 @@ export function TaskActivity({
       });
       setSendPending(false);
       setComment("");
+      setEditing(false);
       await facts.refresh();
     });
   return (
     <>
-      {canDiscuss && (
-        <Card title="Work discussion">
+      {canDiscuss && !editing && (
+        <Button variant="outline" onPress={() => setEditing(true)}>
+          Add work note
+        </Button>
+      )}
+      {canDiscuss && editing && (
+        <Card>
+          <Text>
+            Add a note to the task record. Use the task conversation for team
+            discussion.
+          </Text>
           <Field
-            label="Comment"
+            label="Work note"
             value={comment}
             onChangeText={setComment}
             multiline
@@ -257,16 +268,20 @@ export function TaskActivity({
             disabled={sendPending || !comment.trim()}
             onPress={() => void send()}
           >
-            Post comment
+            Save work note
           </Button>
+          {!sendPending && !action.busy && (
+            <Button variant="ghost" onPress={() => setEditing(false)}>
+              Close editor
+            </Button>
+          )}
           {!!action.error && (
             <ErrorState context="action" error={action.error} />
           )}
           {sendPending && !!action.error && (
             <>
               <Notice>
-                Check the latest activity for your comment before sending it
-                again.
+                Check the latest activity for your note before saving it again.
               </Notice>
               <Button variant="outline" onPress={() => void facts.refresh()}>
                 Refresh activity
@@ -278,7 +293,7 @@ export function TaskActivity({
                   action.clear();
                 }}
               >
-                Edit comment
+                Edit note
               </Button>
             </>
           )}

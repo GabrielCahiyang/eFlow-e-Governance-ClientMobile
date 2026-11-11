@@ -2,14 +2,7 @@ import { FilterChip } from "../../components/ui/FilterChip";
 import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
 import { useEffect, useRef, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
-import {
-  Button,
-  Empty,
-  ErrorState,
-  Row,
-  Status,
-  dateLabel,
-} from "../../components/ui";
+import { Button, Empty, ErrorState, dateLabel } from "../../components/ui";
 
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useTheme } from "../../components/ui/Appearance";
@@ -18,7 +11,7 @@ import {
   RefreshSectionList,
 } from "../../components/ui/FolderRefresh";
 import { Text } from "../../components/ui/Typography";
-import { radius, space } from "../../components/ui/theme";
+import { space } from "../../components/ui/theme";
 import { useAuth } from "../authentication";
 import { useTaskFacts } from "../tasks";
 import { FeedSkeleton } from "../personal-work/FeedSkeleton";
@@ -39,6 +32,7 @@ import {
 } from "../../../core/web/app/services/notificationService";
 import { normalizeWorkUpdateNotification } from "../../../core/web/app/shared/notificationWorkCopy";
 import { inboxUpdateRoute } from "./inboxDestinations";
+import { inboxDestinationLabel, inboxUpdateMessage } from "./inboxPresentation";
 import { useInboxUpdatePages } from "./useInboxUpdatePages";
 import { getActionableSettlementEscalations } from "../budget";
 import type { AppRoute, Navigate } from "../../shared/routes";
@@ -360,29 +354,15 @@ export function ActionInbox({
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
           <DisplayUpdateNotice
-            visible={!reviews && !!feed.data && feed.stale}
+            visible={
+              !reviews &&
+              !!feed.data &&
+              feed.stale &&
+              !feed.loading &&
+              !!feed.error
+            }
             loading={feed.loading}
           />
-          {/* Monday Header (Image 3) */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingTop: 4,
-            }}
-          >
-            <Text
-              accessibilityRole="header"
-              style={{
-                fontSize: 24,
-                fontWeight: "700",
-                color: palette.text,
-              }}
-            >
-              {reviews ? "Reviews" : "Inbox"}
-            </Text>
-          </View>
           {!reviews && (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               <FilterChip
@@ -462,62 +442,98 @@ export function ActionInbox({
         const update = item.update;
         const copy = normalizeWorkUpdateNotification(update);
         const target = inboxUpdateRoute(update, profile!.role);
+        const message = inboxUpdateMessage(copy.message, update.reason);
+        const destinationLabel = inboxDestinationLabel(target);
+        const body = (
+          <>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              {!update.read && (
+                <View
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: 4,
+                    backgroundColor: palette.primary,
+                  }}
+                />
+              )}
+              <Text style={{ fontWeight: "700", flexShrink: 1 }}>
+                {copy.title}
+              </Text>
+              <Text style={{ color: palette.mutedLabel, fontSize: 12 }}>
+                {dateLabel(update.createdAt)}
+              </Text>
+            </View>
+            {!!message && <Text>{message}</Text>}
+            {!!destinationLabel && (
+              <Text
+                style={{
+                  color: palette.primary,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
+                {destinationLabel}
+              </Text>
+            )}
+          </>
+        );
         return (
           <View
             style={{
-              padding: space.md,
-              gap: space.xs,
-              borderRadius: 14,
-              borderWidth: 1,
-              borderColor: update.read ? palette.border : palette.primary,
-              backgroundColor: update.read
-                ? palette.surface
-                : palette.primarySoft,
-              elevation: 1,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 4,
+              backgroundColor: palette.surface,
+              paddingHorizontal: space.md,
+              paddingTop: space.xs,
+              borderBottomWidth: 0.5,
+              borderColor: palette.border,
             }}
           >
-            <Row>
-              <Status value={update.read ? "Read" : "Unread"} />
-              <Text style={{ color: palette.mutedLabel, fontSize: 13 }}>
-                {dateLabel(update.createdAt)}
-              </Text>
-            </Row>
-            <Text
-              style={{
-                fontWeight: "700",
-                fontSize: 15,
-                color: palette.text,
-              }}
-            >
-              {copy.title}
-            </Text>
-            <Text style={{ color: palette.text, lineHeight: 20 }}>
-              {copy.message}
-            </Text>
-            {!!update.reason && (
-              <Text style={{ color: palette.muted }}>{update.reason}</Text>
+            {target ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={destinationLabel}
+                accessibilityHint={[
+                  !update.read && "Unread",
+                  copy.title,
+                  message,
+                ]
+                  .filter(Boolean)
+                  .join(". ")}
+                onPress={() => navigate(target)}
+                style={({ pressed }) => ({
+                  minHeight: 48,
+                  paddingVertical: space.sm,
+                  gap: space.xs,
+                  backgroundColor: pressed
+                    ? palette.primarySoft
+                    : palette.surface,
+                })}
+              >
+                {body}
+              </Pressable>
+            ) : (
+              <View style={{ paddingVertical: space.sm, gap: space.xs }}>
+                {body}
+              </View>
             )}
-            <Row>
-              {target && (
-                <Button variant="ghost" onPress={() => navigate(target)}>
-                  Open related item
-                </Button>
-              )}
-              {!update.read && (
-                <Button
-                  variant="ghost"
-                  busy={marking === update.id}
-                  disabled={!!marking}
-                  onPress={() => void markRead(update)}
-                >
-                  Mark read
-                </Button>
-              )}
-            </Row>
+            {!update.read && (
+              <Button
+                variant="ghost"
+                busy={marking === update.id}
+                disabled={!!marking}
+                style={{ alignSelf: "flex-end" }}
+                onPress={() => void markRead(update)}
+              >
+                Mark read
+              </Button>
+            )}
           </View>
         );
       }}

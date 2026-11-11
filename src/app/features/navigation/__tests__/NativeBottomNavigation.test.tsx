@@ -6,7 +6,7 @@ import { NativeBottomNavigation } from "../NativeBottomNavigation";
 test.each([
   ["head", ["Home", "My Work", "Projects", "Inbox", "More"]],
   ["member", ["Home", "My Work", "Projects", "Inbox", "More"]],
-  ["accounting_staff", ["My Work", "Accounting", "Projects", "Inbox", "More"]],
+  ["accounting_staff", ["Home", "My Work", "Accounting", "Inbox", "More"]],
 ])(
   "%s has exactly the approved five destinations, with a real selected More tab",
   async (role, labels) => {
@@ -25,8 +25,13 @@ test.each([
       screen.getByRole("tab", { name: "More" }).props.accessibilityState
         .selected,
     ).toBe(true);
-    await fireEvent.press(screen.getByRole("tab", { name: "Projects" }));
-    expect(onSelect).toHaveBeenCalledWith("projects");
+    const accounting = role === "accounting_staff";
+    await fireEvent.press(
+      screen.getByRole("tab", { name: accounting ? "Accounting" : "Projects" }),
+    );
+    expect(onSelect).toHaveBeenCalledWith(
+      accounting ? "accounting" : "projects",
+    );
   },
 );
 

@@ -177,7 +177,9 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
   );
   const attention = [
     ...taskReviews,
-    ...signals.attention.filter((row) => !reviewed.has(row.key)),
+    ...signals.attention.filter(
+      (row) => row.priority <= 2 && !reviewed.has(row.key),
+    ),
     ...(!cash.error && !cash.loading ? (cash.data ?? []) : []),
     ...(!reviews.error && !reviews.loading ? (reviews.data ?? []) : []),
   ]
@@ -254,31 +256,44 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
           {showProjects && (
             <>
               <HomeSection title="Office Health">
-                <HomeLink
-                  row={{
-                    title: `${currentProjects.length} current ${currentProjects.length === 1 ? "project" : "projects"}`,
-                    description:
-                      "Office projects in this workspace, including projects on hold",
-                    route: { name: "projects" },
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: space.sm,
                   }}
-                  navigate={navigate}
-                />
-                {showAnalytics && (
-                  <HomeLink
-                    row={{
-                      title:
-                        rows &&
-                        !work.data?.issues?.length &&
-                        !work.data?.unavailable?.length
-                          ? `${signals.overdueOrBlocked} overdue or blocked`
-                          : "Overdue or blocked work",
-                      description:
-                        "Visible open Tasks and Subtasks with a reported blocker or past due date",
-                      route: { name: "reports", view: "risks" },
-                    }}
-                    navigate={navigate}
+                >
+                  <HealthIndicator
+                    value={String(currentProjects.length)}
+                    label="Current projects"
+                    onPress={() => navigate({ name: "projects" })}
                   />
-                )}
+                  {rows &&
+                    !work.data?.issues?.length &&
+                    !work.data?.unavailable?.length && (
+                      <HealthIndicator
+                        value={String(signals.overdueOrBlocked)}
+                        label="Overdue or blocked"
+                        onPress={
+                          showAnalytics
+                            ? () => navigate({ name: "reports", view: "risks" })
+                            : undefined
+                        }
+                      />
+                    )}
+                  {showAnalytics &&
+                    (!rows ||
+                      !!work.data?.issues?.length ||
+                      !!work.data?.unavailable?.length) && (
+                      <HealthIndicator
+                        value="—"
+                        label="Office risks"
+                        onPress={() =>
+                          navigate({ name: "reports", view: "risks" })
+                        }
+                      />
+                    )}
+                </View>
               </HomeSection>
               <HomeSection title="Project Progress">
                 {!projects.length && (
@@ -405,11 +420,8 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
           {data && !incomplete && (
             <HomeSection title="My Work Summary">
               <HomeMessage>
-                {data.overdue} overdue · {data.today} due today ·{" "}
-                {data.awaiting} awaiting review
-              </HomeMessage>
-              <HomeMessage>
-                Due counts cover assignments you can act on.
+                {data.overdue} overdue requiring your action · {data.today} due
+                today requiring your action · {data.awaiting} awaiting review
               </HomeMessage>
             </HomeSection>
           )}
@@ -518,6 +530,36 @@ function ProjectProgressRow({
           {[...risk].join(" · ")}
         </Text>
       )}
+    </Pressable>
+  );
+}
+
+function HealthIndicator({
+  value,
+  label,
+  onPress,
+}: {
+  value: string;
+  label: string;
+  onPress?: () => void;
+}) {
+  const palette = useTheme();
+  return (
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={value + " " + label}
+      onPress={onPress}
+      style={{
+        flexGrow: 1,
+        flexBasis: 132,
+        minHeight: 48,
+        paddingVertical: space.xs,
+        paddingHorizontal: space.sm,
+        backgroundColor: palette.surface,
+      }}
+    >
+      <Text style={{ fontWeight: "700", fontSize: 17 }}>{value}</Text>
+      <Text style={{ fontSize: 13, color: palette.mutedLabel }}>{label}</Text>
     </Pressable>
   );
 }

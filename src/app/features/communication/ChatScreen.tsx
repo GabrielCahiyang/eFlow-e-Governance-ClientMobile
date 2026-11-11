@@ -13,6 +13,7 @@ import {
 import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { retryTransientRead } from "../../shared/retryTransientRead";
 import { readWithTimeout } from "../../shared/readTimeout";
 import { authoritativeReadEpoch } from "../../shared/displayCache";
 import { useAction } from "../../shared/useAction";
@@ -42,6 +43,8 @@ import {
 import { filterConversationContext } from "./conversationContext";
 import { chatImageTypes, uploadChatImage } from "./chatImages";
 import { useComposerDraft } from "./useComposerDraft";
+import { useChatAttachment } from "./useChatAttachment";
+import { conversationLoadState } from "./conversationLoadState";
 import { ConversationInfo } from "./ConversationInfo";
 import { ChatAvatar } from "./ChatAvatar";
 import { ConversationList } from "./ConversationList";
@@ -66,7 +69,12 @@ export function ChatScreen({
   navigate: Navigate;
   route: AppRoute;
 }) {
-  const { profile } = useAuth();
+  const {
+    profile,
+    checkingAccess,
+    accessError,
+    refresh: refreshAccess,
+  } = useAuth();
   const palette = useTheme();
   const actor = profile!.id;
   const assertAccess = useAccountActionAccess();
@@ -80,11 +88,8 @@ export function ChatScreen({
     scope: string;
     item: MessageDraft;
   }>();
-  const [attachment, setAttachment] = useState<{
-    scope: string;
-    file: Awaited<ReturnType<typeof chooseFiles>>[number];
-  }>();
   const action = useAction();
+  const picker = useAction({ requireAccess: false });
   const channels = useConversationDirectory(actor);
   const available = filterConversationContext(
     channels.data || [],
@@ -112,7 +117,7 @@ export function ChatScreen({
   );
   const messages = useFacts(
     "chat-messages:" + actor + ":" + channel?.id,
-    () => loadMessages(channel!.id),
+    () => retryTransientRead(() => loadMessages(channel!.id)),
     !!channel,
   );
   const [history, setHistory] = useState<{
@@ -124,7 +129,8 @@ export function ChatScreen({
   const scope = JSON.stringify([actor, channel?.id, accessEpoch]);
   const composer = useComposerDraft(actor, channel?.id);
   const draft = composer.value;
-  const image = attachment?.scope === scope ? attachment.file : undefined;
+  const attachment = useChatAttachment(actor, channel?.id);
+  const image = attachment.file;
   const shown = useMemo(
     () =>
       mergeMessages(
@@ -326,11 +332,9 @@ export function ChatScreen({
         item.imagePath,
       );
       await composer.clear();
+      await attachment.set();
       await draftStore.remove(actor, "chat:" + channel.id);
       setPending((current) => (current?.scope === scope ? undefined : current));
-      setAttachment((current) =>
-        current?.scope === scope ? undefined : current,
-      );
       await Promise.all([
         messages.refresh(),
         channels.refresh(),
@@ -338,14 +342,14 @@ export function ChatScreen({
       ]);
     });
   const pickImage = () =>
-    void action.run(async () => {
+    void picker.run(async () => {
       if (image) {
-        setAttachment(undefined);
+        await attachment.set();
         return;
       }
       const [chosen] = await chooseFiles(chatImageTypes);
       if (chosen && currentScope.current === scope)
-        setAttachment({ scope, file: chosen });
+        await attachment.set(chosen);
     });
   const lastCreated = messages.data?.rows.at(-1)?.created_at;
   const readMarker = useRef<string | undefined>(undefined);
@@ -493,10 +497,26 @@ export function ChatScreen({
     (channels.loading && !channels.data) ||
     (messages.loading && !messages.data) ||
     !!messages.error ||
+    checkingAccess ||
+    !!accessError ||
+    attachment.loading ||
+    !!attachment.error ||
     recovery.loading ||
     composer.loading ||
     !!recovery.error ||
     (!(original?.text ?? draft).trim() && !original?.imagePath && !image);
+  const retryConversation = async () => {
+    action.clear();
+    if (accessError || action.error) await refreshAccess();
+    await messages.refresh();
+  };
+  const historyState = conversationLoadState({
+    loaded: !!messages.data,
+    hasMessages: !!shown.length,
+    checking: messages.loading || checkingAccess,
+    readError: messages.error || accessError,
+    sendError: action.error,
+  });
   return (
     <ThreadFrame>
       <ThreadHeader
@@ -529,14 +549,14 @@ export function ChatScreen({
         messages={shown}
         busy={action.busy}
         placeholder={
-          messages.error ? (
+          historyState === "unavailable" ? (
             <ErrorState
-              error={messages.error}
-              retry={() => void messages.refresh()}
+              error={messages.error || accessError}
+              retry={() => void retryConversation()}
             />
-          ) : !messages.data ? (
+          ) : historyState === "loading" ? (
             <Loading label="Loading messages" layout="messages" />
-          ) : !shown.length ? (
+          ) : historyState === "empty" ? (
             <Empty
               kind="messages"
               compact
@@ -580,7 +600,7 @@ export function ChatScreen({
         }
         imageName={image?.name}
         onPickImage={original ? undefined : pickImage}
-        pickDisabled={action.busy}
+        pickDisabled={action.busy || picker.busy || attachment.loading}
         busy={action.busy}
         sendDisabled={sendDisabled}
         onSend={() => void send()}
@@ -596,8 +616,15 @@ export function ChatScreen({
           <>
             {!!recovery.error && <ErrorState error={recovery.error} />}
             {!!composer.error && <ErrorState error={composer.error} />}
+            {!!(picker.error || attachment.error) && (
+              <ErrorState error={picker.error || attachment.error} />
+            )}
             {!!action.error && (
-              <ErrorState context="action" error={action.error} />
+              <ErrorState
+                context="action"
+                error={action.error}
+                retry={() => void retryConversation()}
+              />
             )}
           </>
         }

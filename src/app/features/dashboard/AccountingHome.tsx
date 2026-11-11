@@ -122,19 +122,21 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
                 {queue.error ? (
                   <HomeMessage>Request counts are unavailable.</HomeMessage>
                 ) : transactions ? (
-                  <>
-                    <HomeMessage>
-                      Requests visible to your account in this Office and fiscal
-                      year.
-                    </HomeMessage>
-                    {transactions.counts.map(({ label, count }) => (
-                      <LabelValue
-                        key={label}
-                        label={label}
-                        value={count ?? "Unavailable"}
-                      />
-                    ))}
-                  </>
+                  <HomeMessage>
+                    {transactions.counts
+                      .filter(({ count }) => (count ?? 0) > 0)
+                      .map(
+                        ({ label, count }) => `${count} ${label.toLowerCase()}`,
+                      )
+                      .join(" · ") ||
+                      (transactions.counts.some(({ count }) => count == null)
+                        ? "Request counts are incomplete."
+                        : "No requests in the tracked stages.")}
+                    {transactions.counts.some(({ count }) => count == null) &&
+                    transactions.counts.some(({ count }) => (count ?? 0) > 0)
+                      ? " · Some stages unavailable"
+                      : ""}
+                  </HomeMessage>
                 ) : queue.loading ? (
                   <Loading
                     label="Loading request counts"
@@ -201,12 +203,14 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
                 <>
                   {totals.approved != null && (
                     <LabelValue
+                      stacked
                       label="Approved appropriation"
                       value={recordedPeso(totals.approved)}
                     />
                   )}
                   {totals.settled != null && (
                     <LabelValue
+                      stacked
                       label="Settled expenditure"
                       value={recordedPeso(totals.settled)}
                     />
@@ -228,13 +232,6 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
                   No financial summary is available for this fiscal year.
                 </HomeMessage>
               )}
-              <HomeLink
-                row={{
-                  title: "Open Accounting",
-                  route: { name: "accounting_overview" },
-                }}
-                navigate={navigate}
-              />
             </HomeSection>
           )}
         </>

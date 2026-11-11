@@ -147,7 +147,7 @@ export function resolveMobileRoute(
         inbox: "Inbox",
         office_team: "Office Team",
         accounting_overview: "Accounting",
-        accounting_releases: "Releases",
+        accounting_releases: "Requests & releases",
         profile: "Profile",
         settings: "Account & settings",
         messages: "Messages",

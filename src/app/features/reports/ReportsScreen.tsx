@@ -175,7 +175,7 @@ function OfficeReports({
       </Notice>
       {can("navigation.projects") && (
         <Button variant="outline" onPress={() => navigate({ name: "budget" })}>
-          View Office budget and settled spending
+          View Office budget and settled expenditure
         </Button>
       )}
       {webHandoffUrl({ name: "reports" }, backendConfig.webOrigin) && (

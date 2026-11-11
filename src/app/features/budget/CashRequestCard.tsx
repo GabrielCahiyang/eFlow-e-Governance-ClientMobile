@@ -198,7 +198,11 @@ export function CashRequestCard({
         {request.purpose}
       </Text>
       <LabelValue label="Work" value={request.taskTitle || "Authorized work"} />
-      <LabelValue label={amount.label} value={recordedPeso(amount.value)} />
+      <LabelValue
+        stacked
+        label={amount.label}
+        value={recordedPeso(amount.value)}
+      />
       <LabelValue label="Needed by" value={dateLabel(request.neededBy)} />
       <Row>
         {!!(!readOnly && canCorrect && onCorrect) && (
@@ -301,18 +305,22 @@ export function CashRequestCard({
         <Card title="Amount breakdown">
           <LabelValue label="Requested" value={peso(request.requestedAmount)} />
           <LabelValue
+            stacked
             label="Authorized"
             value={recordedPeso(request.approvedAmount)}
           />
           <LabelValue
+            stacked
             label="Cash released"
             value={recordedPeso(request.releasedAmount)}
           />
           <LabelValue
-            label="Settled expense"
+            stacked
+            label="Settled expenditure"
             value={recordedPeso(request.actualSpent)}
           />
           <LabelValue
+            stacked
             label="Cash returned"
             value={recordedPeso(request.returnedAmount)}
           />
@@ -342,10 +350,12 @@ export function CashRequestCard({
           >
             <Status value={liquidation.status} />
             <LabelValue
+              stacked
               label="Declared spending"
               value={peso(liquidation.declaredSpent)}
             />
             <LabelValue
+              stacked
               label="Returned cash"
               value={peso(liquidation.returnedAmount)}
             />

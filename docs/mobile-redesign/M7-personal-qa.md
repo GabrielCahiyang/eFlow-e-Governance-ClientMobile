@@ -2,6 +2,29 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Post-build 42 stabilization
+
+[Android QA APK build 43](../../artifacts/M7/eFlow-Mobile-M7-Stabilization-v43-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V43_APK_VERIFICATION.json) · [Credential audit](M7-stabilization-v43-release-audit.json) · [Android signed-out launch](../../artifacts/M7/stabilization-v43-signed-out.png)
+
+TypeScript, nine Metro checks, and 298 tests across 98 suites passed. Android and iOS production JavaScript exports passed separately. The signed Android package compiled for ARM64 and x86_64. Its embedded bundle and changed feature sources matched, and all three bundles passed the credential audit. Build 43 upgraded and cold-launched on the isolated Android 16 / API 36 x86_64 emulator. The signed-out form rendered in dark appearance. Signed-in Android checks require approved accounts and fixtures. Native iOS, physical-device behavior, large text, keyboard and screen-reader checks for the affected workflows remain pending.
+
+Project details previously waited for both the project record and its named task groups. The record now loads independently. The Main table can retry groups, and Board and Agenda can open while groups are unavailable. A Main table group can contain tasks with different statuses. The `Group:` label distinguishes the saved group name from the task status.
+
+Requests & releases retries an eligible failed page read once within the existing load deadline. An individual cash request loads by request ID, Office and fiscal year. It reads existing releases and liquidations for that request, and loads the allocation and receipt prerequisites only when its stage can use them. Available Office Budget is approved appropriation less holds and active commitments, as defined by the existing Office budget summary contract. Settled expenditure is the separate settled amount from that contract. The screenshots alone cannot reconcile the individual Office amounts or establish why requests timed out on the handset.
+
+The conversation shows an empty history only after a successful read. An access check or failed history read has a distinct state. Retry checks access or refreshes the history as needed. A typed message and picked attachment remain separate from the send attempt. The attachment can be restored while its local file is still available. Sending retains the existing access and receipt checks.
+
+| Approved account and fixture | Personal acceptance checks on Android and iOS |
+| --- | --- |
+| Head with an assigned review, overdue Office work led by another person, and at least three current projects | Only assigned actions appear in Needs Your Attention. Overdue and blocked work appears in Office Health. Verify three project rows, real counts, exact project navigation and Office Analytics drill-down. |
+| Member with an actionable overdue task, a contributor-only overdue assignment and a Subtask with a long title and parent name | Home qualifies the count as requiring the Member’s action. My Work shows all overdue assignments and wraps the title and parent name separately. Compare at narrow width, 150% and 200% text, in both appearances. |
+| Approved Task participant with a readable conversation, a local test image and Activity access | Interrupt the connection before opening the thread, then restore it and tap Retry. Verify that an unavailable thread never shows the successful empty state, and that unsent text and image survive the retry. With keyboard open, verify that the composer remains reachable. Activity offers a compact work-note editor, and conversation opens separately. |
+| Approved recipient of an exact Task or Subtask update, including a message with a duplicate completion detail | Verify a single rendered detail, a subtle unread indicator, Mark read, correct destination and Back. Confirm that older updates still append. |
+| Accounting Staff with an authorized Office, settled request and cash release fixture | Compare all currency values with the same authorized Web records, including at 150% and 200% text. Open Requests & releases, reveal the stage breakdown, open the exact record and return. Test refresh after a connection interruption. Keep financial writes within a separately approved fixture. |
+| Head or Member with an authorized project that has a named `To do` group containing a completed task | Verify the `Group: To do` heading and the task’s Completed status. Open Main table, Board and Agenda, then confirm search, filters, Back and the pinned task column. |
+
+Record the approved actor, server-confirmed role, Office, device and build for each check. Include TalkBack or VoiceOver, reduced motion and both appearances. A signed-out smoke check cannot establish any of these role or financial results.
+
 ## Post-build 42 role dashboards and work details
 
 The source revision after build 42 adds Head, Member and Accounting Home dashboards, native Office Analytics, the revised tab order, structured Activity and inline Office Subtask Funding. Build 42 predates these changes.

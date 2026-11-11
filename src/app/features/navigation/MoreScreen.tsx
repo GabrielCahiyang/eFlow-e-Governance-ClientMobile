@@ -93,17 +93,6 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     <Screen compact style={{ gap: 16 }}>
       <View style={{ gap: 4, paddingTop: 4 }}>
         <Text
-          accessibilityRole="header"
-          style={{
-            fontSize: 26,
-            lineHeight: 32,
-            fontWeight: "700",
-            color: palette.text,
-          }}
-        >
-          More
-        </Text>
-        <Text
           style={{
             fontSize: 16,
             fontWeight: "600",

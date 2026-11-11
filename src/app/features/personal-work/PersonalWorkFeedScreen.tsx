@@ -218,31 +218,35 @@ export function PersonalWorkFeedScreen({
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
-          {/* Monday-style Top Header */}
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent:
+                dueOnly || initial !== "Assigned work"
+                  ? "space-between"
+                  : "flex-end",
               paddingTop: 4,
             }}
           >
-            <Text
-              accessibilityRole="header"
-              style={{
-                fontSize: 24,
-                fontWeight: "700",
-                color: palette.text,
-              }}
-            >
-              {dueOnly
-                ? "Deadlines"
-                : initial === "Subtasks"
-                  ? "Assigned subtasks"
-                  : initial === "Assigned work"
-                    ? "My Work"
-                    : initial}
-            </Text>
+            {(dueOnly || initial !== "Assigned work") && (
+              <Text
+                accessibilityRole="header"
+                style={{
+                  fontSize: 24,
+                  fontWeight: "700",
+                  color: palette.text,
+                }}
+              >
+                {dueOnly
+                  ? "Deadlines"
+                  : initial === "Subtasks"
+                    ? "Assigned subtasks"
+                    : initial === "Assigned work"
+                      ? "My Work"
+                      : initial}
+              </Text>
+            )}
 
             <Pressable
               accessibilityRole="button"
@@ -279,7 +283,11 @@ export function PersonalWorkFeedScreen({
             ).map(([group, count]) => (
               <FilterChip
                 key={group}
-                label={`${group} · ${count}`}
+                label={
+                  group === "Overdue"
+                    ? `${count} overdue assignments`
+                    : `${group} · ${count}`
+                }
                 accessibilityLabel={`${group}, ${count} ${count === 1 ? "item" : "items"}`}
                 selected={filter === group}
                 onPress={() => setFilter(filter === group ? "All work" : group)}

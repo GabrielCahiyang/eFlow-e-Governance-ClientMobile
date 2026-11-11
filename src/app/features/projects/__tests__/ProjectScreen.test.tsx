@@ -89,7 +89,9 @@ test("an archived project loads its historical rows, supports manual refresh, an
   );
   const row = await screen.findByRole("button", { name: historicalTask.title });
   expect(screen.getByText(/This project is read-only/)).toBeOnTheScreen();
-  expect(screen.getByRole("header", { name: "Field work" })).toBeOnTheScreen();
+  expect(
+    screen.getByRole("header", { name: "Group: Field work" }),
+  ).toBeOnTheScreen();
   expect(screen.getByRole("header", { name: "Status" })).toBeOnTheScreen();
   expect(screen.getByRole("header", { name: "Start date" })).toBeOnTheScreen();
   expect(screen.getByRole("header", { name: "Budget" })).toBeOnTheScreen();

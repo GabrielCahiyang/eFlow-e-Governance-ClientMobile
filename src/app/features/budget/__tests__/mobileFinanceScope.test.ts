@@ -15,7 +15,7 @@ test("finance amounts keep stage, missing values, and recorded zero distinct", (
   };
   expect(
     cashRequestAmount({ ...request, status: "settled", actualSpent: 0 }),
-  ).toEqual({ label: "Settled expense", value: 0 });
+  ).toEqual({ label: "Settled expenditure", value: 0 });
   expect(
     cashRequestAmount({ ...request, status: "settled" }).value,
   ).toBeUndefined();

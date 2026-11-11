@@ -2,6 +2,10 @@ import { supabase } from "../../../platform/supabase";
 import { getPhilippineCalendarDate } from "../../../core/web/app/shared/calendarDates";
 import { getAssignedIndependentReviews } from "../../../core/web/app/features/budget/services/independentReviewService";
 import {
+  authorizedStatuses,
+  releasedStatuses,
+  reviewStatuses,
+  cashWorkflowStages,
   cashRequestAmount,
   cashRequestReference,
 } from "../budget/mobileFinanceScope";
@@ -11,35 +15,6 @@ import {
   headSettlementAction,
   settlementAllowsAccountingPosting,
 } from "../budget/staffingEscalation";
-
-const reviewStatuses = [
-  "liquidation_submitted",
-  "pending_leader_liquidation_review",
-  "pending_department_settlement",
-];
-const authorizedStatuses = [
-  "approved",
-  "scheduled_for_release",
-  "partially_released",
-];
-const requestedStatuses = [
-  "pending",
-  "pending_leader_review",
-  "pending_department_approval",
-];
-const releasedStatuses = [
-  "released",
-  "liquidation_draft",
-  "overdue_liquidation",
-  "changes_requested",
-];
-const stages = [
-  ["Requested", requestedStatuses],
-  ["Authorized or partly released", authorizedStatuses],
-  ["Released or awaiting receipts", releasedStatuses],
-  ["Under receipt review", reviewStatuses],
-  ["Settled", ["settled"]],
-] as const;
 
 async function fiscalBudget(office: string, year: number) {
   const { data, error } = await supabase
@@ -274,7 +249,7 @@ export async function accountingHomeQueue(
   });
   const [counts, scheduled, open] = await Promise.all([
     Promise.all(
-      stages.map(async ([label, statuses]) => {
+      cashWorkflowStages.map(async ([label, statuses]) => {
         const { count, error } = await supabase
           .from("petty_cash_requests")
           .select("id", { count: "exact", head: true })
