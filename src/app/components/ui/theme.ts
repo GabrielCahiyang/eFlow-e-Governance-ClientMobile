@@ -75,10 +75,13 @@ export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 export const radius = { control: 8, surface: 10, overlay: 14, pill: 999 };
 export const touchTarget = { android: 48, ios: 44 };
 export const type = { title: 26, heading: 19, body: 15, small: 13, tiny: 11 };
-export const peso = (value: number) =>
-  new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(
-    value || 0,
-  );
+const php = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+});
+export const peso = (value: number) => php.format(value || 0);
+export const recordedPeso = (value?: number | null) =>
+  value == null || !Number.isFinite(value) ? "—" : php.format(value);
 export const dateLabel = (value?: string | number | null) =>
   value
     ? new Date(value).toLocaleDateString("en-PH", {

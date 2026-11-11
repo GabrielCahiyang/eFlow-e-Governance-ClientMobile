@@ -21,6 +21,7 @@ import {
   replaceProfileAvatar,
 } from "../../../core/web/app/services/userSettingsService";
 import { ProfessionalProfile } from "./ProfessionalProfile";
+import { activationRoleLabel } from "../../../core/web/app/features/account-activation/selectors";
 export function ProfileScreen() {
   const { profile, organization, refresh } = useAuth(),
     action = useAction(),
@@ -37,7 +38,7 @@ export function ProfileScreen() {
         onChange={setView}
         items={[
           { id: "account", label: "Account" },
-          { id: "professional", label: "Professional Profile" },
+          { id: "professional", label: "Professional profile" },
         ]}
       />
       {!!(view === "account") && (
@@ -51,7 +52,9 @@ export function ProfileScreen() {
           <LabelValue label="Email" value={profile?.email || ""} />
           <LabelValue
             label="Account role"
-            value={profile?.role?.replaceAll("_", " ") || ""}
+            value={
+              profile?.role ? activationRoleLabel(profile.role) : "Unavailable"
+            }
           />
           <LabelValue
             label="Office"

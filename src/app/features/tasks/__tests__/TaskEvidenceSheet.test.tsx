@@ -92,7 +92,7 @@ test("selection and camera failure are local, then a confirmed submission resume
     screen.getByRole("button", { name: "Check and resume submission" }),
   );
   await waitFor(() =>
-    expect(screen.getByText("Evidence submission confirmed")).toBeOnTheScreen(),
+    expect(screen.getByText("Submitted for approval")).toBeOnTheScreen(),
   );
   expect(jest.mocked(sendTaskEvidence).mock.calls[1][0].request.id).toBe(
     request.id,

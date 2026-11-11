@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useState } from "react";
@@ -218,7 +219,7 @@ export function WorkTreePanel({
                 <NavigationRow
                   key={child.id}
                   title={child.title}
-                  description={`${record.status.replaceAll("_", " ")} · ${branchCompletion(data, record.status, record.id).percent}%`}
+                  description={`${statusLabel(record.status)} · ${branchCompletion(data, record.status, record.id).percent}%`}
                   onPress={() =>
                     navigate(workNodeRoute(data, child.id, child.title))
                   }

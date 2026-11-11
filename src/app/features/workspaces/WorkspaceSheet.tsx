@@ -6,7 +6,7 @@ import BottomSheet, {
 import Building from "lucide-react-native/icons/building-complex";
 import User from "lucide-react-native/icons/user-round";
 import X from "lucide-react-native/icons/x";
-import { ErrorState, Loading, SearchField } from "../../components/ui";
+import { Empty, ErrorState, Loading, SearchField } from "../../components/ui";
 import { FavoriteStar } from "../../components/ui/FavoriteStar";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
@@ -137,6 +137,19 @@ export function WorkspaceSheet({
             <ErrorState error={error} retry={onRetry} />
           ) : loading ? (
             <Loading layout="navigation" label="Loading workspaces" />
+          ) : !items.length ? (
+            <Empty
+              compact
+              kind="workspace"
+              title={
+                query.trim()
+                  ? "No matching workspaces"
+                  : "No workspaces available"
+              }
+              description={
+                query.trim() ? "Try another workspace name." : undefined
+              }
+            />
           ) : (
             items.map((item) => {
               const Icon = item.kind === "office" ? Building : User;

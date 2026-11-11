@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -5,7 +6,7 @@ import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
 import { statusColors } from "../../components/ui/Status";
-import { dateLabel, peso, words } from "../../components/ui/theme";
+import { dateLabel, peso } from "../../components/ui/theme";
 import {
   SkeletonBlock,
   SkeletonPulse,
@@ -24,6 +25,7 @@ const taskColumns = [
 const directoryColumns = ["Project", "Status", "Type"];
 export const projectDirectoryWidths = (viewport: number) => {
   const status = Math.floor(viewport * 0.3);
+  if (viewport < 380) return [viewport - status - rail, status];
   const type = Math.floor(viewport * 0.22);
   return [viewport - status - type - rail, status, type];
 };
@@ -67,7 +69,7 @@ export function ProjectTableCells({
   const values = task
     ? [
         task.title,
-        words(task.status),
+        statusLabel(task.status),
         task.assigneeName || "Unassigned",
         task.startDate ? dateLabel(task.startDate + "T12:00:00") : "—",
         due ? dateLabel(due) : "—",
@@ -101,16 +103,15 @@ export function ProjectDirectoryCells({
 }) {
   const palette = useTheme();
   const type = project?.kind === "personal" ? "Personal" : "Office";
+  const compact = widths.length === 2;
+  const detail = type + (project?.shortcut ? " shortcut" : "");
   const values = project
-    ? [
-        project.title,
-        words(project.status),
-        type + (project.shortcut ? " shortcut" : ""),
-      ]
+    ? [project.title, statusLabel(project.status), ...(compact ? [] : [detail])]
     : undefined;
   return (
     <WorkTableRow
-      columns={directoryColumns}
+      columns={compact ? directoryColumns.slice(0, 2) : directoryColumns}
+      titleDetail={compact && project ? detail : undefined}
       values={values}
       status={project?.status}
       widths={widths}
@@ -129,12 +130,14 @@ function WorkTableRow({
   onOpen,
   pinStyle,
   skeleton,
+  titleDetail,
   header = !values,
 }: {
   widths: number[];
   accent: string;
   columns: string[];
   values?: string[];
+  titleDetail?: string;
   status?: string;
   onOpen?: () => void;
   pinStyle?: ComponentProps<typeof Animated.View>["style"];
@@ -160,23 +163,30 @@ function WorkTableRow({
         <SkeletonBlock style={{ width: "72%", height: 12 }} />
       ) : (
         <>
-          <Text
-            accessibilityRole={header ? "header" : undefined}
-            style={{
-              flex: 1,
-              fontSize: values ? 13 : 12,
-              fontWeight: index === 0 || index === 1 || !values ? "600" : "400",
-              color:
-                index === 1 && tone
-                  ? tone.foreground
-                  : !values || index > 1
-                    ? palette.mutedLabel
-                    : palette.text,
-              textAlign: index === 1 ? "center" : "left",
-            }}
-          >
-            {value}
-          </Text>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text
+              accessibilityRole={header ? "header" : undefined}
+              style={{
+                fontSize: values ? 13 : 12,
+                fontWeight:
+                  index === 0 || index === 1 || !values ? "600" : "400",
+                color:
+                  index === 1 && tone
+                    ? tone.foreground
+                    : !values || index > 1
+                      ? palette.mutedLabel
+                      : palette.text,
+                textAlign: index === 1 ? "center" : "left",
+              }}
+            >
+              {value}
+            </Text>
+            {index === 0 && titleDetail && (
+              <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+                {titleDetail}
+              </Text>
+            )}
+          </View>
           {values && index === 0 && (
             <ChevronRight size={14} color={palette.mutedLabel} />
           )}
@@ -214,6 +224,7 @@ function WorkTableRow({
       accessibilityHint={values
         .slice(1)
         .map((value, index) => `${columns[index + 1]}: ${value}`)
+        .concat(titleDetail ? [titleDetail] : [])
         .join(". ")}
       onPress={onOpen}
       style={({ pressed }) => [

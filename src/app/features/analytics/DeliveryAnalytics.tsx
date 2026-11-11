@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import { useFacts } from "../../shared/useFacts";
 import { useAuth } from "../authentication";
 import { fetchTeamWorkflowFacts } from "../../../core/web/app/features/team-management/services/teamWorkflowFactsService";
@@ -288,7 +289,7 @@ export function DeliveryAnalytics({
             label="Lead"
             value={t.assigneeName || "Needs assignment"}
           />
-          <LabelValue label="Status" value={t.status.replace(/_/g, " ")} />
+          <LabelValue label="Status" value={statusLabel(t.status)} />
           <DeadlineBadge value={t.deadline || t.dueDate} status={t.status} />
           {!!rowById.get(t.id) && (
             <LabelValue

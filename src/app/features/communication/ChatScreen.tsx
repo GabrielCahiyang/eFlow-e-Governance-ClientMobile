@@ -41,6 +41,7 @@ import {
 } from "./messageHistory";
 import { filterConversationContext } from "./conversationContext";
 import { chatImageTypes, uploadChatImage } from "./chatImages";
+import { useComposerDraft } from "./useComposerDraft";
 import { ConversationInfo } from "./ConversationInfo";
 import { ChatAvatar } from "./ChatAvatar";
 import { ConversationList } from "./ConversationList";
@@ -70,15 +71,19 @@ export function ChatScreen({
   const actor = profile!.id;
   const assertAccess = useAccountActionAccess();
   const contextual = !!(route.projectId || route.taskId);
-  const [draft, setDraft] = useState("");
   const [newChat, setNewChat] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [personQuery, setPersonQuery] = useState("");
   const [info, setInfo] = useState(false);
-  const [pending, setPending] = useState<MessageDraft>();
-  const [image, setImage] =
-    useState<Awaited<ReturnType<typeof chooseFiles>>[number]>();
+  const [pending, setPending] = useState<{
+    scope: string;
+    item: MessageDraft;
+  }>();
+  const [attachment, setAttachment] = useState<{
+    scope: string;
+    file: Awaited<ReturnType<typeof chooseFiles>>[number];
+  }>();
   const action = useAction();
   const channels = useConversationDirectory(actor);
   const available = filterConversationContext(
@@ -117,6 +122,9 @@ export function ChatScreen({
   }>({ scope: "", rows: [] });
   const accessEpoch = authoritativeReadEpoch();
   const scope = JSON.stringify([actor, channel?.id, accessEpoch]);
+  const composer = useComposerDraft(actor, channel?.id);
+  const draft = composer.value;
+  const image = attachment?.scope === scope ? attachment.file : undefined;
   const shown = useMemo(
     () =>
       mergeMessages(
@@ -234,13 +242,10 @@ export function ChatScreen({
     },
     !!channel,
   );
-  const original = pending || recovery.data;
+  const original = pending?.scope === scope ? pending.item : recovery.data;
   useEffect(() => {
-    setDraft("");
-    setPending(undefined);
-    setImage(undefined);
     setInfo(false);
-  }, [channel?.id, actor]);
+  }, [scope]);
   useEffect(() => {
     if (!channel) return;
     const live = createPostgresChannel("native-chat:" + channel.id)
@@ -291,7 +296,8 @@ export function ChatScreen({
   }, [channel?.id, actor, scope]);
   const send = () =>
     action.run(async () => {
-      if (!channel) return;
+      if (!channel || composer.loading || recovery.loading || recovery.error)
+        return;
       const session = await supabase.auth.getSession();
       if (session.error || session.data.session?.user.id !== actor)
         throw new Error("Sign in again.");
@@ -309,7 +315,7 @@ export function ChatScreen({
       };
       if (!item.text.trim() && !item.imagePath) return;
       await draftStore.set(actor, "chat:" + channel.id, item);
-      setPending(item);
+      setPending({ scope, item });
       assertAccess(actor);
       await sendChat(
         item.id,
@@ -319,10 +325,12 @@ export function ChatScreen({
         item.text,
         item.imagePath,
       );
+      await composer.clear();
       await draftStore.remove(actor, "chat:" + channel.id);
-      setPending(undefined);
-      setDraft("");
-      setImage(undefined);
+      setPending((current) => (current?.scope === scope ? undefined : current));
+      setAttachment((current) =>
+        current?.scope === scope ? undefined : current,
+      );
       await Promise.all([
         messages.refresh(),
         channels.refresh(),
@@ -332,11 +340,12 @@ export function ChatScreen({
   const pickImage = () =>
     void action.run(async () => {
       if (image) {
-        setImage(undefined);
+        setAttachment(undefined);
         return;
       }
       const [chosen] = await chooseFiles(chatImageTypes);
-      if (chosen) setImage(chosen);
+      if (chosen && currentScope.current === scope)
+        setAttachment({ scope, file: chosen });
     });
   const lastCreated = messages.data?.rows.at(-1)?.created_at;
   const readMarker = useRef<string | undefined>(undefined);
@@ -485,8 +494,9 @@ export function ChatScreen({
     (messages.loading && !messages.data) ||
     !!messages.error ||
     recovery.loading ||
+    composer.loading ||
     !!recovery.error ||
-    (!(original?.text || draft).trim() && !original?.imagePath && !image);
+    (!(original?.text ?? draft).trim() && !original?.imagePath && !image);
   return (
     <ThreadFrame>
       <ThreadHeader
@@ -558,9 +568,16 @@ export function ChatScreen({
         }
       />
       <Composer
-        value={original?.text || draft}
-        onChange={setDraft}
-        editable={!original && !action.busy}
+        value={original?.text ?? draft}
+        onChange={composer.setValue}
+        onBlur={composer.onBlur}
+        editable={
+          !original &&
+          !action.busy &&
+          !composer.loading &&
+          !recovery.loading &&
+          !recovery.error
+        }
         imageName={image?.name}
         onPickImage={original ? undefined : pickImage}
         pickDisabled={action.busy}
@@ -578,6 +595,7 @@ export function ChatScreen({
         error={
           <>
             {!!recovery.error && <ErrorState error={recovery.error} />}
+            {!!composer.error && <ErrorState error={composer.error} />}
             {!!action.error && (
               <ErrorState context="action" error={action.error} />
             )}

@@ -53,7 +53,10 @@ export function ProjectGuestProfile({
   return (
     <Screen title="Your project access is ready">
       <Card title="Professional profile">
-        <Notice>These details are optional. Your PDS stays private.</Notice>
+        <Notice>
+          Add optional details for your project profile. Only authorized viewers
+          can open your Personal Data Sheet (PDS).
+        </Notice>
         {!!profile.error && (
           <ErrorState
             error={profile.error}

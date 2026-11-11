@@ -1,4 +1,7 @@
-import type { DepartmentBudgetBundle } from "../../../core/web/app/features/budget/types";
+import type {
+  DepartmentBudgetBundle,
+  PettyCashRequest,
+} from "../../../core/web/app/features/budget/types";
 import type { RouteName } from "../../shared/routes";
 
 export const officeFinanceRoutes: readonly RouteName[] = [
@@ -37,8 +40,59 @@ const accountingStatuses = new Set([
   "settled",
 ]);
 
+const cashReleasedStatuses = new Set([
+  "partially_released",
+  "released",
+  "liquidation_draft",
+  "liquidation_submitted",
+  "pending_leader_liquidation_review",
+  "pending_department_settlement",
+  "changes_requested",
+  "overdue_liquidation",
+]);
+
 export function cashRequestReference(requestNumber: number) {
   return `FR-${String(requestNumber).padStart(5, "0")}`;
+}
+
+export function cashRequestAmount(
+  request: Pick<
+    PettyCashRequest,
+    "requestedAmount" | "approvedAmount" | "releasedAmount" | "actualSpent"
+  > & { status: string },
+) {
+  if (request.status === "settled")
+    return { label: "Settled expense", value: request.actualSpent };
+  if (
+    cashReleasedStatuses.has(request.status) ||
+    (request.releasedAmount ?? 0) > 0
+  )
+    return { label: "Cash released", value: request.releasedAmount };
+  if (["approved", "scheduled_for_release"].includes(request.status))
+    return { label: "Authorized", value: request.approvedAmount };
+  return { label: "Requested", value: request.requestedAmount };
+}
+
+export function cashReturnAmounts(
+  receipts: { amount: number }[],
+  releasedAmount?: number,
+) {
+  const cents = receipts.reduce(
+    (total, receipt) =>
+      total +
+      (Number.isFinite(receipt.amount) ? Math.round(receipt.amount * 100) : 0),
+    0,
+  );
+  const released =
+    releasedAmount == null || !Number.isFinite(releasedAmount)
+      ? undefined
+      : Math.round(releasedAmount * 100);
+  return {
+    spent: cents / 100,
+    returned:
+      released === undefined ? undefined : Math.max(0, released - cents) / 100,
+    exceedsRelease: released !== undefined && cents > released,
+  };
 }
 
 export function accountingRequestVisible(

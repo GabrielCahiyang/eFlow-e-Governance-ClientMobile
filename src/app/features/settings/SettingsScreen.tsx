@@ -96,10 +96,7 @@ export function SettingsScreen({
             </Card>
           ) : tab === "security" ? (
             <Card title="Change your password">
-              <Notice>
-                Confirm your current password before choosing a new one. Account
-                lockouts and password policy are still enforced.
-              </Notice>
+              <Notice>Have your current password ready.</Notice>
               <Button onPress={() => setPassword(true)}>Change password</Button>
             </Card>
           ) : (
@@ -121,7 +118,9 @@ export function SettingsScreen({
             </>
           )}
           {!!notice && <Notice>{notice}</Notice>}
-          {!!action.error && <ErrorState context="action" error={action.error} />}
+          {!!action.error && (
+            <ErrorState context="action" error={action.error} />
+          )}
         </>
       )}
       {!!password && (

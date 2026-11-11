@@ -71,7 +71,7 @@ export function MondayTableRow({
   isLast?: boolean;
 }) {
   const palette = useTheme();
-  const accent = statusIndicatorColor(status);
+  const accent = statusIndicatorColor(status, palette);
 
   return (
     <Pressable

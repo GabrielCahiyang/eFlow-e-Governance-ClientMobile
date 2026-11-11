@@ -225,7 +225,7 @@ export function InvitationScreen({
                 >
                   {isExisting
                     ? "Need to create an account?"
-                    : "Already have an account? Sign in"}
+                    : "Sign in with an existing account"}
                 </Button>
               )}
               <Notice>

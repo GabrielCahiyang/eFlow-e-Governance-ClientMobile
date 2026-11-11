@@ -1,3 +1,5 @@
+import { recordedPeso } from "../../components/ui/theme";
+import { statusLabel } from "../../shared/statusLabels";
 import { useState } from "react";
 import { useIsFocused } from "@react-navigation/native";
 import {
@@ -26,6 +28,7 @@ import { financialOffices } from "./financialScope";
 import {
   accountingView,
   accountingRequestVisible,
+  cashRequestAmount,
   cashRequestReference,
 } from "./mobileFinanceScope";
 
@@ -58,7 +61,7 @@ export function OfficeBudgetScreen({
   );
   const orgId =
     selectedOffice && selectedOffice !== profile?.org_id
-      ? otherOffice?.id || ""
+      ? (!scopes.error ? otherOffice?.id : undefined) || ""
       : profile?.org_id || "";
   const officeName = otherOffice?.name || organization?.name || "Office";
   const detail = useBudget(view === "requests" && recordId ? orgId : "", year);
@@ -85,7 +88,7 @@ export function OfficeBudgetScreen({
         supabase
           .from("petty_cash_requests")
           .select(
-            "id,request_number,purpose,status,requested_amount,released_amount",
+            "id,request_number,purpose,status,requested_amount,approved_amount,released_amount,actual_spent",
             { count: "exact" },
           )
           .eq("fiscal_budget_id", fiscalBudgetId!)
@@ -99,7 +102,12 @@ export function OfficeBudgetScreen({
         purpose: String(row.purpose || ""),
         status: String(row.status),
         requestedAmount: Number(row.requested_amount),
-        releasedAmount: Number(row.released_amount || 0),
+        approvedAmount:
+          row.approved_amount == null ? undefined : Number(row.approved_amount),
+        releasedAmount:
+          row.released_amount == null ? undefined : Number(row.released_amount),
+        actualSpent:
+          row.actual_spent == null ? undefined : Number(row.actual_spent),
       }));
     },
     !!fiscalBudgetId && !recordId && focused,
@@ -125,20 +133,21 @@ export function OfficeBudgetScreen({
   );
   const [search, setSearch] = useState("");
   const data = detail.data;
-  const requests = (queue.data || []).filter(
+  const requests = (queue.error || years.error ? [] : queue.data || []).filter(
     (request) =>
       accountingRequestVisible(request, accounting) &&
       `${cashRequestReference(request.requestNumber)} ${request.requestNumber} ${request.purpose}`
         .toLowerCase()
         .includes(search.trim().toLowerCase()),
   );
-  const activeRequest = recordId
-    ? data?.requests.find(
-        (request) =>
-          request.id === recordId &&
-          accountingRequestVisible(request, accounting),
-      )
-    : undefined;
+  const activeRequest =
+    recordId && !detail.error
+      ? data?.requests.find(
+          (request) =>
+            request.id === recordId &&
+            accountingRequestVisible(request, accounting),
+        )
+      : undefined;
 
   return (
     <Screen
@@ -150,14 +159,34 @@ export function OfficeBudgetScreen({
             ? "Accounting"
             : "Office Budget"
       }
-      description={`${officeName} · FY ${year}`}
+      description={orgId ? `${officeName} · FY ${year}` : `FY ${year}`}
       onRefresh={() => {
         if (view === "overview") return summary.refresh();
         if (recordId) return detail.refresh();
         return Promise.all([years.refresh(), queue.refresh()]);
       }}
     >
-      {view === "overview" && accounting && (
+      {accounting && !!scopes.error && (
+        <ErrorState
+          error="Other Offices could not be loaded."
+          retry={() => void scopes.refresh()}
+        />
+      )}
+      {accounting && (scopes.data?.length ?? 0) > 1 && !recordId && (
+        <Choice
+          label="Authorized Office"
+          value={orgId}
+          options={scopes.data!.map((office) => ({
+            value: office.id,
+            label: office.name,
+          }))}
+          onChange={(id) => {
+            setOffice(id);
+            setYear(getCurrentFiscalYear());
+          }}
+        />
+      )}
+      {view === "overview" && accounting && !!orgId && (
         <Card title="Cash work">
           {can("navigation.accounting_releases") && (
             <NavigationRow
@@ -178,26 +207,6 @@ export function OfficeBudgetScreen({
             onPress={() => navigate({ name: "financial_reviews" })}
           />
         </Card>
-      )}
-      {accounting && !!scopes.error && (
-        <ErrorState
-          error="Other Offices could not be loaded."
-          retry={() => void scopes.refresh()}
-        />
-      )}
-      {accounting && (scopes.data?.length ?? 0) > 1 && !recordId && (
-        <Choice
-          label="Authorized Office"
-          value={orgId}
-          options={scopes.data!.map((office) => ({
-            value: office.id,
-            label: office.name,
-          }))}
-          onChange={(id) => {
-            setOffice(id);
-            setYear(getCurrentFiscalYear());
-          }}
-        />
       )}
       {!orgId ? (
         scopes.loading ? (
@@ -314,22 +323,25 @@ export function OfficeBudgetScreen({
                 onChange={setSearch}
                 placeholder="Search cash requests"
               />
-              {requests.map((request) => (
-                <NavigationRow
-                  key={request.id}
-                  title={`${cashRequestReference(request.requestNumber)} · ${request.purpose || "Cash request"}`}
-                  description={`${peso(request.requestedAmount)} · ${request.status.replaceAll("_", " ")}`}
-                  onPress={() =>
-                    navigate({
-                      name: "accounting_releases",
-                      recordId: request.id,
-                      financialOfficeId: orgId,
-                      fiscalYear: year,
-                      title: "Cash request",
-                    })
-                  }
-                />
-              ))}
+              {requests.map((request) => {
+                const amount = cashRequestAmount(request);
+                return (
+                  <NavigationRow
+                    key={request.id}
+                    title={`${cashRequestReference(request.requestNumber)} · ${request.purpose || "Cash request"}`}
+                    description={`${statusLabel(request.status, "finance")} · ${amount.label} ${recordedPeso(amount.value)}`}
+                    onPress={() =>
+                      navigate({
+                        name: "accounting_releases",
+                        recordId: request.id,
+                        financialOfficeId: orgId,
+                        fiscalYear: year,
+                        title: "Cash request",
+                      })
+                    }
+                  />
+                );
+              })}
               {!requests.length && !queue.error && !years.error && (
                 <Empty
                   kind="finance"

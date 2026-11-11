@@ -79,7 +79,9 @@ test("compact project filter exposes the current status, changes visible rows an
   ).toBeOnTheScreen();
   expect(view.getByText("Current inspection")).toBeOnTheScreen();
   expect(view.queryByText("Archived inspection")).toBeNull();
-  await fireEvent.press(view.getByRole("button", { name: "Filter projects" }));
+  await fireEvent.press(
+    view.getByRole("button", { name: "Project status: Current projects" }),
+  );
   await fireEvent.press(view.getByRole("button", { name: "Archived" }));
   expect(
     view.getByRole("button", { name: "Project status: Archived" }),

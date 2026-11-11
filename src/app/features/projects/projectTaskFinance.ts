@@ -13,9 +13,7 @@ export function taskFinanceTotals(
   allocations: AmountRow[],
   settlements: AmountRow[],
 ) {
-  const totals = new Map<string, TaskFinance>(
-    taskIds.map((id) => [id, { budget: 0 }]),
-  );
+  const totals = new Map<string, TaskFinance>(taskIds.map((id) => [id, {}]));
   for (const row of allocations) {
     const total = totals.get(row.task_id);
     if (total && row.amount != null)

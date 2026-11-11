@@ -1,7 +1,15 @@
 import { useEffect } from "react";
 import { AppState, Linking, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import { Button, Card, ErrorState, Notice, Row } from "../../components/ui";
+import {
+  Button,
+  Card,
+  ErrorState,
+  LabelValue,
+  Loading,
+  Notice,
+  Row,
+} from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
@@ -11,34 +19,44 @@ export function PushSettings() {
     actor = profile!.id,
     facts = useFacts("push:" + actor, () => pushEnabled(actor)),
     action = useAction();
+  const ready = !facts.loading && !facts.error && facts.data !== undefined;
   return (
     <Card title="Device push notifications">
-      <Notice>
-        {facts.data
-          ? "This device is registered for work updates."
-          : "Push alerts are off for this account on this device."}{" "}
-        Notification previews contain a generic work update; open eFlow to read
-        authorized records.
-      </Notice>
+      {facts.loading && (
+        <Loading label="Checking push settings" layout="summary" />
+      )}
+      {ready && (
+        <>
+          <LabelValue label="Push alerts" value={facts.data ? "On" : "Off"} />
+          <Notice>
+            Alerts show a generic work update. Open eFlow to see the details.
+          </Notice>
+        </>
+      )}
       <Row>
         <Button
           busy={action.busy}
+          disabled={!ready}
           onPress={() =>
             void action.run(async () => {
+              if (!ready) return;
               if (facts.data) await disablePush(actor);
               else await enablePush(actor);
               await facts.refresh();
             })
           }
         >
-          {facts.data ? "Turn off push" : "Enable push on this device"}
+          {facts.data ? "Turn off push alerts" : "Turn on push alerts"}
         </Button>
         <Button variant="outline" onPress={() => void Linking.openSettings()}>
           Device settings
         </Button>
       </Row>
       {!!(facts.error || action.error) && (
-        <ErrorState error={facts.error || action.error} />
+        <ErrorState
+          error={facts.error || action.error}
+          retry={facts.error ? () => void facts.refresh() : undefined}
+        />
       )}
     </Card>
   );

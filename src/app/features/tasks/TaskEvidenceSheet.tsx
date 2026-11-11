@@ -62,7 +62,7 @@ export function TaskEvidenceSheet({
         report,
       });
       setConfirmed(true);
-      report("Evidence submission confirmed");
+      report("Submitted for approval");
       await draftStore.remove(actor, evidenceScope(taskId)).catch(() => {});
       nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       await onSaved().catch(() => {});
@@ -70,7 +70,7 @@ export function TaskEvidenceSheet({
   return (
     <Sheet
       open
-      title="Submit evidence"
+      title="Complete task"
       busy={action.busy}
       onClose={onClose}
       footer={

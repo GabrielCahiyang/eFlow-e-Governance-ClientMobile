@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import { useState } from "react";
 import { EvidenceAttachment } from "./EvidenceAttachment";
 import {
@@ -299,7 +300,7 @@ export function TaskReviewPanel({
                 action.clear();
               }}
             >
-              {`Submission ${item.version} · ${item.status.replaceAll("_", " ")}`}
+              {`Submission ${item.version} · ${statusLabel(item.status)}`}
             </Button>
           ))}
         </Card>

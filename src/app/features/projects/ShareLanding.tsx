@@ -16,7 +16,7 @@ export function ShareLanding({
   return (
     <Screen title="Project invitation">
       <Notice>
-        Open this link using the invited account. Your invitation must still be valid and allow access to this project.
+        Sign in with the email address that received this invitation.
       </Notice>
       <Button
         busy={action.busy}

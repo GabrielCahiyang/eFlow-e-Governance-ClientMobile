@@ -35,16 +35,16 @@ export function HomeWorkspaceContent({
   const palette = useTheme();
   return (
     <Screen compact onRefresh={onRefresh} style={{ gap: 18 }}>
+      <HomeAttentionCard
+        attention={attention}
+        loading={attentionLoading}
+        navigate={navigate}
+      />
       <FavoritesCard
         pinned={pinned}
         loading={loading}
         onFavorites={onFavorites}
         onOpenWorkspace={onOpenWorkspace}
-      />
-      <HomeAttentionCard
-        attention={attention}
-        loading={attentionLoading}
-        navigate={navigate}
       />
       <GlassCard testID="workspaces-card" style={{ padding: 0 }}>
         <Pressable

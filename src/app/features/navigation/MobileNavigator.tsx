@@ -96,10 +96,11 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     if (id === workspace.selected?.workspace.id) return;
     setResume(location.current);
     const selected = await workspace.select(id);
-    if (selected)
-      AccessibilityInfo.announceForAccessibility(
-        `${selected.workspace.kind === "office" ? "Office" : "Personal"} workspace: ${selected.workspace.name}`,
-      );
+    AccessibilityInfo.announceForAccessibility(
+      selected
+        ? `Switched to ${selected.workspace.name}, ${selected.workspace.kind === "office" ? "Office" : "Personal"} workspace.`
+        : "Could not switch workspaces. Open the workspace chooser to try again.",
+    );
   };
   if (!isMobileRole(role))
     return (

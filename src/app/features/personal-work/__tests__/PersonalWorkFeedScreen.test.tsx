@@ -13,9 +13,7 @@ jest.mock("../../../components/ui/FolderRefresh", () => {
   >("../../../components/ui/FolderRefresh");
   return {
     ...real,
-    RefreshSectionList: (
-      props: SectionListProps<WorkRow, WorkSection>,
-    ) => {
+    RefreshSectionList: (props: SectionListProps<WorkRow, WorkSection>) => {
       mockList(props);
       return <real.RefreshSectionList {...props} />;
     },
@@ -106,7 +104,7 @@ test("a failed source cannot masquerade as a successfully empty assignment feed"
   }
 });
 
-test("Today card filters visible assignments, exposes selected state, and toggles back without a floating plus", async () => {
+test("Today chip filters visible assignments, exposes selected state, and toggles back without a floating plus", async () => {
   const base = {
     kind: "office-task" as const,
     workspaceId: "office",
@@ -144,19 +142,15 @@ test("Today card filters visible assignments, exposes selected state, and toggle
     expect(
       view.queryByRole("button", { name: "Filter work or options" }),
     ).toBeNull();
-    const today = () => view.getByRole("button", { name: "Today, 1 items" });
+    const today = () => view.getByRole("button", { name: "Today, 1 item" });
     await fireEvent.press(today());
     expect(today().props.accessibilityState.selected).toBe(true);
     expect(view.getByText("Inspect today")).toBeOnTheScreen();
     expect(view.queryByText("Inspect overdue")).toBeNull();
-    expect(
-      view.getByRole("button", { name: "Date filter: Today" }),
-    ).toBeOnTheScreen();
+
     await fireEvent.press(today());
     expect(view.getByText("Inspect overdue")).toBeOnTheScreen();
-    expect(
-      view.getByRole("button", { name: "Date filter: All dates" }),
-    ).toBeOnTheScreen();
+    expect(today().props.accessibilityState.selected).toBe(false);
   } finally {
     mockRows = [];
   }

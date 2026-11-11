@@ -1,4 +1,5 @@
 import { Text } from "../../components/ui/Typography";
+import { recordedPeso } from "../../components/ui/theme";
 import { useState } from "react";
 import { Linking } from "react-native";
 import {
@@ -36,7 +37,7 @@ import { SettlementPanel } from "./SettlementPanel";
 import { useFinancialAction } from "./useFinancialCommand";
 import { FinancialCancelled } from "./financialReceipt";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
-import { cashRequestReference } from "./mobileFinanceScope";
+import { cashRequestAmount, cashRequestReference } from "./mobileFinanceScope";
 export function CashRequestCard({
   request,
   bundle,
@@ -53,6 +54,8 @@ export function CashRequestCard({
   const { profile, can, organization } = useAuth(),
     readAction = useAction();
   const [receipts, setReceipts] = useState(false),
+    [breakdown, showBreakdown] = useState(false),
+    [history, showHistory] = useState(false),
     [operation, setOperation] = useState<
       "cancel" | "approve" | "reject" | "release"
     >(),
@@ -88,6 +91,7 @@ export function CashRequestCard({
       .filter((l) => l.requestId === request.id)
       .sort((a, b) => b.version - a.version),
     latest = liquidations[0];
+  const amount = cashRequestAmount(request);
   const canCancel =
     own &&
     ![
@@ -117,7 +121,8 @@ export function CashRequestCard({
   const decide = () =>
     action.run(async () => {
       if (!operation) return;
-      if (readOnly) throw new Error("Refresh to verify current cash request access.");
+      if (readOnly)
+        throw new Error("Refresh to verify current cash request access.");
       if (operation !== "release" && !reason.trim())
         throw new Error("Record a reason for this decision.");
       if (operation === "cancel")
@@ -126,10 +131,20 @@ export function CashRequestCard({
         if (
           !(await confirmAction(
             operation === "approve"
-              ? "Authorize this cash request?"
-              : "Reject this cash request?",
+              ? leaderDecision
+                ? "Forward this request to the Office?"
+                : "Authorize this cash request?"
+              : leaderDecision
+                ? "Return this request for changes?"
+                : "Reject this cash request?",
             `${peso(request.requestedAmount)} · ${request.purpose}`,
-            operation === "approve" ? "Authorize request" : "Reject request",
+            operation === "approve"
+              ? leaderDecision
+                ? "Forward for approval"
+                : "Authorize request"
+              : leaderDecision
+                ? "Request changes"
+                : "Reject request",
           ))
         )
           throw new FinancialCancelled();
@@ -170,29 +185,13 @@ export function CashRequestCard({
     }, "Financial action recorded.");
   return (
     <Card title={cashRequestReference(request.requestNumber)}>
-      <Status value={request.status} />
+      <Status value={request.status} domain="finance" />
       <Text style={{ color: colors.text, lineHeight: 21 }}>
         {request.purpose}
       </Text>
       <LabelValue label="Work" value={request.taskTitle || "Authorized work"} />
-      <LabelValue label="Requested" value={peso(request.requestedAmount)} />
-      <LabelValue label="Approved" value={peso(request.approvedAmount || 0)} />
-      <LabelValue
-        label="Cash released"
-        value={peso(request.releasedAmount || 0)}
-      />
-      <LabelValue label="Actual spent" value={peso(request.actualSpent || 0)} />
-      <LabelValue label="Returned" value={peso(request.returnedAmount || 0)} />
+      <LabelValue label={amount.label} value={recordedPeso(amount.value)} />
       <LabelValue label="Needed by" value={dateLabel(request.neededBy)} />
-      {[
-        request.approvalReason,
-        request.leaderDecisionReason,
-        request.departmentDecisionReason,
-      ]
-        .filter(Boolean)
-        .map((text, index) => (
-          <Notice key={index}>{text}</Notice>
-        ))}
       <Row>
         {!!(!readOnly && canCorrect && onCorrect) && (
           <Button variant="outline" onPress={onCorrect}>
@@ -207,10 +206,12 @@ export function CashRequestCard({
         {!!(!readOnly && (leaderDecision || headDecision)) && (
           <>
             <Button onPress={() => setOperation("approve")}>
-              Authorize request
+              {leaderDecision
+                ? "Forward to Office for approval"
+                : "Authorize request"}
             </Button>
             <Button variant="outline" onPress={() => setOperation("reject")}>
-              Reject request
+              {leaderDecision ? "Request changes" : "Reject request"}
             </Button>
           </>
         )}
@@ -278,43 +279,85 @@ export function CashRequestCard({
           Submit receipts and cash return
         </Button>
       )}
-      {liquidations.map((liquidation) => (
-        <Card
-          key={liquidation.id}
-          title={`Receipt package · version ${liquidation.version}`}
-        >
-          <Status value={liquidation.status} />
+      <Button variant="ghost" onPress={() => showBreakdown(!breakdown)}>
+        {breakdown ? "Hide amount breakdown" : "View amount breakdown"}
+      </Button>
+      {breakdown && (
+        <Card title="Amount breakdown">
+          <LabelValue label="Requested" value={peso(request.requestedAmount)} />
           <LabelValue
-            label="Actual spent"
-            value={peso(liquidation.declaredSpent)}
+            label="Authorized"
+            value={recordedPeso(request.approvedAmount)}
           />
           <LabelValue
-            label="Returned cash"
-            value={peso(liquidation.returnedAmount)}
+            label="Cash released"
+            value={recordedPeso(request.releasedAmount)}
           />
-          <Text style={{ color: colors.text, lineHeight: 20 }}>
-            {liquidation.note}
-          </Text>
-          {!!liquidation.decisionReason && (
-            <Notice>{liquidation.decisionReason}</Notice>
-          )}
-          {liquidation.receipts.map((receipt) => (
-            <Button
-              key={receipt.id}
-              variant="outline"
-              onPress={() =>
-                void readAction.run(async () => {
-                  await Linking.openURL(
-                    await createReceiptSignedUrl(receipt.filePath),
-                  );
-                })
-              }
-            >
-              {receipt.vendor} · {peso(receipt.amount)} · Open receipt
-            </Button>
-          ))}
+          <LabelValue
+            label="Settled expense"
+            value={recordedPeso(request.actualSpent)}
+          />
+          <LabelValue
+            label="Cash returned"
+            value={recordedPeso(request.returnedAmount)}
+          />
+          {[
+            request.approvalReason,
+            request.leaderDecisionReason,
+            request.departmentDecisionReason,
+          ]
+            .filter(Boolean)
+            .map((text, index) => (
+              <Notice key={index}>{text}</Notice>
+            ))}
         </Card>
-      ))}
+      )}
+      {liquidations.length > 1 && (
+        <Button variant="ghost" onPress={() => showHistory(!history)}>
+          {history
+            ? "Hide earlier receipt packages"
+            : "View earlier receipt packages"}
+        </Button>
+      )}
+      {(history ? liquidations : liquidations.slice(0, 1)).map(
+        (liquidation) => (
+          <Card
+            key={liquidation.id}
+            title={`Receipt package · version ${liquidation.version}`}
+          >
+            <Status value={liquidation.status} />
+            <LabelValue
+              label="Declared spending"
+              value={peso(liquidation.declaredSpent)}
+            />
+            <LabelValue
+              label="Returned cash"
+              value={peso(liquidation.returnedAmount)}
+            />
+            <Text style={{ color: colors.text, lineHeight: 20 }}>
+              {liquidation.note}
+            </Text>
+            {!!liquidation.decisionReason && (
+              <Notice>{liquidation.decisionReason}</Notice>
+            )}
+            {liquidation.receipts.map((receipt) => (
+              <Button
+                key={receipt.id}
+                variant="outline"
+                onPress={() =>
+                  void readAction.run(async () => {
+                    await Linking.openURL(
+                      await createReceiptSignedUrl(receipt.filePath),
+                    );
+                  })
+                }
+              >
+                {receipt.vendor} · {peso(receipt.amount)} · Open receipt
+              </Button>
+            ))}
+          </Card>
+        ),
+      )}
       {!!(
         latest &&
         !readOnly &&
@@ -335,6 +378,13 @@ export function CashRequestCard({
         <LiquidationSheet
           request={request}
           bundle={bundle}
+          readOnly={
+            readOnly ||
+            !recipient ||
+            !["released", "changes_requested", "overdue_liquidation"].includes(
+              request.status,
+            )
+          }
           onClose={() => setReceipts(false)}
           onSaved={onSaved}
         />
@@ -347,14 +397,32 @@ export function CashRequestCard({
             : operation === "release"
               ? "Record cash release"
               : operation === "reject"
-                  ? "Reject cash request"
+                ? leaderDecision
+                  ? "Request changes"
+                  : "Reject cash request"
+                : leaderDecision
+                  ? "Forward for Office approval"
                   : "Authorize cash request"
         }
         onClose={() => setOperation(undefined)}
         busy={action.busy}
         footer={
-          <Button busy={action.busy} disabled={readOnly} onPress={() => void decide()}>
-            Confirm action
+          <Button
+            busy={action.busy}
+            disabled={readOnly}
+            onPress={() => void decide()}
+          >
+            {operation === "cancel"
+              ? "Withdraw request"
+              : operation === "release"
+                ? "Record release"
+                : operation === "reject"
+                  ? leaderDecision
+                    ? "Request changes"
+                    : "Reject request"
+                  : leaderDecision
+                    ? "Forward for approval"
+                    : "Authorize request"}
           </Button>
         }
       >

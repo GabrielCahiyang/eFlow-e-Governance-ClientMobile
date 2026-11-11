@@ -115,7 +115,7 @@ export async function fetchProjectTaskPage(
   );
 }
 
-const statuses = workStatuses.map(([key]) => key);
+const statuses = workStatuses;
 export function fetchProjectBoardPage(
   project: string,
   includeArchived: boolean,

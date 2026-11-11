@@ -2,6 +2,7 @@ import { Linking } from "react-native";
 import { Empty, ErrorState, Loading, dateLabel } from "../../components/ui";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useFacts } from "../../shared/useFacts";
+import { statusLabel } from "../../shared/statusLabels";
 import { useAction } from "../../shared/useAction";
 import { useAuth } from "../authentication";
 import {
@@ -37,7 +38,7 @@ export function ProjectFiles({
         <NavigationRow
           key={file.id}
           title={file.file_name}
-          description={`${file.uploader_name} · ${dateLabel(file.created_at)} · ${Math.ceil(file.file_size / 1024)} KB`}
+          description={`${file.uploader_name} · ${dateLabel(file.created_at)} · ${file.state === "ready" ? Math.ceil(file.file_size / 1024) + " KB" : statusLabel(file.state)}`}
           disabled={file.state !== "ready" || action.busy}
           onPress={() =>
             void action.run(async () => {

@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import MessageCircle from "lucide-react-native/icons/message-circle";
 import Wallet from "lucide-react-native/icons/wallet";
 import Megaphone from "lucide-react-native/icons/megaphone";
 import Settings from "lucide-react-native/icons/settings";
 import LogOut from "lucide-react-native/icons/log-out";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
+import { NavigationRow } from "../../components/ui/NavigationRow";
 import { Screen, ErrorState, Button } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
@@ -29,32 +29,28 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     subtitle: string;
     route: AppRoute;
     Icon: typeof Settings;
-    tileBg: string;
-    tileColor: string;
+    group: "Work" | "Communication" | "Account";
   }[] = [
     {
       title: "Reviews",
       subtitle: "Work and financial decisions assigned to you",
       route: { name: "inbox", view: "decisions", title: "Reviews" },
       Icon: ClipboardCheck,
-      tileBg: palette.primarySoft,
-      tileColor: palette.primary,
+      group: "Work",
     },
     {
       title: "Messages",
-      subtitle: "Team chat & direct conversations",
+      subtitle: "Team and direct conversations",
       route: { name: "messages" },
       Icon: MessageCircle,
-      tileBg: palette.blueSoft,
-      tileColor: palette.blue,
+      group: "Communication",
     },
     {
       title: "Announcements",
       subtitle: "Official notices and Office broadcasts",
       route: { name: "announcements" },
       Icon: Megaphone,
-      tileBg: palette.blueSoft,
-      tileColor: palette.blue,
+      group: "Communication",
     },
     ...(profile?.org_id
       ? [
@@ -66,24 +62,21 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
               recordType: "office_petty_cash",
             },
             Icon: Wallet,
-            tileBg: palette.primarySoft,
-            tileColor: palette.primary,
+            group: "Work" as const,
           },
         ]
       : []),
     {
       title: "Account & settings",
-      subtitle: "Security, appearance & workspace preferences",
+      subtitle: "Profile, notifications, security and appearance",
       route: { name: "settings" },
       Icon: Settings,
-      tileBg: palette.primarySoft,
-      tileColor: palette.primary,
+      group: "Account",
     },
   ];
 
   return (
     <Screen compact style={{ gap: 16 }}>
-      {/* Header (Monday.com Image 4) */}
       <View style={{ gap: 4, paddingTop: 4 }}>
         <Text
           accessibilityRole="header"
@@ -115,86 +108,42 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
         </Text>
       </View>
 
-      {/* Monday-style List of Separate Rounded Cards (Image 4) */}
-      <View style={{ gap: 12 }}>
-        {entries
-          .filter((entry) =>
+      {(["Work", "Communication", "Account"] as const).map((group) => {
+        const visible = entries.filter(
+          (entry) =>
+            entry.group === group &&
             canOpenNativeSection(profile?.role || "", entry.route.name, can),
-          )
-          .map(({ title, subtitle, route, Icon, tileBg, tileColor }) => (
-            <Pressable
-              key={title}
-              accessibilityRole="button"
-              accessibilityLabel={
-                route.name === "messages" && unreadMessages
-                  ? "Messages, unread"
-                  : title
-              }
-              onPress={() => navigate(route)}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 16,
-                borderRadius: 16,
-                backgroundColor: pressed
-                  ? palette.primarySoft
-                  : palette.surface,
-                borderWidth: 1,
-                borderColor: palette.border,
-                elevation: 2,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-                gap: 14,
-              })}
+        );
+        return visible.length ? (
+          <View key={group} style={{ gap: 4 }}>
+            <Text
+              accessibilityRole="header"
+              style={{
+                color: palette.mutedLabel,
+                fontSize: 13,
+                fontWeight: "600",
+              }}
             >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 14,
-                  backgroundColor: tileBg,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon size={22} color={tileColor} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: palette.text,
-                  }}
-                >
-                  {title}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: palette.mutedLabel,
-                    lineHeight: 16,
-                  }}
-                >
-                  {subtitle}
-                </Text>
-              </View>
-              {route.name === "messages" && unreadMessages && (
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: palette.primary,
-                  }}
+              {group}
+            </Text>
+            {visible.map(({ title, subtitle, route, Icon }) => {
+              const unread = route.name === "messages" && unreadMessages;
+              return (
+                <NavigationRow
+                  key={title}
+                  title={title}
+                  description={unread ? "Unread messages" : subtitle}
+                  accessibilityHint={
+                    unread ? "You have unread messages." : undefined
+                  }
+                  icon={<Icon size={20} color={palette.primary} />}
+                  onPress={() => navigate(route)}
                 />
-              )}
-              <ChevronRight size={18} color={palette.mutedLabel} />
-            </Pressable>
-          ))}
-      </View>
+              );
+            })}
+          </View>
+        ) : null;
+      })}
 
       <Button
         variant="outline"

@@ -2,7 +2,39 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
-## Latest standalone APK — build 41
+## Phase 0 implementation — Slices A–D
+
+Source baseline: Mobile main `53d4d794fcb4303ee4a0a11fc4cb164b4ac402b9` and Web main `4ff217b84e3e8128555ffc87f0514253cd576399`. The work uses existing role, record, and financial contracts. Release acceptance is pending.
+
+[Android QA APK build 42](../../artifacts/M7/eFlow-Mobile-M7-Phase0-v42-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V42_APK_VERIFICATION.json) · [Credential audit](../NATIVE_RELEASE_AUDIT.json)
+
+| Evidence | Result |
+| --- | --- |
+| TypeScript and Metro configuration | Passed. All 9 Metro exclusion checks passed. |
+| Automated regressions | Targeted checks for each slice passed. The final full run passed 283 tests across 89 suites. The final submission-copy adjustment also passed its targeted recovery test. |
+| Android and iOS Hermes exports | Both passed and include the final submission receipt copy. |
+| Android standalone release | ARM64 and x86_64 compilation, signature, non-debuggable manifest, embedded startup sources, and upgrade install on the isolated Android 16 / API 36 x86_64 emulator passed. |
+| Android signed-out smoke | Cold launch and password help passed in dark appearance. With font scale at 150% and animations disabled, scrolling brought the Sign in button fully into view. The checkbox glyph clips at that size. The app stayed dark when the emulator switched to light, so light appearance remains unverified on this build. [Password help](../../artifacts/M7/phase0-v42-password-help.png) · [150% font scale](../../artifacts/M7/phase0-v42-signed-out-large-scrolled.png) |
+| Credential audit | Both exports and the embedded APK bundle passed. |
+| Signed-in and iOS device workflows | Pending. Approved role accounts and dedicated fixtures are needed for signed-in QA. Native iOS compilation and device testing require Xcode. |
+
+| Slice | Approved accounts and fixtures | Personal acceptance checks |
+| --- | --- | --- |
+| A · Work status and decisions | Separate Task Lead, Subtask Lead, contributor, and independent reviewer. Use a root with two completed children and a third awaiting approval. Include explicit zero and unavailable financial amounts. | Check for 67% progress and `Awaiting approval` status. Complete authorized work using the existing evidence and review flow. A recovered receipt says `Submitted for approval`. Confirm a contributor and an actor with execution-only access cannot mark the Subtask complete. Confirm zero and unavailable amounts appear differently. |
+| B · Work and project browsing | Head with active, completed, and archived projects. Member with assignments in two workspaces and authorized branch activity across two pages. | Home shows role priorities before Favorites. My Work date chips filter in one tap. Current projects excludes completed and archived projects, which remain reachable through the status filter. Check Back from Projects, Main table, Board and Agenda. At phone widths, Type is beneath the project name. Loading older activity retains the first page, author names, decisions, and attachments on the same branch. |
+| C · Entry, Inbox, communication and account | Approved Head, Member and Accounting Staff. Use two readable conversations, an exact record notification and a test device with a known push preference. | Confirm the correct primary tabs after sign-in and a workspace switch. Open Inbox and Reviews separately. Switch conversations with unsent text and return to the draft. Verify the other account cannot see it. Check that notification settings show a loading state until the device preference is known, and that existing notification links and Back still work. |
+| D · Financial records | Accounting Staff in an authorized Office and fiscal year. Separate requester/recipient, Task Lead, Office Head and assigned reviewer, with a safe receipt package. | Check the amount and stage on the queue and request. Compare the breakdown with the same authorized Web record. Open and edit one receipt at a time. An invalid package stays editable. An unconfirmed submission retries with its original ID. Check that independent review, settlement, and Office petty cash retain their own controls and authority. |
+
+Run device acceptance on Android and iOS separately. Include light and dark, a narrow viewport, large text, keyboard open, TalkBack or VoiceOver, reduced motion, weak connectivity, and a session/access change. Confirm that deep links and Back return to the originating tab and exact branch. Writable QA requires separately authorized fixtures. The local text draft is separate from a persisted send attempt. A picked image remains attached in the open composer until send; durable pre-send attachment drafts are outside this slice.
+
+### Shared contract and integration dependencies
+
+- **Subtask start date:** `r7_work_command`, `nw_work_command`, and the work-tree read contract need a persisted start date for Office and Personal work. The app keeps the existing supported creation fields.
+- **Contributor validation:** The shared write contract needs staged contributor updates, nearest eligible Lead routing, and a decision that atomically applies accepted updates. The existing contributor restrictions stay in place. Completion and project data only reflect accepted, authorized work.
+- **Announcements:** The existing reciprocal SELECT policies can raise PostgreSQL `42P17`. The app exposes the unavailable state. [M4 integration record](M4-backend-proposal.md)
+- **Finance:** Live NW11 prerequisites and safe test records remain external. Project Actual expense displays authorized settled cash records; complete Office-wide coverage requires an authoritative shared aggregate. [M5 finance dependencies](M5-personal-qa.md)
+
+## Previous standalone APK — build 41
 
 [Download Android APK 41](../../artifacts/M7/eFlow-Mobile-M7-Subtasks-Projects-v41-arm64-x86_64.apk). It uses the same QA certificate as build 40 and supports upgrades with existing app data. [Changes and role-by-role checklist](#subtasks-project-tables-and-role-priorities).
 

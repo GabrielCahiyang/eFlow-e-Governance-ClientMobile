@@ -10,6 +10,7 @@ import {
   LabelValue,
   peso,
   Notice,
+  Status,
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
@@ -19,6 +20,7 @@ import { createReceiptSignedUrl } from "../../../core/web/app/features/budget/se
 import { SettlementPanel } from "./SettlementPanel";
 import { getStaffingReviewPackage } from "./staffingEscalation";
 import { createPostgresChannel } from "../../shared/postgresChannel";
+import { cashRequestReference } from "./mobileFinanceScope";
 import { supabase } from "../../../platform/supabase";
 export function FinancialReviewsScreen({
   recordId,
@@ -98,8 +100,8 @@ export function FinancialReviewsScreen({
     >
       {!staffing && (
         <Notice>
-          These packages are assigned to you. Review approval does not grant
-          settlement or journal-posting permission.
+          Review receipts assigned to you. Settlement and journal posting have
+          separate permissions.
         </Notice>
       )}
       {facts.error ? (
@@ -118,8 +120,14 @@ export function FinancialReviewsScreen({
       ) : (
         packages.map((pack) => (
           <Card key={pack.liquidation.id} title={pack.request.purpose}>
-            <LabelValue label="Request" value={pack.request.requestNumber} />
-            {staffing && organization?.name && <LabelValue label="Office" value={organization.name} />}
+            <Status value={pack.request.status} domain="finance" />
+            <LabelValue
+              label="Request"
+              value={cashRequestReference(pack.request.requestNumber)}
+            />
+            {staffing && organization?.name && (
+              <LabelValue label="Office" value={organization.name} />
+            )}
             {"year" in pack && (
               <LabelValue label="Fiscal year" value={String(pack.year)} />
             )}
@@ -127,7 +135,7 @@ export function FinancialReviewsScreen({
               <Notice>Settlement posted.</Notice>
             )}
             <LabelValue
-              label="Actual spent"
+              label="Declared spending"
               value={peso(pack.liquidation.declaredSpent)}
             />
             {pack.liquidation.receipts.map((receipt) => (

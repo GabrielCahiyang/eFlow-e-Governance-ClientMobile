@@ -118,7 +118,7 @@ export function completionMode(
       return "review";
   } else if (
     (node.lead_id === actorId || tree.root.lead === actorId) &&
-    selectNodeWorkCapability(tree, nodeId, "execute", scope).allowed
+    selectNodeWorkCapability(tree, nodeId, "submit", scope).allowed
   )
     return "direct";
 }

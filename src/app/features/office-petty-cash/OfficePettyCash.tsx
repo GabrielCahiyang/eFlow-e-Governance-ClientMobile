@@ -3,6 +3,7 @@ import { AppState, Linking } from "react-native";
 import {
   Button,
   Card,
+  Empty,
   DateField,
   ErrorState,
   Field,
@@ -11,6 +12,7 @@ import {
   Notice,
   Row,
   Sheet,
+  Status,
   peso,
 } from "../../components/ui";
 import { useAuth } from "../authentication";
@@ -130,7 +132,9 @@ export function OfficePettyCash({
     setReceipts([]);
     setEdit({ kind, request });
   };
-  const data = facts.data;
+  const data = facts.error ? undefined : facts.data;
+  const ready =
+    !!data && !facts.loading && !recovery.loading && !recovery.error;
   const pending = recovery.data;
   const update = (i: number, fields: Partial<Receipt>) =>
     setReceipts((old) =>
@@ -165,7 +169,8 @@ export function OfficePettyCash({
   function save() {
     void action.run(async () => {
       if (pending) return execute(pending);
-      if (!edit || !data) return;
+      if (!edit || !data || !ready)
+        throw new Error("Refresh to verify Office petty cash access.");
       const { kind, request } = edit;
       if (!reference.trim() || !date || date > getPhilippineCalendarDate())
         throw new Error("Enter a purpose or reference and a valid date.");
@@ -220,7 +225,9 @@ export function OfficePettyCash({
         One shared ₱30,000 starting fund. Up to ₱5,000 per receipt. Separate
         from project and task budgets.
       </Notice>
-      {facts.loading && !data && <Loading />}
+      {facts.loading && !data && (
+        <Loading label="Loading Office petty cash" layout="summary" />
+      )}
       {!!facts.error && (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       )}
@@ -248,31 +255,29 @@ export function OfficePettyCash({
               value={peso(data.replenishable)}
             />
           )}
-          {!requestId &&
-            !pending &&
-            !recovery.loading &&
-            !recovery.error &&
-            ownOffice && (
-              <Row>
-                <Button onPress={() => start("request")}>
-                  {labels.request}
+          {!requestId && !pending && ready && ownOffice && (
+            <Row>
+              <Button onPress={() => start("request")}>{labels.request}</Button>
+              {accounting && data.replenishable > 0 && (
+                <Button variant="outline" onPress={() => start("replenish")}>
+                  {labels.replenish}
                 </Button>
-                {accounting && data.replenishable > 0 && (
-                  <Button variant="outline" onPress={() => start("replenish")}>
-                    {labels.replenish}
-                  </Button>
-                )}
-              </Row>
-            )}
+              )}
+            </Row>
+          )}
           {requestId && !data.requests.some((r) => r.id === requestId) && (
-            <Notice>This petty cash request is unavailable.</Notice>
+            <Empty
+              compact
+              kind="finance"
+              title="This Office petty cash request is unavailable"
+            />
           )}
           {data.requests
             .filter((r) => !requestId || r.id === requestId)
             .map((r) => (
               <Card key={r.id} title={r.purpose}>
                 <LabelValue label={r.requesterName} value={peso(r.amount)} />
-                <Notice>{r.status.replace(/_/g, " ")}</Notice>
+                <Status value={r.status} domain="finance" />
                 {r.settlementBlocked && (
                   <Notice>
                     {r.headNotified
@@ -299,7 +304,7 @@ export function OfficePettyCash({
                     View receipt {i + 1}
                   </Button>
                 ))}
-                {!pending && !recovery.loading && !recovery.error && (
+                {!pending && ready && (
                   <Row>
                     {actor === r.requester &&
                       ["pending", "approved"].includes(r.status) &&
@@ -341,8 +346,12 @@ export function OfficePettyCash({
             if (!pending && !action.busy) setEdit(undefined);
           }}
           footer={
-            <Button busy={action.busy} onPress={save}>
-              {pending ? "Retry saved transaction" : "Confirm"}
+            <Button
+              busy={action.busy}
+              disabled={!pending && !ready}
+              onPress={save}
+            >
+              {pending ? "Check saved transaction" : labels[edit!.kind]}
             </Button>
           }
         >

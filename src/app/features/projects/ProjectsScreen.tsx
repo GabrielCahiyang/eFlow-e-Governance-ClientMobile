@@ -27,22 +27,7 @@ import {
 } from "./ProjectTableCells";
 import { projectSections } from "./mobileProjects";
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
-import { nativeWindow } from "../../../platform/webRuntime";
-
-function recentProjects(key: string): string[] {
-  try {
-    const value: unknown = JSON.parse(
-      nativeWindow.localStorage.getItem(key) || "[]",
-    );
-    if (Array.isArray(value))
-      return value
-        .filter((id): id is string => typeof id === "string")
-        .slice(0, 5);
-  } catch {
-    /* Preferences are optional. */
-  }
-  return [];
-}
+import { statusLabel } from "../../shared/statusLabels";
 
 export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const { profile } = useAuth();
@@ -56,7 +41,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   );
   const current = workspace.selected;
   const projects = current?.projects ?? [];
-  const key = `eflow:navigation:v1:${profile?.id}:${current?.workspace.id}:recent-projects`;
+  const key = `eflow:navigation:v1:${profile?.id}:${current?.workspace.id}`;
   const preferences = useNavigationFavorites(
     profile?.id || "",
     current?.workspace.id || "",
@@ -71,14 +56,12 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
     { id: "all", title: "All statuses" },
     ...["planning", "active", "on_hold", "completed", "archived"].map((id) => ({
       id,
-      title: id.charAt(0).toUpperCase() + id.slice(1).replaceAll("_", " "),
+      title: statusLabel(id),
     })),
   ];
-  const [opened, setOpened] = useState<{ key: string; ids: string[] }>();
-  const recent = opened?.key === key ? opened.ids : recentProjects(key);
   const matches =
     current && !workspace.error
-      ? projectSections(projects, preferences.favorites, recent, search, status)
+      ? projectSections(projects, preferences.favorites, search, status)
       : [];
   const total = matches.reduce(
     (count, section) => count + section.data.length,
@@ -109,8 +92,15 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={{ flex: 1 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 152 }}>
               <SearchField
                 value={search}
                 onChange={setSearch}
@@ -118,11 +108,13 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               />
             </View>
             <FilterChip
-              label="Filter"
+              label={
+                statuses.find((item) => item.id === status)?.title || "Filter"
+              }
               icon
               onPress={() => setFilterOpen(true)}
               selected={status !== "current"}
-              accessibilityLabel="Filter projects"
+              accessibilityLabel={`Project status: ${statuses.find((item) => item.id === status)?.title}`}
             />
           </View>
           <View
@@ -133,15 +125,6 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               alignItems: "center",
             }}
           >
-            <FilterChip
-              label={
-                statuses.find((item) => item.id === status)?.title ||
-                "Current projects"
-              }
-              selected
-              onPress={() => setFilterOpen(true)}
-              accessibilityLabel={`Project status: ${statuses.find((item) => item.id === status)?.title}`}
-            />
             {(status !== "current" || search) && (
               <FilterChip
                 label="Clear filters"
@@ -223,12 +206,6 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
             project={item}
             widths={widths}
             onOpen={() => {
-              const ids = [
-                item.id,
-                ...recent.filter((id) => id !== item.id),
-              ].slice(0, 5);
-              setOpened({ key, ids });
-              nativeWindow.localStorage.setItem(key, JSON.stringify(ids));
               navigate({
                 name: item.kind === "personal" ? "personal_project" : "project",
                 id: item.id,
@@ -275,10 +252,18 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
         ) : (
           <Empty
             kind="projects"
-            title="No projects match"
+            title={
+              current && (search || status !== "current")
+                ? "No projects match"
+                : current
+                  ? "No current projects"
+                  : "No workspace selected"
+            }
             description={
               current
-                ? "Try another name or status."
+                ? search || status !== "current"
+                  ? "Try another name or status."
+                  : "Use the status filter to find completed or archived projects."
                 : "Choose an available workspace to see projects."
             }
             action={

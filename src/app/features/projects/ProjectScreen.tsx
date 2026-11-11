@@ -342,7 +342,8 @@ export function ProjectScreen({
             {!!sections.length && (
               <Text style={{ color: palette.mutedLabel, fontSize: 12 }}>
                 Swipe for more columns. Task names stay in view. Actual expense
-                uses settled cash visible to your account.
+                shows settled cash records you can access. A dash means no
+                amount is available.
               </Text>
             )}
             {!!finance.error && (

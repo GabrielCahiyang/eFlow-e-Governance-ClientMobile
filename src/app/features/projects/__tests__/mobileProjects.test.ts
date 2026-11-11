@@ -11,7 +11,7 @@ const project = (id: string, status = "active"): WorkspaceProject => ({
   kind: "office",
 });
 
-test("projects honor current workspace scope and deduplicate favorites, recents and shortcuts", () => {
+test("projects honor current workspace scope and deduplicate favorites and shortcuts", () => {
   const active = project("Office Alpha");
   const personal = {
     ...project("Personal Alpha"),
@@ -19,22 +19,28 @@ test("projects honor current workspace scope and deduplicate favorites, recents 
     shortcut: true,
   };
   const archived = project("Archived Alpha", "archived");
-  const projects = [active, active, personal, archived, project("Other")];
+  const projects = [
+    active,
+    active,
+    personal,
+    archived,
+    project("Other"),
+    project("Completed Alpha", "completed"),
+  ];
   expect(
     projectSections(
       projects,
       new Set([active.id, "revoked"]),
-      ["revoked", active.id, personal.id, personal.id],
       " Alpha ",
       "current",
     ).map(({ key, data }) => [key, data.map((row) => row.id)]),
   ).toEqual([
     ["favorites", [active.id]],
-    ["recent", [personal.id]],
+    ["projects", [personal.id]],
   ]);
-  expect(
-    projectSections(projects, new Set(), [], "", "archived")[0].data,
-  ).toEqual([archived]);
+  expect(projectSections(projects, new Set(), "", "archived")[0].data).toEqual([
+    archived,
+  ]);
 });
 
 test("group, status and agenda retain exact task IDs, including missing group and undated work", () => {

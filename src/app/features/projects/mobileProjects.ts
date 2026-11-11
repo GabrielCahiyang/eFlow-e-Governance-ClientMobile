@@ -1,3 +1,5 @@
+import { statusLabel } from "../../shared/statusLabels";
+import { workDay } from "../../../core/web/app/shared/workCalendar";
 import type { WorkspaceProject } from "../../../core/web/app/features/workspaces/types";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 import type { ProjectGroup } from "../../../core/web/app/features/project-table/types";
@@ -5,7 +7,6 @@ import type { ProjectGroup } from "../../../core/web/app/features/project-table/
 export function projectSections(
   authorized: WorkspaceProject[],
   favorites: ReadonlySet<string>,
-  recent: readonly string[],
   search: string,
   status: string,
 ) {
@@ -17,40 +18,37 @@ export function projectSections(
       project.title.toLowerCase().includes(query) &&
       (status === "all" ||
         (status === "current"
-          ? project.status !== "archived"
+          ? !["archived", "completed"].includes(project.status)
           : project.status === status)),
   );
   const starred = matches.filter((p) => favorites.has(p.id));
-  const remaining = new Map(
-    matches.filter((p) => !favorites.has(p.id)).map((p) => [p.id, p]),
-  );
-  const opened = [];
-  for (const id of recent) {
-    const project = remaining.get(id);
-    if (project) {
-      opened.push(project);
-      remaining.delete(id);
-    }
-  }
   return [
     { key: "favorites", title: "Favorites", data: starred },
-    { key: "recent", title: "Recently opened", data: opened },
-    { key: "projects", title: "Projects", data: [...remaining.values()] },
+    {
+      key: "projects",
+      title: "Projects",
+      data: matches.filter((p) => !favorites.has(p.id)),
+    },
   ].filter((section) => section.data.length);
 }
 
 export type ProjectWorkView = "tasks" | "board" | "calendar";
 export const workStatuses = [
-  ["pending_assignment", "Needs assignment"],
-  ["todo", "To do"],
-  ["in_progress", "In progress"],
-  ["for_review", "For review"],
-  ["changes_requested", "Changes requested"],
-  ["completed", "Completed"],
-  ["cancelled", "Cancelled"],
+  "pending_assignment",
+  "todo",
+  "in_progress",
+  "for_review",
+  "changes_requested",
+  "completed",
+  "cancelled",
 ] as const;
-export const agendaDay = (deadline?: string, dueDate?: string) =>
-  (deadline || dueDate)?.slice(0, 10) || "";
+export function agendaDay(deadline?: string, dueDate?: string) {
+  const value = deadline || dueDate;
+  const day = workDay(value);
+  return day === null
+    ? value || ""
+    : new Date(day * 86400000).toISOString().slice(0, 10);
+}
 export const compareAgendaDays = (a: string, b: string) =>
   a === b ? 0 : !a ? 1 : !b ? -1 : a.localeCompare(b);
 
@@ -79,7 +77,7 @@ export function taskSections(
   }
   const order: [string, string][] =
     view === "board"
-      ? workStatuses.map(([id, label]) => [id, label])
+      ? workStatuses.map((id) => [id, statusLabel(id)])
       : view === "calendar"
         ? [...buckets.keys()]
             .sort(compareAgendaDays)
@@ -90,7 +88,7 @@ export function taskSections(
           ];
   const labels = new Map(order);
   for (const key of buckets.keys())
-    if (!labels.has(key)) labels.set(key, key.replaceAll("_", " "));
+    if (!labels.has(key)) labels.set(key, statusLabel(key));
   return [...labels].flatMap(([key, title]) => {
     const data = buckets.get(key);
     return data?.length ? [{ key, title, data }] : [];

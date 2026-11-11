@@ -194,7 +194,7 @@ export function LoginScreen() {
                   <Pressable
                     accessibilityRole="checkbox"
                     aria-checked={remember}
-                    accessibilityLabel="Remember me"
+                    accessibilityLabel="Keep me signed in"
                     accessibilityState={{ checked: remember, disabled: busy }}
                     disabled={busy}
                     onPress={() => setRemember(!remember)}
@@ -230,7 +230,7 @@ export function LoginScreen() {
                       )}
                     </View>
                     <Text style={{ fontSize: 13, color: palette.muted }}>
-                      Remember me
+                      Keep me signed in
                     </Text>
                   </Pressable>
                 )}
@@ -242,11 +242,11 @@ export function LoginScreen() {
                     setError("");
                     setErrors({});
                     setNotice(
-                      "Please contact your office IT administrator or Admin to reset your password.",
+                      "Ask your Office IT team or eFlow administrator to reset your password.",
                     );
                   }}
                 >
-                  Forgot your password?
+                  Get password help
                 </Button>
               </MotionView>
               <MotionView kind="login" index={4}>
@@ -265,7 +265,7 @@ export function LoginScreen() {
                     ) : undefined
                   }
                 >
-                  {recovery ? "Send recovery link" : "Log in"}
+                  {recovery ? "Send recovery link" : "Sign in"}
                 </Button>
               </MotionView>
               {!recovery && !!walkthroughUrl && (

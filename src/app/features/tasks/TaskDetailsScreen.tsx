@@ -365,7 +365,8 @@ export function TaskDetailsScreen({
               ["todo", "in_progress", "changes_requested"].includes(task.status)
             ) && (
               <Button
-                disabled={evidence.loading || !!evidence.error}
+                variant={task.status === "in_progress" ? "primary" : "outline"}
+                disabled={facts.loading || evidence.loading || !!evidence.error}
                 onPress={() => setExecution("submit")}
               >
                 Mark as complete

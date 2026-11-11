@@ -1,8 +1,7 @@
-import { SelectionSheet } from "../../components/ui/SelectionSheet";
+import { FilterChip } from "../../components/ui/FilterChip";
 import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
 import { useEffect, useRef, useState } from "react";
-import { AppState, Pressable, ScrollView, View } from "react-native";
-import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import { AppState, Pressable, View } from "react-native";
 import {
   Button,
   Empty,
@@ -97,7 +96,6 @@ export function ActionInbox({
     () => getActionableSettlementEscalations(staffingIds),
     staffingIds.length > 0,
   );
-  const [filterOpen, setFilterOpen] = useState(false);
   const [confirmedRead, setConfirmedRead] = useState<Set<string>>(new Set());
   const [marking, setMarking] = useState<string>();
   const [markError, setMarkError] = useState<Error>();
@@ -292,7 +290,7 @@ export function ActionInbox({
   if (!reviews && updatesForView.length)
     sections.push({
       key: filter === "unread" ? "unread" : "updates",
-      title: filter === "unread" ? "Unread updates" : "Updates",
+      title: filter === "unread" ? "Unread updates" : "All updates",
       data: updatesForView.map((update) => ({
         key: "update:" + update.id,
         update,
@@ -382,91 +380,24 @@ export function ActionInbox({
                 color: palette.text,
               }}
             >
-              {reviews ? "Reviews" : "Notifications"}
+              {reviews ? "Reviews" : "Inbox"}
             </Text>
-
-            {!reviews && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Filter inbox"
-                onPress={() => setFilterOpen(true)}
-                style={({ pressed }) => ({
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: pressed
-                    ? palette.primarySoft
-                    : palette.surface,
-                  borderWidth: 1,
-                  borderColor: palette.border,
-                })}
-              >
-                <SlidersHorizontal size={18} color={palette.text} />
-              </Pressable>
-            )}
           </View>
-
-          {/* Horizontal Filter Pills (Monday Image 3) */}
           {!reviews && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
-            >
-              <Pressable
-                accessibilityRole="button"
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <FilterChip
+                label="All"
                 accessibilityLabel="All notifications"
+                selected={filter === "all"}
                 onPress={() => setFilter("all")}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 7,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor:
-                    filter === "all" ? palette.primary : palette.border,
-                  backgroundColor:
-                    filter === "all" ? palette.primarySoft : palette.surface,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: filter === "all" ? "700" : "500",
-                    color: filter === "all" ? palette.primary : palette.text,
-                  }}
-                >
-                  All
-                </Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
+              />
+              <FilterChip
+                label="Unread"
                 accessibilityLabel="Unread notifications"
+                selected={filter === "unread"}
                 onPress={() => setFilter("unread")}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 7,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor:
-                    filter === "unread" ? palette.primary : palette.border,
-                  backgroundColor:
-                    filter === "unread" ? palette.primarySoft : palette.surface,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: filter === "unread" ? "700" : "500",
-                    color: filter === "unread" ? palette.primary : palette.text,
-                  }}
-                >
-                  Unread
-                </Text>
-              </Pressable>
-            </ScrollView>
+              />
+            </View>
           )}
 
           {!!issues.length && (
@@ -647,20 +578,6 @@ export function ActionInbox({
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
       <FolderPullArea pull={pull}>{list}</FolderPullArea>
-      <SelectionSheet
-        open={filterOpen}
-        title="Filter Inbox"
-        value={filter}
-        options={[
-          { id: "all", title: "All" },
-          { id: "unread", title: "Unread" },
-        ]}
-        onClose={() => setFilterOpen(false)}
-        onSelect={(value) => {
-          setFilter(value as Filter);
-          setFilterOpen(false);
-        }}
-      />
     </View>
   );
 }

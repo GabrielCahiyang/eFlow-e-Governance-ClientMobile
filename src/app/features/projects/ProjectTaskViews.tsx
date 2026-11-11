@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
 import { StyleSheet } from "react-native";
@@ -177,7 +178,7 @@ export function ProjectBoard({
               }}
             />
             <Text style={s.heading}>
-              {status.replaceAll("_", " ")} (
+              {statusLabel(status)} (
               {tasks.filter((t) => t.status === status).length})
             </Text>
           </Row>

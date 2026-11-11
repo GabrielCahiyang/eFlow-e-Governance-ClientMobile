@@ -84,8 +84,14 @@ export function TaskFundingCard({
         {funding.loading && !context && (
           <Loading label="Loading funding" layout="summary" rows={2} />
         )}
-        {context && (
+        {context && !funding.error && (
           <>
+            {context.fiscalYear != null && (
+              <LabelValue
+                label="Fiscal year"
+                value={String(context.fiscalYear)}
+              />
+            )}
             <LabelValue
               label="Authorized budget"
               value={peso(context.taskBudget)}
@@ -159,6 +165,8 @@ export function TaskFundingCard({
           />
         ))}
       {budget.data &&
+        !budget.error &&
+        !funding.error &&
         requests.map((item) => (
           <CashRequestCard
             key={item.id}

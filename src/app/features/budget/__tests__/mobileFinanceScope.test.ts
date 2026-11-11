@@ -1,6 +1,54 @@
 import { expect, test } from "@jest/globals";
 import type { DepartmentBudgetBundle } from "../../../../core/web/app/features/budget/types";
-import { linkedFundingSubitem, taskCashRequests } from "../mobileFinanceScope";
+import {
+  cashRequestAmount,
+  cashReturnAmounts,
+  linkedFundingSubitem,
+  taskCashRequests,
+} from "../mobileFinanceScope";
+
+test("finance amounts keep stage, missing values, and recorded zero distinct", () => {
+  const request = {
+    requestedAmount: 2500,
+    approvedAmount: 1800,
+    releasedAmount: 1700,
+  };
+  expect(
+    cashRequestAmount({ ...request, status: "settled", actualSpent: 0 }),
+  ).toEqual({ label: "Settled expense", value: 0 });
+  expect(
+    cashRequestAmount({ ...request, status: "settled" }).value,
+  ).toBeUndefined();
+  expect(cashRequestAmount({ ...request, status: "released" }).label).toBe(
+    "Cash released",
+  );
+  expect(
+    cashRequestAmount({
+      ...request,
+      status: "released",
+      releasedAmount: undefined,
+    }),
+  ).toEqual({ label: "Cash released", value: undefined });
+  expect(
+    cashRequestAmount({
+      ...request,
+      releasedAmount: undefined,
+      status: "approved",
+    }).value,
+  ).toBe(1800);
+});
+
+test("cash return compares exact cents and cannot invent a missing released amount", () => {
+  const receipts = [{ amount: 0.1 }, { amount: 0.2 }];
+  expect(cashReturnAmounts(receipts, 0.3)).toEqual({
+    spent: 0.3,
+    returned: 0,
+    exceedsRelease: false,
+  });
+  expect(cashReturnAmounts(receipts, 0.29).exceedsRelease).toBe(true);
+  expect(cashReturnAmounts(receipts, 0.31).returned).toBe(0.01);
+  expect(cashReturnAmounts(receipts).returned).toBeUndefined();
+});
 
 test("a cash record deep link cannot fall through to a sibling, root, or different task", () => {
   const bundle = {

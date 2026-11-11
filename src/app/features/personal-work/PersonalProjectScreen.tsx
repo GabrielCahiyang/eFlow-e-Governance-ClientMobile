@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import {
@@ -145,7 +146,7 @@ export function PersonalProjectScreen({
               renderItem: ({ item: task }) => (
                 <NavigationRow
                   title={task.title}
-                  description={`${task.status.replaceAll("_", " ")} · ${name(task.lead_id)}`}
+                  description={`${statusLabel(task.status)} · ${name(task.lead_id)}`}
                   onPress={() =>
                     navigate({
                       name: "personal_project",

@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
 import { View } from "../../components/ui/Primitives";
@@ -266,8 +267,7 @@ export function SettlementPanel({
       )}
       {!!(independent.data?.required && independent.data.review) && (
         <Text style={{ color: palette.muted }}>
-          Independent review:{" "}
-          {independent.data!.review!.status.replaceAll("_", " ")}
+          Independent review: {statusLabel(independent.data!.review!.status)}
         </Text>
       )}
       {!!(independent.data?.escalationRequired && !settlementBlocked) && (

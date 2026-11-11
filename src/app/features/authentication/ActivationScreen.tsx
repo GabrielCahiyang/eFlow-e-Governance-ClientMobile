@@ -34,7 +34,7 @@ export function ActivationScreen({
     [confirmation, setConfirmation] = useState(""),
     [result, setResult] = useState<ActivationResult>();
   return (
-    <Screen title="Account activation">
+    <Screen title="Activate your account">
       <EFlowMark
         height={42}
         state={action.busy ? "submitting" : result ? "success" : "idle"}
@@ -45,8 +45,8 @@ export function ActivationScreen({
         <Card
           title={
             result.next_step === "awaiting_authority"
-              ? "Your email is verified"
-              : "You’re ready to go"
+              ? "Awaiting role approval"
+              : "Account activated"
           }
         >
           <Notice>
@@ -54,13 +54,13 @@ export function ActivationScreen({
               ? "Your Admin needs to approve your role before you can sign in."
               : "Your account is activated. Sign in with your email and new password."}
           </Notice>
-          <Button onPress={onClose}>Go to sign in</Button>
+          <Button onPress={onClose}>Sign in</Button>
         </Card>
       ) : preview.data ? (
         <Card title="Welcome to eFlow">
           <Notice>
-            Set your password to finish creating your account. Your Office and
-            role were selected by your Admin.
+            Choose a password with 12 to 128 characters. Your invitation sets
+            your Office and role.
           </Notice>
           <LabelValue label="Name" value={preview.data.full_name} />
           <LabelValue label="Email" value={preview.data.email} />
@@ -125,7 +125,7 @@ export function ActivationScreen({
           }
           retry={() => void preview.refresh()}
         />
-      )}{" "}
+      )}
       {!!action.error && <ErrorState context="action" error={action.error} />}{" "}
       {!result && (
         <Button variant="ghost" disabled={action.busy} onPress={onClose}>

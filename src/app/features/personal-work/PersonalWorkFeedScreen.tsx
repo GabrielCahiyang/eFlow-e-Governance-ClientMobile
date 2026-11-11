@@ -253,8 +253,8 @@ export function PersonalWorkFeedScreen({
               accessibilityLabel="Filter assignments"
               onPress={() => setFilterOpen(true)}
               style={({ pressed }) => ({
-                width: 40,
-                height: 40,
+                width: 48,
+                height: 48,
                 borderRadius: 20,
                 alignItems: "center",
                 justifyContent: "center",
@@ -269,162 +269,40 @@ export function PersonalWorkFeedScreen({
             </Pressable>
           </View>
 
-          {/* Stat Summary Cards Row (Monday.com signature) */}
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Today, ${todayCount} items`}
-              accessibilityState={{ selected: filter === "Today" }}
-              onPress={() =>
-                setFilter((prev) => (prev === "Today" ? "All work" : "Today"))
-              }
-              style={({ pressed }) => ({
-                flex: 1,
-                backgroundColor:
-                  filter === "Today" ? palette.primarySoft : palette.surface,
-                borderWidth: 1,
-                borderColor:
-                  filter === "Today" ? palette.primary : palette.border,
-                borderRadius: 14,
-                padding: 12,
-                elevation: 1,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 22,
-                  fontWeight: "700",
-                  color: palette.text,
-                }}
-              >
-                {todayCount}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: palette.mutedLabel,
-                  marginTop: 2,
-                }}
-              >
-                Today
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Past dates, ${overdueCount} items`}
-              accessibilityState={{ selected: filter === "Overdue" }}
-              onPress={() =>
-                setFilter((prev) =>
-                  prev === "Overdue" ? "All work" : "Overdue",
-                )
-              }
-              style={({ pressed }) => ({
-                flex: 1,
-                backgroundColor:
-                  filter === "Overdue" ? palette.dangerSoft : palette.surface,
-                borderWidth: 1,
-                borderColor:
-                  filter === "Overdue" ? palette.danger : palette.border,
-                borderRadius: 14,
-                padding: 12,
-                elevation: 1,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 22,
-                  fontWeight: "700",
-                  color: overdueCount > 0 ? palette.danger : palette.text,
-                }}
-              >
-                {overdueCount}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: palette.mutedLabel,
-                  marginTop: 2,
-                }}
-              >
-                Past Dates
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Upcoming, ${upcomingCount} items`}
-              accessibilityState={{ selected: filter === "Upcoming" }}
-              onPress={() =>
-                setFilter((prev) =>
-                  prev === "Upcoming" ? "All work" : "Upcoming",
-                )
-              }
-              style={({ pressed }) => ({
-                flex: 1,
-                backgroundColor:
-                  filter === "Upcoming" ? palette.blueSoft : palette.surface,
-                borderWidth: 1,
-                borderColor:
-                  filter === "Upcoming" ? palette.blue : palette.border,
-                borderRadius: 14,
-                padding: 12,
-                elevation: 1,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 22,
-                  fontWeight: "700",
-                  color: palette.text,
-                }}
-              >
-                {upcomingCount}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: palette.mutedLabel,
-                  marginTop: 2,
-                }}
-              >
-                Upcoming
-              </Text>
-            </Pressable>
-          </View>
-
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            <FilterChip
-              label={filter === "All work" ? "All dates" : filter}
-              selected={filter !== "All work"}
-              onPress={() => setFilterOpen(true)}
-              accessibilityLabel={`Date filter: ${filter === "All work" ? "All dates" : filter}`}
-            />
-            <FilterChip
-              label={
-                workspace
-                  ? workspaces.find((item) => item.id === workspace)?.name ||
-                    "Workspace unavailable"
-                  : "All workspaces"
-              }
-              selected={!!workspace}
-              onPress={() => setFilterOpen(true)}
-            />
+            {(
+              [
+                ["Today", todayCount],
+                ["Overdue", overdueCount],
+                ["Upcoming", upcomingCount],
+              ] as const
+            ).map(([group, count]) => (
+              <FilterChip
+                key={group}
+                label={`${group} · ${count}`}
+                accessibilityLabel={`${group}, ${count} ${count === 1 ? "item" : "items"}`}
+                selected={filter === group}
+                onPress={() => setFilter(filter === group ? "All work" : group)}
+              />
+            ))}
+            {filter !== "All work" &&
+              !["Today", "Overdue", "Upcoming"].includes(filter) && (
+                <FilterChip
+                  label={filter}
+                  selected
+                  onPress={() => setFilter("All work")}
+                />
+              )}
+            {!!workspace && (
+              <FilterChip
+                label={
+                  workspaces.find((item) => item.id === workspace)?.name ||
+                  "Workspace unavailable"
+                }
+                selected
+                onPress={() => setFilterOpen(true)}
+              />
+            )}
             {(filter !== "All work" || workspace || query) && (
               <FilterChip
                 label="Clear filters"

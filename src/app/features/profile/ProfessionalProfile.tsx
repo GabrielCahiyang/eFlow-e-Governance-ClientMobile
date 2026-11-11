@@ -3,6 +3,7 @@ import { Linking } from "react-native";
 import {
   Button,
   Card,
+  Empty,
   ErrorState,
   Field,
   LabelValue,
@@ -47,8 +48,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
     ),
     documents = useFacts("own-pds:" + profile?.id, getMyPds, own),
     action = useAction(),
-    [draft, setDraft] = useState<ProfessionalValues>(),
-    [validation, setValidation] = useState("");
+    [draft, setDraft] = useState<ProfessionalValues>();
   const values = draft || facts.data?.profile || empty,
     save = () =>
       action.run(async () => {
@@ -58,7 +58,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
       }, "Professional profile saved. Confirm it before AI staffing uses it.");
   return (
     <>
-      <Card title="Professional Profile">
+      <Card title="Professional profile">
         {facts.error ? (
           <ErrorState error={facts.error} retry={() => void facts.refresh()} />
         ) : facts.loading && !facts.data ? (
@@ -73,9 +73,8 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
               }
             />
             <Notice>
-              AI staffing uses confirmed skills, training and your concise
-              professional summary. Review imported information before
-              confirming.
+              Staffing suggestions use confirmed profile details. Check imported
+              information before confirming.
             </Notice>
             {professionalFields.map((field) => (
               <Field
@@ -107,7 +106,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
             {!!own && (
               <Row>
                 <Button
-                  disabled={!draft}
+                  disabled={!draft || facts.loading}
                   busy={action.busy}
                   onPress={() => void save()}
                 >
@@ -115,7 +114,12 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                 </Button>
                 <Button
                   variant="outline"
-                  disabled={!!draft || !facts.data?.profile || action.busy}
+                  disabled={
+                    !!draft ||
+                    !facts.data?.profile ||
+                    facts.loading ||
+                    action.busy
+                  }
                   onPress={() =>
                     void action.run(async () => {
                       if (
@@ -141,9 +145,8 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
       {!!own && (
         <Card title="Personal Data Sheet (PDS)">
           <Notice>
-            Upload your own PDF, review the extracted draft, then save and
-            confirm the professional profile. Personal documents stay within the
-            existing access rules.
+            Upload a PDF up to 10 MB. Review the extracted details before saving
+            them to your professional profile.
           </Notice>
           <Button
             busy={action.busy}
@@ -161,12 +164,20 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
               })
             }
           >
-            Upload PDS PDF
+            Upload PDS
           </Button>
           {documents.error ? (
             <ErrorState
               error={documents.error}
               retry={() => void documents.refresh()}
+            />
+          ) : documents.loading && !documents.data ? (
+            <Loading label="Loading Personal Data Sheets" layout="files" />
+          ) : !documents.data?.documents.length ? (
+            <Empty
+              compact
+              kind="files"
+              title="No Personal Data Sheets uploaded"
             />
           ) : (
             documents.data?.documents.map((document) => (
@@ -224,7 +235,6 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
       )}
       {!!action.error && <ErrorState context="action" error={action.error} />}
       {!!action.notice && <Notice>{action.notice}</Notice>}
-      {!!validation && <ErrorState error={validation} />}
     </>
   );
 }

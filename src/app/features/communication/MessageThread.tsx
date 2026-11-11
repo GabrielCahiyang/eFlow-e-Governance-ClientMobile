@@ -584,6 +584,7 @@ function Bubble({
 export function Composer({
   value,
   onChange,
+  onBlur,
   editable,
   imageName,
   onPickImage,
@@ -596,6 +597,7 @@ export function Composer({
 }: {
   value: string;
   onChange: (text: string) => void;
+  onBlur?: () => void;
   editable: boolean;
   imageName?: string;
   onPickImage?: () => void;
@@ -699,6 +701,7 @@ export function Composer({
             placeholderTextColor={palette.mutedLabel}
             value={value}
             onChangeText={onChange}
+            onBlur={onBlur}
             editable={editable}
             multiline
             maxLength={5000}

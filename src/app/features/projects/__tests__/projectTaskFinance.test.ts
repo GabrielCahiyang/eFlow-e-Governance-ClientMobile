@@ -19,7 +19,7 @@ test("sums approved allocations and visible settled expenses independently by ta
   );
   expect([...totals]).toEqual([
     ["a", { budget: 120.35, expense: 10.3 }],
-    ["b", { budget: 0, expense: 0 }],
-    ["c", { budget: 0 }],
+    ["b", { expense: 0 }],
+    ["c", {}],
   ]);
 });

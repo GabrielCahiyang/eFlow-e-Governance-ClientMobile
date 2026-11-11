@@ -205,6 +205,12 @@ test("direct Office completion and personal submission require distinct current 
   expect(office.nodes[1].status).toBe("completed");
 });
 
+test("Office execution access alone cannot mark a Subtask complete", () => {
+  const office = tree([node(1, null, { capabilities: { execute: allowed } })]);
+  rememberWorkCapabilityContext(office, "lead");
+  expect(completionMode(office, "n1", "lead")).toBeUndefined();
+});
+
 test("Personal review follows the current independent reviewer rather than branch titles or membership", () => {
   const data = tree(
     [

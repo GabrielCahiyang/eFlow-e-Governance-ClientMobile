@@ -65,7 +65,6 @@ export function AnnouncementsScreen() {
       title="Announcements"
       description="Official updates addressed to you."
       onRefresh={() => facts.refresh()}
-
     >
       <Tabs
         value={tab}
@@ -122,7 +121,7 @@ export function AnnouncementsScreen() {
                   })
                 }
               >
-                Mark read
+                Mark as read
               </Button>
             ) : null}
           </Card>

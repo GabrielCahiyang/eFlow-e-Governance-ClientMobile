@@ -1,5 +1,5 @@
+import { statusLabel } from "../../shared/statusLabels";
 import { useEffect } from "react";
-import { words } from "../../components/ui/theme";
 import { completionPercent } from "../../shared/completion";
 import { useFacts } from "../../shared/useFacts";
 import type { Navigate } from "../../shared/routes";
@@ -87,7 +87,7 @@ export function OverviewScreen({ navigate }: { navigate: Navigate }) {
           key: project.id,
           title: project.title,
           description: [
-            words(project.status),
+            statusLabel(project.status),
             progress.data?.[index] != null
               ? `${progress.data[index]}%`
               : progress.loading
@@ -112,17 +112,25 @@ export function OverviewScreen({ navigate }: { navigate: Navigate }) {
                 ({ title }) =>
                   title !== "Completed" && title !== "Other history",
               )
-              .flatMap(({ title, data }) =>
-                data.map((row) => ({
-                  key: row.key,
-                  title: row.title,
-                  description: [title, row.projectTitle]
-                    .filter(Boolean)
-                    .join(" · "),
-                  route: workDestination(row),
-                })),
+              .flatMap(({ title, data }) => data.map((row) => ({ row, title })))
+              .sort(
+                (a, b) => Number(b.row.actionable) - Number(a.row.actionable),
               )
               .slice(0, 3)
+              .map(({ row, title }) => ({
+                key: row.key,
+                title: row.title,
+                description: [
+                  row.status === "for_review" ||
+                  row.status === "changes_requested"
+                    ? statusLabel(row.status)
+                    : title,
+                  row.projectTitle,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+                route: workDestination(row),
+              }))
           : [],
       };
 

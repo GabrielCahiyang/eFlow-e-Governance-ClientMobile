@@ -1,3 +1,4 @@
+import { statusLabel } from "../../shared/statusLabels";
 import {
   Button,
   Card,
@@ -43,7 +44,7 @@ export function MemberWork({
         .map((item) => ({
           id: "s" + item.id,
           taskId: item.taskId,
-          title: `${item.status.replace(/_/g, " ")} · version ${item.version}`,
+          title: `${statusLabel(item.status)} · version ${item.version}`,
           at: item.decidedAt || item.submittedAt,
         })),
     ].sort((a, b) => b.at - a.at);
@@ -55,10 +56,7 @@ export function MemberWork({
         ) : (
           work.map((task) => (
             <Card key={task.id} title={task.title}>
-              <LabelValue
-                label="Status"
-                value={task.status.replace(/_/g, " ")}
-              />
+              <LabelValue label="Status" value={statusLabel(task.status)} />
               <LabelValue
                 label="Responsibility"
                 value={
@@ -87,10 +85,7 @@ export function MemberWork({
         ) : (
           nested.map((item) => (
             <Card key={item.id} title={item.title}>
-              <LabelValue
-                label="Status"
-                value={item.status.replace(/_/g, " ")}
-              />
+              <LabelValue label="Status" value={statusLabel(item.status)} />
               <LabelValue label="Progress" value={`${item.percentComplete}%`} />
               <Button
                 variant="outline"

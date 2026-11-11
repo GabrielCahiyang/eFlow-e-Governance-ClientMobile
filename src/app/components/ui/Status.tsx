@@ -1,29 +1,14 @@
 import { View } from "react-native";
 import { Text } from "./Typography";
 import { useTheme } from "./Appearance";
-import { words, type ThemeColors } from "./theme";
+import { type ThemeColors } from "./theme";
+import { statusLabel } from "../../shared/statusLabels";
 
-const indicator: Record<string, string> = {
-  pending_assignment: "#7b8495",
-  todo: "#579bfc",
-  in_progress: "#f4ae36",
-  for_review: "#8b6be8",
-  changes_requested: "#df526d",
-  completed: "#00b97d",
-  cancelled: "#76808c",
-};
-
-export function statusIndicatorColor(value: string): string {
-  return indicator[value] || "#7b8495";
-}
-
-export function mondayStatusLabel(value: string): string {
-  if (value === "in_progress") return "Working on it";
-  if (value === "completed" || value === "done") return "Done";
-  if (value === "changes_requested") return "Stuck";
-  if (value === "for_review" || value === "pending_review") return "Review";
-  if (value === "todo") return "To Do";
-  return words(value);
+export function statusIndicatorColor(
+  value: string,
+  palette: ThemeColors,
+): string {
+  return statusColors(value, palette).foreground;
 }
 
 export function statusColors(value: string, palette: ThemeColors) {
@@ -53,13 +38,15 @@ export function statusColors(value: string, palette: ThemeColors) {
 export function Status({
   value,
   variant = "monday",
+  domain,
 }: {
   value: string;
   variant?: "default" | "monday";
+  domain?: "finance";
 }) {
   const palette = useTheme(),
     tone = statusColors(value, palette),
-    accent = indicator[value] || tone.foreground;
+    accent = tone.foreground;
 
   if (variant === "monday") {
     return (
@@ -94,7 +81,7 @@ export function Status({
             color: tone.foreground,
           }}
         >
-          {mondayStatusLabel(value)}
+          {statusLabel(value, domain)}
         </Text>
       </View>
     );
@@ -113,14 +100,14 @@ export function Status({
         backgroundColor: tone.background,
       }}
     >
-      {!!indicator[value] && (
+      {accent !== palette.muted && (
         <View
           accessible={false}
           style={{
             width: 6,
             height: 6,
             borderRadius: 3,
-            backgroundColor: indicator[value],
+            backgroundColor: accent,
           }}
         />
       )}
@@ -132,9 +119,8 @@ export function Status({
           color: tone.foreground,
         }}
       >
-        {words(value)}
+        {statusLabel(value, domain)}
       </Text>
     </View>
   );
 }
-
