@@ -19,7 +19,20 @@ import { fetchTeamWorkflowFacts } from "../../../core/web/app/features/team-mana
 import { buildTeamAttentionItems } from "../../../core/web/app/features/team-management/selectors/attentionSelectors";
 import { buildTeamHealthSummary } from "../../../core/web/app/features/team-management/selectors/healthSelectors";
 import { buildTeamMemberMetrics } from "../../../core/web/app/features/team-management/selectors/teamMemberSelectors";
-export function useOfficeAnalytics(includeCurrentUser = false) {
+import type { TeamWorkflowFacts } from "../../../core/web/app/features/team-management/types";
+const emptyFacts: TeamWorkflowFacts = {
+  subtasks: [],
+  progress: [],
+  submissions: [],
+  statusHistory: [],
+  evidence: [],
+};
+export function useOfficeAnalytics(
+  includeCurrentUser = false,
+  reportOffice?: string,
+  enabled = true,
+  includeHistory = true,
+) {
   const { profile } = useAuth();
   const result = useFacts(
     "office-analytics:" +
@@ -27,7 +40,11 @@ export function useOfficeAnalytics(includeCurrentUser = false) {
       ":" +
       profile?.org_id +
       ":" +
-      includeCurrentUser,
+      includeCurrentUser +
+      ":" +
+      reportOffice +
+      ":" +
+      includeHistory,
     async () => {
       if (!profile?.org_id)
         throw new Error(
@@ -35,29 +52,31 @@ export function useOfficeAnalytics(includeCurrentUser = false) {
         );
       const [visibleTasks, visibleProjects, orgs, profiles] = await Promise.all(
         [
-          fetchVisibleTasks(),
-          fetchProjects(),
-          readAllRows<Organization>((from, to) =>
-            supabase
+          fetchVisibleTasks(reportOffice),
+          fetchProjects(reportOffice),
+          readAllRows<Organization>((from, to) => {
+            const query = supabase
               .from("organizations")
-              .select("*", { count: "exact" })
-              .order("id")
-              .range(from, to),
-          ),
-          readAllRows<UserProfile>((from, to) =>
-            supabase
+              .select("*", { count: "exact" });
+            if (reportOffice) query.eq("id", reportOffice);
+            return query.order("id").range(from, to);
+          }),
+          readAllRows<UserProfile>((from, to) => {
+            const query = supabase
               .from("profiles")
-              .select("*", { count: "exact" })
-              .order("id")
-              .range(from, to),
-          ),
+              .select("*", { count: "exact" });
+            if (reportOffice) query.eq("org_id", reportOffice);
+            return query.order("id").range(from, to);
+          }),
         ],
       );
-      const scope = getDepartmentEmployeeScopeIds(
-          orgs,
-          profile.org_id,
-          "with_children",
-        ),
+      const scope = reportOffice
+          ? new Set([reportOffice])
+          : getDepartmentEmployeeScopeIds(
+              orgs,
+              profile.org_id,
+              "with_children",
+            ),
         names = new Map(orgs.map((org) => [org.id, org.name]));
       const tasks = scopeTasks(visibleTasks, [...scope]),
         projects = scopeProjects(visibleProjects, [...scope]);
@@ -80,7 +99,9 @@ export function useOfficeAnalytics(includeCurrentUser = false) {
             }),
         )
         .map((item) => item.employee);
-      const facts = await fetchTeamWorkflowFacts(tasks.map((task) => task.id));
+      const facts = includeHistory
+        ? await fetchTeamWorkflowFacts(tasks.map((task) => task.id))
+        : emptyFacts;
       const attention = buildTeamAttentionItems(tasks, facts),
         health = buildTeamHealthSummary(tasks, facts, attention),
         memberMetrics = buildTeamMemberMetrics(employees, tasks, facts);
@@ -96,10 +117,11 @@ export function useOfficeAnalytics(includeCurrentUser = false) {
         memberMetrics,
       };
     },
-    !!profile && profile.role !== "admin",
+    enabled && !!profile && profile.role !== "admin",
   );
   useEffect(() => {
-    if (!profile || profile.role === "admin") return;
+    if (!enabled || reportOffice || !profile || profile.role === "admin")
+      return;
     const poll = setInterval(() => void result.refresh(), 30000);
     const app = AppState.addEventListener("change", (state) => {
       if (state === "active") void result.refresh();
@@ -108,6 +130,6 @@ export function useOfficeAnalytics(includeCurrentUser = false) {
       clearInterval(poll);
       app.remove();
     };
-  }, [profile?.id, profile?.org_id, result.refresh]);
+  }, [enabled, reportOffice, profile?.id, profile?.org_id, result.refresh]);
   return result;
 }

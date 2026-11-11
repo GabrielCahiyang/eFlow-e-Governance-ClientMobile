@@ -8,16 +8,16 @@ import {
 import type { ProjectGroup } from "../../../core/web/app/features/project-table/types";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 import { agendaDay, compareAgendaDays, workStatuses } from "./mobileProjects";
-export async function fetchProjects() {
+export async function fetchProjects(office?: string) {
   return (
-    await readAllRows<Record<string, unknown>>((from, to) =>
-      supabase
-        .from("projects")
-        .select("*", { count: "exact" })
+    await readAllRows<Record<string, unknown>>((from, to) => {
+      const query = supabase.from("projects").select("*", { count: "exact" });
+      if (office) query.eq("org_id", office);
+      return query
         .order("created_at", { ascending: false })
         .order("id")
-        .range(from, to),
-    )
+        .range(from, to);
+    })
   ).map(rowToProject);
 }
 export async function fetchProject(id: string) {

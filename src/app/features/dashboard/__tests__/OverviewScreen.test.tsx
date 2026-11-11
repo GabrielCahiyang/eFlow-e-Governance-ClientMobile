@@ -1,204 +1,165 @@
 import { expect, jest, test } from "@jest/globals";
-import { act, render, fireEvent, waitFor } from "@testing-library/react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AppearanceProvider } from "../../../components/ui/Appearance";
-import { colors, darkColors } from "../../../components/ui/theme";
-import { WorkspaceNavigationContext } from "../../workspaces/WorkspaceNavigation";
+import { fireEvent, render } from "@testing-library/react-native";
 import { OverviewScreen } from "../OverviewScreen";
-let mockLoading = false;
+import type { WorkRow } from "../../../../core/web/app/features/personal-work/types";
+import type { WorkspaceSnapshot } from "../../../../core/web/app/features/workspaces/types";
+
 let mockRole = "head";
-let mockWorkRows: import("../../../../core/web/app/features/personal-work/types").WorkRow[] =
-  [];
+let mockWorkRows: WorkRow[] = [];
+const mockSelected: WorkspaceSnapshot = {
+  workspace: {
+    id: "workspace",
+    name: "Planning Office",
+    kind: "office",
+    office_id: "office",
+    owner_id: null,
+    state: "active",
+    timezone: "Asia/Manila",
+  },
+  projects: [
+    {
+      id: "project-a",
+      title: "Bridge works",
+      status: "active",
+      kind: "office",
+      home_workspace_id: "workspace",
+    },
+    {
+      id: "project-b",
+      title: "District permits",
+      status: "on_hold",
+      kind: "office",
+      home_workspace_id: "workspace",
+    },
+    {
+      id: "project-c",
+      title: "Community desk",
+      status: "planning",
+      kind: "office",
+      home_workspace_id: "workspace",
+    },
+    {
+      id: "project-d",
+      title: "Zoning",
+      status: "active",
+      kind: "office",
+      home_workspace_id: "workspace",
+    },
+    {
+      id: "archived",
+      title: "Archived work",
+      status: "archived",
+      kind: "office",
+      home_workspace_id: "workspace",
+    },
+    {
+      id: "personal",
+      title: "Personal shortcut",
+      status: "active",
+      kind: "personal",
+      home_workspace_id: "other",
+    },
+  ],
+};
+jest.mock("../../authentication", () => ({
+  useAuth: () => ({
+    profile: { id: "actor", org_id: "office", role: mockRole, is_active: true },
+    organization: {
+      id: "office",
+      name: "Planning Office",
+      head_user_id: "actor",
+    },
+    can: () => true,
+  }),
+}));
+jest.mock("../../workspaces", () => ({
+  useWorkspace: () => ({ selected: mockSelected, refresh: async () => {} }),
+}));
 jest.mock("../../personal-work/WorkFeedProvider", () => ({
   useMobileWorkFeed: () => ({
-    data: { rows: mockWorkRows },
+    data: { rows: mockWorkRows, issues: [], unavailable: [] },
     refresh: async () => {},
   }),
 }));
+jest.mock("../homeFinance", () => ({
+  headCashDecisions: async () => [],
+  assignedFinanceReviews: async () => [],
+}));
+jest.mock("../AccountingHome", () => ({ AccountingHome: () => null }));
 jest.mock("../../projects/services", () => ({
-  fetchProjectCompletion: async () => ({ completed: 2, required: 3 }),
+  fetchProjectCompletion: async (id: string) => {
+    if (id === "project-c") throw new Error("Counts unavailable");
+    return id === "project-b"
+      ? { completed: 0, required: 0 }
+      : { completed: 2, required: 4 };
+  },
 }));
 jest.mock("../../projects/subscriptions", () => ({
   netProjectUpdates: () => () => {},
 }));
-jest.mock(
-  "../../../../core/web/app/features/workspaces/services/workspaceService",
-  () => ({
-    fetchPersonalProject: jest.fn(),
-  }),
-);
-const mockRefresh = jest.fn<() => Promise<void>>();
 
-jest.mock("../../authentication", () => ({
-  useAuth: () => ({
-    profile: { id: "qa-head", full_name: "QA Head", role: mockRole },
-  }),
-}));
-jest.mock("../../workspaces", () => ({
-  useWorkspace: () => ({
-    loading: mockLoading,
-    workspaces: [{ id: "qa-office", name: "QA Office", state: "active" }],
-    refresh: mockRefresh,
-    selected: {
-      workspace: { id: "qa-office", name: "QA Office" },
-      projects: [{ id: "qa-project", title: "QA Project", status: "active" }],
-    },
-  }),
-}));
-
-for (const [mode, palette] of [
-  ["light", colors],
-  ["dark", darkColors],
-] as const) {
-  test(`${mode} Home uses the same glass surface for Project progress and Workspaces`, async () => {
-    await AsyncStorage.setItem("eflow.appearance", mode);
-    const navigate = jest.fn();
-    try {
-      const view = await render(
-        <AppearanceProvider>
-          <OverviewScreen navigate={navigate} />
-        </AppearanceProvider>,
-      );
-      await waitFor(() =>
-        expect(view.getByTestId("home-attention-card")).toHaveStyle({
-          backgroundColor: palette.glassSurface,
-        }),
-      );
-      const workspaceCard = view.getByTestId("workspaces-card");
-      expect(workspaceCard).toHaveStyle({
-        backgroundColor: palette.glassSurface,
-      });
-      expect(view.queryAllByTestId("glass-card-sheen")).toHaveLength(
-        mode === "light" ? 2 : 0,
-      );
-      expect(view.getByText("QA Project")).toBeOnTheScreen();
-      expect(await view.findByText(/Active · 67%/i)).toBeOnTheScreen();
-      expect(view.queryByText("Nothing needs your attention here")).toBeNull();
-      expect(view.queryByRole("button", { name: "Browse My Work" })).toBeNull();
-      expect(
-        view.getByRole("button", { name: "Browse workspaces" }),
-      ).toBeOnTheScreen();
-      await fireEvent.press(view.getByRole("button", { name: "QA Project" }));
-      expect(navigate).toHaveBeenLastCalledWith({
-        name: "project",
-        id: "qa-project",
-      });
-    } finally {
-      await AsyncStorage.removeItem("eflow.appearance");
-    }
+test("Head Home displays exactly three Office projects with consistent totals and no lifecycle label", async () => {
+  mockRole = "head";
+  const navigate = jest.fn();
+  const view = await render(<OverviewScreen navigate={navigate} />);
+  expect(await view.findByText("2 of 4 tasks completed")).toBeOnTheScreen();
+  expect(view.getByText("50%")).toBeOnTheScreen();
+  expect(view.getByText("No tasks yet")).toBeOnTheScreen();
+  expect(view.getByText("Progress unavailable")).toBeOnTheScreen();
+  expect(view.queryByText("Zoning")).toBeNull();
+  expect(view.queryByText("Planning")).toBeNull();
+  expect(view.queryByText("Archived work")).toBeNull();
+  expect(view.queryByText("Personal shortcut")).toBeNull();
+  expect(view.queryByText("Favorites")).toBeNull();
+  await fireEvent.press(view.getByRole("button", { name: "Bridge works" }));
+  expect(navigate).toHaveBeenLastCalledWith({
+    name: "project",
+    id: "project-a",
+    workspaceId: "workspace",
   });
-}
-
-test("Home keeps background polls silent and uses only the folder for manual refresh", async () => {
-  const view = await render(<OverviewScreen navigate={jest.fn()} />);
-  expect(
-    view.container.queryAll((node) => !!node.props.refreshControl),
-  ).toHaveLength(0);
-  const scroll = view.container.queryAll(
-    (node) => !!node.props.onAccessibilityAction,
-  )[0];
-  expect(view.queryByLabelText("Refreshing")).toBeNull();
-  try {
-    mockLoading = true;
-    await view.rerender(<OverviewScreen navigate={jest.fn()} />);
-    expect(view.getByText("QA Project")).toBeOnTheScreen();
-    expect(view.queryByLabelText("Refreshing")).toBeNull();
-    mockLoading = false;
-    await view.rerender(<OverviewScreen navigate={jest.fn()} />);
-    let finish!: () => void;
-    mockRefresh.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finish = resolve;
-        }),
-    );
-    await act(async () => {
-      scroll.props.onAccessibilityAction({
-        nativeEvent: { actionName: "refresh" },
-      });
-    });
-    expect(
-      view.getByRole("progressbar", { name: "Refreshing", busy: true }),
-    ).toBeOnTheScreen();
-    await act(async () => finish());
-    expect(view.queryByLabelText("Refreshing")).toBeNull();
-    mockLoading = true;
-    await view.rerender(<OverviewScreen navigate={jest.fn()} />);
-    expect(view.queryByLabelText("Refreshing")).toBeNull();
-  } finally {
-    mockLoading = false;
-  }
+  await fireEvent.press(view.getByRole("button", { name: "Office Analytics" }));
+  expect(navigate).toHaveBeenLastCalledWith({ name: "reports" });
 });
 
-test("Home favorites and workspace actions open their sheets instead of redirecting to Projects", async () => {
-  const navigate = jest.fn(),
-    openFavorites = jest.fn(),
-    openWorkspace = jest.fn();
-  const view = await render(
-    <WorkspaceNavigationContext.Provider
-      value={{
-        openFavorites,
-        openWorkspace,
-        chooseWorkspace: async () => {},
-        workspaceChooserOpen: false,
-      }}
-    >
-      <OverviewScreen navigate={navigate} />
-    </WorkspaceNavigationContext.Provider>,
-  );
-  await fireEvent.press(
-    view.getByRole("button", { name: "Open favorite workspaces" }),
-  );
-  expect(openFavorites).toHaveBeenCalledTimes(1);
-  await fireEvent.press(
-    view.getByRole("button", { name: "Browse workspaces" }),
-  );
-  expect(openWorkspace).toHaveBeenCalledTimes(1);
-  expect(navigate).not.toHaveBeenCalled();
-});
-
-test("Member Home surfaces open assignments from the selected workspace", async () => {
+test("Member Home separates pending work from an assignment they lead", async () => {
   mockRole = "member";
+  const row = {
+    id: "task",
+    rootId: "task",
+    key: "task",
+    title: "Road survey",
+    kind: "office-task",
+    status: "changes_requested",
+    mine: true,
+    leading: true,
+    actionable: true,
+    history: false,
+    workspaceId: "workspace",
+    timezone: "Asia/Manila",
+    projectTitle: "Bridge works",
+    relation: "Task Lead",
+    task: { id: "task", assigneeId: "actor" },
+  } as WorkRow;
   mockWorkRows = [
+    row,
+    { ...row, key: "waiting", title: "Check permits", status: "for_review" },
     {
-      key: "assigned",
-      id: "assigned",
-      rootId: "assigned",
-      title: "Priority assignment",
-      kind: "office-task",
-      projectId: "qa-project",
-      projectTitle: "QA Project",
-      workspaceId: "qa-office",
-      workspaceName: "QA Office",
-      timezone: "Asia/Manila",
-      status: "todo",
-      due: "2020-01-01",
-      progress: 0,
-      mine: true,
+      ...row,
+      key: "contributor",
+      title: "Verify inventory",
       leading: false,
-      actionable: true,
-      history: false,
       relation: "Contributor",
     },
   ];
   try {
-    const navigate = jest.fn();
-    const view = await render(<OverviewScreen navigate={navigate} />);
-    expect(view.getByText("My work priorities")).toBeOnTheScreen();
-    expect(view.getByText("Overdue · QA Project")).toBeOnTheScreen();
-    expect(view.queryByText("Project progress")).toBeNull();
-    await fireEvent.press(
-      view.getByRole("button", { name: "Priority assignment" }),
-    );
-    expect(navigate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "task",
-        id: "assigned",
-        projectId: "qa-project",
-      }),
-    );
+    const view = await render(<OverviewScreen navigate={jest.fn()} />);
+    expect(view.getByText("My Priorities")).toBeOnTheScreen();
+    expect(view.getByText("Road survey")).toBeOnTheScreen();
+    expect(view.getByText("Waiting on Others")).toBeOnTheScreen();
+    expect(view.getByText("Check permits")).toBeOnTheScreen();
+    expect(view.queryByText("Verify inventory")).toBeNull();
+    expect(view.queryByText("Project Progress")).toBeNull();
   } finally {
-    mockRole = "head";
     mockWorkRows = [];
   }
 });

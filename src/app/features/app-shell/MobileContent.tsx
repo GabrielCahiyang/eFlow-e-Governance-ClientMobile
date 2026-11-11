@@ -21,6 +21,7 @@ import {
 } from "../budget/mobileFinanceScope";
 import { canOpenNativeSection } from "../navigation/nativeNavigation";
 import { LinkedWorkNodeScreen } from "../tasks/LinkedWorkNodeScreen";
+import { ReportsScreen } from "../reports";
 export function MobileContent({
   current,
   navigate,
@@ -62,6 +63,8 @@ export function MobileContent({
     );
   else if (current.name === "overview")
     content = <OverviewScreen navigate={navigate} />;
+  else if (current.name === "reports" && profile?.role === "head")
+    content = <ReportsScreen navigate={navigate} initialView={current.view} />;
   else if (current.name === "inbox" || current.name === "notifications")
     content = <ActionInbox navigate={navigate} initialView={current.view} />;
   else if (current.name === "messages")
@@ -104,6 +107,7 @@ export function MobileContent({
           recordId={current.recordId}
           officeId={current.financialOfficeId}
           fiscalYear={current.fiscalYear}
+          releaseId={current.recordType === "release" ? current.id : undefined}
         />
       ) : (
         <Screen title="Office finance">

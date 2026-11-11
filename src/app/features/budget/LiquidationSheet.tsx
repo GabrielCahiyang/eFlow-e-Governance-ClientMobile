@@ -30,11 +30,11 @@ import {
 import { submitPettyCashLiquidation } from "../../../core/web/app/features/budget/services/budgetService";
 import { getPhilippineCalendarDate } from "../../../core/web/app/features/budget/selectors/cashWorkflowRules";
 import type {
-  DepartmentBudgetBundle,
   PettyCashRequest,
   ReceiptDraft,
   ReceiptItem,
 } from "../../../core/web/app/features/budget/types";
+import type { CashRequestBundle } from "./focusedSubtaskFunding";
 type NativeReceipt = Omit<ReceiptDraft, "file"> & { file?: PickedFile };
 type SavedIntent = {
   key: string;
@@ -51,7 +51,7 @@ export function LiquidationSheet({
   onSaved,
 }: {
   request: PettyCashRequest;
-  bundle: DepartmentBudgetBundle;
+  bundle: CashRequestBundle;
   onClose: () => void;
   readOnly: boolean;
   onSaved: () => Promise<void>;

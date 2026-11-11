@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Button,
   Card,
@@ -7,8 +7,8 @@ import {
   LabelValue,
   Loading,
   Notice,
-  peso,
 } from "../../components/ui";
+import { recordedPeso } from "../../components/ui/theme";
 import { useFacts } from "../../shared/useFacts";
 import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/constants";
 import { useAuth } from "../authentication";
@@ -19,6 +19,8 @@ import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 import type { PettyCashRequest } from "../../../core/web/app/features/budget/types";
 import { CashRequestCard } from "./CashRequestCard";
 import { linkedFundingSubitem, taskCashRequests } from "./mobileFinanceScope";
+import { readFocusedSubtaskFunding } from "./focusedSubtaskFunding";
+import { useCashRequestUpdates } from "./useCashRequestUpdates";
 
 export function TaskFundingCard({
   task,
@@ -29,7 +31,7 @@ export function TaskFundingCard({
   onManageFunding,
   onOpenLinkedSubitem,
 }: {
-  task: Task;
+  task: Pick<Task, "id" | "orgId">;
   subtaskId?: string;
   recordId?: string;
   canManage: boolean;
@@ -42,13 +44,36 @@ export function TaskFundingCard({
   const [correction, setCorrection] = useState<PettyCashRequest>();
   const funding = useFacts(
     `funding:${profile?.id}:${task.id}:${subtaskId}`,
-    () => fetchTaskFundingContext(task.id, subtaskId),
+    async () => {
+      const context = await fetchTaskFundingContext(task.id, subtaskId);
+      if (
+        context.taskId !== task.id ||
+        (subtaskId && context.subtaskId !== subtaskId)
+      )
+        throw new Error("Could not verify the funding record for this work.");
+      return context;
+    },
   );
-  const context = funding.data;
-  const budget = useBudget(
-    context?.fundingOrgId || task.orgId || profile?.org_id || "",
+  const context = funding.error ? undefined : funding.data;
+  const officeBudget = useBudget(
+    !subtaskId && context
+      ? context.fundingOrgId || task.orgId || profile?.org_id || ""
+      : "",
     context?.fiscalYear || getCurrentFiscalYear(),
   );
+  const subtaskBudget = useFacts(
+    JSON.stringify([
+      "subtask-funding-records",
+      profile?.id,
+      task.id,
+      subtaskId,
+      context?.fundingOrgId,
+      context?.fiscalYear,
+    ]),
+    () => readFocusedSubtaskFunding(context!, subtaskId!),
+    !!context && !!subtaskId,
+  );
+  const budget = subtaskId ? subtaskBudget : officeBudget;
   const requests = budget.data
     ? taskCashRequests(budget.data, task.id, subtaskId, recordId)
     : [];
@@ -61,9 +86,15 @@ export function TaskFundingCard({
     !requests.length
       ? linkedFundingSubitem(budget.data, task.id, recordId)
       : undefined;
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     await Promise.all([funding.refresh(), budget.refresh()]);
-  };
+  }, [funding.refresh, budget.refresh]);
+  useCashRequestUpdates(
+    task.id,
+    !!subtaskId && !!context && !readOnly,
+    refresh,
+    subtaskId,
+  );
   const locked =
     readOnly ||
     funding.loading ||
@@ -92,18 +123,28 @@ export function TaskFundingCard({
                 value={String(context.fiscalYear)}
               />
             )}
-            <LabelValue
-              label="Authorized budget"
-              value={peso(context.taskBudget)}
-            />
-            <LabelValue
-              label="Available to request"
-              value={peso(context.available)}
-            />
+            {context.funded && (
+              <LabelValue
+                label={
+                  subtaskId ? "Authorized task budget" : "Authorized budget"
+                }
+                value={recordedPeso(context.taskBudget)}
+              />
+            )}
+            {context.funded && (
+              <LabelValue
+                label={
+                  subtaskId && !context.cap
+                    ? "Task funds available to request"
+                    : "Available to request"
+                }
+                value={recordedPeso(context.available)}
+              />
+            )}
             {!!context.cap && (
               <LabelValue
                 label="Subtask funding cap"
-                value={peso(context.cap.amount)}
+                value={recordedPeso(context.cap.amount)}
               />
             )}
             {!context.funded && (

@@ -2,6 +2,23 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Post-build 42 role dashboards and work details
+
+The source revision after build 42 adds Head, Member and Accounting Home dashboards, native Office Analytics, the revised tab order, structured Activity and inline Office Subtask Funding. Build 42 predates these changes.
+
+TypeScript, all nine Metro checks, 88 targeted tests across 22 suites, and Android and iOS Hermes exports passed. These checks cover role navigation and Back, scoped project and finance reads, Activity formatting and pagination, and Office Analytics route authorization. The Web handoff URL passed automated tests. The local build environment has no configured HTTPS Web origin for a live handoff.
+
+| Account and fixture | Expected behavior |
+| --- | --- |
+| Appointed Head in an authorized Office workspace with four current projects, an assigned review and a blocker | Home shows up to five attention items with the responsible action or waiting state. It shows exactly three projects when at least three qualify. Confirm one project with two eligible completed root tasks of four shows 50%. A zero-task project shows “No tasks yet.” Office Analytics opens the selected Office report and permits drill-down. |
+| Member with a returned Task, a due-today Subtask, a pending review and a contributor-only assignment | Returned work appears before overdue and due-today work. A pending review appears under Waiting on Others. Contributor work that needs a new approval contract never appears as executable. Opening a row reaches the exact authorized Task or Subtask. |
+| Accounting Staff with release permission and a scheduled release, plus an authorized linked project | Fresh sign-in lands on Home. Accounting remains a primary tab and Projects is under More. Open the scheduled release and confirm the request, release, Office and fiscal year. From Accounting and More, open a project and use Back to return to the original record or list. |
+| Approved Subtask Lead or authorized financial actor on a branch with a sibling, recorded edits and a cash request | The focused Subtask shows Funding without a separate entry button. Its sibling’s funding is absent. Activity shows initial values for creation, distinct changed fields for edits, recorded actors and Philippine timestamps. Older events append. The funding-only link opens the same exact branch. |
+
+Android and iOS signed-in workflows, both appearances, 150% and 200% text, TalkBack and VoiceOver, and live finance remain device acceptance scenarios. Use dedicated actors and approved financial fixtures.
+
+The Head project preview uses exact RLS-visible root-task counts and current blocker/due signals. Office Health and Member counts omit incomplete feed totals. Accounting stage counts use exact authorized request counts by funding Office and fiscal year. Financial Summary uses the fiscal summary RPC’s approved appropriation and settled expenditure. The native Office Analytics reports reuse authorized task, project, assignment, submission, evidence, risk and lifecycle selectors. Historical timeliness requires the deadline in force at each event. Native trend and Office-wide cash-stage amount aggregates require sources beyond the preview. The Web reports handoff requires a configured HTTPS Web origin and separate authorized browser verification.
+
 ## Phase 0 implementation — Slices A–D
 
 Source baseline: Mobile main `53d4d794fcb4303ee4a0a11fc4cb164b4ac402b9` and Web main `4ff217b84e3e8128555ffc87f0514253cd576399`. The work uses existing role, record, and financial contracts. Release acceptance is pending.

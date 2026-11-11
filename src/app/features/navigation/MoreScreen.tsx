@@ -6,6 +6,7 @@ import Megaphone from "lucide-react-native/icons/megaphone";
 import Settings from "lucide-react-native/icons/settings";
 import LogOut from "lucide-react-native/icons/log-out";
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
+import Folder from "lucide-react-native/icons/folder";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { Screen, ErrorState, Button } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
@@ -14,6 +15,7 @@ import { useAuth } from "../authentication";
 import { useConversationDirectory } from "../communication";
 import type { Navigate, AppRoute } from "../../shared/routes";
 import { canOpenNativeSection } from "./nativeNavigation";
+import { useWorkspaceNavigation } from "../workspaces/WorkspaceNavigation";
 
 export function MoreScreen({ navigate }: { navigate: Navigate }) {
   const { profile, can, signOut } = useAuth(),
@@ -21,6 +23,7 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     [error, setError] = useState<Error>(),
     [busy, setBusy] = useState(false);
   const chats = useConversationDirectory(profile?.id || "");
+  const { openFavorites } = useWorkspaceNavigation();
   const unreadMessages =
     !chats.error && chats.data?.some((chat) => chat.unread);
 
@@ -31,6 +34,17 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     Icon: typeof Settings;
     group: "Work" | "Communication" | "Account";
   }[] = [
+    ...(profile?.role === "accounting_staff"
+      ? [
+          {
+            title: "Projects",
+            subtitle: "Browse projects in this workspace",
+            route: { name: "projects" as const },
+            Icon: Folder,
+            group: "Work" as const,
+          },
+        ]
+      : []),
     {
       title: "Reviews",
       subtitle: "Work and financial decisions assigned to you",
@@ -141,6 +155,12 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
                 />
               );
             })}
+            {group === "Account" && (
+              <NavigationRow
+                title="Workspace favorites"
+                onPress={openFavorites}
+              />
+            )}
           </View>
         ) : null;
       })}

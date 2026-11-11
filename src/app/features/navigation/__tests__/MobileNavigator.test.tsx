@@ -254,7 +254,7 @@ test.each(["head", "member", "accounting_staff"])(
   async (role) => {
     mockRole = role;
     await render(<MobileNavigator />);
-    const expected = role === "accounting_staff" ? "My Work" : "Home";
+    const expected = "Home";
     expect(
       screen.getByRole("tab", { name: expected }).props.accessibilityState
         .selected,
@@ -276,6 +276,33 @@ test.each(["head", "member", "accounting_staff"])(
     await waitFor(() => expect(screen.getByText("QA Head")).toBeOnTheScreen());
   },
 );
+
+test("Accounting opens Projects in More and linked projects in Accounting, retaining Back", async () => {
+  mockRole = "accounting_staff";
+  await render(<MobileNavigator />);
+  expect(screen.queryByRole("tab", { name: "Projects" })).toBeNull();
+  await fireEvent.press(screen.getByRole("tab", { name: "More" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Projects" }));
+  expect(await screen.findByText("Body projects")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Open linked project" }),
+  );
+  expect(await screen.findByText("Body project")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Back to previous" }),
+  );
+  expect(await screen.findByText("Body projects")).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("tab", { name: "Accounting" }));
+  expect(await screen.findByText("Body accounting_overview")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Open linked project" }),
+  );
+  expect(await screen.findByText("Body project")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Back to previous" }),
+  );
+  expect(await screen.findByText("Body accounting_overview")).toBeOnTheScreen();
+});
 
 test("switching Office/personal context blocks stale work and retains the exact original task destination for a return", async () => {
   await render(

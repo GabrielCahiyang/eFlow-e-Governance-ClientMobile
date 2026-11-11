@@ -44,7 +44,6 @@ import {
   bindWorkspace,
   defaultTab,
   primaryTabs,
-  readMobileLocation,
   resolveMobileRoute,
   routeFitsWorkspace,
   tabLabels,
@@ -70,19 +69,8 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     navigation = useNavigationContainerRef<TabParams>();
   const initialTab = initialRoute
     ? resolveMobileRoute(initialRoute, role, () => true).tab
-    : defaultTab(role);
-  const [resume, setResume] = useState<{ tab: PrimaryTab; route?: AppRoute }>({
-    tab: initialTab,
-    route: initialRoute,
-  });
-  const selectedWorkspaceId = workspace.selected?.workspace.id;
-  const [navigationWorkspaceId, setNavigationWorkspaceId] =
-    useState(selectedWorkspaceId);
-  // Access is rechecked independently of the tab and stack state.
-  if (selectedWorkspaceId && selectedWorkspaceId !== navigationWorkspaceId)
-    setNavigationWorkspaceId(selectedWorkspaceId);
-  const location = useRef(resume),
-    pendingPush = useRef(false),
+    : defaultTab();
+  const pendingPush = useRef(false),
     [chooser, setChooser] = useState(false);
   const [chooserMode, setChooserMode] = useState<"all" | "favorites">("all");
   const workspaceFavorites = useWorkspaceFavorites();
@@ -94,7 +82,6 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
   const chooseWorkspace = async (id: string) => {
     setChooser(false);
     if (id === workspace.selected?.workspace.id) return;
-    setResume(location.current);
     const selected = await workspace.select(id);
     AccessibilityInfo.announceForAccessibility(
       selected
@@ -122,17 +109,17 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
       notification: palette.danger,
     },
   };
-  const initialState = resume.route
+  const initialState = initialRoute
     ? {
-        index: primaryTabs(role).indexOf(resume.tab),
+        index: primaryTabs(role).indexOf(initialTab),
         routes: primaryTabs(role).map((tab) => ({
           name: tab,
           state: {
-            index: tab === resume.tab ? 1 : 0,
+            index: tab === initialTab ? 1 : 0,
             routes: [
               { name: "Root", params: { name: tabRoots[tab] } },
-              ...(tab === resume.tab
-                ? [{ name: "Destination", params: resume.route }]
+              ...(tab === initialTab
+                ? [{ name: "Destination", params: initialRoute }]
                 : []),
             ],
           },
@@ -156,7 +143,7 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     >
       <View style={{ flex: 1, backgroundColor: palette.background }}>
         <NavigationContainer
-          key={profile!.id + ":" + (navigationWorkspaceId || "pending")}
+          key={profile!.id + ":" + role}
           ref={navigation}
           theme={theme}
           initialState={initialState}
@@ -166,16 +153,9 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
               navigation.navigate("inbox");
             }
           }}
-          onStateChange={(state) => {
-            const next = readMobileLocation(state);
-            if (next) {
-              location.current = next;
-              setResume(next);
-            }
-          }}
         >
           <Tabs.Navigator
-            initialRouteName={resume.tab}
+            initialRouteName={initialTab}
             backBehavior="history"
             screenOptions={{
               headerShown: false,
@@ -386,7 +366,7 @@ function MobileRoute({
       (item) => item !== "more" && tabRoots[item] === next.name,
     );
     if (rootTab && !next.id && !next.view && !next.originTab) {
-      navigation.getParent()?.navigate(rootTab);
+      navigation.getParent()?.navigate(rootTab, { screen: "Root", pop: true });
       return;
     }
     const target = resolveMobileRoute(

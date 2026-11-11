@@ -107,7 +107,10 @@ export function accountingRequestVisible(
 }
 
 export function taskCashRequests(
-  bundle: DepartmentBudgetBundle,
+  bundle: Pick<
+    DepartmentBudgetBundle,
+    "requests" | "releases" | "liquidations"
+  >,
   taskId: string,
   nodeId?: string,
   recordId?: string,
@@ -130,7 +133,10 @@ export function taskCashRequests(
 
 /** Older notices can identify a record without its subitem. Recover only a unique exact match. */
 export function linkedFundingSubitem(
-  bundle: DepartmentBudgetBundle,
+  bundle: Pick<
+    DepartmentBudgetBundle,
+    "requests" | "releases" | "liquidations"
+  >,
   taskId: string,
   recordId: string,
 ) {

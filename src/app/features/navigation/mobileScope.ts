@@ -14,7 +14,7 @@ export const primaryTabs = (role: string): PrimaryTab[] =>
   !isMobileRole(role)
     ? []
     : role === "accounting_staff"
-      ? ["work", "accounting", "projects", "inbox", "more"]
+      ? ["home", "work", "accounting", "inbox", "more"]
       : ["home", "work", "projects", "inbox", "more"];
 export const tabLabels: Record<PrimaryTab, string> = {
   home: "Home",
@@ -32,12 +32,10 @@ export const tabRoots: Record<PrimaryTab, RouteName> = {
   projects: "projects",
   more: "profile",
 };
-export const defaultTab = (role: string): PrimaryTab =>
-  role === "accounting_staff" ? "work" : "home";
+export const defaultTab = (): PrimaryTab => "home";
 export const webOnly: Partial<Record<RouteName, string>> = {
   identity: "Head Office identity and access",
   intelligence: "Team intelligence",
-  reports: "Reports",
   performance: "Performance reports",
   office_team: "Office Team on eFlow Web",
   accounting_journal: "Journal authoring",
@@ -112,7 +110,9 @@ export function resolveMobileRoute(
     input.originTab ||
     origin ||
     (["project", "personal_project", "projects"].includes(route.name)
-      ? "projects"
+      ? role === "accounting_staff"
+        ? "more"
+        : "projects"
       : route.name === "task"
         ? "work"
         : route.name === "overview"
@@ -131,7 +131,8 @@ export function resolveMobileRoute(
                 ? "accounting"
                 : "more");
   if (!primaryTabs(role).includes(tab))
-    tab = role === "accounting_staff" ? "work" : "home";
+    tab =
+      tab === "projects" && role === "accounting_staff" ? "more" : defaultTab();
   const title =
     webOnly[route.name] ||
     route.title ||
@@ -153,6 +154,7 @@ export function resolveMobileRoute(
         announcements: "Announcements",
         financial_reviews: "Financial review",
         budget: "Office Budget",
+        reports: "Office Analytics",
       } as Partial<Record<RouteName, string>>
     )[route.name] ||
     "Work details";
@@ -199,6 +201,7 @@ export function resolveMobileRoute(
     };
   if (
     webOnly[route.name] ||
+    (route.name === "reports" && (role !== "head" || route.view === "web")) ||
     (route.name === "project" && advancedProject.has(route.view || "")) ||
     (route.name === "task" &&
       ["planning", "funding_configuration", "file_management"].includes(

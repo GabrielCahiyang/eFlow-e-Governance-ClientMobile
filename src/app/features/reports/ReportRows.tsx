@@ -1,5 +1,5 @@
 import { useState } from "react";
-import {Pressable,View} from '../../components/ui/Primitives';
+import { Pressable, View } from "../../components/ui/Primitives";
 import {
   Button,
   Card,
@@ -10,20 +10,26 @@ import {
   dateLabel,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
-import type { Navigate } from "../../shared/routes";
+import type { AppRoute, Navigate } from "../../shared/routes";
 import type { DepartmentReportRow } from "../../../core/web/app/features/reports/types";
+import { activityTime } from "../tasks/activityPresentation";
+import { reportRecordRoute } from "./reportRecordRoute";
 export function ReportRows({
   rows,
   navigate,
+  destination = reportRecordRoute,
 }: {
   rows: DepartmentReportRow[];
   navigate: Navigate;
+  destination?: (row: DepartmentReportRow) => AppRoute | undefined;
 }) {
   const [selected, setSelected] = useState<DepartmentReportRow>();
+  const [limit, setLimit] = useState(30);
+  const target = selected ? destination(selected) : undefined;
   return (
     <>
       <DataTable
-        rows={rows}
+        rows={rows.slice(0, limit)}
         rowKey={(row) => row.id}
         empty="No records match these filters."
         columns={[
@@ -100,7 +106,7 @@ export function ReportRows({
             width: 170,
             render: (row) => (
               <>
-                <Text>{dateLabel(row.eventAt)}</Text>
+                <Text>{row.eventAt ? activityTime(row.eventAt) : "—"}</Text>
                 <Text style={{ color: colors.muted }}>
                   Due {dateLabel(row.dueAt)}
                 </Text>
@@ -117,6 +123,14 @@ export function ReportRows({
           },
         ]}
       />
+      {rows.length > limit && (
+        <Button
+          variant="outline"
+          onPress={() => setLimit((value) => value + 30)}
+        >
+          Show more records
+        </Button>
+      )}
       <Sheet
         open={!!selected}
         title={selected?.title || "Report record"}
@@ -146,20 +160,11 @@ export function ReportRows({
                 value={selected.decisionAuthor}
               />
             )}
-            {!!(selected.taskId || selected.projectId) && (
+            {!!target && (
               <Button
                 onPress={() => {
-                  const row = selected;
                   setSelected(undefined);
-                  navigate(
-                    row.taskId
-                      ? {
-                          name: "task",
-                          id: row.taskId,
-                          projectId: row.projectId,
-                        }
-                      : { name: "project", id: row.projectId },
-                  );
+                  navigate(target);
                 }}
               >
                 Open work record

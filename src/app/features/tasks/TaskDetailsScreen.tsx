@@ -24,7 +24,10 @@ import { ProjectFiles } from "../projects";
 import type { Navigate } from "../../shared/routes";
 import { supabase } from "../../../platform/supabase";
 import { rowToTask } from "../../../core/web/app/features/tasks/services/taskMapper";
-import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
+import {
+  fetchWorkTree,
+  WorkTreeUnavailable,
+} from "../../../core/web/app/features/nested-work/services/workTreeService";
 import {
   getTaskTeamMemberIds,
   getTaskLeadId,
@@ -99,6 +102,24 @@ export function TaskDetailsScreen({
     !!profile,
   );
   const view = initialView || "details";
+  const legacyBranch = useFacts(
+    JSON.stringify(["legacy-funding-branch", profile?.id, id, nodeId]),
+    async () => {
+      const result = await supabase
+        .from("subtasks")
+        .select("id,title")
+        .eq("task_id", id)
+        .eq("id", nodeId!)
+        .maybeSingle();
+      if (result.error) throw result.error;
+      return result.data;
+    },
+    !!nodeId &&
+      view === "budget" &&
+      tree.error instanceof WorkTreeUnavailable &&
+      !!facts.data &&
+      !facts.error,
+  );
   const overview = view === "details";
   const [execution, setExecution] = useState<"progress" | "submit">();
   const [taskActions, setTaskActions] = useState(false);
@@ -269,10 +290,33 @@ export function TaskDetailsScreen({
   if (initialView === "budget" && (nodeId || financialRecordId))
     return (
       <Screen
-        title={branch?.title || (nodeId ? "Subtask funding" : task.title)}
+        title={
+          branch?.title ||
+          (!legacyBranch.error && legacyBranch.data?.title) ||
+          (nodeId ? "Subtask funding" : task.title)
+        }
         description={nodeId ? task.title : "Cash request details"}
       >
-        {funding}
+        {nodeId &&
+        (!branch || tree.error) &&
+        (!legacyBranch.data || legacyBranch.error) ? (
+          tree.loading || legacyBranch.loading ? (
+            <Loading label="Verifying subtask access" layout="task" />
+          ) : (
+            <ErrorState
+              error={
+                legacyBranch.error ||
+                tree.error ||
+                "Subtask funding is unavailable."
+              }
+              retry={() =>
+                void Promise.all([tree.refresh(), legacyBranch.refresh()])
+              }
+            />
+          )
+        ) : (
+          funding
+        )}
       </Screen>
     );
   return (
@@ -385,6 +429,7 @@ export function TaskDetailsScreen({
             onSaved={savedTree}
             readOnly={readOnly || tree.loading || facts.loading}
             focusNodeId={nodeId}
+            funding={branch ? funding : undefined}
           />
         ) : (
           <Loading label="Loading subtasks" layout="tree" />

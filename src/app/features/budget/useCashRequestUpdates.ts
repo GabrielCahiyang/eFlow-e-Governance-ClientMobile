@@ -7,6 +7,7 @@ export function useCashRequestUpdates(
   taskId: string,
   enabled: boolean,
   reload: () => Promise<unknown>,
+  subtaskId?: string,
 ) {
   useEffect(() => {
     if (!enabled) return;
@@ -25,7 +26,9 @@ export function useCashRequestUpdates(
           event: "*",
           schema: "public",
           table: "petty_cash_requests",
-          filter: `task_id=eq.${taskId}`,
+          filter: subtaskId
+            ? `subtask_id=eq.${subtaskId}`
+            : `task_id=eq.${taskId}`,
         },
         refresh,
       )
@@ -35,12 +38,12 @@ export function useCashRequestUpdates(
     const app = AppState.addEventListener("change", (state) => {
       if (state === "active") refresh();
     });
-    const fallback = setInterval(refresh, 30_000);
+    const fallback = subtaskId ? undefined : setInterval(refresh, 30_000);
     return () => {
       clearTimeout(timer);
       clearInterval(fallback);
       app?.remove();
       void supabase.removeChannel(channel);
     };
-  }, [taskId, enabled, reload]);
+  }, [taskId, subtaskId, enabled, reload]);
 }

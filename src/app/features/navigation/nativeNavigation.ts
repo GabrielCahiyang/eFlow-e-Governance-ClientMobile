@@ -142,9 +142,5 @@ export const nativeImplementedSections = new Set<RouteName>([
   "reports",
 ]);
 export function nativeDefaultSection(role: string): RouteName {
-  return role === "accounting_staff"
-    ? "personal_work"
-    : role === "head" || role === "member"
-      ? "overview"
-      : "profile";
+  return isMobileRole(role) ? "overview" : "profile";
 }

@@ -1,6 +1,16 @@
 import { test, expect, jest } from "@jest/globals";
 import { webHandoffUrl } from "../webHandoff";
 
+test("Office Analytics opens the real Web reports route with only workspace context", () => {
+  expect(
+    webHandoffUrl(
+      { name: "reports", view: "web", workspaceId: "office-workspace" },
+      "https://eflow.test",
+    ),
+  ).toBe("https://eflow.test/reports?workspace=office-workspace");
+  expect(webHandoffUrl({ name: "reports", view: "web" }, "")).toBeUndefined();
+});
+
 test("web handoff preserves only validated display context under the configured HTTPS origin", () => {
   const result = webHandoffUrl(
     {

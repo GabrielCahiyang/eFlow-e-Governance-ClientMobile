@@ -19,9 +19,26 @@ jest.mock(
   }),
 );
 jest.mock("../WorkTreePanel", () => ({
-  WorkTreePanel: ({ focusNodeId }: { focusNodeId: string }) => {
+  WorkTreePanel: ({
+    focusNodeId,
+    funding,
+  }: {
+    focusNodeId: string;
+    funding?: React.ReactNode;
+  }) => {
+    const { Text, View } = require("react-native");
+    return (
+      <View>
+        <Text>{"Focused branch " + focusNodeId}</Text>
+        {funding}
+      </View>
+    );
+  },
+}));
+jest.mock("../../budget/TaskFundingCard", () => ({
+  TaskFundingCard: ({ subtaskId }: { subtaskId: string }) => {
     const { Text } = require("react-native");
-    return <Text>{"Focused branch " + focusNodeId}</Text>;
+    return <Text>{"Funding " + subtaskId}</Text>;
   },
 }));
 const tree = {
@@ -54,8 +71,35 @@ test("personal links pass the exact branch from its verified root to the focused
     expect(screen.getByText("Focused branch depth-eight")).toBeOnTheScreen(),
   );
   expect(screen.getByText("Exact branch")).toBeOnTheScreen();
+  expect(screen.queryByText(/Funding/)).toBeNull();
   expect(screen.queryByText("Sibling")).toBeNull();
   expect(fetchWorkTree).toHaveBeenLastCalledWith("root");
+});
+
+test("only the verified Office branch renders inline funding", async () => {
+  jest.mocked(fetchWorkTree).mockResolvedValue({
+    ...tree,
+    root: {
+      ...tree.root,
+      kind: "office",
+      office: "office",
+      project: "project",
+    },
+  });
+  await render(
+    <LinkedWorkNodeScreen
+      navigate={jest.fn()}
+      route={{
+        name: "task",
+        id: "root",
+        projectId: "project",
+        nodeId: "depth-eight",
+      }}
+    />,
+  );
+  expect(await screen.findByText("Funding depth-eight")).toBeOnTheScreen();
+  expect(screen.queryByText("Funding sibling")).toBeNull();
+  expect(screen.queryByText("Open subtask funding")).toBeNull();
 });
 
 test("a mismatched project or a missing branch never opens another row", async () => {

@@ -3,7 +3,12 @@ import { render } from "@testing-library/react-native";
 import { TaskActivity } from "../TaskActivity";
 
 jest.mock("../../authentication", () => ({ useAuth: () => ({}) }));
-jest.mock("../../../shared/useAction", () => ({ useAction: () => ({}) }));
+jest.mock("../../../shared/useAction", () => ({
+  useAction: () => ({ clear: jest.fn() }),
+}));
+jest.mock("../../../../platform/webRuntime", () => ({
+  nativeWindow: { addEventListener: jest.fn(), removeEventListener: jest.fn() },
+}));
 jest.mock("../../../shared/postgresChannel", () => ({
   createPostgresChannel: () => ({ on: jest.fn(), subscribe: jest.fn() }),
 }));

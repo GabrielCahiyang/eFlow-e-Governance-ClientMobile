@@ -67,7 +67,7 @@ export function webHandoffUrl(
             ? "plan"
             : undefined
           : route.view;
-    if (displayView)
+    if (displayView && !(route.name === "reports" && displayView === "web"))
       url.searchParams.set(
         "view",
         fundingSetup

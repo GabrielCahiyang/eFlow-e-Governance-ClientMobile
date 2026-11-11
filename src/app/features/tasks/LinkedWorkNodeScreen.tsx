@@ -16,7 +16,9 @@ import {
 import { rowToSubtask } from "../../../core/web/app/features/subtasks";
 import { WorkTreePanel } from "./WorkTreePanel";
 import { OfficeSubitemActivity } from "./OfficeSubitemActivity";
+import { TaskFundingCard } from "../budget/TaskFundingCard";
 import type { AppRoute, Navigate } from "../../shared/routes";
+import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
 
 export function LinkedWorkNodeScreen({
   route,
@@ -25,7 +27,8 @@ export function LinkedWorkNodeScreen({
   route: AppRoute;
   navigate: Navigate;
 }) {
-  const actor = useAuth().profile?.id;
+  const { profile, organization } = useAuth();
+  const actor = profile?.id;
   const personal = route.name === "personal_project";
   const rootId = personal ? route.taskId : route.id;
   const nodeId = route.nodeId;
@@ -92,6 +95,32 @@ export function LinkedWorkNodeScreen({
           navigate={navigate}
           focusNodeId={data.node.id}
           readOnly={!data.tree.root.open || facts.loading}
+          funding={
+            !personal && data.tree.root.office ? (
+              <TaskFundingCard
+                key={data.node.id}
+                task={{ id: data.tree.root.id, orgId: data.tree.root.office }}
+                subtaskId={data.node.id}
+                canManage={false}
+                readOnly={!data.tree.root.open || facts.loading}
+                onManageFunding={
+                  data.tree.root.lead === actor ||
+                  (profile?.org_id === data.tree.root.office &&
+                    isAppointedOfficeHead(
+                      profile,
+                      organization ? [organization] : [],
+                    ))
+                    ? () =>
+                        navigate({
+                          ...route,
+                          view: "funding_configuration",
+                          projectId: data.tree!.root.project,
+                        })
+                    : undefined
+                }
+              />
+            ) : undefined
+          }
           onSaved={async () => {
             await facts.refresh();
           }}
@@ -108,6 +137,15 @@ export function LinkedWorkNodeScreen({
             nodeId={data.legacy.id}
             actorId={actor || null}
           />
+          {!!rootId && (
+            <TaskFundingCard
+              key={data.legacy.id}
+              task={{ id: rootId }}
+              subtaskId={data.legacy.id}
+              canManage={false}
+              readOnly
+            />
+          )}
         </>
       ) : (
         <Empty

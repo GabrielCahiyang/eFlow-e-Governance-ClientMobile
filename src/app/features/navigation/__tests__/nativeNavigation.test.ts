@@ -64,5 +64,5 @@ test("M1 defaults follow the approved mobile scope", () => {
   expect(nativeDefaultSection("admin")).toBe("profile");
   expect(nativeDefaultSection("head")).toBe("overview");
   expect(nativeDefaultSection("member")).toBe("overview");
-  expect(nativeDefaultSection("accounting_staff")).toBe("personal_work");
+  expect(nativeDefaultSection("accounting_staff")).toBe("overview");
 });

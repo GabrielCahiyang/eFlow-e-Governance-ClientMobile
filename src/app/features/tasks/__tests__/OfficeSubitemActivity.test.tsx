@@ -29,7 +29,7 @@ jest.mock(
 jest.mock(
   "../../../../core/web/app/features/nested-work/selectors/workEventPresentation",
   () => ({
-    presentWorkEvent: (event: WorkEvent) => ({ title: event.id, detail: "" }),
+    workEventTitle: (command: string) => command,
   }),
 );
 jest.mock(
@@ -55,6 +55,8 @@ test("older activity appends to the focused branch and keeps progress history", 
   const row = (id: string, node_id: string, day: number) =>
     ({
       id,
+      root_id: "task",
+      command: id,
       node_id,
       occurred_at: `2026-11-0${day}T00:00:00Z`,
     }) as WorkEvent;

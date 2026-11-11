@@ -1,7 +1,7 @@
 import { statusLabel } from "../../shared/statusLabels";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { NavigationRow } from "../../components/ui/NavigationRow";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Button,
   Card,
@@ -45,12 +45,14 @@ export function WorkTreePanel({
   readOnly = false,
   focusNodeId,
   navigate,
+  funding,
 }: {
   data: WorkTreeSnapshot;
   onSaved: (data: WorkTreeSnapshot) => Promise<void>;
   readOnly?: boolean;
   focusNodeId?: string;
   navigate: Navigate;
+  funding?: ReactNode;
 }) {
   const actor = useAuth().profile?.id ?? null;
   const [edit, setEdit] = useState<WorkEdit>();
@@ -184,6 +186,7 @@ export function WorkTreePanel({
           </Row>
         </Card>
       )}
+      {node && data.root.kind === "office" && funding}
       {node && (
         <OfficeSubitemActivity
           key={node.id}
@@ -191,19 +194,6 @@ export function WorkTreePanel({
           nodeId={node.id}
           actorId={actor}
         />
-      )}
-      {node && data.root.kind === "office" && (
-        <Button
-          variant="outline"
-          onPress={() =>
-            navigate({
-              ...workNodeRoute(data, node.id, node.title),
-              view: "budget",
-            })
-          }
-        >
-          Open subtask funding
-        </Button>
       )}
       {(!node || actions.length > 0 || children.length > 0) && (
         <Card title={node ? "Child subtasks" : "Subtasks"}>

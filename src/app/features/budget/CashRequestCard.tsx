@@ -28,28 +28,29 @@ import {
   decidePettyCashLeaderReview,
   recordAccountingRelease,
 } from "../../../core/web/app/features/budget/services/budgetService";
-import type {
-  DepartmentBudgetBundle,
-  PettyCashRequest,
-} from "../../../core/web/app/features/budget/types";
+import type { PettyCashRequest } from "../../../core/web/app/features/budget/types";
 import { LiquidationSheet } from "./LiquidationSheet";
 import { SettlementPanel } from "./SettlementPanel";
 import { useFinancialAction } from "./useFinancialCommand";
 import { FinancialCancelled } from "./financialReceipt";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
 import { cashRequestAmount, cashRequestReference } from "./mobileFinanceScope";
+import type { CashRequestBundle } from "./focusedSubtaskFunding";
+import { nativeWindow } from "../../../platform/webRuntime";
 export function CashRequestCard({
   request,
   bundle,
   onSaved,
   onCorrect,
   readOnly = false,
+  focusedReleaseId,
 }: {
   request: PettyCashRequest;
-  bundle: DepartmentBudgetBundle;
+  bundle: CashRequestBundle;
   onSaved: () => Promise<void>;
   onCorrect?: () => void;
   readOnly?: boolean;
+  focusedReleaseId?: string;
 }) {
   const { profile, can, organization } = useAuth(),
     readAction = useAction();
@@ -86,7 +87,13 @@ export function CashRequestCard({
     accounting =
       profile?.role === "accounting_staff" &&
       can("navigation.accounting_releases");
-  const releases = bundle.releases.filter((r) => r.requestId === request.id),
+  const canReleaseCash = accounting && can("accounting.release_cash");
+  const releases = bundle.releases
+      .filter((r) => r.requestId === request.id)
+      .sort(
+        (a, b) =>
+          Number(b.id === focusedReleaseId) - Number(a.id === focusedReleaseId),
+      ),
     liquidations = bundle.liquidations
       .filter((l) => l.requestId === request.id)
       .sort((a, b) => b.version - a.version),
@@ -163,7 +170,7 @@ export function CashRequestCard({
       }
       if (operation === "release") {
         const release = releases.find((item) => item.id === releaseId);
-        if (!accounting || release?.status !== "scheduled")
+        if (!canReleaseCash || release?.status !== "scheduled")
           throw new Error("This release is no longer available to record.");
         if (
           !(await confirmAction(
@@ -181,6 +188,7 @@ export function CashRequestCard({
       }
       setOperation(undefined);
       setReason("");
+      nativeWindow.dispatchEvent({ type: "eflow:finance-updated" });
       await onSaved();
     }, "Financial action recorded.");
   return (
@@ -225,7 +233,11 @@ export function CashRequestCard({
           <LabelValue label="Amount" value={peso(release.amount)} />
           <Status value={release.status} />
           <Row>
-            {!!(!readOnly && accounting && release.status === "scheduled") && (
+            {!!(
+              !readOnly &&
+              canReleaseCash &&
+              release.status === "scheduled"
+            ) && (
               <Button
                 variant="outline"
                 onPress={() => {
@@ -258,6 +270,9 @@ export function CashRequestCard({
                       release.id,
                       release.voucherNumber,
                     );
+                    nativeWindow.dispatchEvent({
+                      type: "eflow:finance-updated",
+                    });
                     await onSaved();
                   })
                 }

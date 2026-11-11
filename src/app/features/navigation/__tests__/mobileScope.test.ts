@@ -19,11 +19,67 @@ const personal = {
 } as WorkspaceSnapshot;
 
 test("mobile role defaults never inherit desktop Accounting or Member defaults", () => {
-  expect(defaultTab("member")).toBe("home");
-  expect(defaultTab("head")).toBe("home");
-  expect(defaultTab("accounting_staff")).toBe("work");
+  expect(defaultTab()).toBe("home");
+  expect(primaryTabs("head")).toEqual([
+    "home",
+    "work",
+    "projects",
+    "inbox",
+    "more",
+  ]);
+  expect(primaryTabs("member")).toEqual(primaryTabs("head"));
+  expect(primaryTabs("accounting_staff")).toEqual([
+    "home",
+    "work",
+    "accounting",
+    "inbox",
+    "more",
+  ]);
   expect(primaryTabs("admin")).toEqual([]);
   expect(primaryTabs("unknown")).toEqual([]);
+});
+
+test("Accounting project routes restore to More or stay in the financial stack", () => {
+  const route = { name: "project", id: "project-a" } as const;
+  expect(
+    resolveMobileRoute(route, "accounting_staff", () => true),
+  ).toMatchObject({ tab: "more", disposition: "native" });
+  expect(
+    resolveMobileRoute(
+      { ...route, originTab: "projects" },
+      "accounting_staff",
+      () => true,
+    ).tab,
+  ).toBe("more");
+  expect(
+    resolveMobileRoute(route, "accounting_staff", () => true, "accounting").tab,
+  ).toBe("accounting");
+  expect(
+    resolveMobileRoute(route, "accounting_staff", () => false).disposition,
+  ).toBe("denied");
+});
+
+test("Office Analytics uses the native Head route and the configured Web handoff explicitly", () => {
+  const reports = (key: string) => key === "navigation.reports";
+  expect(
+    resolveMobileRoute(
+      { name: "reports", view: "risks" },
+      "head",
+      reports,
+      "home",
+    ),
+  ).toMatchObject({
+    tab: "home",
+    disposition: "native",
+    route: { name: "reports", view: "risks" },
+  });
+  expect(
+    resolveMobileRoute({ name: "reports", view: "web" }, "head", reports)
+      .disposition,
+  ).toBe("web");
+  expect(
+    resolveMobileRoute({ name: "reports" }, "head", () => false).disposition,
+  ).toBe("denied");
 });
 
 test.each(["home", "work", "inbox", "projects", "more"] as PrimaryTab[])(

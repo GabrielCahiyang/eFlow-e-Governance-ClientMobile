@@ -12,7 +12,6 @@ import {
   Loading,
   Screen,
   SearchField,
-  peso,
 } from "../../components/ui";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useAuth } from "../authentication";
@@ -20,7 +19,7 @@ import { useFacts } from "../../shared/useFacts";
 import type { Navigate } from "../../shared/routes";
 import { supabase } from "../../../platform/supabase";
 import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/constants";
-import { mapBudgetSummary } from "../../../core/web/app/features/budget/services/budgetMappers";
+import { officeFinancialSummary } from "./officeFinancialSummary";
 import { budgetReportRead } from "../../../core/web/app/features/budget/services/budgetReportReads";
 import { useBudget } from "./useBudget";
 import { CashRequestCard } from "./CashRequestCard";
@@ -38,12 +37,14 @@ export function OfficeBudgetScreen({
   recordId,
   officeId,
   fiscalYear,
+  releaseId,
 }: {
   initialView?: string;
   navigate: Navigate;
   recordId?: string;
   officeId?: string;
   fiscalYear?: number;
+  releaseId?: string;
 }) {
   const { profile, organization, can } = useAuth();
   const accounting = profile?.role === "accounting_staff";
@@ -114,21 +115,7 @@ export function OfficeBudgetScreen({
   );
   const summary = useFacts(
     `mobile-financial-summary:${profile?.id}:${orgId}:${year}`,
-    async () => {
-      const result = await supabase.rpc("department_budget_summary", {
-        p_org_id: orgId,
-        p_fiscal_year: year,
-      });
-      if (result.error) throw new Error(result.error.message);
-      if (!result.data) return null;
-      if (
-        Array.isArray(result.data) ||
-        !result.data.id ||
-        result.data.orgId !== orgId
-      )
-        throw new Error("Office financial scope could not be verified.");
-      return mapBudgetSummary(result.data);
-    },
+    () => officeFinancialSummary(orgId, year),
     !!orgId && view === "overview",
   );
   const [search, setSearch] = useState("");
@@ -149,6 +136,20 @@ export function OfficeBudgetScreen({
         )
       : undefined;
 
+  const linkedWork = useFacts(
+    `cash-work:${profile?.id}:${orgId}:${activeRequest?.id}`,
+    async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("id,linked_project_id")
+        .eq("id", activeRequest!.taskId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    !!activeRequest?.taskId && can("navigation.projects"),
+  );
   return (
     <Screen
       compact
@@ -225,15 +226,15 @@ export function OfficeBudgetScreen({
             <>
               <LabelValue
                 label="Approved appropriation"
-                value={peso(summary.data.approvedAmount)}
+                value={recordedPeso(summary.data.approved)}
               />
               <LabelValue
                 label="Settled spending"
-                value={peso(summary.data.spentAmount)}
+                value={recordedPeso(summary.data.settled)}
               />
               <LabelValue
                 label="Available Office Budget"
-                value={peso(summary.data.availableAmount)}
+                value={recordedPeso(summary.data.available)}
               />
             </>
           ) : summary.loading ? (
@@ -281,10 +282,30 @@ export function OfficeBudgetScreen({
           )}
           {activeRequest && data ? (
             <>
+              {!linkedWork.error && linkedWork.data?.linked_project_id && (
+                <NavigationRow
+                  title="Open linked project"
+                  onPress={() =>
+                    navigate({
+                      name: "project",
+                      id: linkedWork.data!.linked_project_id,
+                    })
+                  }
+                />
+              )}
+              {releaseId &&
+                !data.releases.some(
+                  (release) =>
+                    release.id === releaseId &&
+                    release.requestId === activeRequest.id,
+                ) && (
+                  <ErrorState error="This scheduled release is no longer available." />
+                )}
               <CashRequestCard
                 key={activeRequest.id}
                 request={activeRequest}
                 bundle={data}
+                focusedReleaseId={releaseId}
                 readOnly={
                   detail.loading ||
                   !!detail.error ||
