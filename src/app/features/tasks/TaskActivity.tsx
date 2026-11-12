@@ -245,7 +245,11 @@ export function TaskActivity({
   return (
     <>
       {canDiscuss && !editing && (
-        <Button variant="outline" onPress={() => setEditing(true)}>
+        <Button
+          variant="ghost"
+          style={{ alignSelf: "flex-start" }}
+          onPress={() => setEditing(true)}
+        >
           Add work note
         </Button>
       )}
@@ -321,8 +325,12 @@ export function TaskActivity({
             <Empty compact kind="activity" title="No recorded task activity" />
           )
         ))}
-      {entries.map((entry) => (
-        <ActivityEntry key={entry.id} entry={entry} />
+      {entries.map((entry, index) => (
+        <ActivityEntry
+          key={entry.id}
+          entry={entry}
+          last={index === entries.length - 1}
+        />
       ))}
       {!!events.paging.error && <ErrorState error={events.paging.error} />}
       {events.more && (

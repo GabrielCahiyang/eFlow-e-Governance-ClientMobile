@@ -104,7 +104,7 @@ test("ErrorState pairs contextual titles with public messages and invokes its co
   expect(view.getByText("Connection unavailable")).toBeOnTheScreen();
   expect(
     view.getByText(
-      "We couldn't connect. Check your internet connection and try again.",
+      "Connection unavailable. Try again when the service is reachable.",
     ),
   ).toBeOnTheScreen();
   await fireEvent.press(view.getByRole("button", { name: "Retry" }));
@@ -118,9 +118,14 @@ test("ErrorState pairs contextual titles with public messages and invokes its co
   expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
 
   await view.rerender(
-    <ErrorState error="The submission outcome could not be confirmed." context="action" />,
+    <ErrorState
+      error="The submission outcome could not be confirmed."
+      context="action"
+    />,
   );
   expect(view.getByText("Check before retrying")).toBeOnTheScreen();
-  expect(view.getByText(/Refresh this page and check before trying again/)).toBeOnTheScreen();
+  expect(
+    view.getByText(/Refresh this page and check before trying again/),
+  ).toBeOnTheScreen();
   expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
 });

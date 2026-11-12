@@ -152,9 +152,9 @@ export function Loading({
 function errorMeta(message: string, context: FeedbackContext) {
   if (message === feedback.invalidCredentials)
     return { title: "Couldn't sign in", Icon: ShieldAlert };
-  if (/couldn't connect|internet connection|offline/i.test(message))
+  if (/Connection unavailable/i.test(message))
     return { title: "Connection unavailable", Icon: WifiOff };
-  if (/longer than expected|timed? out/i.test(message))
+  if (/timed? out/i.test(message))
     return { title: "Request timed out", Icon: ClockAlert };
   if (message === feedback.session)
     return { title: "Session expired", Icon: ShieldAlert };

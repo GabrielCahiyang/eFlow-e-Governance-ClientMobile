@@ -17,7 +17,7 @@ import User from "lucide-react-native/icons/user-round";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
-import { usePushInbox } from "../notifications";
+import { useInboxIndicator, usePushInbox } from "../notifications";
 import {
   Button,
   Empty,
@@ -79,6 +79,7 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     else pendingPush.current = true;
   };
   usePushInbox(openInbox);
+  const inboxUnread = useInboxIndicator(isMobileRole(role) ? profile?.id : undefined);
   const chooseWorkspace = async (id: string) => {
     setChooser(false);
     if (id === workspace.selected?.workspace.id) return;
@@ -184,6 +185,7 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
               return (
                 <NativeBottomNavigation
                   role={role}
+                  inboxUnread={inboxUnread}
                   selected={state.routes[state.index].name as PrimaryTab}
                   onSelect={(tab) => {
                     const event = tabs.emit({
@@ -308,25 +310,7 @@ function MobileTabStack({ tab }: { tab: PrimaryTab }) {
                   }
                 />
               ) : (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 10,
-                    alignItems: "center",
-                  }}
-                >
-                  <EFlowMark height={20} />
-                  <Text
-                    style={{
-                      fontSize: 19,
-                      lineHeight: 26,
-                      color: palette.text,
-                      fontWeight: "600",
-                    }}
-                  >
-                    {tabLabels[tab]}
-                  </Text>
-                </View>
+                <EFlowMark height={20} />
               ),
           })}
         />

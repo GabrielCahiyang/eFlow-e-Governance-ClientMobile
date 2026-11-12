@@ -8,14 +8,68 @@ import { useFacts } from "../../shared/useFacts";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { useAuth } from "../authentication";
 import { clearDisplayCache } from "../../shared/displayCache";
-import { displayWorkSnapshot } from "./displayWorkSnapshot";
+import { workScheduleToday } from "../tasks/subtaskSchedule";
+import { displayWorkSnapshot, mobileWorkSnapshot } from "./displayWorkSnapshot";
 
 const Context = createContext<ReturnType<typeof useFeed> | null>(null);
 function useFeed(actor: string) {
-  return useFacts("mobile-work:" + actor, () => loadWorkFeed(actor), !!actor, {
-    actor,
-    select: displayWorkSnapshot,
-  });
+  return useFacts(
+    "mobile-work:v3:" + actor,
+    async () => {
+      const snapshot = mobileWorkSnapshot(await loadWorkFeed(actor), actor);
+      if (
+        !snapshot.rows.some(
+          (row) =>
+            row.kind.startsWith("office-") &&
+            row.tree &&
+            workScheduleToday(row.tree),
+        )
+      )
+        return snapshot;
+
+      const { data, error } = await supabase.rpc("m7_office_assignments", {
+        p_workspace: null,
+      });
+      if (error?.code === "PGRST202" || error?.code === "42883")
+        return snapshot;
+      if (error) throw error;
+      if (
+        !Array.isArray(data) ||
+        data.some(
+          (row) =>
+            typeof row?.key !== "string" ||
+            typeof row?.workspace_id !== "string",
+        )
+      )
+        throw new Error("Could not verify current Office assignments.");
+      const assignments = new Map<string, string>(
+        data.map((row) => [row.key, row.workspace_id]),
+      );
+      const workspaceNames = new Map(
+        snapshot.workspaces.map((workspace) => [workspace.id, workspace.name]),
+      );
+      return {
+        ...snapshot,
+        rows: snapshot.rows.map((row) => {
+          if (!row.kind.startsWith("office-")) return row;
+          const workspaceId = assignments.get(row.key);
+          return {
+            ...row,
+            mine: !!workspaceId,
+            workspaceId: workspaceId ?? row.workspaceId,
+            workspaceName: workspaceId
+              ? (workspaceNames.get(workspaceId) ?? row.workspaceName)
+              : row.workspaceName,
+          };
+        }),
+      };
+    },
+    !!actor,
+    {
+      actor,
+      select: displayWorkSnapshot,
+    },
+  );
 }
 
 export function WorkFeedProvider({ children }: { children: ReactNode }) {
@@ -37,6 +91,11 @@ export function WorkFeedProvider({ children }: { children: ReactNode }) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "subtasks" },
+        schedule,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "projects" },
         schedule,
       )
       .subscribe();

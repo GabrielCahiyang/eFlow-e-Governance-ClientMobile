@@ -14,11 +14,13 @@ import {
   WorkTreeUnavailable,
 } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { rowToSubtask } from "../../../core/web/app/features/subtasks";
+import { officeSubtaskPublished } from "./branchInspector";
 import { WorkTreePanel } from "./WorkTreePanel";
 import { OfficeSubitemActivity } from "./OfficeSubitemActivity";
 import { TaskFundingCard } from "../budget/TaskFundingCard";
 import type { AppRoute, Navigate } from "../../shared/routes";
-import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
+import { fetchProject } from "../projects/services";
+import { workDateLabel } from "../../../core/web/app/shared/workCalendar";
 
 export function LinkedWorkNodeScreen({
   route,
@@ -27,7 +29,7 @@ export function LinkedWorkNodeScreen({
   route: AppRoute;
   navigate: Navigate;
 }) {
-  const { profile, organization } = useAuth();
+  const { profile } = useAuth();
   const actor = profile?.id;
   const personal = route.name === "personal_project";
   const rootId = personal ? route.taskId : route.id;
@@ -47,24 +49,37 @@ export function LinkedWorkNodeScreen({
           throw new Error(
             "This subtask is outside the linked project context.",
           );
-        return {
-          tree,
-          node: tree.nodes.find(
-            (item) => item.id === nodeId && item.task_id === rootId,
-          ),
-        };
+        if (!personal) await fetchProject(tree.root.project);
+        const node = tree.nodes.find(
+          (item) => item.id === nodeId && item.task_id === rootId,
+        );
+        if (
+          !personal &&
+          node &&
+          actor &&
+          !officeSubtaskPublished(tree.root.status, tree.root.lead, actor) &&
+          (node.lead_id === actor || node.assigned_to_ids?.includes(actor))
+        )
+          return { tree, node: undefined };
+        return { tree, node };
       } catch (error) {
         if (!(error instanceof WorkTreeUnavailable) || personal) throw error;
-        if (projectId) {
+        {
           const parent = await supabase
             .from("tasks")
             .select("linked_project_id")
             .eq("id", rootId)
             .maybeSingle();
-          if (parent.error || parent.data?.linked_project_id !== projectId)
+          if (
+            parent.error ||
+            !parent.data ||
+            (projectId && parent.data.linked_project_id !== projectId)
+          )
             throw new Error(
               "The linked project context could not be verified.",
             );
+          if (parent.data.linked_project_id)
+            await fetchProject(parent.data.linked_project_id);
         }
         // Older Office feeds can carry a legacy subtask. Read only that exact record under RLS.
         const result = await supabase
@@ -103,21 +118,7 @@ export function LinkedWorkNodeScreen({
                 subtaskId={data.node.id}
                 canManage={false}
                 readOnly={!data.tree.root.open || facts.loading}
-                onManageFunding={
-                  data.tree.root.lead === actor ||
-                  (profile?.org_id === data.tree.root.office &&
-                    isAppointedOfficeHead(
-                      profile,
-                      organization ? [organization] : [],
-                    ))
-                    ? () =>
-                        navigate({
-                          ...route,
-                          view: "funding_configuration",
-                          projectId: data.tree!.root.project,
-                        })
-                    : undefined
-                }
+                showWebSetup={data.tree.root.lead === actor}
               />
             ) : undefined
           }
@@ -128,6 +129,10 @@ export function LinkedWorkNodeScreen({
       ) : data.legacy ? (
         <>
           <Status value={data.legacy.status} />
+          <LabelValue
+            label="Due date"
+            value={workDateLabel(data.legacy.dueDate, "Asia/Manila")}
+          />
           <LabelValue
             label="Progress"
             value={data.legacy.status === "completed" ? "100%" : "Unavailable"}

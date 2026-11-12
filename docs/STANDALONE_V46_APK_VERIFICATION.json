@@ -1,0 +1,18 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Shared-Contracts-v46-arm64-x86_64.apk",
+  "versionCode": 46,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5233052,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "9208255b5805438a0e0ecd82bd00765759ed44509d5cc8a810963ea34fbf6604",
+  "bytes": 99075077
+}

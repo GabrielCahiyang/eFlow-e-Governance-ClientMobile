@@ -6,9 +6,11 @@ import { supabase } from "../../../platform/supabase";
 export function EvidenceAttachment({
   path,
   name,
+  bucket = "task-attachments",
 }: {
   path: string;
   name: string;
+  bucket?: "task-attachments" | "m7-work-evidence";
 }) {
   const action = useAction();
   return (
@@ -19,7 +21,7 @@ export function EvidenceAttachment({
         onPress={() =>
           void action.run(async () => {
             const { data, error } = await supabase.storage
-              .from("task-attachments")
+              .from(bucket)
               .createSignedUrl(path, 60);
             if (error || !data?.signedUrl)
               throw new Error(

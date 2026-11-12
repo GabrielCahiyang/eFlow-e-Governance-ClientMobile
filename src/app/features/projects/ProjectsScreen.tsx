@@ -6,7 +6,12 @@ import {
   RefreshSectionList,
 } from "../../components/ui/FolderRefresh";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, useWindowDimensions } from "react-native";
+import Animated, {
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import Star from "lucide-react-native/icons/star";
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
@@ -21,7 +26,12 @@ import {
   SearchField,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
-import { NavigationRow } from "../../components/ui/NavigationRow";
+import { useFacts } from "../../shared/useFacts";
+import {
+  portfolioSummary,
+  readPortfolioFacts,
+  verifiedProjectStatus,
+} from "./portfolioFacts";
 import { projectSections } from "./mobileProjects";
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
 import { statusLabel } from "../../shared/statusLabels";
@@ -29,10 +39,39 @@ import { statusLabel } from "../../shared/statusLabels";
 export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const { profile } = useAuth();
   const workspace = useWorkspace();
-  const pull = usePullRefresh(workspace.refresh);
   const palette = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const pinnedWidth = Math.max(176, Math.min(228, width * 0.48));
+  const tableWidth = pinnedWidth + 140 + 175 + 150 + 150 + 135 + 150;
+  const horizontal = useSharedValue(0);
+  const onHorizontalScroll = useAnimatedScrollHandler((event) => {
+    horizontal.set(event.contentOffset.x);
+  });
+  const pinned = useAnimatedStyle(() => ({
+    transform: [{ translateX: horizontal.get() }],
+  }));
   const current = workspace.selected;
   const projects = current?.projects ?? [];
+  const facts = useFacts(
+    `project-portfolio:${profile?.id}:${current?.workspace.id}:${projects.map((item) => item.id).join(",")}`,
+    () => readPortfolioFacts(projects.map((item) => item.id)),
+    !!current && !!profile?.id,
+  );
+  const pull = usePullRefresh(async () => {
+    await Promise.all([workspace.refresh(), facts.refresh()]);
+  });
+  const authoritative = new Map(
+    (facts.data?.projects ?? []).map((row) => [String(row.id), row]),
+  );
+  const verifiedProjects = projects.map((item) => ({
+    ...item,
+    status:
+      verifiedProjectStatus(
+        item.kind === "personal"
+          ? item.status
+          : authoritative.get(item.id)?.status,
+      ) || "unavailable",
+  }));
   const key = `eflow:navigation:v1:${profile?.id}:${current?.workspace.id}`;
   const preferences = useNavigationFavorites(
     profile?.id || "",
@@ -46,14 +85,14 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const statuses = [
     { id: "current", title: "Current projects" },
     { id: "all", title: "All statuses" },
-    ...["planning", "active", "on_hold", "completed", "archived"].map((id) => ({
+    ...["active", "on_hold", "completed", "archived"].map((id) => ({
       id,
       title: statusLabel(id),
     })),
   ];
   const matches =
-    current && !workspace.error
-      ? projectSections(projects, preferences.favorites, search, status)
+    current && !workspace.error && facts.data && !facts.error
+      ? projectSections(verifiedProjects, preferences.favorites, search, status)
       : [];
   const total = matches.reduce(
     (count, section) => count + section.data.length,
@@ -80,9 +119,31 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
       contentContainerStyle={{ padding: 16 }}
       stickySectionHeadersEnabled={false}
       ListHeaderComponent={
-        <View style={{ gap: 12, marginBottom: 12 }}>
+        <Animated.View
+          style={[
+            { width: Math.max(0, width - 32), gap: 12, marginBottom: 12 },
+            pinned,
+          ]}
+        >
+          <Text
+            accessibilityRole="header"
+            style={{ fontSize: 24, fontWeight: "700", color: palette.text }}
+          >
+            Projects
+          </Text>
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
+          )}
+          {!!facts.error && (
+            <ErrorState
+              error={facts.error}
+              retry={() => void facts.refresh()}
+            />
+          )}
+          {!!facts.data && (
+            <Text style={{ color: palette.mutedLabel, fontSize: 12 }}>
+              Swipe sideways to see project details.
+            </Text>
           )}
           <View
             style={{
@@ -133,18 +194,21 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               {total} {total === 1 ? "project" : "projects"}
             </Text>
           </View>
-        </View>
+        </Animated.View>
       }
       renderSectionHeader={({ section }) => (
         <View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              paddingTop: 16,
-              paddingBottom: 6,
-            }}
+          <Animated.View
+            style={[
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingTop: 16,
+                paddingBottom: 6,
+              },
+              pinned,
+            ]}
           >
             <View
               style={{
@@ -182,72 +246,263 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                 {section.total}
               </Text>
             </View>
-          </View>
-        </View>
-      )}
-      renderItem={({ item }) => (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "stretch",
-            backgroundColor: palette.surface,
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <NavigationRow
-              title={item.title}
-              description={[
-                item.kind === "office" ? "Office" : "Personal",
-                item.shortcut && "Shortcut",
-                statusLabel(item.status),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-              onPress={() => {
-                navigate({
-                  name:
-                    item.kind === "personal" ? "personal_project" : "project",
-                  id: item.id,
-                  title: item.title,
-                });
-              }}
-            />
-          </View>
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityLabel={`Favorite ${item.title}`}
-            accessibilityState={{
-              checked: preferences.favorites.has(item.id),
-            }}
-            onPress={() => preferences.toggle(item.id)}
+          </Animated.View>
+          <View
             style={{
-              width: 48,
-              minHeight: 48,
-              borderBottomWidth: 0.5,
+              flexDirection: "row",
+              width: tableWidth,
+              backgroundColor: palette.background,
+              borderBottomWidth: 1,
               borderColor: palette.border,
+              minHeight: 42,
               alignItems: "center",
-              justifyContent: "center",
             }}
           >
-            <Star
-              size={21}
-              color={palette.primary}
-              fill={
-                preferences.favorites.has(item.id)
-                  ? palette.primary
-                  : "transparent"
-              }
-            />
-          </Pressable>
+            <Animated.View
+              style={[
+                {
+                  width: pinnedWidth,
+                  backgroundColor: palette.background,
+                  paddingHorizontal: 10,
+                  zIndex: 2,
+                },
+                pinned,
+              ]}
+            >
+              <Text>Project</Text>
+            </Animated.View>
+            {[
+              "Status",
+              "Progress",
+              "Lead office",
+              "Project lead",
+              "Schedule",
+              "Target date",
+            ].map((label, index) => (
+              <Text
+                key={label}
+                style={{
+                  width: [140, 175, 150, 150, 135, 150][index],
+                  paddingHorizontal: 8,
+                  color: palette.mutedLabel,
+                }}
+              >
+                {label}
+              </Text>
+            ))}
+          </View>
         </View>
       )}
+      renderItem={({ item }) => {
+        const record = authoritative.get(item.id);
+        const progress =
+          record && portfolioSummary(record, facts.data?.tasks ?? []);
+        return (
+          <View
+            style={{
+              flexDirection: "row",
+              width: tableWidth,
+              minHeight: fontScale > 1.5 ? 100 : 76,
+              alignItems: "stretch",
+              backgroundColor: palette.surface,
+              borderBottomWidth: 1,
+              borderColor: palette.border,
+            }}
+          >
+            <Animated.View
+              style={[
+                {
+                  width: pinnedWidth,
+                  backgroundColor: palette.surface,
+                  zIndex: 2,
+                  flexDirection: "row",
+                  alignItems: "center",
+                },
+                pinned,
+              ]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open project ${item.title}`}
+                onPress={() =>
+                  navigate({
+                    name:
+                      item.kind === "personal" ? "personal_project" : "project",
+                    id: item.id,
+                    title: item.title,
+                  })
+                }
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  justifyContent: "center",
+                  paddingHorizontal: 8,
+                }}
+              >
+                <Text
+                  numberOfLines={fontScale > 1.5 ? 3 : 2}
+                  style={{ fontWeight: "600" }}
+                >
+                  {item.title}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel={`Favorite ${item.title}`}
+                accessibilityState={{
+                  checked: preferences.favorites.has(item.id),
+                }}
+                onPress={() => preferences.toggle(item.id)}
+                style={{
+                  width: 44,
+                  minHeight: 48,
+                  borderBottomWidth: 0.5,
+                  borderColor: palette.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Star
+                  size={21}
+                  color={palette.primary}
+                  fill={
+                    preferences.favorites.has(item.id)
+                      ? palette.primary
+                      : "transparent"
+                  }
+                />
+              </Pressable>
+            </Animated.View>
+            <View
+              style={{
+                width: 140,
+                justifyContent: "center",
+                paddingHorizontal: 8,
+              }}
+            >
+              <Text>
+                {item.status === "unavailable"
+                  ? "Status unavailable"
+                  : statusLabel(item.status)}
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 175,
+                justifyContent: "center",
+                paddingHorizontal: 8,
+              }}
+            >
+              {
+                <>
+                  <Text>
+                    {!progress
+                      ? "Unavailable"
+                      : progress.total
+                        ? `${progress.completed} of ${progress.total} · ${progress.progress}%`
+                        : "No tasks yet"}
+                  </Text>
+                  {!!progress?.total && (
+                    <View
+                      style={{
+                        height: 3,
+                        backgroundColor: palette.border,
+                        marginTop: 5,
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 3,
+                          width: `${progress.progress}%`,
+                          backgroundColor: palette.primary,
+                        }}
+                      />
+                    </View>
+                  )}
+                </>
+              }
+            </View>
+            <View
+              style={{
+                width: 150,
+                justifyContent: "center",
+                paddingHorizontal: 8,
+              }}
+            >
+              <Text>
+                {String(
+                  facts.data?.offices.find(
+                    (office) =>
+                      office.id === authoritative.get(item.id)?.org_id,
+                  )?.name ||
+                    (item.kind === "personal" ? "Personal" : "Unavailable"),
+                )}
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 150,
+                justifyContent: "center",
+                paddingHorizontal: 8,
+              }}
+            >
+              <Text>
+                {String(
+                  facts.data?.owners.find(
+                    (owner) =>
+                      owner.id === authoritative.get(item.id)?.owner_id,
+                  )?.full_name ||
+                    (record && !record.owner_id ? "Unassigned" : "Unavailable"),
+                )}
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 135,
+                justifyContent: "center",
+                paddingHorizontal: 8,
+              }}
+            >
+              <Text>
+                {progress
+                  ? progress.isEmpty
+                    ? "No scheduled work"
+                    : {
+                        on_track: "On track",
+                        due_soon: "Due soon",
+                        overdue: "Overdue",
+                        at_risk: "At risk",
+                        completed: "Completed",
+                      }[progress.health]
+                  : "Unavailable"}
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 150,
+                justifyContent: "center",
+                paddingHorizontal: 8,
+              }}
+            >
+              <Text>
+                {record
+                  ? typeof record.target_date === "string"
+                    ? record.target_date
+                    : (progress?.nextDeadline ?? "Unscheduled")
+                  : "Unavailable"}
+              </Text>
+            </View>
+          </View>
+        );
+      }}
       ListEmptyComponent={
         workspace.error ? (
           <ErrorState
             error={workspace.error}
             retry={() => void workspace.refresh()}
           />
-        ) : !current && workspace.loading ? (
+        ) : facts.error ? undefined : (workspace.loading || facts.loading) &&
+          !facts.data ? (
           <Loading label="Loading projects" layout="projects" />
         ) : (
           <Empty
@@ -263,7 +518,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               current
                 ? search || status !== "current"
                   ? "Try another name or status."
-                  : "Use the status filter to find completed or archived projects."
+                : "Use the status filter to find archived projects."
                 : "Choose an available workspace to see projects."
             }
             action={
@@ -290,7 +545,22 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   );
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <FolderPullArea pull={pull}>{list}</FolderPullArea>
+      <FolderPullArea
+        pull={pull}
+        frame={(scroll) => (
+          <Animated.ScrollView
+            horizontal
+            nestedScrollEnabled
+            directionalLockEnabled
+            onScroll={onHorizontalScroll}
+            scrollEventThrottle={16}
+          >
+            <View style={{ width: tableWidth }}>{scroll}</View>
+          </Animated.ScrollView>
+        )}
+      >
+        {list}
+      </FolderPullArea>
       <SelectionSheet
         open={filterOpen}
         title="Filter projects"

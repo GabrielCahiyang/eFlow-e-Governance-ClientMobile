@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
-import { Pressable, View } from "react-native";
-import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import { View } from "react-native";
 import { Button, Empty, ErrorState, SearchField } from "../../components/ui";
 import { useTheme } from "../../components/ui/Appearance";
 import {
@@ -15,6 +14,7 @@ import { space, type ThemeColors } from "../../components/ui/theme";
 import { FeedSkeleton } from "./FeedSkeleton";
 import { WorkRowItem } from "./WorkRowItem";
 import { useMobileWorkFeed } from "./WorkFeedProvider";
+import { useWorkspace } from "../workspaces";
 import { usePullRefresh } from "../../shared/usePullRefresh";
 import {
   groupAssignedWork,
@@ -50,7 +50,12 @@ export function PersonalWorkFeedScreen({
   const palette = useTheme();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<WorkGroup | "All work">("All work");
-  const [workspace, setWorkspace] = useState("");
+  const workspace = useWorkspace();
+  const selected = workspace.error ? undefined : workspace.selected;
+  const workspaceId = selected?.workspace.id;
+  const filters = dueOnly
+    ? (["Overdue", "Today", "Upcoming"] as const)
+    : workGroups.filter((group) => group !== "Other history");
   const [filterOpen, setFilterOpen] = useState(false);
   const [openError, setOpenError] = useState<Error>();
 
@@ -64,7 +69,7 @@ export function PersonalWorkFeedScreen({
   const allAssigned = useMemo(
     () =>
       groupAssignedWork(
-        (rows ?? []).filter((row) =>
+        (workspaceId ? (rows ?? []) : []).filter((row) =>
           initial === "History"
             ? row.history
             : initial === "Subtasks"
@@ -74,24 +79,18 @@ export function PersonalWorkFeedScreen({
                 : true,
         ),
         "",
-        workspace,
+        workspaceId,
         new Date(minute * 60_000),
       ),
-    [rows, initial, workspace, minute],
+    [rows, initial, workspaceId, minute],
   );
-  const overdueCount =
-    allAssigned.find((g) => g.title === "Overdue")?.data.length || 0;
-  const todayCount =
-    allAssigned.find((g) => g.title === "Today")?.data.length || 0;
-  const upcomingCount =
-    allAssigned.find((g) => g.title === "Upcoming")?.data.length || 0;
-
   const needle = query.trim().toLocaleLowerCase();
   const matches = useMemo(
     () =>
       allAssigned
         .filter(
           ({ title }) =>
+            (initial === "History" || title !== "Other history") &&
             (!dueOnly || ["Overdue", "Today", "Upcoming"].includes(title)) &&
             (filter === "All work" || title === filter),
         )
@@ -101,10 +100,10 @@ export function PersonalWorkFeedScreen({
             ? data.filter((row) => matchesWorkSearch(row, needle))
             : data,
         })),
-    [allAssigned, dueOnly, filter, needle],
+    [allAssigned, initial, dueOnly, filter, needle],
   );
   const total = matches.reduce((count, group) => count + group.data.length, 0);
-  const scope = JSON.stringify([initial, dueOnly, workspace, filter, needle]);
+  const scope = JSON.stringify([initial, dueOnly, workspaceId, filter, needle]);
   const [page, setPage] = useState({ scope, limit: rowsPerPage });
   if (page.scope !== scope) setPage({ scope, limit: rowsPerPage });
   const limit = page.scope === scope ? page.limit : rowsPerPage;
@@ -117,9 +116,6 @@ export function PersonalWorkFeedScreen({
     remaining -= visible.length;
     return [{ key: title, title, data: visible, total: data.length }];
   });
-
-  const workspaces =
-    facts.data?.workspaces.filter((item) => item.state === "active") || [];
 
   const list = (
     <RefreshSectionList
@@ -218,116 +214,47 @@ export function PersonalWorkFeedScreen({
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
+          <Text
+            accessibilityRole="header"
+            style={{ fontSize: 24, fontWeight: "700", color: palette.text }}
+          >
+            {dueOnly
+              ? "Deadlines"
+              : initial === "Subtasks"
+                ? "Assigned subtasks"
+                : initial === "Assigned work"
+                  ? "My Work"
+                  : initial}
+          </Text>
           <View
             style={{
               flexDirection: "row",
+              flexWrap: "wrap",
               alignItems: "center",
-              justifyContent:
-                dueOnly || initial !== "Assigned work"
-                  ? "space-between"
-                  : "flex-end",
-              paddingTop: 4,
+              gap: 8,
             }}
           >
-            {(dueOnly || initial !== "Assigned work") && (
-              <Text
-                accessibilityRole="header"
-                style={{
-                  fontSize: 24,
-                  fontWeight: "700",
-                  color: palette.text,
-                }}
-              >
-                {dueOnly
-                  ? "Deadlines"
-                  : initial === "Subtasks"
-                    ? "Assigned subtasks"
-                    : initial === "Assigned work"
-                      ? "My Work"
-                      : initial}
-              </Text>
-            )}
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{
-                expanded: filterOpen,
-                selected: filter !== "All work" || !!workspace,
-              }}
-              accessibilityLabel="Filter assignments"
+            <View style={{ flex: 1, minWidth: 152 }}>
+              <SearchField
+                value={query}
+                onChange={setQuery}
+                placeholder="Search assignments"
+              />
+            </View>
+            <FilterChip
+              label={filter === "All work" ? "Filter" : filter}
+              icon
               onPress={() => setFilterOpen(true)}
-              style={({ pressed }) => ({
-                width: 48,
-                height: 48,
-                borderRadius: 20,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: pressed
-                  ? palette.primarySoft
-                  : palette.surface,
-                borderWidth: 1,
-                borderColor: palette.border,
-              })}
-            >
-              <SlidersHorizontal size={18} color={palette.text} />
-            </Pressable>
+              selected={filter !== "All work"}
+              accessibilityLabel={`Filter assignments: ${filter}`}
+            />
           </View>
-
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {(
-              [
-                ["Today", todayCount],
-                ["Overdue", overdueCount],
-                ["Upcoming", upcomingCount],
-              ] as const
-            ).map(([group, count]) => (
-              <FilterChip
-                key={group}
-                label={
-                  group === "Overdue"
-                    ? `${count} overdue assignments`
-                    : `${group} · ${count}`
-                }
-                accessibilityLabel={`${group}, ${count} ${count === 1 ? "item" : "items"}`}
-                selected={filter === group}
-                onPress={() => setFilter(filter === group ? "All work" : group)}
-              />
-            ))}
-            {filter !== "All work" &&
-              !["Today", "Overdue", "Upcoming"].includes(filter) && (
-                <FilterChip
-                  label={filter}
-                  selected
-                  onPress={() => setFilter("All work")}
-                />
-              )}
-            {!!workspace && (
-              <FilterChip
-                label={
-                  workspaces.find((item) => item.id === workspace)?.name ||
-                  "Workspace unavailable"
-                }
-                selected
-                onPress={() => setFilterOpen(true)}
-              />
-            )}
-            {(filter !== "All work" || workspace || query) && (
-              <FilterChip
-                label="Clear filters"
-                onPress={() => {
-                  setFilter("All work");
-                  setWorkspace("");
-                  setQuery("");
-                }}
-              />
-            )}
-          </View>
-          <SearchField
-            value={query}
-            onChange={setQuery}
-            placeholder="Search assignments"
-          />
-
+          {!!workspace.error && (
+            <ErrorState
+              error={workspace.error}
+              retry={() => void workspace.refresh()}
+            />
+          )}
           {!!(facts.error || openError) && (
             <ErrorState
               error={facts.error || openError}
@@ -347,42 +274,37 @@ export function PersonalWorkFeedScreen({
         </View>
       }
       ListEmptyComponent={
-        facts.loading && !facts.data ? (
+        (facts.loading && !facts.data) || workspace.loading ? (
           <FeedSkeleton label="Loading assigned work" />
         ) : (
           <Empty
             kind="work"
             title={
-              facts.error || issues.length
+              workspace.error || facts.error || issues.length
                 ? "Assignments could not be checked"
-                : query || workspace || filter !== "All work"
+                : query || filter !== "All work"
                   ? "No matching assignments"
                   : "Your work starts here"
             }
             description={
-              facts.error || issues.length
+              workspace.error || facts.error || issues.length
                 ? "Some work sources could not load. Refresh to check your assignments."
-                : query || workspace || filter !== "All work"
+                : query || filter !== "All work"
                   ? "Try another search or clear your filters."
                   : "Tasks and subtasks assigned to you will appear here, grouped by due date."
             }
             action={
-              filter !== "All work" || workspace || query ? (
+              filter !== "All work" || query ? (
                 <Button
                   variant="outline"
                   onPress={() => {
                     setFilter("All work");
-                    setWorkspace("");
                     setQuery("");
                   }}
                 >
                   Reset search and filters
                 </Button>
-              ) : (
-                <Button onPress={() => void facts.refresh()}>
-                  Refresh assignments
-                </Button>
-              )
+              ) : undefined
             }
           />
         )
@@ -395,28 +317,13 @@ export function PersonalWorkFeedScreen({
       <SelectionSheet
         open={filterOpen}
         title="Filter work"
-        description="Choose a date group or an authorized workspace."
-        value={"date:" + filter}
-        options={[
-          ...(["All work", ...workGroups] as const).map((title) => ({
-            id: "date:" + title,
-            title,
-          })),
-          { id: "scope:", title: "All workspaces", selected: !workspace },
-          ...workspaces.map((item) => ({
-            id: "scope:" + item.id,
-            title: item.name,
-            description:
-              item.kind === "office"
-                ? "Office workspace"
-                : "Personal workspace",
-            selected: workspace === item.id,
-          })),
-        ]}
+        value={filter}
+        options={(["All work", ...filters] as const).map((title) => ({
+          id: title,
+          title,
+        }))}
         onSelect={(value) => {
-          if (value.startsWith("date:"))
-            setFilter(value.slice(5) as WorkGroup | "All work");
-          else setWorkspace(value.slice(6));
+          setFilter(value as WorkGroup | "All work");
           setFilterOpen(false);
         }}
         onClose={() => setFilterOpen(false)}

@@ -35,6 +35,7 @@ jest.mock("../WorkTreePanel", () => ({
     );
   },
 }));
+jest.mock("../../projects/services", () => ({ fetchProject: async () => ({ status: "active" }) }));
 jest.mock("../../budget/TaskFundingCard", () => ({
   TaskFundingCard: ({ subtaskId }: { subtaskId: string }) => {
     const { Text } = require("react-native");

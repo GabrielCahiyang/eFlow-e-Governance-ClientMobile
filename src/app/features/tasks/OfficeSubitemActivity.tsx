@@ -147,8 +147,12 @@ function SubtaskTimeline({
       {!loading && !entries.length && !events.error && !history.error && (
         <Empty compact kind="activity" title="No activity yet" />
       )}
-      {entries.map((entry) => (
-        <ActivityEntry key={entry.id} entry={entry} />
+      {entries.map((entry, index) => (
+        <ActivityEntry
+          key={entry.id}
+          entry={entry}
+          last={index === entries.length - 1}
+        />
       ))}
       {!!events.paging.error && <ErrorState error={events.paging.error} />}
       {events.more && (

@@ -90,27 +90,7 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
   ];
 
   return (
-    <Screen compact style={{ gap: 16 }}>
-      <View style={{ gap: 4, paddingTop: 4 }}>
-        <Text
-          style={{
-            fontSize: 16,
-            fontWeight: "600",
-            color: palette.text,
-            marginTop: 4,
-          }}
-        >
-          {profile?.full_name || "Your account"}
-        </Text>
-        <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-          {profile?.role === "accounting_staff"
-            ? "Accounting Staff"
-            : profile?.role === "head"
-              ? "Head"
-              : "Member"}
-        </Text>
-      </View>
-
+    <Screen compact title="More" style={{ gap: 16 }}>
       {(["Work", "Communication", "Account"] as const).map((group) => {
         const visible = entries.filter(
           (entry) =>

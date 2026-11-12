@@ -1,5 +1,4 @@
 import {
-  Button,
   Card,
   Empty,
   ErrorState,
@@ -38,11 +37,9 @@ type FundingBlocker = ProjectCompletionBlocker & {
 export function ProjectFundingSummary({
   projectId,
   showCloseout,
-  onManageFunding,
 }: {
   projectId: string;
   showCloseout?: boolean;
-  onManageFunding: () => void;
 }) {
   const { profile } = useAuth();
   const facts = useFacts(
@@ -125,11 +122,7 @@ export function ProjectFundingSummary({
           )}
         </Card>
       )}
-      <Button variant="outline" onPress={onManageFunding}>
-        {unused
-          ? "Return unused funding on eFlow Web"
-          : "Funding setup on eFlow Web"}
-      </Button>
+      {!unused && <Notice>Set up funding in eFlow Web.</Notice>}
     </Card>
   );
 }

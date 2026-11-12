@@ -20,7 +20,7 @@
         "foregroundImage": "./assets/eflow-icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 43
+      "versionCode": 46
     },
     "web": {
       "favicon": "./assets/eflow-icon.png"

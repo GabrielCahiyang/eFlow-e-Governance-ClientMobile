@@ -2,6 +2,78 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Build 46 shared backend contracts
+
+12 November 2026, Asia/Singapore. The four shared migrations and their disposable SQL runner are in the Web checkout. Build 46 consumes the new contracts when the backend exposes them. The hosted project still serves the existing contracts. The Build 45 notes below describe that earlier package.
+
+[Build 46 APK](../../artifacts/M7/eFlow-Mobile-M7-Shared-Contracts-v46-arm64-x86_64.apk) · [APK verification](../STANDALONE_V46_APK_VERIFICATION.json) · [Credential audit](../NATIVE_RELEASE_AUDIT.json) · [Web implementation handoff](M7-shared-backend-handoff.md)
+
+- The disposable PostgreSQL fixture passed 80 assertions, including direct denied RPC and table calls, schedule and activation, Office and Personal reviews, scoped evidence and assignments, and allocation balances and receipts.
+- Mobile TypeScript, nine Metro checks, and 313 tests in 101 suites passed. Android and iOS production JS exports passed separately. The credential audit passed for both exports and the embedded APK bundle.
+- The signed, non-debuggable ARM64/x86_64 APK installed and cold-launched as version code 46 on the Android API 36 emulator. Six feature sources in its release source map matched the final workspace files. Native iOS compilation and device workflows remain pending.
+- Web type checking and the production build passed. The full Web suite reported 2,301 passing and 23 failing tests across 14 failing suites. A clean-baseline comparison was outside this run.
+
+Use dedicated, approved accounts and fixtures after the shared backend and Web cutover are available in an authorized test environment. Record the exact actor, server-confirmed permanent role, contextual appointment and workspace for each result.
+
+| Personal check | Approved accounts and fixtures | Expected result |
+| --- | --- | --- |
+| Planned date and activation | Responsible Office Head, appointed Task Lead and separate Subtask Lead/contributor. Use an overdue Task and a Task with eligible and future Subtasks. | Check Today in the workspace timezone, explicit recovery dates, planned date round-trip and actual activation. Confirm the Task Lead starts the parent, eligible descendants activate, and the scheduled job activates future descendants on their date. |
+| Contributor and Subtask Lead review | Task contributor, Subtask contributor, Subtask Lead, parent Task Lead and eligible independent Task reviewer. Repeat nested review in a Personal workspace with approved Member accounts. | Check private pending progress and evidence, nearest eligible reviewer, return and resubmission, exact Inbox routes, accepted canonical progress, and audit attribution. Check same-appointed-Lead direct completion and independent final Task review separately. |
+| Visibility and assignment publication | Responsible Office Head, Project Lead, appointed Task Lead and affected Members across two Offices. Use a Planning project, an unrelated active Task and a pre-start branch. | Drafts open through authorized Web draft routes. Operational screens, direct queries and financial reads omit them. The Task Lead can prepare pre-start work. The branch assignees see the branch and receive the assignment notice when eligible. |
+| Allocation and receipts | Project Lead, Responsible Office Head, parent Task Lead, Subtask Lead and Accounting Staff. Use approved Task and Subtask allocation fixtures. | Check Project Lead Task allocation, Task Lead Subtask allocation, parent balance and exact retry. Check denials for other roles and verify the established Head and Accounting actions with approved fixtures. |
+
+Live PostgREST, Storage, scheduler, push, and installed NW11 role and receipt verification are pending. Verify the role workflows separately on Android and iOS, including theme, font scaling, screen reader, reduced motion and keyboard. Personal acceptance is pending.
+
+## Workflow and assignment revisions
+
+11–12 November 2026, Asia/Singapore. M7 personal acceptance is pending. Web contracts were checked at `4ff217b84e3e8128555ffc87f0514253cd576399` against Web `main`.
+
+TypeScript, nine Metro checks, and all 310 tests in 100 suites passed. Android and iOS production Hermes exports passed separately. The credential audit passed on both exports and the embedded APK bundle. [Credential audit](../NATIVE_RELEASE_AUDIT.json)
+
+The signed, non-debuggable ARM64/x86_64 APK installed and cold-launched on the Android API 36 QA emulator. The restored Andres Manili account displayed the server-confirmed Member role in Profile and LEDIPO as its current Office workspace. Read-only QA verified the My Work toolbar, Today selection, date ranges and the Inbox unread dot. The account had one available workspace. Fresh login, Head and Accounting Staff workflows, physical Android, and native iOS compilation and workflows remain pending.
+
+[Build 45 APK](../../artifacts/M7/eFlow-Mobile-M7-Workflows-v45-arm64-x86_64.apk) · [My Work screenshot](../../artifacts/M7/workflow-v45-my-work.png) · [Today filter](../../artifacts/M7/workflow-v45-today.png) · [APK verification](../STANDALONE_V45_APK_VERIFICATION.json)
+
+- My Work shows the selected workspace. It uses the Projects search-and-filter layout, with pull-to-refresh and a retry control for failed reads. Today matches open assignments whose due date falls on the same calendar day in the work item's workspace timezone. Date-only values keep their saved day. Cards show the saved Task start and due dates as a date range when both are present. The mobile feed uses the exact readable Subtask record's due date when the tree omits it.
+- My Work excludes unrelated work and recommendations that did not become appointments. It hides a Subtask assignment from the branch Lead and contributors while its Office root Task is waiting to start. Opening the native branch directly checks the same rule on its current snapshot. Only the assigned Task Lead sees Start work, and Mobile rechecks that assignment before requesting the status change.
+- Office task creation uses the same title and project group inputs and `phase3_create_task` RPC as the Web Main table. Native editing uses `phase3_patch_task` for the title and schedule. Both require current scoped project permissions and an active project. A create result without a confirmed receipt locks that form and asks the user to check the task list. Subtask editing uses the existing branch capability and revision checks. The native workflow offers no Task or Subtask delete action.
+- The subtask form still defaults to the eligible Task Lead. On an overdue parent, it accepts the existing parent deadline and checks the earliest applicable ancestor deadline. The server still validates lifecycle, branch capability and dates. The Inbox Bell shows a recipient-scoped unread dot, and an assignment received through Realtime while the app is in use produces a generic notice. The device push configuration is independent.
+- Planning projects are filtered out of the mobile workspace directory and My Work. Native project and linked work details check the saved Office project status. Funding setup guidance appears as text.
+
+| Personal check | Approved account and fixture | Expected result |
+| --- | --- | --- |
+| My Work | Member with dated assignments in two authorized workspaces, a recommendation without an appointment and an unrelated task | Switch the toolbar workspace and check search, Today, both dates, pagination and exact links. Try the selection with an unscheduled Subtask and a readable Subtask whose saved due date matches the Web record. |
+| Create and edit | Responsible Office Head with an active project and an existing group. Repeat with a Member or a Head outside the authorized project. | Authorized Head can add by group and edit Task title and dates. Unauthorized account has no edit or add control. Check that a Planning project stays out of search and Favorites, including on an authorized Head's account. |
+| Start, overdue and Subtask edit | Assigned Task Lead and a separate appointed Subtask Lead/contributor, with an overdue root and a dedicated safe branch | Add a Subtask using the overdue parent deadline. Try a later date and check the specific validation. Verify default Lead, edit availability, visibility before and after start, and absence of delete. Check the existing server guard on descendant completion. |
+| Inbox | Member or Accounting Staff who is the recipient of a safe new assignment | From My Work, see the unread dot and generic in-app notice. Open Inbox, follow the exact record, go back, and mark the final unread update read. Confirm the dot clears and a different account does not inherit it. |
+| Funding | Project Lead, Task Lead and Accounting Staff using readable dedicated fixtures | Check authorized amounts, the plain Web setup label and exact existing cash record links. Allocation writes and real financial operations require dedicated authorization and backend verification. |
+
+Run each supported scenario separately on Android and iOS. Include light and dark appearance, large fonts, screen reader, reduced motion and the keyboard. No signed-in mutations or full native accessibility pass are recorded for this revision.
+
+### Shared contract and integration gaps
+
+- **Subtask start date.** Office and Personal nodes and the `r7_work_command` and `nw_work_command` create payloads lack a persisted `start_date`. The owner needs to add a field, validation and round-trip read projection before Mobile can save a default of today.
+- **Subtask start and publication.** Mobile suppresses pre-start assignments on the covered surfaces. The Web migration `20261102192953_work_status_lifecycle_sync.sql` starts the root after recorded Subtask execution. The requested direction needs a root-start transaction that publishes eligible descendants and changes their actual status while preserving ordered steps and closed branches. Universal draft/pre-start isolation also needs the shared read, notification, conversation and finance contracts to enforce visibility. The client-side presentation controls do not establish a new access policy.
+- **Office Subtask Lead review and contributor changes.** The Office `complete_subitem` contract allows direct completion for a Subtask Lead and does not implement the requested Task Lead approval. Mobile limits direct completion to the currently authorized Task Lead and explains the unavailable path to the Subtask Lead. `save_subtask_work_update` applies immediately. Contributor work still needs pending submissions, nearest eligible Lead decisions, atomic apply, notifications and receipt recovery. Preserve independent root review, no self-review and ancestor fallback.
+- **Task and Subtask allocations.** `allocate_project_task_funding` authorizes both the Project Lead and appointed Head in Web. Enforcing Project Lead exclusivity requires a shared server capability and write guard. Subtask funding uses `get_task_funding_context` and `set_subtask_budget_cap` with an approved parent allocation line. Hosted NW11 compatibility and role-scoped receipt verification are required for both native write paths. Existing approved amounts and authorized cash workflows remain usable where their current prerequisites are installed.
+- **Background push delivery.** Requires `EXPO_PUBLIC_EAS_PROJECT_ID`, Android/iOS platform push credentials, the hosted `register_mobile_push_device` contract and an active dispatcher. Background delivery was not verified.
+## Web parity and reliability pass
+
+TypeScript, nine Metro checks, 52 focused tests in 13 suites, the platform exports, and the three-bundle credential audit passed. The signed build 44 APK installed and cold launched on Android. The restored Member session displayed the logo-only header on Projects, Inbox and More, the pinned Project column during a horizontal swipe, a localized Inbox press that opened the intended Subtask, and the Subtask Activity timeline. These display checks used existing records. Web comparison for those same records and signed-in checks for the other roles remain pending.
+
+[Build 44 APK](../../artifacts/M7/eFlow-Mobile-M7-Parity-v44-arm64-x86_64.apk) · [Projects swipe](../../artifacts/M7/parity-v44-projects-swiped.png) · [Inbox press](../../artifacts/M7/parity-v44-inbox-press.png) · [Subtask timeline](../../artifacts/M7/parity-v44-activity.png)
+
+The source comparison used Mobile `2c14db9d46d21fdd50b4464aa9c9ef14cf442388` and Web `4ff217b84e3e8128555ffc87f0514253cd576399`. The Projects directory reads `projects.status` by the authorized workspace project IDs before applying lifecycle filters. The Web mapper substitutes Planning for an absent status, and Web creation also saves Planning when the creator supplies no status. Mobile presents an unavailable status when an Office project row has no recognized lifecycle value. Progress, schedule and the target-date fallback use the Web portfolio selector. Zero eligible tasks are shown as “No tasks yet.” Office and project lead names are displayed only when the scoped read returns them.
+
+The public gateway discovery returned HTTP 200. Its published hostname failed DNS resolution on the workstation and Android emulator, while a public control domain resolved on Android. The protected Professional Profile and PDS reads share that gateway. Mobile preserves the HTTP status when a response is available and combines matching recovery messages. The earlier handset failures for Projects, Task conversation, and financial records still require device evidence.
+
+| Scenario | Acceptance check |
+| --- | --- |
+| Authorized Office project with a known ID on both platforms | Compare the saved lifecycle, Lead office, Project lead, schedule, completed and eligible tasks, and target date. Verify that completed and archived rows are accessible through filters. Repeat in a Personal workspace with a shortcut. |
+| Signed-in Head, Member and Accounting Staff | Check all primary tab titles, the top-right workspace switcher, the pinned Project column, and the absence of name and role on More. Verify Inbox View and Mark read independently with native focus and press feedback. |
+| Approved Task or Subtask history with submissions and attachments | Compare actors, timestamps, changes, notes and evidence. Load older entries and verify the timeline retains distinct events. Test both appearances and large text. |
+| Approved account with Profile and PDS access | Recheck the published gateway after DNS is restored. Test session expiry, denied access, retry and recovery without writing production data. |
+
 ## Post-build 42 stabilization
 
 [Android QA APK build 43](../../artifacts/M7/eFlow-Mobile-M7-Stabilization-v43-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V43_APK_VERIFICATION.json) · [Credential audit](M7-stabilization-v43-release-audit.json) · [Android signed-out launch](../../artifacts/M7/stabilization-v43-signed-out.png)

@@ -1,4 +1,4 @@
-import type { WorkRow } from "../../../core/web/app/features/personal-work/types";
+import type { MobileWorkRow as WorkRow } from "./displayWorkSnapshot";
 import { workDay } from "../../../core/web/app/shared/workCalendar";
 
 export const workGroups = [

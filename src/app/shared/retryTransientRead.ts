@@ -21,6 +21,17 @@ export async function retryTransientRead<T>(
     )
       throw error;
     await new Promise((resolve) => setTimeout(resolve, 250));
-    return load();
+    try {
+      const result = await load();
+      if (__DEV__) console.info("eFlow read retry", { outcome: "ok" });
+      return result;
+    } catch (retryError) {
+      if (__DEV__)
+        console.warn("eFlow read retry", {
+          outcome: "failed",
+          errorClass: (retryError as Error)?.name || "Unknown",
+        });
+      throw retryError;
+    }
   }
 }

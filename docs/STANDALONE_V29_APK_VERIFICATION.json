@@ -1,0 +1,18 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Latest-v29-arm64-x86_64.apk",
+  "versionCode": 29,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 4897960,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "fb0ac8a3fe936f3d8c3eb0696df82a6f4b7f856af23c022cf26c806edc255a7d",
+  "bytes": 98475845
+}

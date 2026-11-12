@@ -71,3 +71,45 @@ test("a staffing escalation opens the exact settlement for the Head only", () =>
   expect(inboxUpdateRoute(notice, "accounting_staff")).toBeUndefined();
   expect(inboxUpdateRoute(notice, "member")).toBeUndefined();
 });
+
+test("an M7 Lead review notice opens its exact work details instead of the final task review", () => {
+  const notice = {
+    id: "notice",
+    taskId: "root",
+    projectId: "project",
+    entityType: "m7_work_proposal",
+  } as Notification;
+  expect(inboxUpdateRoute(notice, "member")).toEqual({
+    name: "task",
+    id: "root",
+    projectId: "project",
+    view: "details",
+  });
+  expect(
+    inboxUpdateRoute({ ...notice, workNodeId: "branch" }, "member"),
+  ).toEqual({
+    name: "task",
+    id: "root",
+    projectId: "project",
+    nodeId: "branch",
+    view: "subitems",
+  });
+});
+
+test("Personal Lead review notices open the exact Personal branch", () => {
+  expect(
+    inboxUpdateRoute(
+      {
+        ...update,
+        entityType: "m7_personal_work_proposal",
+        workNodeId: "branch",
+      },
+      "member",
+    ),
+  ).toEqual({
+    name: "personal_project",
+    id: "project",
+    taskId: "root",
+    nodeId: "branch",
+  });
+});

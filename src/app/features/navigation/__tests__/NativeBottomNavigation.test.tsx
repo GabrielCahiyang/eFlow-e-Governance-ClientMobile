@@ -128,3 +128,13 @@ test("one selection disc follows the selected tab and resizes with the bar", asy
     transform: [{ translateX: 106 }],
   });
 });
+
+test("the Inbox shows an accessible indicator only while there are unread updates", async () => {
+  const view = await render(
+    <NativeBottomNavigation role="member" selected="work" onSelect={jest.fn()} inboxUnread />,
+  );
+  expect(view.getByTestId("inbox-unread-indicator")).toBeOnTheScreen();
+  expect(view.getByRole("tab", { name: "Inbox" }).props.accessibilityHint).toBe("Unread updates");
+  await view.rerender(<NativeBottomNavigation role="member" selected="work" onSelect={jest.fn()} />);
+  expect(view.queryByTestId("inbox-unread-indicator")).toBeNull();
+});

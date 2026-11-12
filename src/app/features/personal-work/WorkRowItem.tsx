@@ -1,4 +1,4 @@
-import type { WorkRow } from "../../../core/web/app/features/personal-work/types";
+import type { MobileWorkRow } from "./displayWorkSnapshot";
 import { workDateLabel } from "../../../core/web/app/shared/workCalendar";
 import { MondayTableRow } from "../../components/ui/MondayTable";
 
@@ -7,11 +7,27 @@ export function WorkRowItem({
   onPress,
   isLast = false,
 }: {
-  row: WorkRow;
+  row: MobileWorkRow;
   onPress: () => void;
   isLast?: boolean;
 }) {
   const due = row.due ? workDateLabel(row.due, row.timezone) : null;
+  const start = row.start ? workDateLabel(row.start, row.timezone) : null;
+  const compactStart =
+    start &&
+    due &&
+    /^\d{4}$/.test(due.slice(-4)) &&
+    start.slice(-4) === due.slice(-4)
+      ? start.slice(0, -5)
+      : start;
+  const schedule =
+    start && due
+      ? `${compactStart} to ${due}`
+      : start
+        ? `Starts ${start}`
+        : due
+          ? `Due ${due}`
+          : null;
   const context = [
     row.projectTitle,
     row.workspaceName !== row.projectTitle ? row.workspaceName : null,
@@ -25,7 +41,10 @@ export function WorkRowItem({
       title={row.title}
       status={row.status}
       context={context}
-      due={due}
+      due={schedule}
+      scheduleLabel={[start && `Starts ${start}`, due && `Due ${due}`]
+        .filter(Boolean)
+        .join(", ")}
       assignee={row.relation || null}
       tag={tag}
       blocker={row.blocker || null}
@@ -34,4 +53,3 @@ export function WorkRowItem({
     />
   );
 }
-

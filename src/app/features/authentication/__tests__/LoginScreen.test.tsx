@@ -125,7 +125,7 @@ test.each([
     await waitFor(() =>
       expect(
         screen.getByText(
-          /We couldn't connect|Sign-in is taking longer than expected/,
+          failure.name === "TimeoutError" ? "Request timed out. Please try again." : "Connection unavailable. Try again when the service is reachable.",
         ),
       ).toBeOnTheScreen(),
     );

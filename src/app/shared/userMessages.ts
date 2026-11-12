@@ -8,8 +8,8 @@ export const feedback = {
   action:
     "We couldn't confirm your changes. Refresh this page and check before trying again.",
   connection:
-    "We couldn't connect. Check your internet connection and try again.",
-  timeout: "This is taking longer than expected. Please try again.",
+    "Connection unavailable. Try again when the service is reachable.",
+  timeout: "Request timed out. Please try again.",
   access:
     "You don't have access to do this. Refresh the page or contact your Office Head.",
   changed: "This item has changed. Refresh the page before continuing.",
@@ -104,12 +104,14 @@ const internal =
   /https?:\/\/|(?:[a-z\d-]+\.)+(?:com|co|net|org|io|dev)(?:\b|\/)|\b(?:supabase|cloudflare|postgres|postgrest|PGRST\w*|RLS|RPC|SQL|JWT|schema|migration|gateway|endpoint|stack trace|payload|service.role|capabilities?|lease|revision|request ID|server|backend|native build)\b|(?:[A-Z]:\\)|[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}/i;
 
 export function isConnectionFailure(error: unknown) {
-  const item = error as { name?: string; message?: string } | null;
-  return (
-    /AbortError|TimeoutError/.test(item?.name || "") ||
-    /network|fetch failed|failed to fetch|UnknownHost|unable to resolve|timed? out|connection|offline/i.test(
-      item?.message || "",
-    )
+  const item = error as {
+    name?: string;
+    message?: string;
+    status?: number;
+  } | null;
+  if (item?.status) return false;
+  return /^(?:TypeError: )?(?:Network request failed|Failed to fetch|fetch failed|The device is offline)\.?$|UnknownHostException|unable to resolve host|\b(?:ENOTFOUND|ECONNREFUSED)\b|NetworkError when attempting to fetch/i.test(
+    item?.message || "",
   );
 }
 export function userErrorMessage(
@@ -150,25 +152,27 @@ export function userErrorMessage(
     return "This account is inactive. Contact your Office support team for help.";
   if (error instanceof PublicMessageError && !internal.test(text)) return text;
   if (
-    /AbortError|TimeoutError/.test(item?.name || "") ||
-    /timed? out/i.test(text)
-  )
-    return context === "action" ? feedback.action : feedback.timeout;
-  if (isConnectionFailure(error))
-    return context === "action" ? feedback.action : feedback.connection;
-  if (
     item?.status === 401 ||
+    item?.code === "PGRST301" ||
     /sign in again|session (?:changed|expired)/i.test(text)
   )
     return feedback.session;
   if (
     item?.status === 403 ||
     item?.code === "42501" ||
-    /permission denied|not authorized|access denied|current .*access is required/i.test(
-      text,
-    )
+    /permission denied|not authorized|access denied/i.test(text)
   )
     return feedback.access;
+  if (item?.status === 404 || item?.code === "PGRST116")
+    return context === "action" ? feedback.action : feedback.unavailable;
+  if (
+    item?.status === 408 ||
+    /TimeoutError/.test(item?.name || "") ||
+    (!item?.status && /timed? out/i.test(text))
+  )
+    return context === "action" ? feedback.action : feedback.timeout;
+  if (isConnectionFailure(error))
+    return context === "action" ? feedback.action : feedback.connection;
   if (
     /revision changed|stale|version changed|item.*changed|no longer editable/i.test(
       text,

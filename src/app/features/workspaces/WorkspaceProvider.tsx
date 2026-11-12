@@ -57,8 +57,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             )
           )
             throw new Error("Could not verify the selected workspace context.");
-          setSelected(snapshot);
-          return snapshot;
+          const visible = {
+            ...snapshot,
+            projects: snapshot.projects.filter(
+              (project) => project.status !== "planning",
+            ),
+          };
+          setSelected(visible);
+          return visible;
         }
       } catch (e) {
         if (token === generation.current)

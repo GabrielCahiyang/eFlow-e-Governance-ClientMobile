@@ -43,6 +43,7 @@ import { fetchProjectGroups } from "../../../core/web/app/features/project-table
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
 import { nativeWindow } from "../../../platform/webRuntime";
 import { netProjectUpdates } from "./subscriptions";
+import { ProjectTaskEditor, useTaskStructure } from "./ProjectTaskEditor";
 import { ProjectPeople } from "./ProjectPeople";
 import { ProjectFiles } from "./ProjectFiles";
 import { ProjectOffices } from "./ProjectOffices";
@@ -105,6 +106,7 @@ export function ProjectScreen({
   const [view, setView] = useState(initialView || "tasks");
   const [menu, setMenu] = useState(false);
   const [people, setPeople] = useState(false);
+  const [addTask, setAddTask] = useState(false);
   const [query, setQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const workView: ProjectWorkView =
@@ -126,6 +128,9 @@ export function ProjectScreen({
     projectReady && main && !auxiliary,
   );
   const groups = groupFacts.error ? [] : (groupFacts.data ?? []);
+  const taskScope = { actor: profile?.id || "", project: id, office: facts.data?.orgId || "" };
+  const createAccess = useTaskStructure(taskScope, projectReady && !!taskScope.office && facts.data?.status === "active" && profile?.role === "head" && main && !auxiliary);
+  const canAdd = createAccess.data === true && !createAccess.loading && !createAccess.error && !facts.loading && !groupFacts.loading && !!groups.length;
   const pages = useProjectTaskPages({
     scope,
     project: id,
@@ -327,6 +332,7 @@ export function ProjectScreen({
         <Button variant="outline" onPress={() => setMenu(true)}>
           Project options
         </Button>
+        {canAdd && <Button onPress={() => setAddTask(true)}>Add task</Button>}
       </Row>
       {!auxiliary && (
         <Tabs items={views} value={main ? "tasks" : view} onChange={setView} />
@@ -582,14 +588,6 @@ export function ProjectScreen({
               key={profile?.id + ":" + id}
               projectId={id}
               showCloseout={profile?.role === "head" && !closed}
-              onManageFunding={() =>
-                navigate({
-                  name: "project",
-                  id,
-                  view: "funding_configuration",
-                  title: "Project funding setup",
-                })
-              }
             />
           )}
         </Screen>
@@ -651,6 +649,7 @@ export function ProjectScreen({
             });
         }}
       />
+      {addTask && <ProjectTaskEditor scope={taskScope} groups={groups} onClose={() => setAddTask(false)} onSaved={refresh} />}
       {people && (
         <ProjectPeople
           project={project}

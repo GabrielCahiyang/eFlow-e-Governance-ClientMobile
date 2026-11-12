@@ -1,6 +1,8 @@
 import { supabase } from "../../../platform/supabase";
 import { readAllRows } from "../../../core/web/app/shared/readAllRows";
 import { rowToProject } from "../../../core/web/app/features/projects/services/projectMappers";
+import { verifiedProjectStatus } from "./portfolioFacts";
+import { PublicMessageError } from "../../shared/userMessages";
 import {
   readString,
   rowToTask,
@@ -18,15 +20,18 @@ export async function fetchProjects(office?: string) {
         .order("id")
         .range(from, to);
     })
-  ).map(rowToProject);
+  ).filter((row) => row.status !== "planning").map(rowToProject);
 }
 export async function fetchProject(id: string) {
   const { data, error } = await supabase
     .from("projects")
     .select("*")
     .eq("id", id)
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data || data.status === "planning") throw new PublicMessageError("This project is unavailable here.");
+  if (!verifiedProjectStatus(data.status))
+    throw new Error("Project status is unavailable.");
   return rowToProject(data);
 }
 type TaskColumns = "*" | "id" | "id,deadline,due_date";

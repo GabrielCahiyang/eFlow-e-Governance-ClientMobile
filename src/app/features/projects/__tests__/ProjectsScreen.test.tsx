@@ -13,6 +13,7 @@ const mockSections =
       >,
     ) => void
   >();
+jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
 jest.mock("../../../components/ui/FolderRefresh", () => {
   const real = jest.requireActual<
     typeof import("../../../components/ui/FolderRefresh")
@@ -47,6 +48,37 @@ const mockDefaultProjects = [
   },
 ] satisfies WorkspaceProject[];
 let mockProjects: WorkspaceProject[] = mockDefaultProjects;
+let mockRecordedStatus: Record<string, string | null> = {};
+jest.mock("../portfolioFacts", () => ({
+  ...jest.requireActual<typeof import("../portfolioFacts")>(
+    "../portfolioFacts",
+  ),
+  readPortfolioFacts: async () => ({
+    projects: mockProjects
+      .filter((project) => project.kind === "office")
+      .map((project) => ({
+        id: project.id,
+        status:
+          project.id in mockRecordedStatus
+            ? mockRecordedStatus[project.id]
+            : project.status,
+      })),
+    tasks: [],
+    offices: [],
+    owners: [],
+  }),
+}));
+test("keeps a verified Planning project out of the mobile directory", async () => {
+  mockRecordedStatus = { active: "planning", archived: null };
+  try {
+    const view = await render(<ProjectsScreen navigate={jest.fn()} />);
+    expect(await view.findByText("Status unavailable")).toBeOnTheScreen();
+    expect(view.queryByText("Planning")).toBeNull();
+    expect(view.queryByText(mockProjects[0].title)).toBeNull();
+  } finally {
+    mockRecordedStatus = {};
+  }
+});
 jest.mock("../../authentication", () => ({
   useAuth: () => ({ profile: { id: "filter-qa" } }),
 }));
@@ -124,7 +156,9 @@ test("directory pages projects after filtering, keeps the full count and opens a
     );
     expect(ids()).toEqual(["45"]);
     expect(view.getByText("1 project")).toBeOnTheScreen();
-    await fireEvent.press(view.getByText("Directory project 45"));
+    await fireEvent.press(
+      view.getByRole("button", { name: "Open project Directory project 45" }),
+    );
     expect(navigate).toHaveBeenCalledWith({
       name: "personal_project",
       id: "45",

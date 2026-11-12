@@ -13,6 +13,7 @@ import { useFacts } from "../../shared/useFacts";
 import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/constants";
 import { useAuth } from "../authentication";
 import { useBudget } from "./useBudget";
+import { WorkAllocationCard } from "./WorkAllocationCard";
 import { CashRequestSheet } from "./CashRequestSheet";
 import { fetchTaskFundingContext } from "../../../core/web/app/features/budget/services/budgetService";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
@@ -28,7 +29,7 @@ export function TaskFundingCard({
   recordId,
   canManage,
   readOnly,
-  onManageFunding,
+  showWebSetup,
   onOpenLinkedSubitem,
 }: {
   task: Pick<Task, "id" | "orgId">;
@@ -36,7 +37,7 @@ export function TaskFundingCard({
   recordId?: string;
   canManage: boolean;
   readOnly: boolean;
-  onManageFunding?: () => void;
+  showWebSetup?: boolean;
   onOpenLinkedSubitem?: (id: string) => void;
 }) {
   const { profile } = useAuth();
@@ -166,10 +167,15 @@ export function TaskFundingCard({
               )}
           </>
         )}
-        {!recordId && onManageFunding && (
-          <Button variant="outline" onPress={onManageFunding}>
-            Funding setup on eFlow Web
-          </Button>
+        {!recordId && (
+          <WorkAllocationCard
+            key={task.id + ":" + (subtaskId || "")}
+            task={task.id}
+            node={subtaskId}
+            readOnly={readOnly || funding.loading || !!funding.error}
+            showWebSetup={!!showWebSetup}
+            onSaved={refresh}
+          />
         )}
       </Card>
       {!!budget.error && (

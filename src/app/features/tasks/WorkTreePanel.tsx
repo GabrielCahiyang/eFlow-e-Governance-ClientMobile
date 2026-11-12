@@ -1,3 +1,5 @@
+import { LeadWorkReviewCard } from "./LeadWorkReviewCard";
+import { nodeSchedule, workScheduleToday } from "./subtaskSchedule";
 import { statusLabel } from "../../shared/statusLabels";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { NavigationRow } from "../../components/ui/NavigationRow";
@@ -9,8 +11,8 @@ import {
   Notice,
   Row,
   Status,
-  dateLabel,
 } from "../../components/ui";
+import { workDateLabel } from "../../../core/web/app/shared/workCalendar";
 import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
 import type { Navigate } from "../../shared/routes";
@@ -23,6 +25,7 @@ import {
   branchCompletion,
   completionMode,
   isSubtaskContributor,
+  officeSubtaskPublished,
   personalReviewAllowed,
   workNodeRoute,
   workScope,
@@ -65,12 +68,31 @@ export function WorkTreePanel({
     data.nodes.find(
       (item) => item.id === focused.id && item.task_id === data.root.id,
     );
+  const schedule = nodeSchedule(node);
+  const scheduled = !!workScheduleToday(data);
+  const canExecuteSchedule =
+    !scheduled || !schedule?.start_date || !!schedule.started_at;
   const context = workScope(data, actor, readOnly);
   const can = (action: NodeWorkAction) =>
     !!node && selectNodeWorkCapability(data, node.id, action, context).allowed;
   const actions: { id: string; title: string; edit: WorkEdit }[] = [];
-  const finish = node && completionMode(data, node.id, actor, readOnly);
+  const finish =
+    node &&
+    canExecuteSchedule &&
+    completionMode(data, node.id, actor, readOnly);
   const contributor = !!node && isSubtaskContributor(data, node.id, actor);
+  const waitingToStart =
+    data.root.kind === "office" &&
+    !officeSubtaskPublished(data.root.status, data.root.lead, actor);
+  const visibleChildren = waitingToStart
+    ? children.filter((child) => {
+        const item = data.nodes.find((entry) => entry.id === child.id);
+        return (
+          item?.lead_id !== actor &&
+          !item?.assigned_to_ids.includes(actor || "")
+        );
+      })
+    : children;
   const completionSummary =
     node && branchCompletion(data, node.status, node.id);
   if (node) {
@@ -79,6 +101,12 @@ export function WorkTreePanel({
         id: "staff",
         title: "Choose people",
         edit: { command: "staff", node },
+      });
+    if (can("edit_details"))
+      actions.push({
+        id: "edit",
+        title: "Edit subtask",
+        edit: { command: "edit", node },
       });
     if (can("create_child"))
       actions.push({
@@ -105,7 +133,10 @@ export function WorkTreePanel({
     nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
     await onSaved(receipt);
   };
-  if (focusNodeId && !node)
+  if (
+    focusNodeId &&
+    (!node || (waitingToStart && (node.lead_id === actor || contributor)))
+  )
     return (
       <Notice>This subtask is no longer available in this work tree.</Notice>
     );
@@ -114,7 +145,13 @@ export function WorkTreePanel({
       {node && (
         <Card>
           <Row>
-            <Status value={node.status} />
+            <Status
+              value={
+                schedule?.started_at && node.status === "todo"
+                  ? "in_progress"
+                  : node.status
+              }
+            />
           </Row>
           <LabelValue
             label="Progress"
@@ -124,9 +161,21 @@ export function WorkTreePanel({
                 : `${completionSummary?.percent}%`
             }
           />
+          {!!schedule?.start_date && (
+            <LabelValue
+              label="Planned start"
+              value={workDateLabel(schedule.start_date, "Asia/Manila")}
+            />
+          )}
+          {!!schedule?.started_at && (
+            <LabelValue
+              label="Started"
+              value={new Date(schedule.started_at).toLocaleString()}
+            />
+          )}
           <LabelValue
             label="Due date"
-            value={dateLabel(node.due_date || undefined)}
+            value={workDateLabel(node.due_date, "Asia/Manila")}
           />
           <LabelValue
             label="Subtask Lead"
@@ -155,11 +204,8 @@ export function WorkTreePanel({
               this work is closed.
             </Notice>
           )}
-          {contributor && !readOnly && node.status !== "completed" && (
-            <Notice>{contributorReviewUnavailable}</Notice>
-          )}
           <Row>
-            {!contributor && can("execute") && (
+            {!contributor && canExecuteSchedule && can("execute") && (
               <Button
                 variant="outline"
                 onPress={() => {
@@ -180,11 +226,31 @@ export function WorkTreePanel({
                 variant="outline"
                 onPress={() => setEdit({ command: "submit", node })}
               >
-                Submit for review
+                {scheduled ? "Mark as complete" : "Submit for review"}
               </Button>
             )}
           </Row>
         </Card>
+      )}
+      {node && (
+        <LeadWorkReviewCard
+          root={data.root.id}
+          node={node.id}
+          readOnly={readOnly}
+          onSaved={() => saved(data)}
+          fallback={
+            !readOnly &&
+            node.status !== "completed" &&
+            (contributor ? (
+              <Notice>{contributorReviewUnavailable}</Notice>
+            ) : node.lead_id === actor && actor !== data.root.lead ? (
+              <Notice>
+                Submitting this subtask to the Task Lead for review is currently
+                unavailable.
+              </Notice>
+            ) : undefined)
+          }
+        />
       )}
       {node && data.root.kind === "office" && funding}
       {node && (
@@ -195,21 +261,21 @@ export function WorkTreePanel({
           actorId={actor}
         />
       )}
-      {(!node || actions.length > 0 || children.length > 0) && (
+      {(!node || actions.length > 0 || visibleChildren.length > 0) && (
         <Card title={node ? "Child subtasks" : "Subtasks"}>
           {!!actions.length && (
             <Button variant="outline" onPress={() => setMenu(true)}>
               {node ? "Branch actions" : "Subtask actions"}
             </Button>
           )}
-          {children.length ? (
-            children.map((child) => {
+          {visibleChildren.length ? (
+            visibleChildren.map((child) => {
               const record = data.nodes.find((item) => item.id === child.id)!;
               return (
                 <NavigationRow
                   key={child.id}
                   title={child.title}
-                  description={`${statusLabel(record.status)} · ${branchCompletion(data, record.status, record.id).percent}%`}
+                  description={`${statusLabel(nodeSchedule(record)?.effective_status ?? record.status)} · ${branchCompletion(data, record.status, record.id).percent}%`}
                   onPress={() =>
                     navigate(workNodeRoute(data, child.id, child.title))
                   }
@@ -221,10 +287,8 @@ export function WorkTreePanel({
           )}
         </Card>
       )}
-      {(can("edit_details") ||
-        can("move") ||
+      {(can("move") ||
         can("order_children") ||
-        can("delete") ||
         (!node &&
           selectRootWorkCapability(data, "order_children", context)
             .allowed)) && (

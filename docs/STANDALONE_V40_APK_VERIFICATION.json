@@ -1,0 +1,18 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Sign-In-Copy-v40-arm64-x86_64.apk",
+  "versionCode": 40,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5005340,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "378bdc49b2bc5baed73d4ae03523ef5291dae979f1f45036140146c9caed8d1f",
+  "bytes": 98847369
+}

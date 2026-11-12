@@ -25,6 +25,7 @@ const historicalTask = {
 
 const mockCaptureEndReached =
   jest.fn<(callback: SectionListProps<Task>["onEndReached"]) => void>();
+jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
 jest.mock("../../../components/ui/FolderRefresh", () => {
   const real = jest.requireActual<
     typeof import("../../../components/ui/FolderRefresh")

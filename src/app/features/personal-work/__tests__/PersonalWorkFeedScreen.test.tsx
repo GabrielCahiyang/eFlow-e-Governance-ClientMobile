@@ -22,9 +22,34 @@ jest.mock("../../../components/ui/FolderRefresh", () => {
 
 let mockError: Error | undefined;
 let mockLoading = false;
-let mockRows: import("../../../../core/web/app/features/personal-work/types").WorkRow[] =
-  [];
+let mockRows: import("../displayWorkSnapshot").MobileWorkRow[] = [];
+jest.mock("../../../components/ui/SelectionSheet", () => ({
+  SelectionSheet: ({
+    open,
+    options,
+    onSelect,
+  }: React.ComponentProps<
+    typeof import("../../../components/ui/SelectionSheet").SelectionSheet
+  >) => {
+    const { Pressable, Text } = require("react-native");
+    return open
+      ? options.map((option) => (
+          <Pressable
+            key={option.id}
+            accessibilityRole="radio"
+            accessibilityLabel={option.title}
+            onPress={() => onSelect(option.id)}
+          >
+            <Text>{option.title}</Text>
+          </Pressable>
+        ))
+      : null;
+  },
+}));
 const mockRefresh = jest.fn();
+jest.mock("../../workspaces", () => ({
+  useWorkspace: () => ({ selected: { workspace: { id: "office" } } }),
+}));
 jest.mock("../WorkFeedProvider", () => ({
   useMobileWorkFeed: () => ({
     data: { rows: mockRows, issues: [], unavailable: [], workspaces: [] },
@@ -34,7 +59,7 @@ jest.mock("../WorkFeedProvider", () => ({
   }),
 }));
 
-test("an empty assignment search offers a working clear action and then refreshes the actor's feed", async () => {
+test("an empty assignment search can be reset without a refresh button", async () => {
   const view = await render(<PersonalWorkFeedScreen navigate={jest.fn()} />);
   expect(view.getByText("Your work starts here")).toBeOnTheScreen();
   await fireEvent.changeText(
@@ -42,15 +67,16 @@ test("an empty assignment search offers a working clear action and then refreshe
     "qa-no-match",
   );
   expect(view.getByText("No matching assignments")).toBeOnTheScreen();
-  await fireEvent.press(view.getByRole("button", { name: "Clear filters" }));
+  await fireEvent.press(
+    view.getByRole("button", { name: "Reset search and filters" }),
+  );
   expect(view.getByPlaceholderText("Search assignments")).toHaveDisplayValue(
     "",
   );
   expect(view.getByText("Your work starts here")).toBeOnTheScreen();
-  await fireEvent.press(
-    view.getByRole("button", { name: "Refresh assignments" }),
-  );
-  expect(mockRefresh).toHaveBeenCalledTimes(1);
+  expect(
+    view.queryByRole("button", { name: "Refresh assignments" }),
+  ).toBeNull();
 });
 
 test("My Work keeps automatic reads quiet and shows the folder for a manual refresh", async () => {
@@ -95,16 +121,14 @@ test("a failed source cannot masquerade as a successfully empty assignment feed"
     expect(
       view.getByText("We couldn't load this information. Please try again."),
     ).toBeOnTheScreen();
-    await fireEvent.press(
-      view.getByRole("button", { name: "Refresh assignments" }),
-    );
+    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     expect(mockRefresh).toHaveBeenCalled();
   } finally {
     mockError = undefined;
   }
 });
 
-test("Today chip filters visible assignments, exposes selected state, and toggles back without a floating plus", async () => {
+test("Today uses the due date and My Work keeps assignments in the selected workspace", async () => {
   const base = {
     kind: "office-task" as const,
     workspaceId: "office",
@@ -126,6 +150,7 @@ test("Today chip filters visible assignments, exposes selected state, and toggle
       id: "today",
       rootId: "today",
       title: "Inspect today",
+      start: "2026-10-05",
       due: new Date().toISOString(),
     },
     {
@@ -136,21 +161,35 @@ test("Today chip filters visible assignments, exposes selected state, and toggle
       title: "Inspect overdue",
       due: new Date(Date.now() - 86400000).toISOString(),
     },
+    {
+      ...base,
+      key: "other",
+      id: "other",
+      rootId: "other",
+      workspaceId: "other-office",
+      title: "Other workspace",
+    },
   ];
   try {
     const view = await render(<PersonalWorkFeedScreen navigate={jest.fn()} />);
+    expect(view.queryByText("Other workspace")).toBeNull();
+    await fireEvent.press(
+      view.getByRole("button", { name: "Filter assignments: All work" }),
+    );
+    expect(view.queryByText("All workspaces")).toBeNull();
+    expect(view.queryByText("Other history")).toBeNull();
+    await fireEvent.press(view.getByRole("radio", { name: "Today" }));
     expect(
-      view.queryByRole("button", { name: "Filter work or options" }),
-    ).toBeNull();
-    const today = () => view.getByRole("button", { name: "Today, 1 item" });
-    await fireEvent.press(today());
-    expect(today().props.accessibilityState.selected).toBe(true);
-    expect(view.getByText("Inspect today")).toBeOnTheScreen();
+      view.getByRole("button", { name: "Filter assignments: Today" }).props
+        .accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      view.getByRole("button", {
+        name: /Inspect today, Starts 5 Oct 2026, Due/,
+      }),
+    ).toBeOnTheScreen();
+    expect(view.getByText(/^5 Oct(?: 2026)? to /)).toBeOnTheScreen();
     expect(view.queryByText("Inspect overdue")).toBeNull();
-
-    await fireEvent.press(today());
-    expect(view.getByText("Inspect overdue")).toBeOnTheScreen();
-    expect(today().props.accessibilityState.selected).toBe(false);
   } finally {
     mockRows = [];
   }
@@ -187,7 +226,7 @@ test("My Work expands in order while totals and search include rows beyond the f
     const view = await render(<PersonalWorkFeedScreen navigate={jest.fn()} />);
     expect(lengths()).toEqual([[40, 50]]);
     expect(
-      view.getByRole("button", { name: "Today, 50 items" }),
+      view.getByRole("button", { name: "Filter assignments: All work" }),
     ).toBeOnTheScreen();
     const end = props().onEndReached!;
     await act(async () => {
@@ -210,7 +249,7 @@ test("My Work expands in order while totals and search include rows beyond the f
     expect(lengths()).toEqual([[1, 1]]);
     expect(view.getByText("Assignment 83")).toBeOnTheScreen();
     expect(
-      view.getByRole("button", { name: "Today, 50 items" }),
+      view.getByRole("button", { name: "Filter assignments: All work" }),
     ).toBeOnTheScreen();
     await fireEvent.changeText(search, "");
     expect(lengths()).toEqual([[40, 50]]);

@@ -1,0 +1,18 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Chat-v33-arm64.apk",
+  "versionCode": 33,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 4980060,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "0eafa7c055be9b606d0cd77828c634c665f867fdfe7cbc62c5a3d3111c575aa5",
+  "bytes": 57496676
+}

@@ -265,7 +265,7 @@ export function routeFitsWorkspace(
     return false;
   const projectId = route.name === "task" ? route.projectId : route.id;
   return (
-    !projectId || snapshot.projects.some((project) => project.id === projectId)
+    !projectId || snapshot.projects.some((project) => project.id === projectId && project.status !== "planning")
   );
 }
 

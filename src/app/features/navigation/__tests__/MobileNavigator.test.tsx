@@ -41,7 +41,7 @@ jest.mock("../../authentication", () => ({
   }),
 }));
 jest.mock("../../workspaces", () => ({ useWorkspace: () => mockWorkspace }));
-jest.mock("../../notifications", () => ({ usePushInbox: () => {} }));
+jest.mock("../../notifications", () => ({ usePushInbox: () => {}, useInboxIndicator: () => false }));
 jest.mock("../../communication", () => ({
   useConversationDirectory: () => ({ data: [] }),
 }));
@@ -213,7 +213,9 @@ test("a child opened from Home retains Home selection; Projects and More are sta
     expect(screen.getByText("Body projects")).toBeOnTheScreen(),
   );
   await fireEvent.press(screen.getByRole("tab", { name: "More" }));
-  await waitFor(() => expect(screen.getByText("QA Head")).toBeOnTheScreen());
+  await waitFor(() =>
+    expect(screen.getByRole("header", { name: "More" })).toBeOnTheScreen(),
+  );
   await fireEvent.press(
     screen.getByRole("button", { name: "Account & settings" }),
   );
@@ -273,7 +275,9 @@ test.each(["head", "member", "accounting_staff"])(
     await fireEvent.press(
       screen.getByRole("button", { name: "Back to previous" }),
     );
-    await waitFor(() => expect(screen.getByText("QA Head")).toBeOnTheScreen());
+    await waitFor(() =>
+      expect(screen.getByRole("header", { name: "More" })).toBeOnTheScreen(),
+    );
   },
 );
 

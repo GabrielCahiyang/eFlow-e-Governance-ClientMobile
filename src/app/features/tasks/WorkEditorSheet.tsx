@@ -28,7 +28,6 @@ import {
   captureWorkEditorBaseline,
   freezeWorkEditorRequest,
   workEditorCapability,
-  workEditorDateError,
   workEditorDirty,
   sameWorkEditorScope,
 } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
@@ -59,6 +58,13 @@ import {
   personalReviewAllowed,
 } from "./branchInspector";
 import { contributorReviewUnavailable } from "../../shared/userMessages";
+import {
+  nodeSchedule,
+  plannedSubtaskStartIssue,
+  subtaskScheduleError,
+  workScheduleToday,
+} from "./subtaskSchedule";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
 import { workEditorReceiptRetryAllowed } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
 export function WorkEditorSheet(
@@ -227,6 +233,19 @@ function WorkEditorForm({
     people: [...(recovered?.fields || baseline.fields).people],
     order: [...(recovered?.fields || baseline.fields).order],
   }));
+  const originalStart =
+    nodeSchedule(data.nodes.find((item) => item.id === baseline.nodeId))
+      ?.start_date || "";
+  const today = workScheduleToday(data);
+  const [plannedStart, setPlannedStart] = useState(
+    () =>
+      (typeof recovered?.request.payload.start === "string"
+        ? recovered.request.payload.start
+        : undefined) ??
+      (edit.command === "create" ? today || "" : originalStart),
+  );
+  const changedStart =
+    !!today && edit.command === "edit" && plannedStart !== originalStart;
   const request = useRef<WorkRequest | undefined>(recovered?.request),
     action = useAction();
   const context = {
@@ -318,11 +337,11 @@ function WorkEditorForm({
               fields.lead || null,
               fields.people,
             )
-          : workEditorDateError(latest, baseline, fields);
-        if (issue) throw new Error(issue);
+          : subtaskScheduleError(latest, baseline, fields);
+        if (issue) throw new PublicMessageError(issue);
         const current = workEditorCapability(latest, baseline, context);
         if (!isStaff && !current.allowed)
-          throw new Error(
+          throw new PublicMessageError(
             current.disabledReason || "Current work access is required.",
           );
         if (["create", "edit"].includes(edit.command) && !fields.title.trim())
@@ -335,10 +354,24 @@ function WorkEditorForm({
         let next = isStaff
           ? createStaffingRequest(staffing, fields.lead, fields.people)
           : freezeWorkEditorRequest(baseline, fields, crypto.randomUUID());
+        if (today && (edit.command === "create" || changedStart)) {
+          if (!workScheduleToday(latest))
+            throw new PublicMessageError(
+              "Refresh to verify subtask scheduling before saving.",
+            );
+          const issue = plannedSubtaskStartIssue(
+            plannedStart,
+            fields.due,
+            true,
+          );
+          if (issue) throw new PublicMessageError(issue);
+          next = { ...next, payload: { ...next.payload, start: plannedStart } };
+        }
         const needsImpact =
           ["move", "order", "delete"].includes(edit.command) ||
           (edit.command === "edit" &&
-            (fields.due !== baseline.fields.due ||
+            (changedStart ||
+              fields.due !== baseline.fields.due ||
               fields.standalone !== baseline.fields.standalone)) ||
           (isStaff && fields.lead !== staffing.leadId && !!staffing.leadId);
         if (needsImpact) {
@@ -445,13 +478,18 @@ function WorkEditorForm({
             : fields.standalone,
         note: fields.note,
       });
+      if (plannedStart === originalStart)
+        setPlannedStart(nodeSchedule(latestNode)?.start_date || "");
       setData(latest);
       setBaseline(nextBaseline);
       setNewer(undefined);
     });
   const close = async () => {
     if (action.busy) return;
-    if (!committed && (request.current || workEditorDirty(baseline, fields))) {
+    if (
+      !committed &&
+      (request.current || changedStart || workEditorDirty(baseline, fields))
+    ) {
       if (
         !(await confirmAction(
           "Leave these work changes?",
@@ -510,9 +548,20 @@ function WorkEditorForm({
             onChangeText={(v) => update("title", v)}
             editable={!request.current && !action.busy}
           />
-          {edit.command === "create" && (
+          {today ? (
+            <DateField
+              label="Planned start"
+              value={plannedStart}
+              onChange={setPlannedStart}
+              disabled={
+                !!request.current ||
+                action.busy ||
+                !!nodeSchedule(node)?.started_at
+              }
+            />
+          ) : edit.command === "create" ? (
             <Notice>Subtask start dates are currently unavailable.</Notice>
-          )}
+          ) : null}
           <DateField
             label="Due date"
             value={fields.due}

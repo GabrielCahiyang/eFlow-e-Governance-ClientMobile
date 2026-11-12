@@ -25,6 +25,7 @@ test("projects honor current workspace scope and deduplicate favorites and short
     personal,
     archived,
     project("Other"),
+    project("Planning Alpha", "planning"),
     project("Completed Alpha", "completed"),
   ];
   expect(
@@ -36,8 +37,9 @@ test("projects honor current workspace scope and deduplicate favorites and short
     ).map(({ key, data }) => [key, data.map((row) => row.id)]),
   ).toEqual([
     ["favorites", [active.id]],
-    ["projects", [personal.id]],
+    ["projects", [personal.id, "Completed Alpha"]],
   ]);
+  expect(projectSections(projects, new Set(["Planning Alpha"]), "Planning", "all")).toEqual([]);
   expect(projectSections(projects, new Set(), "", "archived")[0].data).toEqual([
     archived,
   ]);

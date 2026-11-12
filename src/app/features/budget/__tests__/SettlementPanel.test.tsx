@@ -13,6 +13,7 @@ let mockLoading = false;
 let mockError: Error | undefined;
 const mockRun = jest.fn();
 
+jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
 jest.mock("../../authentication", () => ({
   useAuth: () => ({
     profile: {

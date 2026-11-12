@@ -9,6 +9,26 @@ export function inboxUpdateRoute(
 ): AppRoute | undefined {
   if (!isMobileRole(role)) return;
   if (
+    item.entityType === "m7_personal_work_proposal" &&
+    item.projectId &&
+    item.taskId &&
+    item.workNodeId
+  )
+    return {
+      name: "personal_project",
+      id: item.projectId,
+      taskId: item.taskId,
+      nodeId: item.workNodeId,
+    };
+  if (item.entityType === "m7_work_proposal" && item.taskId)
+    return {
+      name: "task",
+      id: item.taskId,
+      projectId: item.projectId,
+      nodeId: item.workNodeId,
+      view: item.workNodeId ? "subitems" : "details",
+    };
+  if (
     item.financialRecordType === "settlement_staffing" ||
     item.financialRecordType === "office_petty_cash_staffing"
   )

@@ -45,6 +45,7 @@ async function hasReceipt(taskId: string, actor: string, id: string) {
 export async function uploadEvidenceFile(
   path: string,
   file: EvidenceFile,
+  bucketId: "task-attachments" | "m7-work-evidence" = "task-attachments",
 ): Promise<TaskSubmissionAttachment> {
   const bytes = await readEvidenceFile(file);
   if (
@@ -56,7 +57,7 @@ export async function uploadEvidenceFile(
       "The selected file is empty, too large, or changed. Verify the original file.",
     );
 
-  const bucket = supabase.storage.from("task-attachments");
+  const bucket = supabase.storage.from(bucketId);
   const result = await bucket.upload(path, bytes, {
     upsert: false,
     contentType: file.type,

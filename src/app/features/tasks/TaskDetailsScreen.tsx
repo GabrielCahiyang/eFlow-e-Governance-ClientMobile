@@ -1,3 +1,5 @@
+import { LeadWorkReviewCard } from "./LeadWorkReviewCard";
+import { ProjectTaskEditor, useTaskStructure } from "../projects/ProjectTaskEditor";
 import { DeadlineBadge } from "../../components/ui/DeadlineBadge";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -30,7 +32,6 @@ import {
 } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import {
   getTaskTeamMemberIds,
-  getTaskLeadId,
 } from "../../../core/web/app/features/tasks/selectors/teamMembership";
 import { updateTaskStatus } from "../../../core/web/app/features/tasks/services/taskService";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
@@ -87,6 +88,8 @@ export function TaskDetailsScreen({
       if (project.error) throw project.error;
       projectStatus = project.data?.status || "unavailable";
     }
+    if (projectStatus === "planning" || projectStatus === "unavailable")
+      throw new Error("Task unavailable.");
     return { task, projectStatus };
   };
   const facts = useFacts(
@@ -123,6 +126,20 @@ export function TaskDetailsScreen({
   const overview = view === "details";
   const [execution, setExecution] = useState<"progress" | "submit">();
   const [taskActions, setTaskActions] = useState(false);
+  const [editingTask, setEditingTask] = useState(false);
+  const loadedTask = facts.data?.task;
+  const taskScope = {
+    actor: profile?.id || "",
+    project: loadedTask?.linkedProjectId || "",
+    office: loadedTask?.orgId || "",
+    task: loadedTask,
+  };
+  const editAccess = useTaskStructure(
+    taskScope,
+    overview && !!taskScope.project && !!taskScope.office && profile?.role === "head" &&
+      !facts.error && facts.data?.projectStatus === "active" && !loadedTask?.archivedAt &&
+      !["completed", "cancelled"].includes(loadedTask?.status || ""),
+  );
   const [staff, setStaff] = useState(false);
   const refresh = async () => {
     await Promise.all([facts.refresh(), tree.refresh()]);
@@ -167,6 +184,7 @@ export function TaskDetailsScreen({
       </Screen>
     );
   const { task, projectStatus } = facts.data;
+  const canEditTask = !facts.loading && !editAccess.loading && !editAccess.error && editAccess.data === true;
   const readOnly =
       ["completed", "archived", "unavailable"].includes(projectStatus) ||
       !!task.archivedAt,
@@ -174,7 +192,7 @@ export function TaskDetailsScreen({
       isAppointedOfficeHead(profile, organization ? [organization] : []) &&
       profile?.org_id === task.orgId,
     participant = getTaskTeamMemberIds(task).includes(profile?.id || ""),
-    lead = !!profile?.id && getTaskLeadId(task) === profile.id;
+    lead = !!profile?.id && task.assigneeId === profile.id;
   const completion =
     tree.data && !tree.error
       ? branchCompletion(tree.data, task.status)
@@ -221,7 +239,7 @@ export function TaskDetailsScreen({
     const { latest, actorId } = await verifyCurrentTask();
     const status = latest.status;
     const allowed =
-      getTaskLeadId(latest) === actorId &&
+      latest.assigneeId === actorId &&
       (mode === "submit"
         ? ["todo", "in_progress", "changes_requested"].includes(status)
         : mode === "start"
@@ -266,19 +284,7 @@ export function TaskDetailsScreen({
               })
           : undefined
       }
-      onManageFunding={
-        head || lead
-          ? () =>
-              navigate({
-                name: "task",
-                id,
-                projectId: task.linkedProjectId,
-                nodeId,
-                view: "funding_configuration",
-                title: "Task funding setup",
-              })
-          : undefined
-      }
+      showWebSetup={nodeId ? lead : head || lead}
       canManage={lead}
       readOnly={
         readOnly ||
@@ -368,18 +374,26 @@ export function TaskDetailsScreen({
         </>
       )}
       {readOnly && <Notice>This work is read-only.</Notice>}
+      {overview && canEditTask && (
+        <Button variant="outline" onPress={() => setEditingTask(true)}>Edit task</Button>
+      )}
+      {editingTask && (
+        <ProjectTaskEditor scope={taskScope} groups={[]} onClose={() => setEditingTask(false)} onSaved={refresh} />
+      )}
       {!!(view === "details") && (
         <>
-          {!readOnly &&
-            participant &&
-            !lead &&
-            ["todo", "in_progress", "changes_requested"].includes(
-              task.status,
-            ) && <Notice>{contributorReviewUnavailable}</Notice>}
+          {!!task.linkedProjectId && (
+            <LeadWorkReviewCard root={id} readOnly={readOnly || facts.loading} onSaved={refresh}
+              fallback={!readOnly && participant && !lead &&
+                ["todo", "in_progress", "changes_requested"].includes(task.status)
+                ? <Notice>{contributorReviewUnavailable}</Notice> : undefined}
+            />
+          )}
           <Row>
             {!!(
               !readOnly &&
               lead &&
+              !facts.loading &&
               ["todo", "changes_requested"].includes(task.status)
             ) && (
               <Button
@@ -486,7 +500,8 @@ export function TaskDetailsScreen({
       {!!(view === "activity") && (
         <>
           <Button
-            variant="outline"
+            variant="ghost"
+            style={{ alignSelf: "flex-start" }}
             onPress={() =>
               navigate({
                 name: "messages",

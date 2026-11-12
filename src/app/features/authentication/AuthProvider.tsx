@@ -51,6 +51,7 @@ function temporaryFailure(error: unknown) {
   if (failure?.status === 401 || failure?.status === 403) return false;
   return (
     isConnectionFailure(error) ||
+    failure?.name === "TimeoutError" ||
     failure?.name === "AuthRetryableFetchError" ||
     (typeof failure?.status === "number" && failure.status >= 500)
   );

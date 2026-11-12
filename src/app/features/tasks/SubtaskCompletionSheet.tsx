@@ -61,12 +61,18 @@ export function SubtaskCompletionSheet({
       let attempt = recovery.data || local.current;
       const needsUpload =
         attempt?.files && attempt.attachments.length < attempt.files.length;
-      if (!attempt || needsUpload) {
+      {
         const tree = await fetchWorkTree(rootId);
         if (
           tree.root.project !== projectId ||
           tree.root.office !== officeId ||
-          completionMode(tree, node.id, actorId) !== "direct"
+          tree.root.lead !== actorId ||
+          (completionMode(tree, node.id, actorId) !== "direct" &&
+            (!attempt ||
+              needsUpload ||
+              !tree.nodes.some(
+                (item) => item.id === node.id && item.status === "completed",
+              )))
         )
           throw new Error(
             "Current access does not permit direct completion of this subtask.",

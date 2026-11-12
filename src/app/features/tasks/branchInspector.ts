@@ -1,3 +1,4 @@
+import { nodeSchedule, workScheduleToday } from "./subtaskSchedule";
 import { buildWorkDisplayTree } from "../../../core/web/app/features/nested-work/selectors/displayTree";
 import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
@@ -45,6 +46,17 @@ export function isSubtaskContributor(
     node.lead_id !== actorId &&
     (!Array.isArray(node.assigned_to_ids) ||
       node.assigned_to_ids.includes(actorId))
+  );
+}
+
+export function officeSubtaskPublished(
+  rootStatus: string | undefined,
+  rootLead: string | null | undefined,
+  actorId: string | null | undefined,
+) {
+  return (
+    (!!actorId && rootLead === actorId) ||
+    (rootStatus !== "todo" && rootStatus !== "pending_assignment")
   );
 }
 
@@ -114,10 +126,19 @@ export function completionMode(
     return;
   const scope = workScope(tree, actorId, readOnly);
   if (tree.root.kind === "personal") {
+    if (
+      workScheduleToday(tree) &&
+      (tree.root.lead !== actorId || node.lead_id !== actorId)
+    )
+      return;
     if (selectNodeWorkCapability(tree, nodeId, "submit", scope).allowed)
       return "review";
   } else if (
-    (node.lead_id === actorId || tree.root.lead === actorId) &&
+    tree.root.lead === actorId &&
+    (!workScheduleToday(tree) ||
+      (node.lead_id === actorId &&
+        (!nodeSchedule(node)?.start_date ||
+          !!nodeSchedule(node)?.started_at))) &&
     selectNodeWorkCapability(tree, nodeId, "submit", scope).allowed
   )
     return "direct";

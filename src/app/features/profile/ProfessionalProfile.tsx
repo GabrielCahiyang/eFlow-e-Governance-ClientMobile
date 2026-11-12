@@ -18,10 +18,8 @@ import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { chooseFiles, asServiceFile } from "../../../platform/files";
 import {
-  getProfessionalProfile,
   updateProfessionalProfile,
   confirmProfessionalProfile,
-  getMyPds,
   uploadPds,
   retryPds,
   getPdsDownload,
@@ -29,8 +27,25 @@ import {
 } from "../../../core/web/app/features/professional-profile/services/professionalProfileService";
 import {
   professionalFields,
+  type PdsDocument,
+  type ProfessionalProfile as ProfessionalProfileRecord,
   type ProfessionalValues,
 } from "../../../core/web/app/features/professional-profile/types";
+import { controlPanelFetch } from "../../../core/web/app/shared/controlPanelClient";
+import { userErrorMessage } from "../../shared/userMessages";
+
+async function readProfessionalRecord<T>(path: string): Promise<T> {
+  const response = await controlPanelFetch(
+    path,
+    { cache: "no-store" },
+    { retryOnEndpointChange: false, timeoutMs: 30000 },
+  );
+  if (!response.ok)
+    throw Object.assign(new Error("Professional record request failed."), {
+      status: response.status,
+    });
+  return response.json() as Promise<T>;
+}
 const empty: ProfessionalValues = {
   skills: [],
   education: [],
@@ -44,9 +59,15 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
   const { profile } = useAuth(),
     own = profile?.id === userId,
     facts = useFacts(`professional:${profile?.id}:${userId}`, () =>
-      getProfessionalProfile(userId),
+      readProfessionalRecord<{ profile: ProfessionalProfileRecord | null }>(
+        `/professional-profile/${encodeURIComponent(userId)}`,
+      ),
     ),
-    documents = useFacts("own-pds:" + profile?.id, getMyPds, own),
+    documents = useFacts(
+      "own-pds:" + profile?.id,
+      () => readProfessionalRecord<{ documents: PdsDocument[] }>("/pds/me"),
+      own,
+    ),
     action = useAction(),
     [draft, setDraft] = useState<ProfessionalValues>();
   const values = draft || facts.data?.profile || empty,
@@ -60,7 +81,12 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
     <>
       <Card title="Professional profile">
         {facts.error ? (
-          <ErrorState error={facts.error} retry={() => void facts.refresh()} />
+          <ErrorState
+            error={facts.error}
+            retry={() =>
+              void Promise.all([facts.refresh(), documents.refresh()])
+            }
+          />
         ) : facts.loading && !facts.data ? (
           <Loading label="Loading professional profile" layout="form" />
         ) : (
@@ -142,97 +168,102 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
           </>
         )}
       </Card>
-      {!!own && (
-        <Card title="Personal Data Sheet (PDS)">
-          <Notice>
-            Upload a PDF up to 10 MB. Review the extracted details before saving
-            them to your professional profile.
-          </Notice>
-          <Button
-            busy={action.busy}
-            onPress={() =>
-              void action.run(async () => {
-                const [file] = await chooseFiles("application/pdf");
-                if (!file) return;
-                if (
-                  file.size > 10 * 1024 * 1024 ||
-                  !file.name.toLowerCase().endsWith(".pdf")
-                )
-                  throw new Error("Choose a PDF smaller than 10 MB.");
-                await uploadPds(await asServiceFile(file));
-                await documents.refresh();
-              })
-            }
-          >
-            Upload PDS
-          </Button>
-          {documents.error ? (
-            <ErrorState
-              error={documents.error}
-              retry={() => void documents.refresh()}
-            />
-          ) : documents.loading && !documents.data ? (
-            <Loading label="Loading Personal Data Sheets" layout="files" />
-          ) : !documents.data?.documents.length ? (
-            <Empty
-              compact
-              kind="files"
-              title="No Personal Data Sheets uploaded"
-            />
-          ) : (
-            documents.data?.documents.map((document) => (
-              <Card key={document.id} title={document.original_filename}>
-                <Status value={document.processing_status} />
-                {!!document.processing_error && (
-                  <Notice>{document.processing_error}</Notice>
-                )}
-                <Row>
-                  <Button
-                    variant="outline"
-                    onPress={() =>
-                      void action.run(async () => {
-                        await Linking.openURL(
-                          (await getPdsDownload(document.id)).url,
-                        );
-                      })
-                    }
-                  >
-                    Open PDF
-                  </Button>
-                  {!!(document.processing_status === "failed") && (
+      {!!own &&
+        !(
+          facts.error &&
+          documents.error &&
+          userErrorMessage(facts.error) === userErrorMessage(documents.error)
+        ) && (
+          <Card title="Personal Data Sheet (PDS)">
+            <Notice>
+              Upload a PDF up to 10 MB. Review the extracted details before
+              saving them to your professional profile.
+            </Notice>
+            <Button
+              busy={action.busy}
+              onPress={() =>
+                void action.run(async () => {
+                  const [file] = await chooseFiles("application/pdf");
+                  if (!file) return;
+                  if (
+                    file.size > 10 * 1024 * 1024 ||
+                    !file.name.toLowerCase().endsWith(".pdf")
+                  )
+                    throw new Error("Choose a PDF smaller than 10 MB.");
+                  await uploadPds(await asServiceFile(file));
+                  await documents.refresh();
+                })
+              }
+            >
+              Upload PDS
+            </Button>
+            {documents.error ? (
+              <ErrorState
+                error={documents.error}
+                retry={() => void documents.refresh()}
+              />
+            ) : documents.loading && !documents.data ? (
+              <Loading label="Loading Personal Data Sheets" layout="files" />
+            ) : !documents.data?.documents.length ? (
+              <Empty
+                compact
+                kind="files"
+                title="No Personal Data Sheets uploaded"
+              />
+            ) : (
+              documents.data?.documents.map((document) => (
+                <Card key={document.id} title={document.original_filename}>
+                  <Status value={document.processing_status} />
+                  {!!document.processing_error && (
+                    <Notice>{document.processing_error}</Notice>
+                  )}
+                  <Row>
                     <Button
                       variant="outline"
-                      busy={action.busy}
                       onPress={() =>
                         void action.run(async () => {
-                          await retryPds(document.id);
-                          await documents.refresh();
+                          await Linking.openURL(
+                            (await getPdsDownload(document.id)).url,
+                          );
                         })
                       }
                     >
-                      Retry extraction
+                      Open PDF
                     </Button>
-                  )}
-                  {!!(document.processing_status === "completed") && (
-                    <Button
-                      variant="outline"
-                      busy={action.busy}
-                      onPress={() =>
-                        void action.run(async () => {
-                          const result = await getPdsDraft(document.id);
-                          setDraft(result.draft);
-                        })
-                      }
-                    >
-                      Review extracted profile
-                    </Button>
-                  )}
-                </Row>
-              </Card>
-            ))
-          )}
-        </Card>
-      )}
+                    {!!(document.processing_status === "failed") && (
+                      <Button
+                        variant="outline"
+                        busy={action.busy}
+                        onPress={() =>
+                          void action.run(async () => {
+                            await retryPds(document.id);
+                            await documents.refresh();
+                          })
+                        }
+                      >
+                        Retry extraction
+                      </Button>
+                    )}
+                    {!!(document.processing_status === "completed") && (
+                      <Button
+                        variant="outline"
+                        busy={action.busy}
+                        onPress={() =>
+                          void action.run(async () => {
+                            const result = await getPdsDraft(document.id);
+                            setDraft(result.draft);
+                          })
+                        }
+                      >
+                        Review extracted profile
+                      </Button>
+                    )}
+                  </Row>
+                </Card>
+              ))
+            )}
+          </Card>
+        )}
       {!!action.error && <ErrorState context="action" error={action.error} />}
       {!!action.notice && <Notice>{action.notice}</Notice>}
     </>

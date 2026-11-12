@@ -5,6 +5,21 @@ import { displayWorkSnapshot } from "../../features/personal-work/displayWorkSna
 import type { WorkSnapshot } from "../../../core/web/app/features/personal-work/types";
 
 test.each([
+  [{ message: "gateway connection refused", status: 503 }, feedback.load],
+  [{ message: "offline policy", status: 403 }, feedback.access],
+  [{ message: "opaque", status: 401 }, feedback.session],
+  [{ message: "opaque", status: 404 }, feedback.unavailable],
+  [{ name: "AbortError", message: "superseded" }, feedback.load],
+  [{ name: "TimeoutError", message: "deadline" }, feedback.timeout],
+  [new TypeError("Network request failed"), feedback.connection],
+])(
+  "classifies read recovery without exposing provider details: %j",
+  (error, expected) => {
+    expect(userErrorMessage(error)).toBe(expected);
+  },
+);
+
+test.each([
   new Error(
     "permission denied for table profiles; https://secret.example.test key=private",
   ),
@@ -31,7 +46,7 @@ test("login uses plain offline/timeout/account guidance, never the supplied acco
     loginErrorMessage(
       Object.assign(new Error("internal error"), { name: "TimeoutError" }),
     ),
-  ).toMatch(/taking longer/);
+  ).toMatch(/timed out/);
   for (const status of [401, 403, 423, 429, 500]) {
     const text = loginErrorMessage(
       Object.assign(new Error("sql private signing key"), {

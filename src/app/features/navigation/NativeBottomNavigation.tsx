@@ -102,9 +102,11 @@ export function NativeBottomNavigation({
   role,
   selected,
   onSelect,
+  inboxUnread = false,
 }: {
   role: string;
   selected: PrimaryTab;
+  inboxUnread?: boolean;
   onSelect: (tab: PrimaryTab) => void;
 }) {
   const palette = useTheme(),
@@ -197,6 +199,7 @@ export function NativeBottomNavigation({
                 key={tab}
                 accessibilityRole="tab"
                 accessibilityLabel={tabLabels[tab]}
+                accessibilityHint={tab === "inbox" && inboxUnread ? "Unread updates" : undefined}
                 aria-selected={active}
                 accessibilityState={{ selected: active }}
                 onPress={() => onSelect(tab)}
@@ -247,6 +250,24 @@ export function NativeBottomNavigation({
                         play={animate && active && motionTab === tab}
                       />
                     </Animated.View>
+                    {tab === "inbox" && inboxUnread && (
+                      <View
+                        testID="inbox-unread-indicator"
+                        importantForAccessibility="no"
+                        pointerEvents="none"
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: palette.danger,
+                          borderColor: palette.surface,
+                          borderWidth: 1,
+                        }}
+                      />
+                    )}
                   </View>
                 )}
               </Pressable>

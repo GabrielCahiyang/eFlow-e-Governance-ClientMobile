@@ -15,10 +15,11 @@ export function projectSections(
     ...new Map(authorized.map((p) => [p.id, p])).values(),
   ].filter(
     (project) =>
+      project.status !== "planning" &&
       project.title.toLowerCase().includes(query) &&
       (status === "all" ||
         (status === "current"
-          ? !["archived", "completed"].includes(project.status)
+          ? project.status !== "archived"
           : project.status === status)),
   );
   const starred = matches.filter((p) => favorites.has(p.id));

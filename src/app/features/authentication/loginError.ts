@@ -16,11 +16,8 @@ export function loginErrorMessage(error: unknown): string {
         return "Please wait a moment before trying to sign in again.";
     }
   }
-  if (
-    /AbortError|TimeoutError/.test(item?.name || "") ||
-    /timed? out/i.test(item?.message || "")
-  )
-    return "Sign-in is taking longer than expected. Check your connection and try again.";
+  if (item?.name === "TimeoutError" || /timed? out/i.test(item?.message || ""))
+    return feedback.timeout;
   if (isConnectionFailure(error)) return feedback.connection;
   return "We couldn't sign you in right now. Please try again shortly.";
 }

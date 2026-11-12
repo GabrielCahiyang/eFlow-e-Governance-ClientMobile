@@ -64,6 +64,7 @@ export function MondayTableRow({
   status,
   context,
   due,
+  scheduleLabel,
   assignee,
   tag,
   blocker,
@@ -74,6 +75,7 @@ export function MondayTableRow({
   status: string;
   context?: string | null;
   due?: string | null;
+  scheduleLabel?: string;
   assignee?: string | null;
   tag?: string | null;
   blocker?: string | null;
@@ -86,7 +88,7 @@ export function MondayTableRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={[title, scheduleLabel].filter(Boolean).join(", ")}
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,

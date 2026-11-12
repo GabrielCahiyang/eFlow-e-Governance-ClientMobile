@@ -55,6 +55,8 @@ export function useFacts<T>(
       loading: true,
       stale: old.key === key && old.stale,
     }));
+    const started = Date.now();
+    const operation = /^[a-z][a-z-]{1,40}(?=:)/i.exec(key)?.[0] ?? "read";
     try {
       const requestLoader = loader.current;
       const data = await loadDisplayData(
@@ -63,10 +65,30 @@ export function useFacts<T>(
         policy.current,
       );
       if (stillCurrent()) {
+        if (__DEV__)
+          console.info("eFlow read", {
+            operation,
+            outcome: "ok",
+            durationMs: Date.now() - started,
+          });
         lastRead.current = Date.now();
         setState({ key, data, loading: false, stale: false });
       }
     } catch (e) {
+      if (__DEV__) {
+        const failure = e as {
+          name?: string;
+          code?: string;
+          status?: number;
+        } | null;
+        console.warn("eFlow read", {
+          operation,
+          outcome: "failed",
+          errorClass: failure?.name || "Unknown",
+          code: failure?.code || failure?.status || "unknown",
+          durationMs: Date.now() - started,
+        });
+      }
       if (stillCurrent())
         setState((old) => ({
           key,
@@ -80,7 +102,11 @@ export function useFacts<T>(
                   typeof e === "object" &&
                   "message" in e &&
                   typeof e.message === "string"
-                ? Object.assign(new Error(e.message), { cause: e })
+                ? Object.assign(new Error(e.message), {
+                    cause: e,
+                    status: "status" in e ? e.status : undefined,
+                    code: "code" in e ? e.code : undefined,
+                  })
                 : new Error("Could not load this view."),
         }));
     }

@@ -1,3 +1,4 @@
+import { inboxReadEvent } from "./useInboxIndicator";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
 import { useEffect, useRef, useState } from "react";
@@ -317,6 +318,7 @@ export function ActionInbox({
       assertAccess(actor);
       await markRecentNotificationRead(actor, item.id);
       setConfirmedRead((previous) => new Set(previous).add(item.id));
+      nativeWindow.dispatchEvent({ type: inboxReadEvent });
       await Promise.all([updates.refresh(), unreadUpdates.refresh()]);
     } catch (error) {
       setMarkError(
@@ -350,6 +352,12 @@ export function ActionInbox({
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <View style={{ gap: space.md, marginBottom: space.xs }}>
+          <Text
+            accessibilityRole="header"
+            style={{ fontSize: 24, fontWeight: "700", color: palette.text }}
+          >
+            {reviews ? "Reviews" : "Inbox"}
+          </Text>
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
@@ -472,17 +480,6 @@ export function ActionInbox({
               </Text>
             </View>
             {!!message && <Text>{message}</Text>}
-            {!!destinationLabel && (
-              <Text
-                style={{
-                  color: palette.primary,
-                  fontSize: 13,
-                  fontWeight: "600",
-                }}
-              >
-                {destinationLabel}
-              </Text>
-            )}
           </>
         );
         return (
@@ -495,33 +492,38 @@ export function ActionInbox({
               borderColor: palette.border,
             }}
           >
-            {target ? (
+            <View style={{ paddingVertical: space.sm, gap: space.xs }}>
+              {body}
+            </View>
+            {!!target && !!destinationLabel && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={destinationLabel}
-                accessibilityHint={[
-                  !update.read && "Unread",
-                  copy.title,
-                  message,
-                ]
+                accessibilityHint={[copy.title, message]
                   .filter(Boolean)
                   .join(". ")}
                 onPress={() => navigate(target)}
                 style={({ pressed }) => ({
                   minHeight: 48,
-                  paddingVertical: space.sm,
-                  gap: space.xs,
+                  alignSelf: "flex-start",
+                  justifyContent: "center",
+                  paddingHorizontal: space.sm,
+                  borderRadius: 8,
                   backgroundColor: pressed
                     ? palette.primarySoft
-                    : palette.surface,
+                    : "transparent",
                 })}
               >
-                {body}
+                <Text
+                  style={{
+                    color: palette.primary,
+                    fontSize: 13,
+                    fontWeight: "600",
+                  }}
+                >
+                  {destinationLabel}
+                </Text>
               </Pressable>
-            ) : (
-              <View style={{ paddingVertical: space.sm, gap: space.xs }}>
-                {body}
-              </View>
             )}
             {!update.read && (
               <Button

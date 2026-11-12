@@ -184,6 +184,7 @@ export function OfficeBudgetScreen({
   return (
     <Screen
       compact
+      title={view === "overview" ? "Accounting" : undefined}
       description={orgId ? `${officeName} · FY ${year}` : `FY ${year}`}
       onRefresh={() => {
         if (view === "overview") return summary.refresh();

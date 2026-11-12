@@ -197,7 +197,9 @@ test("direct Office completion and personal submission require distinct current 
   expect(completionMode(office, row.id, "lead")).toBeUndefined();
   rememberWorkCapabilityContext(office, "lead");
   rememberWorkCapabilityContext(personal, "lead");
-  expect(completionMode(office, row.id, "lead")).toBe("direct");
+  expect(completionMode(office, row.id, "lead")).toBeUndefined();
+  rememberWorkCapabilityContext(office, "root-lead");
+  expect(completionMode(office, row.id, "root-lead")).toBe("direct");
   expect(completionMode(personal, row.id, "lead")).toBe("review");
   expect(completionMode(office, row.id, "someone-else")).toBeUndefined();
   expect(completionMode(office, row.id, "lead", true)).toBeUndefined();
