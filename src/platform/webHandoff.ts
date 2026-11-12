@@ -13,6 +13,7 @@ const paths: Record<string, string> = {
   accounting_overview: "accounting-overview",
   accounting_releases: "voucher-cash-releases",
   project: "projects",
+  projects: "projects",
   personal_project: "projects",
   task: "projects",
 };
@@ -52,6 +53,14 @@ export function webHandoffUrl(
       if (!fundingSetup) url.searchParams.set("task", route.id);
     }
     if (route.workspaceId) url.searchParams.set("workspace", route.workspaceId);
+    if (route.name === "project" && route.id && route.view === "people_management")
+      url.searchParams.set("people", "add");
+    if (
+      route.name === "budget" &&
+      route.fiscalYear &&
+      Number.isInteger(route.fiscalYear)
+    )
+      url.searchParams.set("fy", String(route.fiscalYear));
     const displayView =
       route.view === "people_management"
         ? "people"
@@ -67,14 +76,26 @@ export function webHandoffUrl(
             ? "plan"
             : undefined
           : route.view;
-    if (displayView && !(route.name === "reports" && displayView === "web"))
+    const projectViews: Record<string, string> = {
+      project_setup: "settings",
+      task_templates: "settings",
+      ai_draft: "settings",
+      import: "tasks",
+      audit_trail: "audit-trail",
+      analysis: "analytics",
+    };
+    const view = route.name === "projects" && route.view === "project_setup" ? undefined
+      : route.name === "project" && displayView
+      ? projectViews[displayView] ?? displayView
+      : displayView;
+    if (view && !(route.name === "reports" && view === "web"))
       url.searchParams.set(
         "view",
         fundingSetup
           ? taskOutsideProject
             ? "funding"
             : "budget"
-          : displayView,
+          : view,
       );
     return url.toString();
   } catch {

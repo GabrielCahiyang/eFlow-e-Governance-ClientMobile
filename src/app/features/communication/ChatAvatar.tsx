@@ -4,6 +4,7 @@ import ClipboardList from "lucide-react-native/icons/clipboard-list";
 import Folder from "lucide-react-native/icons/folder";
 import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
+import { ChatImage } from "./chatImages";
 import { initials } from "./chatPresentation";
 
 /** Messenger-style round avatar: initials for people, glyphs for groups. */
@@ -11,10 +12,14 @@ export function ChatAvatar({
   name,
   kind,
   size = 48,
+  actor,
+  path,
 }: {
   name?: string | null;
   kind?: string;
   size?: number;
+  actor?: string;
+  path?: string;
 }) {
   const palette = useTheme();
   const { isDark } = useAppearance();
@@ -34,6 +39,7 @@ export function ChatAvatar({
         width: size,
         height: size,
         borderRadius: size / 2,
+        overflow: "hidden",
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: palette.primarySoft,
@@ -52,6 +58,20 @@ export function ChatAvatar({
         >
           {initials(name)}
         </Text>
+      )}
+      {!!(actor && path) && (
+        <ChatImage
+          actor={actor}
+          path={path}
+          avatar
+          resizeMode="cover"
+          style={{
+            position: "absolute",
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+          }}
+        />
       )}
     </View>
   );

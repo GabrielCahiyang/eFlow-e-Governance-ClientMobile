@@ -301,6 +301,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { event: "*", schema: "public", table: "role_permissions" },
         accessChanged,
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "project_office_members",
+          filter: "user_id=eq." + user.id,
+        },
+        accessChanged,
+      )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           if (subscribed) accessChanged();

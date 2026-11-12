@@ -1,6 +1,8 @@
+import { parseMessage } from "../../../core/web/app/features/chat-calls/services/chatMessageCodec";
 import type { Channel, Message } from "./services";
 
-export type ConversationFilter = "all" | "people" | "groups" | "office";
+export type ConversationFilter =
+  "all" | "people" | "groups" | "office" | "archive";
 export const conversationFilters: {
   value: ConversationFilter;
   label: string;
@@ -9,6 +11,7 @@ export const conversationFilters: {
   { value: "people", label: "People" },
   { value: "groups", label: "Groups" },
   { value: "office", label: "Office" },
+  { value: "archive", label: "Archived" },
 ];
 
 export const quickReactions = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -25,7 +28,7 @@ export function initials(name?: string | null) {
 
 export function conversationGroup(
   kind: string,
-): Exclude<ConversationFilter, "all"> {
+): Exclude<ConversationFilter, "all" | "archive"> {
   return kind === "direct" ? "people" : kind === "org" ? "office" : "groups";
 }
 
@@ -37,12 +40,22 @@ export function filterConversations(
   const needle = query.trim().toLowerCase();
   return channels.filter(
     (item) =>
-      (filter === "all" || conversationGroup(item.kind) === filter) &&
+      (filter === "archive"
+        ? item.archived
+        : !item.archived &&
+          (filter === "all" || conversationGroup(item.kind) === filter)) &&
       (!needle ||
-        [item.name, item.projectTitle, item.lastMessage].some((value) =>
-          value?.toLowerCase().includes(needle),
-        )),
+        [
+          item.name,
+          item.defaultName,
+          item.projectTitle,
+          item.lastMessage && parseMessage(item.lastMessage).text,
+        ].some((value) => value?.toLowerCase().includes(needle))),
   );
+}
+
+export function pinnedConversation(item: Channel) {
+  return !item.archived && (item.kind === "project" || !!item.personalPin);
 }
 
 export function conversationKindLabel(kind: string) {
@@ -119,6 +132,10 @@ export function buildThreadItems(
       !previous ||
       day ||
       pause ||
+      !!previous.deleted_at ||
+      !!message.deleted_at ||
+      !!previous.activity_kind ||
+      !!message.activity_kind ||
       previous.sender_id !== message.sender_id ||
       at - before > GROUP_GAP_MS;
     return {

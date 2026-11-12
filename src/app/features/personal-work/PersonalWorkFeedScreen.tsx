@@ -55,7 +55,9 @@ export function PersonalWorkFeedScreen({
   const workspaceId = selected?.workspace.id;
   const filters = dueOnly
     ? (["Overdue", "Today", "Upcoming"] as const)
-    : workGroups.filter((group) => group !== "Other history");
+    : workGroups.filter((group) => initial === "History"
+      ? group === "Completed" || group === "Other history"
+      : group !== "Completed" && group !== "Other history");
   const [filterOpen, setFilterOpen] = useState(false);
   const [openError, setOpenError] = useState<Error>();
 
@@ -69,20 +71,19 @@ export function PersonalWorkFeedScreen({
   const allAssigned = useMemo(
     () =>
       groupAssignedWork(
-        (workspaceId ? (rows ?? []) : []).filter((row) =>
-          initial === "History"
-            ? row.history
-            : initial === "Subtasks"
-              ? row.kind.endsWith("node")
-              : initial === "Leading"
-                ? row.leading
-                : true,
-        ),
+        (workspaceId ? (rows ?? []) : []).filter((row) => {
+          if (initial === "History") return row.history;
+          if (row.history) return false;
+          if (dueOnly) return true;
+          if (initial === "Leading") return row.leading;
+          if (initial === "Subtasks") return row.kind.endsWith("node");
+          return row.kind.endsWith("task");
+        }),
         "",
         workspaceId,
         new Date(minute * 60_000),
       ),
-    [rows, initial, workspaceId, minute],
+    [rows, initial, dueOnly, workspaceId, minute],
   );
   const needle = query.trim().toLocaleLowerCase();
   const matches = useMemo(

@@ -146,15 +146,25 @@ export function DateField({
   value,
   onChange,
   disabled,
+  min,
+  max,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  min?: string;
+  max?: string;
 }) {
   const palette = useTheme();
   const [open, setOpen] = useState(false);
   const parsed = value ? new Date(value + "T12:00:00") : new Date();
+  const minimumDate = min ? new Date(min + "T12:00:00") : undefined;
+  const maximumDate = max && (!min || max >= min)
+    ? new Date(max + "T12:00:00") : undefined;
+  let pickerDate = Number.isFinite(parsed.getTime()) ? parsed : new Date();
+  if (minimumDate && pickerDate < minimumDate) pickerDate = minimumDate;
+  if (maximumDate && pickerDate > maximumDate) pickerDate = maximumDate;
   return (
     <View style={s.field}>
       <Text style={s.label}>{label}</Text>
@@ -163,6 +173,7 @@ export function DateField({
           accessibilityLabel={label}
           value={value}
           onChangeText={onChange}
+          editable={!disabled}
           placeholder="YYYY-MM-DD"
           style={s.input}
         />
@@ -182,7 +193,9 @@ export function DateField({
           </Pressable>
           {!!open && (
             <DateTimePicker
-              value={Number.isFinite(parsed.getTime()) ? parsed : new Date()}
+              value={pickerDate}
+              minimumDate={minimumDate}
+              maximumDate={maximumDate}
               mode="date"
               onChange={(event, date) => {
                 setOpen(Platform.OS === "ios" && event.type !== "dismissed");

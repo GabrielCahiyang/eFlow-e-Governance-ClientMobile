@@ -7,7 +7,22 @@ import type { WorkTreeSnapshot } from "../../../../core/web/app/features/nested-
 jest.mock("../../authentication", () => ({
   useAuth: () => ({ profile: { id: "actor" } }),
 }));
-jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
+let mockWorkChanged: () => void;
+jest.mock("../../../../platform/supabase", () => ({
+  supabase: {
+    channel: () => {
+      const channel = {
+        on: (_event: string, filter: { table: string }, callback: () => void) => {
+          if (filter.table === "subtasks") mockWorkChanged = callback;
+          return channel;
+        },
+        subscribe: () => channel,
+      };
+      return channel;
+    },
+    removeChannel: jest.fn(),
+  },
+}));
 jest.mock("../../../../core/web/app/features/subtasks", () => ({
   rowToSubtask: jest.fn(),
 }));
@@ -77,16 +92,22 @@ test("personal links pass the exact branch from its verified root to the focused
   expect(fetchWorkTree).toHaveBeenLastCalledWith("root");
 });
 
-test("only the verified Office branch renders inline funding", async () => {
-  jest.mocked(fetchWorkTree).mockResolvedValue({
+test("an assigned Office subtask can be opened before its parent starts", async () => {
+  const office = {
     ...tree,
     root: {
       ...tree.root,
-      kind: "office",
+      kind: "office" as const,
       office: "office",
       project: "project",
+      status: "todo",
+      lead: "another-person",
     },
-  });
+    nodes: tree.nodes.map((node) => node.id === "depth-eight"
+      ? { ...node, assigned_to_ids: ["actor"] }
+      : node),
+  };
+  jest.mocked(fetchWorkTree).mockResolvedValue(office);
   await render(
     <LinkedWorkNodeScreen
       navigate={jest.fn()}
@@ -101,6 +122,14 @@ test("only the verified Office branch renders inline funding", async () => {
   expect(await screen.findByText("Funding depth-eight")).toBeOnTheScreen();
   expect(screen.queryByText("Funding sibling")).toBeNull();
   expect(screen.queryByText("Open subtask funding")).toBeNull();
+  jest.mocked(fetchWorkTree).mockResolvedValue({
+    ...office,
+    nodes: office.nodes.map((node) => node.id === "depth-eight"
+      ? { ...node, title: "Updated on another device" }
+      : node),
+  });
+  mockWorkChanged();
+  expect(await screen.findByText("Updated on another device")).toBeOnTheScreen();
 });
 
 test("a mismatched project or a missing branch never opens another row", async () => {

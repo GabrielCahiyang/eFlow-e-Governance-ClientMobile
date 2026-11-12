@@ -1,11 +1,10 @@
-import { LeadWorkReviewCard } from "./LeadWorkReviewCard";
 import { ProjectTaskEditor, useTaskStructure } from "../projects/ProjectTaskEditor";
 import { DeadlineBadge } from "../../components/ui/DeadlineBadge";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
-import { nativeWindow } from "../../../platform/webRuntime";
-import { createPostgresChannel } from "../../shared/postgresChannel";
 import { Text } from "../../components/ui/Typography";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { CustomWorkStatusControl } from "../work-status";
+import { useWorkRecordUpdates } from "./useWorkRecordUpdates";
 import {
   Button,
   Card,
@@ -31,6 +30,7 @@ import {
   WorkTreeUnavailable,
 } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import {
+  getTaskLeadId,
   getTaskTeamMemberIds,
 } from "../../../core/web/app/features/tasks/selectors/teamMembership";
 import { updateTaskStatus } from "../../../core/web/app/features/tasks/services/taskService";
@@ -47,7 +47,13 @@ import { WorkTreePanel } from "./WorkTreePanel";
 import { WorkEditorSheet } from "./WorkEditorSheet";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { branchCompletion } from "./branchInspector";
-import { contributorReviewUnavailable } from "../../shared/userMessages";
+function canPostTaskUpdate(task: ReturnType<typeof rowToTask>, actorId: string) {
+  return getTaskTeamMemberIds(task).includes(actorId) &&
+    (task.status === "todo" ||
+      task.status === "in_progress" ||
+      (task.status === "changes_requested" && getTaskLeadId(task) === actorId));
+}
+
 export function TaskDetailsScreen({
   id,
   projectId,
@@ -88,7 +94,7 @@ export function TaskDetailsScreen({
       if (project.error) throw project.error;
       projectStatus = project.data?.status || "unavailable";
     }
-    if (projectStatus === "planning" || projectStatus === "unavailable")
+    if (projectStatus === "unavailable")
       throw new Error("Task unavailable.");
     return { task, projectStatus };
   };
@@ -133,41 +139,19 @@ export function TaskDetailsScreen({
     project: loadedTask?.linkedProjectId || "",
     office: loadedTask?.orgId || "",
     task: loadedTask,
+    canDelegateEdit: !!profile?.org_id && profile.org_id === loadedTask?.orgId,
   };
   const editAccess = useTaskStructure(
     taskScope,
-    overview && !!taskScope.project && !!taskScope.office && profile?.role === "head" &&
-      !facts.error && facts.data?.projectStatus === "active" && !loadedTask?.archivedAt &&
+    overview && !!taskScope.project && !!taskScope.office && !!taskScope.actor && (profile?.role === "head" || taskScope.canDelegateEdit) &&
+      !facts.error && ["active", "on_hold"].includes(facts.data?.projectStatus ?? "") && !loadedTask?.archivedAt &&
       !["completed", "cancelled"].includes(loadedTask?.status || ""),
   );
   const [staff, setStaff] = useState(false);
-  const refresh = async () => {
-    await Promise.all([facts.refresh(), tree.refresh()]);
-  };
-  useEffect(() => {
-    const channel = createPostgresChannel("native-task-detail:" + id)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks", filter: "id=eq." + id },
-        () => void refresh(),
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "subtasks",
-          filter: "task_id=eq." + id,
-        },
-        () => void tree.refresh(),
-      )
-      .subscribe();
-    nativeWindow.addEventListener("eflow:work-updated", refresh);
-    return () => {
-      nativeWindow.removeEventListener("eflow:work-updated", refresh);
-      void supabase.removeChannel(channel);
-    };
-  }, [id, facts.refresh, tree.refresh]);
+  const refresh = useCallback(async () => {
+    await Promise.all([facts.refresh(), tree.refresh(), editAccess.refresh()]);
+  }, [facts.refresh, tree.refresh, editAccess.refresh]);
+  useWorkRecordUpdates(id, refresh);
   if (facts.loading && !facts.data)
     return (
       <Screen>
@@ -184,10 +168,11 @@ export function TaskDetailsScreen({
       </Screen>
     );
   const { task, projectStatus } = facts.data;
-  const canEditTask = !facts.loading && !editAccess.loading && !editAccess.error && editAccess.data === true;
+  const canEditTask = !facts.loading && !editAccess.loading && !editAccess.error && !!editAccess.data;
   const readOnly =
       ["completed", "archived", "unavailable"].includes(projectStatus) ||
       !!task.archivedAt,
+    executionBlocked = readOnly || !!task.proposedOfficeIdentityId,
     head =
       isAppointedOfficeHead(profile, organization ? [organization] : []) &&
       profile?.org_id === task.orgId,
@@ -238,13 +223,13 @@ export function TaskDetailsScreen({
   const verifyExecution = async (mode: "start" | "progress" | "submit") => {
     const { latest, actorId } = await verifyCurrentTask();
     const status = latest.status;
-    const allowed =
-      latest.assigneeId === actorId &&
-      (mode === "submit"
-        ? ["todo", "in_progress", "changes_requested"].includes(status)
-        : mode === "start"
-          ? ["todo", "changes_requested"].includes(status)
-          : status === "in_progress");
+    const allowed = !latest.proposedOfficeIdentityId &&
+      (mode === "progress"
+        ? canPostTaskUpdate(latest, actorId)
+        : latest.assigneeId === actorId &&
+          (mode === "submit"
+            ? ["todo", "in_progress", "changes_requested"].includes(status)
+            : ["todo", "changes_requested"].includes(status)));
     if (!allowed)
       throw new Error(
         "Current task status or responsibility no longer allows this action.",
@@ -343,7 +328,7 @@ export function TaskDetailsScreen({
     >
       {overview && (
         <Row>
-          <Status value={task.status} />
+          <Status value={task.status} work customId={task.customStatusId} />
           <Status value={task.priority || "normal"} />
           <DeadlineBadge
             value={task.deadline || task.dueDate}
@@ -351,6 +336,10 @@ export function TaskDetailsScreen({
           />
         </Row>
       )}
+      {overview && profile?.id && (lead || task.teamMemberIds?.includes(profile.id)) && !facts.loading && !readOnly &&
+          task.linkedProjectId && projectStatus === "active" && task.status === "in_progress" && !tree.data?.root.blocker && (
+            <CustomWorkStatusControl actor={profile.id} taskId={id} customId={task.customStatusId} />
+          )}
       {overview && (
         <>
           <LabelValue
@@ -382,16 +371,9 @@ export function TaskDetailsScreen({
       )}
       {!!(view === "details") && (
         <>
-          {!!task.linkedProjectId && (
-            <LeadWorkReviewCard root={id} readOnly={readOnly || facts.loading} onSaved={refresh}
-              fallback={!readOnly && participant && !lead &&
-                ["todo", "in_progress", "changes_requested"].includes(task.status)
-                ? <Notice>{contributorReviewUnavailable}</Notice> : undefined}
-            />
-          )}
           <Row>
             {!!(
-              !readOnly &&
+              !executionBlocked &&
               lead &&
               !facts.loading &&
               ["todo", "changes_requested"].includes(task.status)
@@ -409,7 +391,7 @@ export function TaskDetailsScreen({
                 {task.status === "todo" ? "Start work" : "Resume work"}
               </Button>
             )}
-            {!!(!readOnly && lead && task.status === "in_progress") && (
+            {!!(!executionBlocked && !facts.loading && profile?.id && canPostTaskUpdate(task, profile.id)) && (
               <Button
                 variant="outline"
                 onPress={() => setExecution("progress")}
@@ -418,7 +400,7 @@ export function TaskDetailsScreen({
               </Button>
             )}
             {!!(
-              !readOnly &&
+              !executionBlocked &&
               lead &&
               ["todo", "in_progress", "changes_requested"].includes(task.status)
             ) && (

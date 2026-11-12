@@ -5,7 +5,8 @@ import Calendar from "lucide-react-native/icons/calendar";
 import User from "lucide-react-native/icons/user";
 import { Text } from "./Typography";
 import { useTheme } from "./Appearance";
-import { Status, statusIndicatorColor } from "./Status";
+import { Status, workStatusTone } from "./Status";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 
 export function MondayTableSection({
   title,
@@ -62,6 +63,7 @@ export function MondayTableSection({
 export function MondayTableRow({
   title,
   status,
+  customStatusId,
   context,
   due,
   scheduleLabel,
@@ -73,6 +75,7 @@ export function MondayTableRow({
 }: {
   title: string;
   status: string;
+  customStatusId?: string | null;
   context?: string | null;
   due?: string | null;
   scheduleLabel?: string;
@@ -83,7 +86,8 @@ export function MondayTableRow({
   isLast?: boolean;
 }) {
   const palette = useTheme();
-  const accent = statusIndicatorColor(status, palette);
+  const resolve = useWorkStatus();
+  const accent = workStatusTone(status, palette, resolve(status, customStatusId).color).accent;
 
   return (
     <Pressable
@@ -127,7 +131,7 @@ export function MondayTableRow({
         )}
 
         <View style={styles.columnsRow}>
-          <Status value={status} variant="monday" />
+          <Status value={status} customId={customStatusId} work variant="monday" />
 
           {!!due && (
             <View

@@ -1,310 +1,294 @@
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   Card,
-  Choice,
   ErrorState,
   Field,
   LabelValue,
   Loading,
   Notice,
+  Row,
   Sheet,
   peso,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { useFacts } from "../../shared/useFacts";
-import { useAuth } from "../authentication";
+import { PublicMessageError } from "../../shared/userMessages";
+import { draftStore } from "../../../platform/draftStore";
 import { supabase } from "../../../platform/supabase";
+import { nativeWindow } from "../../../platform/webRuntime";
+import { netProjectUpdates } from "./subscriptions";
+import { useOfficeFinanceUpdates } from "../budget";
 
 type Source = { id: string; name: string; available: number };
-type Snapshot = {
+type TaskLine = { id: string; task: string; source: string; available: number };
+type Funding = {
+  project: { id: string; org_id: string; status: string };
   canAuthorize: boolean;
   canAllocate: boolean;
-  total: number;
-  allocated: number;
-  unallocated: number;
-  released: number;
-  spent: number;
-  returned?: number;
-  outstanding?: number;
   funds: Source[];
-  sources: Source[];
-  fundingRequests: {
-    id: string;
-    reason: string;
-    lines: { amount: number }[];
-  }[];
+  taskFunding: TaskLine[];
 };
-type Decision = {
-  kind: "release" | "request" | "approve" | "decline";
-  id?: string;
-  label: string;
-  maximum?: number;
+type ReturnKind = "project" | "task";
+type Selection = { kind: ReturnKind; id: string; name: string; amount: number };
+type Attempt = {
+  project: string;
+  selection: Selection;
+  reason: string;
+  key: string;
 };
-async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.rpc(name, args);
-  if (error)
-    throw Object.assign(new Error(error.message), { code: error.code });
-  return data as T;
+
+async function loadFunding(project: string): Promise<Funding> {
+  const { data, error } = await supabase.rpc("project_flow_snapshot", {
+    p_project: project,
+  });
+  if (error) throw error;
+  if (
+    data?.project?.id !== project ||
+    !Array.isArray(data.funds) ||
+    !Array.isArray(data.taskFunding)
+  )
+    throw new Error("Could not verify current project funding.");
+  return data;
 }
+
 export function ProjectFundingCloseout({
-  projectId,
-  readOnly = false,
+  actor,
+  project,
+  office,
+  onChanged,
 }: {
-  projectId: string;
-  readOnly?: boolean;
+  actor: string;
+  project: string;
+  office: string;
+  onChanged: () => Promise<unknown>;
 }) {
-  const { profile } = useAuth();
-  const facts = useFacts(
-    "project-funding-closeout:" + profile?.id + ":" + projectId,
-    () => rpc<Snapshot>("project_flow_snapshot", { p_project: projectId }),
-    !!profile,
+  const scope = "project-funding-return:" + project;
+  const facts = useFacts(scope + ":" + actor, () => loadFunding(project));
+  const draft = useFacts(scope + ":retry:" + actor, () =>
+    draftStore.get<Attempt>(actor, scope),
   );
-  const [edit, setEdit] = useState<Decision>(),
-    [reason, setReason] = useState(""),
-    [source, setSource] = useState(""),
-    [amount, setAmount] = useState(""),
-    [retry, setRetry] = useState(false);
-  const pending = useRef<{
-    name: string;
-    args: Record<string, unknown>;
-  } | null>(null);
+  const [selection, setSelection] = useState<Selection>();
+  const [reason, setReason] = useState("");
+  const [retry, setRetry] = useState<Attempt>();
   const action = useAction();
-  const data = facts.data;
-  const start = (decision: Decision) => {
-    action.clear();
-    setEdit(decision);
-    setReason("");
-    setSource("");
-    setAmount(decision.maximum?.toString() || "");
-  };
+  useEffect(
+    () => netProjectUpdates(project, () => void facts.refresh()),
+    [project, facts.refresh],
+  );
+  useOfficeFinanceUpdates(office, undefined, true, facts.refresh);
+
+  const pending = retry || draft.data;
+  const selected = pending?.selection || selection;
   const save = () =>
     action.run(async () => {
-      if (!data || !edit) return;
-      if (!pending.current) {
-        if (!reason.trim()) throw new Error("Enter a reason.");
-        const value = Number(amount),
-          key = crypto.randomUUID();
-        if (edit.kind === "release" || edit.kind === "request") {
-          const limit =
-            edit.kind === "release"
-              ? edit.maximum
-              : data.sources.find((s) => s.id === source)?.available;
-          if (
-            !limit ||
-            !/^\d+(\.\d{1,2})?$/.test(amount) ||
-            !Number.isFinite(value) ||
-            value <= 0 ||
-            value > limit
-          )
-            throw new Error(
-              "Choose an available account and enter an amount within its balance.",
-            );
-        }
-        pending.current =
-          edit.kind === "release"
-            ? {
-                name: "release_project_funding",
-                args: {
-                  p_project: projectId,
-                  p_source: edit.id,
-                  p_amount: value,
-                  p_reason: reason.trim(),
-                  p_key: key,
-                },
-              }
-            : edit.kind === "request"
-              ? {
-                  name: data.canAuthorize
-                    ? "authorize_project_funding"
-                    : "request_project_funding",
-                  args: {
-                    p_project: projectId,
-                    p_lines: [{ partitionId: source, amount: value }],
-                    p_reason: reason.trim(),
-                    p_key: key,
-                  },
-                }
-              : {
-                  name: "decide_project_funding",
-                  args: {
-                    p_request: edit.id,
-                    p_approve: edit.kind === "approve",
-                    p_reason: reason.trim(),
-                  },
-                };
-      }
-      try {
-        await rpc(pending.current.name, pending.current.args);
-      } catch (error) {
-        const code = (error as { code?: string }).code;
+      if (!selected || draft.error || draft.loading) return;
+      const { data: session, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError || session.session?.user.id !== actor)
+        throw new PublicMessageError(
+          "Sign in with the same account to continue.",
+        );
+      const current = await loadFunding(project);
+      const authorized =
+        selected.kind === "project"
+          ? current.canAuthorize
+          : current.canAllocate;
+      if (!authorized || current.project.org_id !== office)
+        throw new PublicMessageError(
+          "Your current project access does not allow this return.",
+        );
+      let attempt = pending;
+      if (attempt && attempt.project !== project)
+        throw new PublicMessageError(
+          "The saved return belongs to a different project.",
+        );
+      if (!attempt) {
+        const source = (
+          selected.kind === "project" ? current.funds : current.taskFunding
+        ).find((row) => row.id === selected.id);
         if (
-          !retry &&
-          code &&
-          /^[A-Z0-9]{5}$/.test(code) &&
-          !code.startsWith("08") &&
-          code !== "57014"
+          !source ||
+          source.available < selected.amount ||
+          selected.amount <= 0 ||
+          ["completed", "archived"].includes(current.project.status)
         )
-          pending.current = null;
-        setRetry(!!pending.current);
-        throw error;
+          throw new PublicMessageError(
+            "The available amount changed. Reopen this return and check the balance.",
+          );
+        attempt = {
+          project,
+          selection: selected,
+          reason: reason.trim(),
+          key: crypto.randomUUID(),
+        };
+        if (!attempt.reason)
+          throw new PublicMessageError(
+            "Enter a reason for returning this money.",
+          );
+        await draftStore.set(actor, scope, attempt);
+        setRetry(attempt);
       }
-      pending.current = null;
-      setRetry(false);
-      setEdit(undefined);
-      await facts.refresh();
-    }, "Project funding updated.");
+      const { selection: line, key, reason: note } = attempt;
+      const terms = { p_amount: line.amount, p_reason: note, p_key: key };
+      const response =
+        line.kind === "project"
+          ? await supabase.rpc("release_project_funding", {
+              p_project: project,
+              p_source: line.id,
+              ...terms,
+            })
+          : await supabase.rpc("release_project_task_funding", {
+              p_line: line.id,
+              ...terms,
+            });
+      if (response.error) {
+        if (
+          !pending &&
+          /^(22|23|40|42)[A-Z0-9]{3}$/.test(response.error.code || "")
+        ) {
+          await draftStore.remove(actor, scope);
+          setRetry(undefined);
+        }
+        throw response.error;
+      }
+      await draftStore.remove(actor, scope);
+      setRetry(undefined);
+      setSelection(undefined);
+      setReason("");
+      nativeWindow.dispatchEvent({
+        type: "eflow:finance-updated",
+        detail: { orgId: office },
+      });
+      await Promise.all([facts.refresh(), draft.refresh(), onChanged()]).catch(
+        () => {},
+      );
+    }, "Unused funding returned.");
+
+  const data = facts.error ? undefined : facts.data;
+  const open = (next: Selection) => {
+    action.clear();
+    setReason("");
+    setSelection(next);
+  };
   return (
-    <Card title="Project funding">
-      {facts.loading && !data && <Loading />}
-      {!!facts.error && (
-        <ErrorState error={facts.error} retry={() => void facts.refresh()} />
+    <Card title="Return unused funding">
+      <Notice>
+        Return unused task allocations to the project, then return the remaining
+        project funds to Office Budget.
+      </Notice>
+      {!!draft.error && (
+        <ErrorState error={draft.error} retry={() => void draft.refresh()} />
       )}
-      {!!action.notice && <Notice>{action.notice}</Notice>}
-      {data && (
+      {facts.error ? (
+        <ErrorState error={facts.error} retry={() => void facts.refresh()} />
+      ) : !data ? (
+        <Loading label="Checking returnable funds" layout="summary" />
+      ) : (
         <>
-          {Object.entries({
-            Authorized: data.total,
-            Allocated: data.allocated,
-            Unallocated: data.unallocated,
-            "Cash released": data.released,
-            "Actual spent": data.spent,
-            "Cash returned": data.returned,
-            "Outstanding advances": data.outstanding,
-          }).map(
-            ([label, value]) =>
-              value !== undefined && (
-                <LabelValue key={label} label={label} value={peso(value)} />
-              ),
-          )}
-          {data.funds.map((s) => (
-            <Card key={s.id} title={s.name}>
-              <LabelValue label="Unallocated" value={peso(s.available)} />
-              {data.canAuthorize && s.available > 0 && (
-                <Button
-                  variant="outline"
-                  onPress={() =>
-                    start({
-                      kind: "release",
-                      id: s.id,
-                      label: "Release unused funding",
-                      maximum: s.available,
-                    })
-                  }
-                >
-                  Release unused to Office Budget
-                </Button>
-              )}
-            </Card>
-          ))}
-          {!readOnly &&
-            (data.canAllocate || data.canAuthorize) &&
-            data.sources.some((s) => s.available > 0) && (
-              <Button
-                variant="outline"
-                onPress={() =>
-                  start({
-                    kind: "request",
-                    label: data.canAuthorize
-                      ? "Authorize additional funding"
-                      : "Request additional funding",
-                  })
-                }
-              >
-                {data.canAuthorize
-                  ? "Authorize additional funding"
-                  : "Request additional funding"}
-              </Button>
-            )}
-          {(data.fundingRequests || []).map((r) => (
-            <Card key={r.id} title="Pending funding request">
-              <Notice>{r.reason}</Notice>
-              <LabelValue
-                label="Requested"
-                value={peso(
-                  r.lines.reduce((sum, l) => sum + Number(l.amount || 0), 0),
-                )}
-              />
-              {!readOnly && data.canAuthorize && (
-                <>
-                  <Button
-                    onPress={() =>
-                      start({
-                        kind: "approve",
-                        id: r.id,
-                        label: "Authorize funding request",
-                      })
-                    }
-                  >
-                    Authorize
-                  </Button>
+          {data.canAllocate &&
+            data.taskFunding
+              .filter((row) => row.available > 0)
+              .map((row) => (
+                <Row key={row.id}>
+                  <LabelValue
+                    label={row.task + " · " + row.source}
+                    value={peso(row.available)}
+                  />
                   <Button
                     variant="outline"
+                    disabled={
+                      !!pending ||
+                      draft.loading ||
+                      !!draft.error ||
+                      facts.loading
+                    }
                     onPress={() =>
-                      start({
-                        kind: "decline",
-                        id: r.id,
-                        label: "Decline funding request",
+                      open({
+                        kind: "task",
+                        id: row.id,
+                        name: row.task,
+                        amount: row.available,
                       })
                     }
                   >
-                    Decline
+                    Return to project
                   </Button>
-                </>
-              )}
-            </Card>
-          ))}
+                </Row>
+              ))}
+          {data.canAuthorize &&
+            data.funds
+              .filter((row) => row.available > 0)
+              .map((row) => (
+                <Row key={row.id}>
+                  <LabelValue label={row.name} value={peso(row.available)} />
+                  <Button
+                    variant="outline"
+                    disabled={
+                      !!pending ||
+                      draft.loading ||
+                      !!draft.error ||
+                      facts.loading
+                    }
+                    onPress={() =>
+                      open({
+                        kind: "project",
+                        id: row.id,
+                        name: row.name,
+                        amount: row.available,
+                      })
+                    }
+                  >
+                    Return to Office Budget
+                  </Button>
+                </Row>
+              ))}
+          {!data.taskFunding.some((row) => row.available > 0) &&
+            !data.funds.some((row) => row.available > 0) && (
+              <Notice>
+                No unused task or project funding is available to return.
+              </Notice>
+            )}
         </>
       )}
-      {edit && (
+      {!!action.notice && <Notice>{action.notice}</Notice>}
+      {!!selected && (
         <Sheet
           open
-          title={edit.label}
+          title={pending ? "Check funding return" : "Confirm funding return"}
           busy={action.busy}
           onClose={() => {
-            if (!retry && !action.busy) setEdit(undefined);
+            if (!pending && !action.busy) setSelection(undefined);
           }}
+          footer={
+            <Button
+              busy={action.busy}
+              disabled={
+                draft.loading || !!draft.error || (!pending && !reason.trim())
+              }
+              onPress={() => void save()}
+            >
+              {pending ? "Retry saved return" : "Confirm return"}
+            </Button>
+          }
         >
-          {edit.kind === "release" && (
-            <Notice>
-              Unused project money returns to Office Budget. Existing
-              commitments remain protected.
-            </Notice>
-          )}
-          {edit.kind === "request" && (
-            <Choice
-              label="Office Budget account"
-              value={source}
-              onChange={(v) => {
-                if (!retry) setSource(v);
-              }}
-              options={(data?.sources || [])
-                .filter((s) => s.available > 0)
-                .map((s) => ({
-                  value: s.id,
-                  label: s.name + " · " + peso(s.available),
-                }))}
-            />
-          )}
-          {["release", "request"].includes(edit.kind) && (
-            <Field
-              label="Amount"
-              value={amount}
-              editable={!retry && !action.busy}
-              keyboardType="decimal-pad"
-              onChangeText={setAmount}
-            />
-          )}
+          <LabelValue label={selected.name} value={peso(selected.amount)} />
+          <Notice>
+            {selected.kind === "task"
+              ? "This money returns to the project budget."
+              : "This money returns to Office Budget."}
+          </Notice>
           <Field
             label="Reason"
-            value={reason}
-            editable={!retry && !action.busy}
+            value={pending?.reason ?? reason}
+            editable={!pending && !action.busy}
             onChangeText={setReason}
+            maxLength={3000}
+            multiline
           />
-          {!!action.error && <ErrorState context="action" error={action.error} />}
-          <Button busy={action.busy} onPress={() => void save()}>
-            {retry ? "Verify saved decision" : "Confirm"}
-          </Button>
+          {!!action.error && (
+            <ErrorState context="action" error={action.error} />
+          )}
         </Sheet>
       )}
     </Card>

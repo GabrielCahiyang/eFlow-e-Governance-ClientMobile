@@ -22,6 +22,7 @@ import { getStaffingReviewPackage } from "./staffingEscalation";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { cashRequestReference } from "./mobileFinanceScope";
 import { supabase } from "../../../platform/supabase";
+import { nativeWindow } from "../../../platform/webRuntime";
 export function FinancialReviewsScreen({
   recordId,
   recordType,
@@ -69,14 +70,15 @@ export function FinancialReviewsScreen({
         {
           event: "*",
           schema: "public",
-          table: "liquidation_independent_reviews",
-          ...(staffing ? { filter: `liquidation_id=eq.${recordId}` } : {}),
+          table: "notifications",
+          filter: `user_id=eq.${actor}`,
         },
         refresh,
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") refresh();
       });
+    nativeWindow.addEventListener("eflow:finance-updated", refresh);
     const app = AppState.addEventListener("change", (state) => {
       if (state === "active") refresh();
     });
@@ -84,6 +86,7 @@ export function FinancialReviewsScreen({
     return () => {
       clearTimeout(timer);
       clearInterval(fallback);
+      nativeWindow.removeEventListener("eflow:finance-updated", refresh);
       app.remove();
       void supabase.removeChannel(channel);
     };

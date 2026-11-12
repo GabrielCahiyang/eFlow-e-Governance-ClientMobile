@@ -9,13 +9,14 @@ export function projectSections(
   favorites: ReadonlySet<string>,
   search: string,
   status: string,
+  showPlanning = false,
 ) {
   const query = search.trim().toLowerCase();
   const matches = [
     ...new Map(authorized.map((p) => [p.id, p])).values(),
   ].filter(
     (project) =>
-      project.status !== "planning" &&
+      (showPlanning || project.status !== "planning") &&
       project.title.toLowerCase().includes(query) &&
       (status === "all" ||
         (status === "current"

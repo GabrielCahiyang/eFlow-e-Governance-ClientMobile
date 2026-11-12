@@ -70,7 +70,7 @@ export function PersonalWorkspaceScreen({ navigate }: { navigate: Navigate }) {
             }
           >
             <Card title={project.title}>
-              <Status value={project.status} />
+              <Status value={project.status} work />
               <Text>Open project →</Text>
             </Card>
           </Pressable>

@@ -1,6 +1,6 @@
 import { recordedPeso } from "../../components/ui/theme";
 import { statusLabel } from "../../shared/statusLabels";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useIsFocused } from "@react-navigation/native";
 import {
   Card,
@@ -25,6 +25,8 @@ import { officeFinancialSummary } from "./officeFinancialSummary";
 import { budgetReportRead } from "../../../core/web/app/features/budget/services/budgetReportReads";
 import { readOfficeCashRequest } from "./focusedSubtaskFunding";
 import { useCashRequestUpdates } from "./useCashRequestUpdates";
+import { useOfficeFinanceUpdates } from "./useOfficeFinanceUpdates";
+import { BudgetReleaseHistory } from "./BudgetReleaseHistory";
 import { CashRequestCard } from "./CashRequestCard";
 import { financialOffices } from "./financialScope";
 import {
@@ -55,6 +57,7 @@ export function OfficeBudgetScreen({
   const view = accountingView(initialView);
   const focused = useIsFocused();
   const [selectedOffice, setOffice] = useState(officeId || "");
+  const [showBudgetReleases, setShowBudgetReleases] = useState(false);
   const [year, setYear] = useState(fiscalYear ?? getCurrentFiscalYear());
   const scopes = useFacts(
     "financial-offices:" + profile?.id,
@@ -91,7 +94,7 @@ export function OfficeBudgetScreen({
         if (error) throw error;
         return data;
       }),
-    !!orgId && view === "requests" && !recordId,
+    !!orgId && !recordId && (view === "requests" || showBudgetReleases),
   );
   const fiscalBudgetId = years.data?.find(
     (row) => Number(row.fiscal_year) === year,
@@ -181,6 +184,10 @@ export function OfficeBudgetScreen({
     detail.refresh,
     activeRequest?.subtaskId,
   );
+  const refreshFinance = useCallback(async () => {
+    await Promise.all([summary.refresh(), queue.refresh()]);
+  }, [summary.refresh, queue.refresh]);
+  useOfficeFinanceUpdates(orgId, year, focused && !recordId, refreshFinance);
   return (
     <Screen
       compact
@@ -211,6 +218,22 @@ export function OfficeBudgetScreen({
             setYear(getCurrentFiscalYear());
           }}
         />
+      )}
+      {view === "overview" && !!orgId && !!profile?.id && (
+        <>
+          <Button variant="outline" onPress={() => setShowBudgetReleases((visible) => !visible)}>
+            {showBudgetReleases ? "Hide budget releases" : "View budget releases"}
+          </Button>
+          {showBudgetReleases && (
+            <>
+              {(years.data?.length ?? 0) > 1 && <Choice label="Budget fiscal year" value={String(year)}
+                options={years.data!.map((row) => ({ value: String(row.fiscal_year), label: "FY " + row.fiscal_year }))}
+                onChange={(value) => setYear(Number(value))} />}
+              <BudgetReleaseHistory key={profile.id + ":" + orgId + ":" + year}
+                actor={profile.id} office={orgId} year={year} onChanged={refreshFinance} />
+            </>
+          )}
+        </>
       )}
       {view === "overview" && accounting && !!orgId && (
         <Card title="Cash work">
@@ -251,8 +274,18 @@ export function OfficeBudgetScreen({
             <>
               <LabelValue
                 stacked
-                label="Approved appropriation"
+                label="Total allocated budget"
                 value={recordedPeso(summary.data.approved)}
+              />
+              <LabelValue
+                stacked
+                label="Budget released"
+                value={recordedPeso(summary.data.released)}
+              />
+              <LabelValue
+                stacked
+                label="Pending release"
+                value={recordedPeso(summary.data.pending)}
               />
               <LabelValue
                 stacked
@@ -265,9 +298,23 @@ export function OfficeBudgetScreen({
                 value={recordedPeso(summary.data.available)}
               />
               <Notice>
-                The available budget is the approved appropriation less budget
-                holds and active commitments.
+                Only released budget can be committed. Scheduled releases use Philippine time.
               </Notice>
+              {profile?.role === "head" && can("navigation.projects") && (
+                <Button
+                  variant="outline"
+                  onPress={() =>
+                    navigate({
+                      name: "budget",
+                      view: "annual",
+                      financialOfficeId: orgId,
+                      fiscalYear: year,
+                    })
+                  }
+                >
+                  Open Office Budget in eFlow Web
+                </Button>
+              )}
             </>
           ) : summary.loading ? (
             <Loading label="Loading Office summary" layout="summary" />

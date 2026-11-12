@@ -4,6 +4,7 @@ import type { AppRoute } from "../../shared/routes";
 import { MobileNavigator } from "../navigation/MobileNavigator";
 import { ToastProvider } from "../../components/ui/Toast";
 import { WorkFeedProvider } from "../personal-work/WorkFeedProvider";
+import { WorkStatusProvider } from "../work-status";
 
 export function NativeWorkspace({
   initialRoute,
@@ -12,9 +13,11 @@ export function NativeWorkspace({
   return (
     <WorkspaceProvider key={profile?.id}>
       <WorkFeedProvider key={profile?.id}>
-        <ToastProvider>
-          <MobileNavigator key={profile?.id} initialRoute={initialRoute} />
-        </ToastProvider>
+        <WorkStatusProvider actor={profile?.is_active ? profile.id : undefined}>
+          <ToastProvider>
+            <MobileNavigator key={profile?.id} initialRoute={initialRoute} />
+          </ToastProvider>
+        </WorkStatusProvider>
       </WorkFeedProvider>
     </WorkspaceProvider>
   );

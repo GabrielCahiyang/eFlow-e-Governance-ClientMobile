@@ -54,3 +54,19 @@ test("review requires the exact pending submission and excludes the worker even 
     false,
   );
 });
+
+test("the server-appointed Project Lead reviews normal work, and the assigned Head reviews the Project Lead's work", () => {
+  const review = {
+    id: "latest", taskId: "task", status: "pending", submitterId: "task-lead",
+  } as ReviewSubmission;
+  const assigned = {
+    id: "task", reviewerId: "project-lead", status: "for_review",
+    latestSubmission: { id: "latest" },
+  } as Task;
+  expect(independentReviewAllowed(assigned, review, "project-lead", "member")).toBe(true);
+  expect(independentReviewAllowed(assigned, review, "head", "head")).toBe(false);
+  const projectLeadReview = { ...review, submitterId: "project-lead" };
+  const routed = { ...assigned, reviewerId: "head" };
+  expect(independentReviewAllowed(routed, projectLeadReview, "head", "head")).toBe(true);
+  expect(independentReviewAllowed(routed, projectLeadReview, "project-lead", "member")).toBe(false);
+});

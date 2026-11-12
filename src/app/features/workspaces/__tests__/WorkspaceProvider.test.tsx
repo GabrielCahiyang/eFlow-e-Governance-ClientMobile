@@ -17,9 +17,15 @@ import type {
   WorkspaceSnapshot,
 } from "../../../../core/web/app/features/workspaces/types";
 
+const mockProfile: {
+  id: string;
+  role: string;
+  org_id: string | null;
+  employee_id?: string;
+} = { id: "qa-actor", role: "member", org_id: "office-a" };
 jest.mock("../../authentication", () => ({
   useAuth: () => ({
-    profile: { id: "qa-actor", role: "member", org_id: "office-a" },
+    profile: mockProfile,
   }),
 }));
 jest.mock(
@@ -61,6 +67,10 @@ function Probe() {
   return (
     <View>
       <Text testID="selected">{context.selected?.workspace.id || "none"}</Text>
+      <Text testID="projects">
+        {context.selected?.projects.map((project) => project.id).join(",") ||
+          "none"}
+      </Text>
       <Text testID="loading">{String(context.loading)}</Text>
       <Text testID="error">{context.error?.message || "none"}</Text>
       <Button title="Office" onPress={() => void context.select("office-a")} />
@@ -84,6 +94,7 @@ async function mount() {
   );
 }
 beforeEach(() => {
+  delete mockProfile.employee_id;
   list.mockReset().mockResolvedValue([office, personal]);
   select
     .mockReset()
@@ -169,4 +180,34 @@ test("a mismatched response cannot become current context", async () => {
     ),
   );
   expect(screen.getByTestId("selected")).toHaveTextContent("none");
+});
+
+test("an open guest workspace drops an expired project on the fallback check", async () => {
+  jest.useFakeTimers();
+  try {
+    mockProfile.employee_id = "GUEST-qa-actor";
+    select.mockResolvedValueOnce({
+      ...snapshot(office),
+      projects: [
+        {
+          id: "temporary-project",
+          title: "Guest project",
+          kind: "office",
+          status: "active",
+          home_workspace_id: office.id,
+        },
+      ],
+    });
+    await mount();
+    expect(screen.getByTestId("projects")).toHaveTextContent(
+      "temporary-project",
+    );
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(30_000);
+    });
+    expect(screen.getByTestId("projects")).toHaveTextContent("none");
+    expect(screen.getByTestId("selected")).toHaveTextContent("office-a");
+  } finally {
+    jest.useRealTimers();
+  }
 });

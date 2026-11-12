@@ -1,7 +1,5 @@
 /** Public feedback only. Never interpolate a transport, database or provider error. */
 export class PublicMessageError extends Error {}
-export const contributorReviewUnavailable =
-  "Work updates that need your Lead’s approval are currently unavailable on mobile.";
 export const feedback = {
   invalidCredentials: "Email or password is incorrect.",
   load: "We couldn't load this information. Please try again.",
@@ -21,7 +19,6 @@ export const feedback = {
 } as const;
 export type FeedbackContext = "load" | "action";
 const known = new Map<string, string>([
-  [contributorReviewUnavailable, contributorReviewUnavailable],
   [
     "Allow camera access",
     "Allow camera access in device settings, or choose a file instead.",

@@ -1,6 +1,9 @@
-import { expect, test } from "@jest/globals";
+import { expect, jest, test } from "@jest/globals";
 import type { Notification } from "../../../../core/web/app/services/notificationService";
+import { readInboxNotification } from "../inboxUpdates";
 import { inboxUpdateRoute } from "../inboxDestinations";
+
+jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
 
 const update: Notification = {
   id: "notification",
@@ -112,4 +115,21 @@ test("Personal Lead review notices open the exact Personal branch", () => {
     taskId: "root",
     nodeId: "branch",
   });
+});
+
+test("the Inbox bell update preserves the exact conversation and mentioned message", () => {
+  const mention = readInboxNotification({
+    id: "alert",
+    title: "You were mentioned",
+    type: "comment",
+    conversation_id: "project-chat",
+    conversation_message_id: "older-message",
+  });
+  for (const role of ["head", "member", "accounting_staff"])
+    expect(inboxUpdateRoute(mention, role)).toEqual({
+      name: "messages",
+      id: "project-chat",
+      recordId: "older-message",
+    });
+  expect(inboxUpdateRoute(mention, "admin")).toBeUndefined();
 });

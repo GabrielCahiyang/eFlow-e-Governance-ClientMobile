@@ -34,12 +34,13 @@ import {
 } from "./portfolioFacts";
 import { projectSections } from "./mobileProjects";
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
-import { statusLabel } from "../../shared/statusLabels";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 
 export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const { profile } = useAuth();
   const workspace = useWorkspace();
   const palette = useTheme();
+  const resolveStatus = useWorkStatus();
   const { width, fontScale } = useWindowDimensions();
   const pinnedWidth = Math.max(176, Math.min(228, width * 0.48));
   const tableWidth = pinnedWidth + 140 + 175 + 150 + 150 + 135 + 150;
@@ -52,6 +53,8 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   }));
   const current = workspace.selected;
   const projects = current?.projects ?? [];
+  const showPlanning = profile?.role === "head" && current?.workspace.kind === "office" &&
+    current.workspace.office_id === profile.org_id;
   const facts = useFacts(
     `project-portfolio:${profile?.id}:${current?.workspace.id}:${projects.map((item) => item.id).join(",")}`,
     () => readPortfolioFacts(projects.map((item) => item.id)),
@@ -85,14 +88,14 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const statuses = [
     { id: "current", title: "Current projects" },
     { id: "all", title: "All statuses" },
-    ...["active", "on_hold", "completed", "archived"].map((id) => ({
+    ...["active", "on_hold", "completed", "archived", ...(showPlanning ? ["planning"] : [])].map((id) => ({
       id,
-      title: statusLabel(id),
+      title: resolveStatus(id).label,
     })),
   ];
   const matches =
     current && !workspace.error && facts.data && !facts.error
-      ? projectSections(verifiedProjects, preferences.favorites, search, status)
+      ? projectSections(verifiedProjects, preferences.favorites, search, status, showPlanning)
       : [];
   const total = matches.reduce(
     (count, section) => count + section.data.length,
@@ -131,6 +134,16 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
           >
             Projects
           </Text>
+          {showPlanning && (
+              <Button variant="outline" onPress={() => navigate({
+                name: "projects",
+                view: "project_setup",
+                workspaceId: current?.workspace.id,
+                title: "Create or resume a project on eFlow Web",
+              })}>
+                Create or resume on eFlow Web
+              </Button>
+            )}
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
@@ -330,6 +343,10 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                       item.kind === "personal" ? "personal_project" : "project",
                     id: item.id,
                     title: item.title,
+                    ...(item.status === "planning" ? {
+                      view: "project_setup",
+                      workspaceId: current?.workspace.id,
+                    } : {}),
                   })
                 }
                 style={{
@@ -383,7 +400,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               <Text>
                 {item.status === "unavailable"
                   ? "Status unavailable"
-                  : statusLabel(item.status)}
+                  : resolveStatus(item.status).label}
               </Text>
             </View>
             <View

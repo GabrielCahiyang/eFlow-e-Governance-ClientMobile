@@ -1,0 +1,18 @@
+{
+  "apk": "C:\\Users\\gabri\\OneDrive\\Desktop\\EflowMobile\\artifacts\\M7\\eFlow-Mobile-Alignment-Phase-4-v52-arm64-x86_64.apk",
+  "versionCode": 52,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5367768,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "d19c6c24212280cc8eb70464d23225fc7a49732fe232f7689f796c4be6a490cd",
+  "bytes": 99209793
+}

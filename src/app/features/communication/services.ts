@@ -4,11 +4,20 @@ export {
   getOrCreateDirectChannel,
   updateMessageContent,
 } from "../../../core/web/app/services/chatService";
+import { encodeChatDraft } from "./messageHistory";
+import type { ChatMention } from "../../../core/web/app/features/chat-calls/services/chatMentions";
+
 export type Channel = {
   id: string;
   name: string;
   kind: string;
   taskId?: string;
+  parentProjectId?: string;
+  defaultName?: string;
+  avatarPath?: string;
+  archived?: boolean;
+  personalPin?: string;
+  canEditGroup?: boolean;
   projectId?: string;
   projectTitle?: string;
   lastMessage?: string;
@@ -25,9 +34,11 @@ export type Message = {
   image_path?: string | null;
   pinned_at?: string | null;
   reaction_users?: Record<string, Record<string, string>> | null;
+  deleted_at?: string | null;
+  activity_kind?: string | null;
 };
 export async function loadChannels() {
-  const { data, error } = await supabase.rpc("list_message_conversations");
+  const { data, error } = await supabase.rpc("list_message_conversations_v2");
   if (error) throw new Error(error.message);
   if (!Array.isArray(data))
     throw new Error("Could not verify your conversations.");
@@ -36,6 +47,12 @@ export async function loadChannels() {
     name: row.name,
     kind: row.channel_type,
     taskId: row.task_id || undefined,
+    parentProjectId: row.parent_project_id || undefined,
+    defaultName: row.default_name || undefined,
+    avatarPath: row.avatar_path || undefined,
+    archived: row.archived === true,
+    personalPin: row.personal_pin || undefined,
+    canEditGroup: row.can_edit_group === true,
     projectId: row.project_id || undefined,
     projectTitle: row.project_title || undefined,
     otherId: row.other_user_id || undefined,
@@ -53,16 +70,22 @@ export async function readConversation(channel: string, through: string) {
   if (error) throw new Error(error.message);
 }
 
+export type ChatPerson = {
+  id: string;
+  name: string | null;
+  is_lead: boolean;
+  nickname?: string | null;
+};
+
 export async function listChatPeople(channel?: string) {
-  const { data, error } = await supabase.rpc("list_message_people", {
-    p_channel: channel || null,
-  });
+  const { data, error } = await supabase.rpc(
+    channel ? "list_message_people_v2" : "list_message_people",
+    {
+      p_channel: channel || null,
+    },
+  );
   if (error) throw new Error(error.message);
-  return (data || []) as Array<{
-    id: string;
-    name: string | null;
-    is_lead: boolean;
-  }>;
+  return (data || []) as ChatPerson[];
 }
 
 export async function openDirectConversation(personId: string) {
@@ -81,10 +104,85 @@ export async function setMessagePin(messageId: string, pin: boolean) {
   if (error) throw new Error(error.message);
 }
 
+const messageFields =
+  "id,sender_id,sender_name,content,created_at,image_path,pinned_at,reaction_users,deleted_at,activity_kind";
+
+export async function readChatMessage(
+  channel: string,
+  id: string,
+): Promise<Message | null> {
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select(messageFields)
+    .eq("channel_id", channel)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function refreshChatHistory(channel: string, ids: string[]) {
+  const rows: Message[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select(messageFields)
+      .eq("channel_id", channel)
+      .in("id", ids.slice(i, i + 100));
+    if (error) throw new Error(error.message);
+    rows.push(...(data ?? []));
+  }
+  return rows;
+}
+
+export async function setConversationPin(channel: string, pin: boolean) {
+  const { error } = await supabase.rpc("set_conversation_pin", {
+    p_channel: channel,
+    p_pin: pin,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function editConversationGroup(
+  channel: string,
+  name: string,
+  avatar: string | null,
+) {
+  const { error } = await supabase.rpc("edit_conversation_group", {
+    p_channel: channel,
+    p_name: name,
+    p_avatar: avatar,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function setConversationNickname(
+  channel: string,
+  person: string,
+  nickname: string,
+) {
+  const { error } = await supabase.rpc("set_conversation_nickname", {
+    p_channel: channel,
+    p_person: person,
+    p_nickname: nickname,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeConversationMessage(
+  message: string,
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc("remove_conversation_message", {
+    p_message: message,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function listPinnedMessages(channel: string): Promise<Message[]> {
   const { data, error } = await supabase
     .from("chat_messages")
-    .select("id,sender_id,sender_name,content,created_at,image_path,pinned_at")
+    .select(messageFields)
     .eq("channel_id", channel)
     .not("pinned_at", "is", null)
     .order("pinned_at", { ascending: false })
@@ -109,9 +207,7 @@ export async function loadMessages(
 ) {
   let query = supabase
     .from("chat_messages")
-    .select(
-      "id,sender_id,sender_name,content,created_at,image_path,pinned_at,reaction_users",
-    )
+    .select(messageFields)
     .eq("channel_id", channel)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false });
@@ -143,15 +239,16 @@ export async function sendChat(
   name: string,
   text: string,
   imagePath?: string,
+  mentions?: ChatMention[],
 ) {
-  const content = text.trim(),
-    valid = content
-      ? validateOutgoingChatContent(content)
+  const content = encodeChatDraft(text, mentions),
+    valid = text.trim()
+      ? validateOutgoingChatContent(text.trim())
       : { isValid: !!imagePath, reason: "" };
   if (!valid.isValid) throw new Error(valid.reason || "Write a message first.");
   const prior = await supabase
     .from("chat_messages")
-    .select("id,channel_id,sender_id,content,image_path")
+    .select("id,channel_id,sender_id,content,image_path,deleted_at")
     .eq("id", id)
     .maybeSingle();
   if (prior.error) throw prior.error;
@@ -159,8 +256,9 @@ export async function sendChat(
     if (
       prior.data.channel_id !== channel ||
       prior.data.sender_id !== actor ||
-      prior.data.content !== content ||
-      (prior.data.image_path || undefined) !== imagePath
+      (!prior.data.deleted_at &&
+        (prior.data.content !== content ||
+          (prior.data.image_path || undefined) !== imagePath))
     )
       throw new Error(
         "The original message receipt does not match. Refresh the conversation.",

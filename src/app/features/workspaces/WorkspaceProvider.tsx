@@ -17,6 +17,10 @@ import type {
 } from "../../../core/web/app/features/workspaces/types";
 import { useAuth } from "../authentication";
 import { isMobileRole } from "../../shared/mobileRoles";
+import { AppState } from "react-native";
+import { readWithTimeout } from "../../shared/readTimeout";
+import { clearDisplayCache } from "../../shared/displayCache";
+import { isProjectGuest, guestProjectAccessChanged } from "./guestProjectAccess";
 type Context = {
   workspaces: Workspace[];
   selected?: WorkspaceSnapshot;
@@ -35,6 +39,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const generation = useRef(0),
     currentSelection = useRef<string | undefined>(undefined),
     authorized = useRef<Workspace[]>([]);
+  const maySeePlanning = profile?.role === "head";
   const loadSelection = useCallback(
     async (id: string, token: number, list: Workspace[]) => {
       try {
@@ -60,7 +65,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           const visible = {
             ...snapshot,
             projects: snapshot.projects.filter(
-              (project) => project.status !== "planning",
+              (project) => project.status !== "planning" ||
+                (maySeePlanning && project.kind === "office" &&
+                  snapshot.workspace.office_id === profile?.org_id),
             ),
           };
           setSelected(visible);
@@ -77,7 +84,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (token === generation.current) setLoading(false);
       }
     },
-    [],
+    [maySeePlanning, profile?.org_id],
   );
   const select = async (id: string) => {
     const token = ++generation.current;
@@ -132,6 +139,51 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ++generation.current;
     };
   }, [refresh]);
+  const guest = isProjectGuest(profile);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  useEffect(() => {
+    if (!guest || !selected) return;
+    const workspaceId = selected.workspace.id;
+    let stopped = false;
+    let checking = false;
+    const check = async () => {
+      if (checking || AppState.currentState === "background") return;
+      const previous = selectedRef.current;
+      if (previous?.workspace.id !== workspaceId) return;
+      const token = generation.current;
+      checking = true;
+      try {
+        const current = await readWithTimeout(() => selectWorkspace(workspaceId));
+        if (stopped || token !== generation.current) return;
+        if (current.workspace.id !== workspaceId || current.workspace.state !== "active")
+          throw new Error("Workspace access ended.");
+        const visible = { ...current, projects: current.projects.filter(project => project.status !== "planning") };
+        if (guestProjectAccessChanged(previous, visible)) {
+          clearDisplayCache("access");
+          setSelected(visible);
+        }
+      } catch {
+        if (!stopped && token === generation.current) {
+          clearDisplayCache("access");
+          setSelected(undefined);
+          setError(new Error("Could not verify your current project access."));
+        }
+      } finally {
+        checking = false;
+      }
+    };
+    // Expiry can occur without a row update and revoked rows may be hidden by RLS.
+    const fallback = setInterval(() => void check(), 30_000);
+    const app = AppState.addEventListener("change", state => {
+      if (state === "active") void check();
+    });
+    return () => {
+      stopped = true;
+      clearInterval(fallback);
+      app.remove();
+    };
+  }, [guest, selected?.workspace.id]);
   return (
     <WorkspaceContext.Provider
       value={{

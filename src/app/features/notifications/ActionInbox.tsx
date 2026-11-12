@@ -33,7 +33,7 @@ import {
 } from "../../../core/web/app/services/notificationService";
 import { normalizeWorkUpdateNotification } from "../../../core/web/app/shared/notificationWorkCopy";
 import { inboxUpdateRoute } from "./inboxDestinations";
-import { inboxDestinationLabel, inboxUpdateMessage } from "./inboxPresentation";
+import { inboxDestinationLabel, inboxUpdateMessage, workUpdateTitle } from "./inboxPresentation";
 import { useInboxUpdatePages } from "./useInboxUpdatePages";
 import { getActionableSettlementEscalations } from "../budget";
 import type { AppRoute, Navigate } from "../../shared/routes";
@@ -448,7 +448,7 @@ export function ActionInbox({
             </View>
           );
         const update = item.update;
-        const copy = normalizeWorkUpdateNotification(update);
+        const copy = normalizeWorkUpdateNotification({ ...update, title: workUpdateTitle(update.title) });
         const target = inboxUpdateRoute(update, profile!.role);
         const message = inboxUpdateMessage(copy.message, update.reason);
         const destinationLabel = inboxDestinationLabel(target);

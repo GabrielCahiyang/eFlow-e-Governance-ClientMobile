@@ -8,8 +8,8 @@ import type {
   WorkEditorFields,
 } from "../../../core/web/app/features/nested-work/types/editor";
 import { sameWorkEditorScope } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
-import { isSubtaskContributor } from "./branchInspector";
-import { contributorReviewUnavailable } from "../../shared/userMessages";
+import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
+import { workScope } from "./branchInspector";
 
 export async function recoverWorkRequest(
   rootId: string,
@@ -43,10 +43,12 @@ export async function recoverWorkRequest(
         "confirmed_failure",
         "The original subtask is unavailable.",
       );
-    if (isSubtaskContributor(latest, nodeId, actorId))
+    const action = request.command === "progress" ? "execute" : "submit";
+    const capability = selectNodeWorkCapability(latest, nodeId, action, workScope(latest, actorId));
+    if (!capability.allowed)
       throw new WorkRequestFailure(
         "confirmed_failure",
-        contributorReviewUnavailable,
+        capability.disabledReason || "Current work access is required.",
       );
   }
   return saveWorkTree(rootId, request);

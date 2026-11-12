@@ -1,4 +1,4 @@
-import { statusLabel } from "../../shared/statusLabels";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
 import { StyleSheet } from "react-native";
@@ -77,7 +77,7 @@ export function ProjectTaskTable({
       id: "status",
       title: "Status",
       width: 150,
-      render: (t: Task) => <Status value={t.status} />,
+      render: (t: Task) => <Status value={t.status} work customId={t.customStatusId} />,
     },
     {
       id: "timeline",
@@ -152,6 +152,7 @@ export function ProjectBoard({
   tasks: Task[];
   navigate: Navigate;
 }) {
+  const resolve = useWorkStatus();
   return (
     <ScrollView
       horizontal
@@ -174,11 +175,11 @@ export function ProjectBoard({
                 width: 8,
                 height: 8,
                 borderRadius: 4,
-                backgroundColor: STATUS_COLORS[status],
+                backgroundColor: resolve(status).color ?? STATUS_COLORS[status],
               }}
             />
             <Text style={s.heading}>
-              {statusLabel(status)} (
+              {resolve(status).label} (
               {tasks.filter((t) => t.status === status).length})
             </Text>
           </Row>
@@ -191,7 +192,7 @@ export function ProjectBoard({
                 onPress={() => navigate({ name: "task", id: t.id })}
               >
                 <Card title={t.title}>
-                  <Status value={t.status} />
+                  <Status value={t.status} work customId={t.customStatusId} />
                   <Text style={s.muted}>
                     {t.assigneeName || "Needs assignment"}
                   </Text>

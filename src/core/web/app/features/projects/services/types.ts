@@ -9,6 +9,10 @@ export interface Project {
   title: string;
   description: string;
   ownerId?: string;
+  projectLeadId?: string;
+  scope?: string;
+  setupCompletedAt?: string;
+  fundingNotRequired?: boolean;
   proposalId?: string;
   proposalTitle?: string;
   programId?: string;
@@ -25,6 +29,7 @@ export interface Project {
   startDate?: string;
   targetDate?: string;
   archivedAt?: number;
+  completedAt?: string;
   createdBy?: string;
   createdAt: number;
   updatedAt: number;

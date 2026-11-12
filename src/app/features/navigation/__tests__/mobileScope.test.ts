@@ -392,3 +392,15 @@ test.each(["activity", "review", "budget", "files"])(
     });
   },
 );
+
+
+test("project Audit Trail is native while project creation and AI tooling remain on Web", () => {
+  const project = { name: "project", id: "project-a", workspaceId: "workspace-a" } as const;
+  expect(resolveMobileRoute({ ...project, view: "audit_trail" }, "head", () => true)).toMatchObject({
+    disposition: "native",
+    route: { ...project, view: "audit_trail" },
+  });
+  for (const view of ["project_setup", "ai_draft", "import"]) {
+    expect(resolveMobileRoute({ ...project, view }, "head", () => true).disposition).toBe("web");
+  }
+});

@@ -21,10 +21,11 @@ import {
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 import { rowToTask } from "../../../core/web/app/features/tasks/services/taskMapper";
 import { fetchProject } from "./services";
+import { projectEditorAccess, requireProjectSetup } from "./projectAccess";
 
-type Scope = { actor: string; project: string; office: string; task?: Task };
+type Scope = { actor: string; project: string; office: string; task?: Task; canDelegateEdit?: boolean };
 
-async function taskStructureAllowed({ actor, project, office, task }: Scope) {
+async function taskStructureAccess({ actor, project, office, task, canDelegateEdit }: Scope) {
   const [scoped, managesProject, managesTask] = await Promise.all([
     supabase.rpc("can_create_scoped_work", {
       target_org: office,
@@ -43,11 +44,11 @@ async function taskStructureAllowed({ actor, project, office, task }: Scope) {
   ]);
   const error = scoped.error || managesProject.error || managesTask.error;
   if (error) throw error;
-  return (
-    scoped.data === true &&
-    managesProject.data === true &&
-    managesTask.data === true
-  );
+  if (scoped.data === true && managesProject.data === true && managesTask.data === true)
+    return "head" as const;
+  if (task && canDelegateEdit && await projectEditorAccess(project, office, actor, task))
+    return "delegated" as const;
+  return null;
 }
 
 export function useTaskStructure(scope: Scope, enabled: boolean) {
@@ -58,8 +59,11 @@ export function useTaskStructure(scope: Scope, enabled: boolean) {
       scope.project,
       scope.office,
       scope.task?.id,
+      scope.task?.updatedAt,
+      scope.task?.status,
+      scope.canDelegateEdit,
     ]),
-    () => taskStructureAllowed(scope),
+    () => taskStructureAccess(scope),
     enabled,
   );
 }
@@ -97,10 +101,13 @@ export function ProjectTaskEditor({
       if (session.error || session.data.session?.user.id !== scope.actor)
         throw new PublicMessageError("Sign in again to save this task.");
       const project = await fetchProject(scope.project);
-      if (project.status !== "active" || !(await taskStructureAllowed(scope)))
+      const editable = project.status === "active" || (!!task && project.status === "on_hold");
+      const access = editable ? await taskStructureAccess(scope) : null;
+      if (!access || (access === "delegated" && project.sourceCollaborationDraftId))
         throw new PublicMessageError(
           "Current project access does not allow this change.",
         );
+      await requireProjectSetup(scope.project);
       if (
         !task &&
         !(await fetchProjectGroups(scope.project)).some(
@@ -124,6 +131,7 @@ export function ProjectTaskEditor({
           latest.orgId !== scope.office ||
           latest.updatedAt !== task.updatedAt ||
           latest.archivedAt ||
+          (access === "delegated" && (latest.proposedOfficeIdentityId || latest.status === "for_review")) ||
           ["completed", "cancelled"].includes(latest.status)
         )
           throw new PublicMessageError(
@@ -152,7 +160,7 @@ export function ProjectTaskEditor({
       // a confirmed rejection permits another submission from this editor.
       setUnconfirmed(true);
       const result = task
-        ? await supabase.rpc("phase3_patch_task", {
+        ? await supabase.rpc(access === "delegated" ? "edit_selected_project_task" : "phase3_patch_task", {
             p_task_id: task.id,
             p_patch: { title: name, ...schedule },
           })

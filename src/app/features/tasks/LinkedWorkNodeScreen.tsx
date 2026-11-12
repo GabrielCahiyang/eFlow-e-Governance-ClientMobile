@@ -14,13 +14,13 @@ import {
   WorkTreeUnavailable,
 } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { rowToSubtask } from "../../../core/web/app/features/subtasks";
-import { officeSubtaskPublished } from "./branchInspector";
 import { WorkTreePanel } from "./WorkTreePanel";
 import { OfficeSubitemActivity } from "./OfficeSubitemActivity";
 import { TaskFundingCard } from "../budget/TaskFundingCard";
 import type { AppRoute, Navigate } from "../../shared/routes";
 import { fetchProject } from "../projects/services";
 import { workDateLabel } from "../../../core/web/app/shared/workCalendar";
+import { useWorkRecordUpdates } from "./useWorkRecordUpdates";
 
 export function LinkedWorkNodeScreen({
   route,
@@ -53,14 +53,6 @@ export function LinkedWorkNodeScreen({
         const node = tree.nodes.find(
           (item) => item.id === nodeId && item.task_id === rootId,
         );
-        if (
-          !personal &&
-          node &&
-          actor &&
-          !officeSubtaskPublished(tree.root.status, tree.root.lead, actor) &&
-          (node.lead_id === actor || node.assigned_to_ids?.includes(actor))
-        )
-          return { tree, node: undefined };
         return { tree, node };
       } catch (error) {
         if (!(error instanceof WorkTreeUnavailable) || personal) throw error;
@@ -89,10 +81,14 @@ export function LinkedWorkNodeScreen({
           .eq("id", nodeId)
           .maybeSingle();
         if (result.error) throw new Error(result.error.message);
-        return { legacy: result.data ? rowToSubtask(result.data) : undefined };
+        return {
+          legacy: result.data ? rowToSubtask(result.data) : undefined,
+          customStatusId: typeof result.data?.custom_status_id === "string" ? result.data.custom_status_id : undefined,
+        };
       }
     },
   );
+  useWorkRecordUpdates(rootId, facts.refresh, personal);
   const data = facts.data;
   return (
     <Screen
@@ -114,7 +110,13 @@ export function LinkedWorkNodeScreen({
             !personal && data.tree.root.office ? (
               <TaskFundingCard
                 key={data.node.id}
-                task={{ id: data.tree.root.id, orgId: data.tree.root.office }}
+                task={{
+                  id: data.tree.root.id,
+                  orgId: data.tree.root.office,
+                  status: data.tree.root.status === "completed" || data.tree.root.status === "cancelled"
+                    ? data.tree.root.status
+                    : undefined,
+                }}
                 subtaskId={data.node.id}
                 canManage={false}
                 readOnly={!data.tree.root.open || facts.loading}
@@ -128,7 +130,7 @@ export function LinkedWorkNodeScreen({
         />
       ) : data.legacy ? (
         <>
-          <Status value={data.legacy.status} />
+          <Status value={data.legacy.status} work customId={data.customStatusId} />
           <LabelValue
             label="Due date"
             value={workDateLabel(data.legacy.dueDate, "Asia/Manila")}

@@ -1,66 +1,30 @@
 import { nodeSchedule } from "../tasks/subtaskSchedule";
-import { officeSubtaskPublished } from "../tasks/branchInspector";
 import type {
   WorkRow,
   WorkSnapshot,
 } from "../../../core/web/app/features/personal-work/types";
 
-export type MobileWorkRow = WorkRow & { start?: string };
+export type MobileWorkRow = WorkRow & {
+  start?: string;
+  customStatusId?: string | null;
+  listedAsOpen?: boolean;
+};
 
 type MobileWorkSnapshot = Omit<WorkSnapshot, "rows"> & {
   rows: MobileWorkRow[];
 };
 
-export function mobileWorkSnapshot(
-  data: WorkSnapshot,
-  actor: string,
-): MobileWorkSnapshot {
-  const visibleProjects = new Set(
-    data.projects
-      .filter((project) => project.status !== "planning")
-      .map((project) => project.id),
-  );
+export function mobileWorkSnapshot(data: WorkSnapshot): MobileWorkSnapshot {
   return {
     ...data,
-    projects: data.projects.filter((project) =>
-      visibleProjects.has(project.id),
-    ),
-    rows: data.rows
-      .filter((row) => !row.projectId || visibleProjects.has(row.projectId))
-      .filter(
-        (row) =>
-          row.kind !== "office-node" ||
-          !row.mine ||
-          officeSubtaskPublished(
-            row.tree?.root.status || row.task?.status,
-            row.tree?.root.lead ?? row.task?.assigneeId,
-            actor,
-          ),
-      )
-      .map((row) => ({
-        ...row,
-        status: nodeSchedule(row.node)?.effective_status ?? row.status,
-        mine:
-          row.mine &&
-          row.relation !== "Recommended lead" &&
-          (row.kind !== "office-task" ||
-            !row.task ||
-            row.task.assigneeId === actor ||
-            !!row.task.teamMemberIds?.includes(actor)),
-        start:
-          row.kind === "office-task"
-            ? row.task?.startDate
-            : nodeSchedule(row.node)?.start_date || undefined,
-        due: row.due || row.subtask?.dueDate,
-        relation:
-          row.relation === "Subitem Lead"
-            ? "Subtask Lead"
-            : row.kind === "office-task" &&
-                row.task?.assigneeId !== actor &&
-                row.task?.teamMemberIds?.includes(actor)
-              ? "Contributor"
-              : row.relation,
-      })),
+    rows: data.rows.map((row) => ({
+      ...row,
+      listedAsOpen: row.actionable,
+      customStatusId: row.kind === "office-task" ? row.task?.customStatusId : row.node?.custom_status_id,
+      start: row.kind === "office-task" ? row.task?.startDate : nodeSchedule(row.node)?.start_date || undefined,
+      due: row.due || row.subtask?.dueDate,
+      relation: row.relation === "Subitem Lead" ? "Subtask Lead" : row.relation,
+    })),
   };
 }
 
@@ -85,6 +49,7 @@ export function displayWorkSnapshot(
       timezone: row.timezone,
       blocker: row.blocker,
       status: row.status,
+      customStatusId: row.customStatusId,
       due: row.due,
       start: row.start,
       progress: row.progress,
@@ -93,6 +58,7 @@ export function displayWorkSnapshot(
       leading: row.leading,
       history: row.history,
       relation: row.relation,
+      listedAsOpen: row.listedAsOpen ?? row.actionable,
       actionable: false,
     })),
   };

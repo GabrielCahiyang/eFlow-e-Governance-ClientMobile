@@ -1,6 +1,6 @@
 {
   "source": "C:\\Users\\gabri\\OneDrive\\Desktop\\EflowWeb",
-  "generatedAt": "2026-10-27T16:32:24.620Z",
+  "generatedAt": "2026-11-12T20:17:39.030Z",
   "files": [
     {
       "source": "src/app/components/ui/modalSizing.ts",
@@ -496,13 +496,13 @@
     },
     {
       "source": "src/app/features/budget/selectors/taskCashClearance.ts",
-      "sha256": "b051bed523d74e77ef8a34e7821f43d6716df3fab05cfd7ed4f970c698246dad",
+      "sha256": "34f70c694c4cffaf89d996101c0e45d5f64ba0de9f45e4195bc4e5ef3dc3a812",
       "native": "app/features/budget/selectors/taskCashClearance.ts",
       "adapted": false
     },
     {
       "source": "src/app/features/budget/services/budgetMappers.ts",
-      "sha256": "67323358c0472d058cceaffc06af2de7f480aa98cac7ff80f3d34c5b5e99a4bf",
+      "sha256": "ba4e947dd584da06910992a5343dff6c63509cd62274d6db78774532496e43d2",
       "native": "app/features/budget/services/budgetMappers.ts",
       "adapted": false
     },
@@ -526,7 +526,7 @@
     },
     {
       "source": "src/app/features/budget/services/budgetService.ts",
-      "sha256": "47f05494c6dcd172f7ae60f18a2af0bc3cbf24bf47bd3208ff647186cbe1c9c4",
+      "sha256": "e60a6045099299007053947251da9fccae2099712b04e232f734b03d67b4a51f",
       "native": "app/features/budget/services/budgetService.ts",
       "adapted": false
     },
@@ -538,7 +538,7 @@
     },
     {
       "source": "src/app/features/budget/services/independentReviewService.ts",
-      "sha256": "edf34dedf6ed3ec3d56d62cf21c120582c7f778afd2d1fe8f62154d0d7dc2263",
+      "sha256": "1b8503f8ae6bddbfdda9685242870028c7c7a56996080500fc24b62729ecf03f",
       "native": "app/features/budget/services/independentReviewService.ts",
       "adapted": false
     },
@@ -550,13 +550,13 @@
     },
     {
       "source": "src/app/features/budget/services/taskCashClearanceService.ts",
-      "sha256": "33b867801cedf7de8370b6e317065bb519dc2fabc7dd5cf0e0c00cb7681dab86",
+      "sha256": "5de75c272252a85aa932748e45af07d081fdf02b08c963a5610c69a737bd1aeb",
       "native": "app/features/budget/services/taskCashClearanceService.ts",
       "adapted": false
     },
     {
       "source": "src/app/features/budget/types.ts",
-      "sha256": "a72e4ee4ea0c421f485170151fb9707ddbbc7da6baff77e855daacae430de998",
+      "sha256": "52d850cac6640d8400f18594b1af1c8e9ad3b1a569ffe98cd313ec109acb7788",
       "native": "app/features/budget/types.ts",
       "adapted": false
     },
@@ -580,7 +580,7 @@
     },
     {
       "source": "src/app/features/chat-calls/services/chatMessageCodec.ts",
-      "sha256": "b55545b6ee6f29e69b233afcb31920ce7c9064e0f511cb4c3d7656ea5a1b33f3",
+      "sha256": "77e6fc0b27dbcc26e74c8c47ea8f7abd97a4fbfdfdd711aea56afcbbbced5dcc",
       "native": "app/features/chat-calls/services/chatMessageCodec.ts",
       "adapted": false
     },
@@ -1084,7 +1084,7 @@
     },
     {
       "source": "src/app/features/nested-work/selectors/editorDraft.ts",
-      "sha256": "e09b8f592e7aa56d08d0d56973836aa6a0b722f2858c6192f110b68fbd218c27",
+      "sha256": "6a412383c353c27c27589df947fae1c746bc7421ee29b6a5c754348a6586e9eb",
       "native": "app/features/nested-work/selectors/editorDraft.ts",
       "adapted": false
     },
@@ -1126,7 +1126,7 @@
     },
     {
       "source": "src/app/features/nested-work/selectors/workEventPresentation.ts",
-      "sha256": "f7a03e11b0eda909a3bba639d3e0e63be219ac5ee4e6315c00a5617ad382c98e",
+      "sha256": "95d515428f13489fb276bca1f0dc6885488bc3a9d0fef65c95e5c01bed6440d1",
       "native": "app/features/nested-work/selectors/workEventPresentation.ts",
       "adapted": false
     },
@@ -1150,13 +1150,13 @@
     },
     {
       "source": "src/app/features/nested-work/types/editor.ts",
-      "sha256": "6105d2404d147b12301248d5fa24b41089bdd351a9a67560f88ccb04817d7439",
+      "sha256": "47e67e717effd522ef82d696892e29b110f17e1d605ed458a49630b648b8b4c0",
       "native": "app/features/nested-work/types/editor.ts",
       "adapted": false
     },
     {
       "source": "src/app/features/nested-work/types.ts",
-      "sha256": "217bc9bb882b36976563959935cb5dd0672525f5a1df8879375edfaf670c7e74",
+      "sha256": "731a5134ceeda4521e7f203bcf8f63aa9e65056da95f50041a294ff28deb7161",
       "native": "app/features/nested-work/types.ts",
       "adapted": false
     },
@@ -1630,7 +1630,7 @@
     },
     {
       "source": "src/app/features/project-offices/types.ts",
-      "sha256": "04664b47779c0d0a2ddb12de3836592eb7c8c41779c76de1a3e1fbd3473a38dc",
+      "sha256": "ae05b73155cf8f66773754682bf84cd517cbf6d0015f348fb6fa06466cf3eccd",
       "native": "app/features/project-offices/types.ts",
       "adapted": false
     },
@@ -1960,7 +1960,7 @@
     },
     {
       "source": "src/app/features/projects/services/projectMappers.ts",
-      "sha256": "0b913c28996c269d128301418ad33d17e8ceb652881da9148042fa37af64347e",
+      "sha256": "f9fd13c873fa6450cc580fd93bc6dedd505b9847bddbb7af4d702ee4fc433b9a",
       "native": "app/features/projects/services/projectMappers.ts",
       "adapted": false
     },
@@ -2002,7 +2002,7 @@
     },
     {
       "source": "src/app/features/projects/services/types.ts",
-      "sha256": "547bf6028c8694663500e17835b453cea47ac00e20a2fdae386c80e5f7a1ab7c",
+      "sha256": "c394192c39a1cba68fb3df4e5a082651947ccd5908feeb68c2cd54d4b97c01bf",
       "native": "app/features/projects/services/types.ts",
       "adapted": false
     },
@@ -2782,7 +2782,7 @@
     },
     {
       "source": "src/app/features/tasks/services/taskMapper.ts",
-      "sha256": "fc5eb94efc08a4edc998015578edf4109abecd0515f0993a7a86008b2f74d08f",
+      "sha256": "ef2b09d9010240a1e47780621745a6ac1d5acff909bb529814aa2c69355ae85b",
       "native": "app/features/tasks/services/taskMapper.ts",
       "adapted": false
     },
@@ -2836,7 +2836,7 @@
     },
     {
       "source": "src/app/features/tasks/taskTypes.ts",
-      "sha256": "ab532a4715394bbab0e6bc1bd8f196c4440f86dafabd46bea479bd9991cb8c3b",
+      "sha256": "2337dd3d33f0028db3cef0dc0c999d16ed472aa599c13ef0117095d4f1bc361a",
       "native": "app/features/tasks/taskTypes.ts",
       "adapted": false
     },
@@ -3421,6 +3421,36 @@
       "sha256": "645ebc8f8083fcba89459684b710f8c44ce067e0f5fe6af983dbc6241a9b1d2b",
       "native": "pages/Login/useLoginForm.ts",
       "adapted": false
+    },
+    {
+      "source": "src/app/features/work-status/statusDefinitions.ts",
+      "sha256": "865539f42674afd37301f5ce46e7577d7b90e911dd35a34d6964acce2f146acd",
+      "native": "app/features/work-status/statusDefinitions.ts",
+      "adapted": false
+    },
+    {
+      "source": "src/app/features/analytics/selectors/projectAnalysis.ts",
+      "sha256": "41d934266aa2058af7b7760f5a5786a536065d634135981ea91be100eae64af8",
+      "native": "app/features/analytics/selectors/projectAnalysis.ts",
+      "adapted": false
+    },
+    {
+      "source": "src/app/features/analytics/types.ts",
+      "sha256": "6fe7a49095eda04377e6c963955d27d2c0975bfb2e3200d64003b1e5b5b718fa",
+      "native": "app/features/analytics/types.ts",
+      "adapted": false
+    },
+    {
+      "source": "src/app/features/chat-calls/services/chatMentions.ts",
+      "sha256": "782bcd2ea2d9fb0854f7804498b12399aec98b0fb08c6eb75ec5037bd717bb71",
+      "native": "app/features/chat-calls/services/chatMentions.ts",
+      "adapted": false
+    },
+    {
+      "source": "src/app/features/nested-work/selectors/subtaskDates.ts",
+      "sha256": "c5d28b686f30577e6bfe07df1db3ce96bf6f59d0410f75cffbf1ed3066b785fa",
+      "native": "app/features/nested-work/selectors/subtaskDates.ts",
+      "adapted": false
     }
   ],
   "serviceExports": [
@@ -3529,50 +3559,6 @@
       "name": "validateLoginFields"
     },
     {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapBudgetSummary"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapBudgetLine"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapCommitment"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapAllocation"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapAllocationLine"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapRequest"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapRelease"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapReceipt"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapLiquidation"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapLedger"
-    },
-    {
-      "module": "app/features/budget/services/budgetMappers.ts",
-      "name": "mapAdjustment"
-    },
-    {
       "module": "app/features/budget/services/budgetReportExport.ts",
       "name": "downloadBudgetCsv"
     },
@@ -3585,172 +3571,8 @@
       "name": "budgetReportRead"
     },
     {
-      "module": "app/features/budget/services/budgetSectionService.ts",
-      "name": "fetchBudgetSections"
-    },
-    {
-      "module": "app/features/budget/services/budgetSectionService.ts",
-      "name": "saveBudgetSections"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "fetchDepartmentFiscalYears"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "fetchDepartmentBudgetBundle"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "saveDepartmentFiscalBudget"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "lockDepartmentFiscalBudget"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "createWorkBudgetAllocation"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "createSubtaskBudgetAllocation"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "decideWorkBudgetAllocation"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "createPettyCashRequest"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "fetchTaskFundingContext"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "createContextualCashRequest"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "resubmitContextualCashRequest"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "setSubtaskBudgetCap"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "removeSubtaskBudgetCap"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "cancelContextualCashRequest"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "resubmitPettyCashRequest"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "decidePettyCashRequest"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "decidePettyCashLeaderReview"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "markPettyCashReleased"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "recordAccountingRelease"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "overridePettyCashReleaseSchedule"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "overrideAccountingPettyCashReleaseSchedule"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "acknowledgePettyCashRelease"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "adjustDepartmentFiscalBudget"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "closeDepartmentFiscalBudget"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "runDepartmentBudgetMaintenance"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "uploadCashRequestAttachment"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "submitPettyCashLiquidation"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "decidePettyCashLiquidation"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "authorizeLateLiquidation"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "decidePettyCashLiquidationLeaderReview"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "createReceiptSignedUrl"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "fetchAccountingAccounts"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "fetchGeneralJournal"
-    },
-    {
-      "module": "app/features/budget/services/budgetService.ts",
-      "name": "postGeneralJournalAdjustment"
-    },
-    {
       "module": "app/features/budget/services/directFundingService.ts",
       "name": "fundOfficeWork"
-    },
-    {
-      "module": "app/features/budget/services/independentReviewService.ts",
-      "name": "getIndependentReview"
-    },
-    {
-      "module": "app/features/budget/services/independentReviewService.ts",
-      "name": "routeIndependentReview"
-    },
-    {
-      "module": "app/features/budget/services/independentReviewService.ts",
-      "name": "decideIndependentReview"
-    },
-    {
-      "module": "app/features/budget/services/independentReviewService.ts",
-      "name": "independentReviewAllowsPosting"
-    },
-    {
-      "module": "app/features/budget/services/independentReviewService.ts",
-      "name": "getAssignedIndependentReviews"
     },
     {
       "module": "app/features/budget/services/pettyCashVoucherService.ts",
@@ -3759,14 +3581,6 @@
     {
       "module": "app/features/budget/services/pettyCashVoucherService.ts",
       "name": "mapOfficeBudgetAccount"
-    },
-    {
-      "module": "app/features/budget/services/taskCashClearanceService.ts",
-      "name": "fetchTaskCashBlockers"
-    },
-    {
-      "module": "app/features/chat-calls/services/chatMessageCodec.ts",
-      "name": "parseMessage"
     },
     {
       "module": "app/features/chat-calls/services/chatModerationService.ts",
@@ -4817,26 +4631,6 @@
       "name": "createProjectCommandCache"
     },
     {
-      "module": "app/features/projects/services/projectLifecycleService.ts",
-      "name": "fetchProjectCompletionReadiness"
-    },
-    {
-      "module": "app/features/projects/services/projectLifecycleService.ts",
-      "name": "completeProject"
-    },
-    {
-      "module": "app/features/projects/services/projectLifecycleService.ts",
-      "name": "archiveCompletedProject"
-    },
-    {
-      "module": "app/features/projects/services/projectMappers.ts",
-      "name": "rowToProject"
-    },
-    {
-      "module": "app/features/projects/services/projectMappers.ts",
-      "name": "rowToMilestone"
-    },
-    {
       "module": "app/features/projects/services/projectMemberService.ts",
       "name": "fetchProjectMembers"
     },
@@ -5305,22 +5099,6 @@
       "name": "runTaskMaintenance"
     },
     {
-      "module": "app/features/tasks/services/taskMapper.ts",
-      "name": "readString"
-    },
-    {
-      "module": "app/features/tasks/services/taskMapper.ts",
-      "name": "readStringArray"
-    },
-    {
-      "module": "app/features/tasks/services/taskMapper.ts",
-      "name": "rowToTask"
-    },
-    {
-      "module": "app/features/tasks/services/taskMapper.ts",
-      "name": "taskToRow"
-    },
-    {
       "module": "app/features/tasks/services/taskMutationService.ts",
       "name": "createTask"
     },
@@ -5649,34 +5427,6 @@
       "name": "recommendTeamsForTasks"
     },
     {
-      "module": "app/services/notificationService.ts",
-      "name": "subscribeToNotifications"
-    },
-    {
-      "module": "app/services/notificationService.ts",
-      "name": "createNotification"
-    },
-    {
-      "module": "app/services/notificationService.ts",
-      "name": "markNotificationRead"
-    },
-    {
-      "module": "app/services/notificationService.ts",
-      "name": "markAllNotificationsRead"
-    },
-    {
-      "module": "app/services/notificationService.ts",
-      "name": "getUnreadCount"
-    },
-    {
-      "module": "app/services/notificationService.ts",
-      "name": "fetchRecentNotifications"
-    },
-    {
-      "module": "app/services/notificationService.ts",
-      "name": "markRecentNotificationRead"
-    },
-    {
       "module": "app/services/reportService.ts",
       "name": "recordReportExport"
     },
@@ -5863,6 +5613,326 @@
     {
       "module": "app/services/workflowService.ts",
       "name": "getDefaultStatuses"
+    },
+    {
+      "module": "app/features/tasks/services/taskMapper.ts",
+      "name": "readString"
+    },
+    {
+      "module": "app/features/tasks/services/taskMapper.ts",
+      "name": "readStringArray"
+    },
+    {
+      "module": "app/features/tasks/services/taskMapper.ts",
+      "name": "rowToTask"
+    },
+    {
+      "module": "app/features/tasks/services/taskMapper.ts",
+      "name": "taskToRow"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapBudgetSummary"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapBudgetLine"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapCommitment"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapAllocation"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapAllocationLine"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapRequest"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapRelease"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapReceipt"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapLiquidation"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapLedger"
+    },
+    {
+      "module": "app/features/budget/services/budgetMappers.ts",
+      "name": "mapAdjustment"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "fetchDepartmentFiscalYears"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "fetchDepartmentBudgetBundle"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "saveDepartmentFiscalBudget"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "lockDepartmentFiscalBudget"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "createWorkBudgetAllocation"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "createSubtaskBudgetAllocation"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "decideWorkBudgetAllocation"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "createPettyCashRequest"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "fetchTaskFundingContext"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "createContextualCashRequest"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "resubmitContextualCashRequest"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "setSubtaskBudgetCap"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "removeSubtaskBudgetCap"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "cancelContextualCashRequest"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "resubmitPettyCashRequest"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "decidePettyCashRequest"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "decidePettyCashLeaderReview"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "markPettyCashReleased"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "recordAccountingRelease"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "overridePettyCashReleaseSchedule"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "overrideAccountingPettyCashReleaseSchedule"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "acknowledgePettyCashRelease"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "adjustDepartmentFiscalBudget"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "closeDepartmentFiscalBudget"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "runDepartmentBudgetMaintenance"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "uploadCashRequestAttachment"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "submitPettyCashLiquidation"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "decidePettyCashLiquidation"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "authorizeLateLiquidation"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "decidePettyCashLiquidationLeaderReview"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "createReceiptSignedUrl"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "fetchAccountingAccounts"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "fetchGeneralJournal"
+    },
+    {
+      "module": "app/features/budget/services/budgetService.ts",
+      "name": "postGeneralJournalAdjustment"
+    },
+    {
+      "module": "app/features/budget/services/taskCashClearanceService.ts",
+      "name": "fetchTaskCashBlockers"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "getIndependentReview"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "routeIndependentReview"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "decideIndependentReview"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "independentReviewAllowsPosting"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "needsLeadershipReview"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "getLiquidationFiscalYear"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "approveStaffingEscalation"
+    },
+    {
+      "module": "app/features/budget/services/independentReviewService.ts",
+      "name": "getAssignedIndependentReviews"
+    },
+    {
+      "module": "app/features/projects/services/projectMappers.ts",
+      "name": "rowToProject"
+    },
+    {
+      "module": "app/features/projects/services/projectMappers.ts",
+      "name": "rowToMilestone"
+    },
+    {
+      "module": "app/features/chat-calls/services/chatMentions.ts",
+      "name": "CHAT_TEXT_LIMIT"
+    },
+    {
+      "module": "app/features/chat-calls/services/chatMentions.ts",
+      "name": "findMentionQuery"
+    },
+    {
+      "module": "app/features/chat-calls/services/chatMentions.ts",
+      "name": "editChatDraft"
+    },
+    {
+      "module": "app/features/chat-calls/services/chatMentions.ts",
+      "name": "insertChatMention"
+    },
+    {
+      "module": "app/features/chat-calls/services/chatMentions.ts",
+      "name": "readChatMentions"
+    },
+    {
+      "module": "app/features/chat-calls/services/chatMentions.ts",
+      "name": "mentionHighlights"
+    },
+    {
+      "module": "app/features/chat-calls/services/chatMessageCodec.ts",
+      "name": "parseMessage"
+    },
+    {
+      "module": "app/services/notificationService.ts",
+      "name": "subscribeToNotifications"
+    },
+    {
+      "module": "app/services/notificationService.ts",
+      "name": "createNotification"
+    },
+    {
+      "module": "app/services/notificationService.ts",
+      "name": "markNotificationRead"
+    },
+    {
+      "module": "app/services/notificationService.ts",
+      "name": "markAllNotificationsRead"
+    },
+    {
+      "module": "app/services/notificationService.ts",
+      "name": "getUnreadCount"
+    },
+    {
+      "module": "app/services/notificationService.ts",
+      "name": "fetchRecentNotifications"
+    },
+    {
+      "module": "app/services/notificationService.ts",
+      "name": "markRecentNotificationRead"
+    },
+    {
+      "module": "app/features/budget/services/budgetSectionService.ts",
+      "name": "fetchBudgetSections"
+    },
+    {
+      "module": "app/features/budget/services/budgetSectionService.ts",
+      "name": "saveBudgetSections"
+    },
+    {
+      "module": "app/features/projects/services/projectLifecycleService.ts",
+      "name": "fetchProjectCompletionReadiness"
+    },
+    {
+      "module": "app/features/projects/services/projectLifecycleService.ts",
+      "name": "fetchProjectDeletionBlockers"
+    },
+    {
+      "module": "app/features/projects/services/projectLifecycleService.ts",
+      "name": "completeProject"
+    },
+    {
+      "module": "app/features/projects/services/projectLifecycleService.ts",
+      "name": "archiveCompletedProject"
     }
   ],
   "browserAdapterReview": [
@@ -5917,7 +5987,6 @@
     "app/features/project-views/hooks/useProjectPresentation.ts",
     "app/features/project-views/hooks/useProjectReviewDates.ts",
     "app/features/project-views/hooks/useProjectViewPreferences.ts",
-    "app/features/projects/activity/activityService.ts",
     "app/features/projects/activity/useActivityPage.ts",
     "app/features/projects/hooks/useProjectCompletionAvailability.ts",
     "app/features/projects/hooks/useProjectLocation.ts",
@@ -5942,7 +6011,6 @@
     "app/features/workspaces/hooks/useWorkspaceState.ts",
     "app/features/workspaces/workspaceLocation.ts",
     "app/services/callService.ts",
-    "app/services/notificationService.ts",
     "app/services/reportService.ts",
     "app/services/taskDiscussionService.ts",
     "app/shared/controlPanelClient.ts",
@@ -5954,7 +6022,9 @@
     "app/shared/polygonClient.ts",
     "app/shared/useMediaQuery.ts",
     "app/shared/usePanelDismissal.ts",
-    "pages/Login/useLoginForm.ts"
+    "pages/Login/useLoginForm.ts",
+    "app/services/notificationService.ts",
+    "app/features/projects/activity/activityService.ts"
   ],
   "externalPackages": [
     "@supabase/supabase-js",

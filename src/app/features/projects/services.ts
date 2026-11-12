@@ -50,6 +50,14 @@ function visibleProjectTasks(
   return query;
 }
 
+export async function fetchProjectAnalysisTasks(project: string) {
+  const rows = await readAllRows<Record<string, unknown>>((from, to) =>
+    visibleProjectTasks(project, true, "*", { count: "exact" })
+      .order("id").range(from, to),
+  );
+  return rows.map(rowToTask);
+}
+
 export async function fetchProjectCompletion(
   project: string,
   includeArchived: boolean,

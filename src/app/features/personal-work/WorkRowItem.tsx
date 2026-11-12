@@ -40,6 +40,7 @@ export function WorkRowItem({
     <MondayTableRow
       title={row.title}
       status={row.status}
+      customStatusId={row.customStatusId}
       context={context}
       due={schedule}
       scheduleLabel={[start && `Starts ${start}`, due && `Due ${due}`]

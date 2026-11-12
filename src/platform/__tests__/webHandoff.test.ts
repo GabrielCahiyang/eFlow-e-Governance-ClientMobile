@@ -1,6 +1,15 @@
 import { test, expect, jest } from "@jest/globals";
 import { webHandoffUrl } from "../webHandoff";
 
+test("Office Budget handoff preserves the fiscal year and annual view", () => {
+  expect(
+    webHandoffUrl(
+      { name: "budget", view: "annual", fiscalYear: 2026 },
+      "https://eflow.test",
+    ),
+  ).toBe("https://eflow.test/office-budget?fy=2026&view=annual");
+});
+
 test("Office Analytics opens the real Web reports route with only workspace context", () => {
   expect(
     webHandoffUrl(
@@ -78,7 +87,7 @@ test("management handoffs use known web displays and omit private branch context
       { name: "project", id: "p", view: "people_management" },
       origin,
     ),
-  ).toBe(origin + "/projects?project=p&view=people");
+  ).toBe(origin + "/projects?project=p&people=add&view=people");
   expect(
     webHandoffUrl(
       {
@@ -90,4 +99,29 @@ test("management handoffs use known web displays and omit private branch context
       origin,
     ),
   ).toBe(origin + "/projects?project=p");
+});
+
+test("Phase 3 links keep the workspace and exact project and use supported Web views", () => {
+  const origin = "https://eflow.example.test";
+  for (const [view, target] of Object.entries({
+    project_setup: "settings",
+    task_templates: "settings",
+    ai_draft: "settings",
+    import: "tasks",
+    audit_trail: "audit-trail",
+    analytics: "analytics",
+  })) {
+    expect(
+      webHandoffUrl(
+        { name: "project", id: "p", workspaceId: "office", view },
+        origin,
+      ),
+    ).toBe(origin + "/projects?project=p&workspace=office&view=" + target);
+  }
+  expect(
+    webHandoffUrl(
+      { name: "projects", workspaceId: "office", view: "project_setup" },
+      origin,
+    ),
+  ).toBe(origin + "/projects?workspace=office");
 });

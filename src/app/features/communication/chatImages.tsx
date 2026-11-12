@@ -18,6 +18,7 @@ export async function uploadChatImage(
   channel: string,
   actor: string,
   file: PickedFile,
+  avatar = false,
 ) {
   const extension = extensions[file.type];
   if (!extension) throw new Error("Choose a JPG, PNG, GIF or WebP image.");
@@ -26,7 +27,7 @@ export async function uploadChatImage(
   const bytes = await file.arrayBuffer();
   if (!bytes.byteLength || bytes.byteLength > 10 * 1024 * 1024)
     throw new Error("Choose an image up to 10 MB.");
-  const path = `${channel}/${actor}/${crypto.randomUUID()}.${extension}`;
+  const path = `${channel}/${actor}/${avatar ? "avatar-" : ""}${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from(bucket).upload(path, bytes, {
     contentType: file.type,
   });
@@ -34,16 +35,22 @@ export async function uploadChatImage(
   return path;
 }
 
+export async function cleanupChatImage(path: string) {
+  await supabase.storage.from(bucket).remove([path]);
+}
+
 export function ChatImage({
   actor,
   path,
   style,
   resizeMode = "contain",
+  avatar = false,
 }: {
   actor: string;
   path: string;
   style?: StyleProp<ImageStyle>;
   resizeMode?: "contain" | "cover";
+  avatar?: boolean;
 }) {
   const [failedUrl, setFailedUrl] = useState<string>();
   const image = useFacts(`chat-image:${actor}:${path}`, async () => {
@@ -54,7 +61,7 @@ export function ChatImage({
     return data.signedUrl;
   });
   if (image.error || (!!failedUrl && failedUrl === image.data))
-    return (
+    return avatar ? null : (
       <ErrorState
         error="Image unavailable"
         retry={() => {
@@ -65,7 +72,7 @@ export function ChatImage({
     );
   return image.data ? (
     <Image
-      accessibilityLabel="Image attachment"
+      accessibilityLabel={avatar ? "Group photo" : "Image attachment"}
       source={{ uri: image.data }}
       resizeMode={resizeMode}
       style={[{ width: "100%", height: 200, borderRadius: 12 }, style]}

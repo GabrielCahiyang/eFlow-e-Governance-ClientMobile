@@ -28,7 +28,7 @@ export function UnavailableDestination({
         title={destination.title}
         description={
           destination.disposition === "web" && !url
-            ? "Open eFlow Web to manage this."
+            ? "This build needs the eFlow Web address to open this page."
             : destination.reason
         }
       />

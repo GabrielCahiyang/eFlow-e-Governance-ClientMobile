@@ -5,22 +5,14 @@ import {
   mapRequest,
 } from "../../../core/web/app/features/budget/services/budgetMappers";
 import { fetchTaskCashBlockers } from "../../../core/web/app/features/budget/services/taskCashClearanceService";
-import { isLiquidationLate } from "../../../core/web/app/features/budget/selectors/cashWorkflowRules";
+import { isTaskCashApprovalBlocked } from "../../../core/web/app/features/budget/selectors/taskCashClearance";
 import {
   getIndependentReview,
   independentReviewAllowsPosting,
   type IndependentReviewContext,
 } from "../../../core/web/app/features/budget/services/independentReviewService";
 
-// Additive fields from the hosted staffing and Head settlement migrations.
-export interface SettlementReview extends IndependentReviewContext {
-  headAlertStatus?: "notified" | "pending" | "no_head" | null;
-  headEscalationApproved?: boolean;
-  headCanPostSettlement?: boolean;
-  headSettlementPosted?: boolean;
-  headEscalationFingerprint?: string | null;
-  headEscalationCommandId?: string | null;
-}
+export type SettlementReview = IndependentReviewContext;
 
 export async function getSettlementReview(
   id: string,
@@ -65,27 +57,7 @@ export function settlementAllowsAccountingPosting(
 
 export async function fetchTaskApprovalCashBlockers(taskId: string) {
   const blockers = await fetchTaskCashBlockers(taskId);
-  const checked = await Promise.all(
-    blockers.map(async (blocker) => {
-      const { request, liquidation } = blocker;
-      if (
-        request.status !== "pending_department_settlement" ||
-        liquidation?.status !== "pending_department_settlement" ||
-        (isLiquidationLate(request, liquidation) &&
-          !liquidation.departmentDecidedAt)
-      )
-        return blocker;
-      const current = await getSettlementReview(liquidation.id).catch(
-        () => undefined,
-      );
-      // This mirrors the web task approval gate. Project closure still requires settlement.
-      return current?.version === liquidation.version &&
-        current.headEscalationApproved === true
-        ? undefined
-        : blocker;
-    }),
-  );
-  return checked.filter((blocker) => blocker !== undefined);
+  return blockers.filter(isTaskCashApprovalBlocked);
 }
 
 export async function approveStaffingEscalation(

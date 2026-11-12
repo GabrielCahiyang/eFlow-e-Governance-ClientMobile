@@ -2,6 +2,128 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Follow-up Phases 3–4 — Audit Trail, budget releases and project closeout
+
+- Projects now has a native **Audit Trail** tab and Project options entry. It reads the same authorized, paginated project history as Web and shows the change, actor and time in the workspace timezone.
+- Office Budget and Accounting open the release calendar and budget versions from **View budget releases**. Releases become available automatically on their scheduled date. The existing confirmation command is available only for due releases with current Accounting authorization in the Office. The server rejects early releases and stale budget versions.
+- Eligible Heads can open **Complete project** or **Archive project** from Project options. The sheet shows current work, finance and governance blockers and rechecks them on confirmation. Project funding shows authorized unused task and project returns. Uncertain funding returns retain their original request and amounts for retry.
+- Project creation, AI drafting and PDF import remain Web workflows. The subtask date migration `20261112191530_subtask_schedule_bounds.sql` remains pending in the hosted project. The read-only catalog check confirmed the Audit Trail, budget confirmation, closeout and funding return functions, along with the active scheduled release job.
+
+Mobile TypeScript and nine Metro checks passed. The full Mobile Jest run passed 337 tests in 107 suites. A separate closeout regression passed, and the focused release, funding and navigation run passed 24 tests. The Android and iOS production JavaScript exports and the APK's embedded bundle passed the credential audit. Web TypeScript and the production build passed, along with four Chromium smoke tests against the built app. The isolated date-form test passed with a longer timeout. The broader Web unit run had 2,284 passes, 44 failures, six skips and one unhandled error. Failures included timeouts and assertions for the older Delete subtree label.
+
+Signed Android build 52 upgraded build 51 and cold-launched directly to eFlow sign-in on the x86_64 emulator. The standalone APK includes ARM64 and x86_64, uses the same signing certificate as build 51, and embeds the verified release JavaScript bundle. Physical-device, signed-in and native iOS checks remain pending. [Android APK](../../artifacts/M7/eFlow-Mobile-Alignment-Phase-4-v52-arm64-x86_64.apk) · [APK verification](../STANDALONE_V52_APK_VERIFICATION.json) · [Launch screenshot](../../artifacts/M7/phase-4-v52-launch.png)
+
+| Signed-in check | Expected result |
+| --- | --- |
+| Head and assigned member open the same project on both clients | Audit Trail shows the same events and respects access after a workspace switch. Search and pagination stay within the current project. |
+| Accounting Officer opens a locked budget with two pending dates | The calendar shows both amounts. A future entry is display-only. A due entry can be confirmed with a reference if still pending. A release that the scheduler already confirmed appears in the calendar and budget totals once. |
+| Task Lead, Project Lead and Head use an eligible project with unused allocations | The Task Lead returns unused subtask money to its parent. The Project Lead or Head returns unused task allocations. The Head returns the project remainder to Office Budget. Open cash and unfinished work continue to block closeout. |
+| Head completes and archives a ready QA project | Completion and archive are separate confirmations and appear in Audit Trail. The server rejects a stale or unauthorized attempt. |
+| Contributor updates a task and a subtask | The update appears in activity and the My Work list. The server still enforces final completion and review permissions. |
+
+## Follow-up Phase 2 — My Work and contributor updates
+
+Mobile now uses the Web work feed for assignment and status, and saves contributor updates directly through the shared task and subtask commands. These rules supersede the staged contributor approval and pre-start visibility notes in the earlier M7 walkthrough below.
+
+Signed-in checks remain pending. Compare Assigned work, Leading, Subtasks and History across both clients using the same workspace. Open an assigned subtask before its parent starts. Save an update as a contributor, confirm it appears in activity and the lists, and verify the server still enforces completion and final review permissions. Repeat after a reconnect.
+
+## Follow-up Phase 1 — Subtask dates
+
+- The Web and Mobile subtask editors use the same planned start and due date rules. A new subtask needs both dates when the server exposes the new schedule contract. Existing records can keep a missing start date until the lead edits the schedule.
+- The database checks the project, task and every dated parent subtask. It also rejects parent timeline changes that would leave child dates outside the new range. Start dates do not trigger a status transition.
+- The prepared Web migration is `20261112191530_subtask_schedule_bounds.sql`. Hosted rollout is pending. An older server continues to expose its current due-date-only contract.
+
+Both TypeScript checks, the Web production build, both Mobile JavaScript exports, 336 Mobile tests, the focused Web form and table tests, and both Chromium subtask checks passed. The isolated database test passed ten date-rejection scenarios. The broader Web test run reported failures, including timeouts and assertions outside the new schedule checks. Signed-in acceptance on the hosted database remains pending.
+
+Signed Android build 51 upgraded the x86_64 emulator and opened directly to eFlow sign-in. It includes ARM64 and x86_64, uses the build 50 signing certificate, and passed the credential audit and source-map checks. [APK](../../artifacts/M7/eFlow-Mobile-Subtask-Dates-v51-arm64-x86_64.apk) · [APK verification](../STANDALONE_V51_APK_VERIFICATION.json) · [Launch screenshot](../../artifacts/M7/subtask-dates-v51-launch.png)
+
+| Check | Expected result |
+| --- | --- |
+| Project Oct 30–Nov 5 and parent task Nov 1–4 | Nov 1–4 and a same-day range save. Oct 31 or Nov 6 is rejected. Reload Web and Mobile to confirm the same dates. |
+| Dated parent subtask | A child cannot start before the parent or finish after it. Shortening the parent, task or project names a conflicting subtask. |
+| Older subtask with only a due date | Start is shown as missing. Renaming keeps its stored dates. Editing its schedule requires both dates. |
+| Authorized lead and contributor | Verify that an eligible lead can save and a contributor without planning access cannot. Check that the start date does not change task status. |
+
+## Web alignment Phase 4 — Messages and Android delivery
+
+- Type `@` to choose an authorized conversation member. Group chats also offer `@everyone`. The server creates the recipients' Inbox bell alerts. The alert opens the matching conversation and shows the exact message, including older messages outside the loaded page. Message receipt retries preserve the same ID and mention targets.
+- Project chats appear under **Pinned** automatically. Pin or unpin other conversations in **Conversation info**. Task chats show their owning project in the list and thread. Unread dots appear on active conversations and the Messages shortcut.
+- Long-press your own message and confirm **Delete for everyone**. Both sides keep a placeholder and lose the original content. A completed or archived project and its task chats move to **Archived** as read-only history.
+- Authorized leads can change the group name or photo in **Conversation info**. Project and task conversation members can set and clear their own and peers' chat nicknames. Nicknames are scoped to that conversation and appear on messages. The server records changes in the thread.
+- Read-only checks confirmed the hosted conversation commands and mention trigger. Mobile uses the deployed Web permissions and project lifecycle. No hosted migrations are required.
+
+TypeScript, nine Metro checks, all 335 tests across 107 suites, and production JavaScript exports for Android and iOS passed. The automated two-participant fixture verifies mentions, exact Inbox links and recipient unread behavior with a mocked backend. Two-account acceptance against the hosted backend, physical Android testing and native iOS compilation are pending.
+
+Signed standalone Android build 50 includes ARM64 and x86_64. It upgraded build 49 and cold-launched directly to eFlow sign-in on the Android API 36 x86_64 emulator. Signature continuity, release source maps, and the credential audit for three production bundles passed. [APK](../../artifacts/M7/eFlow-Mobile-Phase-4-v50-arm64-x86_64.apk) · [APK verification](../STANDALONE_V50_APK_VERIFICATION.json) · [Launch screenshot](../../artifacts/M7/phase-4-v50-launch.png)
+
+| Check | Approved accounts and fixture | Expected result |
+| --- | --- | --- |
+| Mentions and Inbox | Two members of one project chat and a direct conversation | Send a selected peer mention and then `@everyone` in the group. The recipient sees the unread dot and an Inbox alert for each message. Tap an older alert to open its exact message. The sender receives no self-alert. The direct composer omits `@everyone`. |
+| Pins and chat labels | Both accounts and a project with two task chats | The project chat starts pinned for both. A personal pin on one task or direct chat affects only the pinning account. Message pins remain shared. Task chat rows identify their project. |
+| Delete and reconnect | Sender and recipient with a text and image message | Delete the sender's message and verify both placeholders. Check the recipient after reconnecting and after loading older history. The content and attachment do not reappear. |
+| Group name, photo and nicknames | Project or task lead and another authorized participant | Save and reset the name and photo as the lead. The other member sees the changes and has no group editor. Change and clear a peer's nickname, then check the activity row and display name in that chat. |
+| Archive | Head and a participant with a dedicated project ready for completion | Complete the project. Both the project and task chats move to **Archived**. History stays readable and send, reaction, pin and customization controls are unavailable. |
+
+## Web alignment Phase 3 — Projects, people and analysis
+
+- A Head can open a planning project from the Office project directory and continue setup in its Web Settings. Mobile uses the same server readiness check before showing active project work. It checks readiness again before a native task write.
+- Project People shows **Can edit** for eligible saved project members who hold the permission. Grant or revoke it in Web Add people. Mobile checks the current roster before a delegated task edit and sends the edit to the restricted Web command. It grants no authority to create tasks, change staffing or allocate money.
+- **Projects → project → Analysis** shows the target and actual completion dates, how early or late the project finished, late submissions, pending reviews and typical review time. It uses Web's project timing calculations. The full analysis opens for the same project on Web.
+- Project options link to the project's Web Settings for setup and **Draft tasks**, Main table for **Import PDF**, and Audit Trail. The links preserve the project and workspace IDs. Use an HTTPS eFlow Web address in `EXPO_PUBLIC_WEB_ORIGIN` for these links.
+- Mobile rechecks an open guest workspace on foreground and every 30 seconds while active. If the server drops the project, Mobile removes it from the workspace and clears affected display data. Realtime membership changes also invalidate access. The hosted guest-maintenance job is active and the shared commands are installed. There were zero registered guest accounts on the hosted target during the check.
+
+TypeScript, nine Metro checks, all 329 tests across 106 suites, Android and iOS production JavaScript exports, and the credential audit of both exports and the embedded Android bundle passed. Signed-in device acceptance and native iOS compilation are pending. This QA build has no configured HTTPS Web origin. URL routing passed with a test origin.
+
+The standalone, QA-signed build 49 upgraded the Android API 35 x86_64 emulator and opened directly to the eFlow sign-in screen. It includes ARM64 and x86_64 libraries and preserves the build 48 signing certificate. Six Phase 3 source-map entries match the Mobile source. [Phase 3 APK](../../artifacts/M7/eFlow-Mobile-Phase-3-v49-arm64-x86_64.apk) · [APK verification](../STANDALONE_V49_APK_VERIFICATION.json) · [Emulator sign-in](../../artifacts/M7/phase-3-v49-launch.png)
+
+| Check | Approved accounts and fixture | Expected result |
+| --- | --- | --- |
+| Setup and handoffs | Head with one planning project and one ready project in LEDIPO | Planning project opens its Settings on Web. Tasks and people appear after setup is complete. Open shared templates, AI drafting, PDF import and Audit Trail and confirm each Web view uses the original project. |
+| Project editing access | Head and a saved LEDIPO project member | Grant Can edit in Web Add people, then open the assigned project's task on Mobile. Edit its title or dates. Revoke the checkbox and verify the person remains on the project and the task edit action disappears. Check an unrelated project and a task in review. |
+| Delivery analysis | A project with an early or late completion and a submitted task with a recorded review | Compare target and actual dates with Web. A late submission changes the submission count. Review duration is measured independently. Check a project with missing dates. |
+| Guest expiration | An approved temporary guest with a soon-expiring project and a second authorized project | Leave the expiring project open. After expiry, foreground the app or wait for its next access check. The expired project disappears and the second project remains available. A deactivated guest can no longer use the signed-in session. |
+
+## Web alignment Phase 2 — Funding and settlement
+
+Mobile reads the same task funding, Office Budget, settlement and completion records as eFlow Web. The parent Funding tab shows its approved budget, subtask allocations, unallocated and currently allocatable amounts, cash released and actual spending. The assigned Task Lead can manage an allocation from the parent or the subtask. The allocation uses an approved task account and sends the server a durable command ID for retry. Returning unused subtask funding credits the parent and preserves recorded spending.
+
+The Head's escalation review shows a posting success only after the server confirms settlement for that liquidation version. Task review uses the shared cash-clearance decision logic. Active finance screens check for changes through Realtime, local decisions and foreground or periodic checks. Office Petty Cash keeps its existing separate workflow.
+
+The Office Budget summary shows the total, the amount released and the amount pending. The project Funding screen shows the specific cash and unused-funding blockers reported by the server. Return unused subtask funding from the parent task. Use eFlow Web for Office Budget scheduling and early release, project-level funding returns and final project completion. Direct handoffs require a configured `EXPO_PUBLIC_WEB_ORIGIN`.
+
+TypeScript and nine Metro checks passed. The full mobile suite passed 324 tests across 105 suites. Production Android and iOS JavaScript exports passed. Read-only checks confirmed the deployed funding, settlement and closeout commands and the active Office Budget release job. The hosted database was read only during this phase.
+
+The signed standalone APK upgraded the Android API 35 x86_64 emulator from build 47 to build 48 and cold-launched to the eFlow sign-in screen. The APK contains ARM64 and x86_64 libraries. Its signature, release manifest and six Phase 2 source-map entries passed verification. The credential audit passed for both exports and the embedded APK bundle. [Phase 2 APK](../../artifacts/M7/eFlow-Mobile-Phase-2-v48-arm64-x86_64.apk) · [APK verification](../STANDALONE_V48_APK_VERIFICATION.json) · [Credential audit](../NATIVE_RELEASE_AUDIT.json) · [Emulator sign-in screen](../../artifacts/M7/phase-2-v48-launch.png)
+
+| Check | Approved accounts and dedicated fixture | Expected result |
+| --- | --- | --- |
+| Allocate and adjust | Task Lead on a task funded for ₱50,000, with three subtasks and a contributor on the same project | Allocate ₱45,000 in total. The parent shows ₱5,000 unallocated, and another allocation above its account's availability is blocked. Cash released and actual spending stay unchanged. A contributor can see their authorized funding without changing it. |
+| Return and retry | Task Lead on a completed subtask with a partially spent allocation and another with an open cash request | Return only the unused amount to the parent. Open requests prevent edits and returns. On an approved network failure fixture, reopen the form and verify the same saved command. Check the ledger for one adjustment. |
+| Settlement | Head and Accounting Staff using an authorized escalation fixture with no independent Accounting Officer | A conflicted Accounting Staff account cannot settle its own package. The eligible Head opens the exact package in Inbox and posts it. Compare the request, liquidation, Accounting queue, task clearance and project completion on Mobile and Web. |
+| Office Budget | Head with a dedicated Office Budget containing two scheduled ₱25,000 releases | A ₱50,000 budget with nothing released starts at ₱0 released. Each confirmed server release updates the Mobile totals to ₱25,000 and then ₱50,000. Compare available budget after commitments. |
+| Closeout and separate petty cash | Head and Task Lead on a project with unused subtask, task and project funds, plus an Office Petty Cash fixture | The project funding screen names the amounts to return and links to the parent Task Funding and Web budget. Confirm the server reports readiness once its blockers clear. Office Petty Cash activity leaves project and task allocations unchanged. |
+
+Signed-in financial workflow acceptance is pending on both platforms. Use only approved fixtures. Repeat with dark mode, large text, assistive technology, the keyboard open and reconnects.
+
+## Web alignment Phase 1 — Tasks and subtasks
+
+Mobile follows Web's work terminology, status catalog and server-assigned review routes. The native screens and dashboards use the existing layouts. Task and subtask label changes appear in Projects, My Work and work details. Retired custom labels remain readable on existing work. New selections use the scope and order from the Web catalog. Project Board lanes continue to group by workflow state, including work with custom in-progress labels.
+
+Mobile reads the deployed catalog and sends label changes through the same `set_work_custom_status` command as Web. Task and subtask screens refresh after local changes, Realtime updates, reconnects and app foregrounding. Linked Personal subtasks also check periodically while the app is active. The four shared TypeScript modules were refreshed from the reviewed Web working tree at Git base `4ff217b`. The subscription, presentation and native selector are mobile adaptations.
+
+TypeScript and Metro checks passed. All 317 tests in 102 suites passed. Android and iOS production JavaScript exports and the credential audit passed. The hosted catalog, its Realtime publication, the label command and the direct subtask completion command were confirmed through read-only queries. Signed-in device workflows and personal acceptance are pending.
+
+The signed QA APK, version code 47, contains ARM64 and x86_64 native code and an embedded production bundle. Its signature, release manifest, embedded credential audit and six Phase 1 source-map entries passed verification. The APK installed and cold-launched directly to the eFlow sign-in screen on the Android API 35 x86_64 emulator. Native iOS compilation and the physical-phone workflow remain pending. [Phase 1 APK](../../artifacts/M7/eFlow-Mobile-Phase-1-v47-arm64-x86_64.apk) · [APK verification](../STANDALONE_V47_APK_VERIFICATION.json) · [Emulator sign-in screen](../../artifacts/M7/phase-1-v47-launch.png)
+
+| Check | Approved accounts and dedicated fixture | Expected result |
+| --- | --- | --- |
+| Work terminology and status labels | Member and Head viewing the same active project, with a Web Admin available to change a test label | Projects, task details, Assigned Work and Leading use Task and Subtask. A renamed built-in label and an eligible custom in-progress label appear with the configured color. A retired label stays visible on existing work and leaves the picker. |
+| Live status updates | Task Lead and contributor viewing the same task or subtask on different devices | Start work, apply a custom label and move through review. Compare the canonical status in the Main table, details and My Work. Check after reconnecting. |
+| Optional evidence and direct completion | Eligible Subtask Lead, parent Task Lead and a separate contributor | On an active branch with prerequisites satisfied, the eligible lead can complete a subtask without a file. A contributor without a lead appointment cannot complete it. |
+| Parent task review | Distinct Task Lead, Project Lead and Head, plus a task led by the Project Lead | Submit a completion note with no files. The first task goes to the assigned Project Lead. The Project Lead's own submission goes to the assigned Head. Verify the submitter cannot approve their own task. |
+
+Repeat the role walkthrough on Android and iOS, including large text, screen readers, dark mode, reduced motion and an open keyboard. The hosted scheduled-work contract `m7_office_assignments` is still absent, so the separate shared scheduling and staged contributor approval scenarios remain subject to their existing prerequisites.
+
 ## Build 46 shared backend contracts
 
 12 November 2026, Asia/Singapore. The four shared migrations and their disposable SQL runner are in the Web checkout. Build 46 consumes the new contracts when the backend exposes them. The hosted project still serves the existing contracts. The Build 45 notes below describe that earlier package.

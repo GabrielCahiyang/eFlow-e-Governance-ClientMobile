@@ -1,13 +1,19 @@
 import type { AppRoute } from "../../shared/routes";
-import type { Notification } from "../../../core/web/app/services/notificationService";
+import type { InboxNotification } from "./inboxUpdates";
 import { resolveNotificationDestination } from "../../../core/web/app/features/notifications/navigation";
 import { isMobileRole } from "../../shared/mobileRoles";
 
 export function inboxUpdateRoute(
-  item: Notification,
+  item: InboxNotification,
   role: string,
 ): AppRoute | undefined {
   if (!isMobileRole(role)) return;
+  if (item.conversationId)
+    return {
+      name: "messages",
+      id: item.conversationId,
+      recordId: item.conversationMessageId,
+    };
   if (
     item.entityType === "m7_personal_work_proposal" &&
     item.projectId &&

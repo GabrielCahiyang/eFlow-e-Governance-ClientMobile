@@ -90,13 +90,39 @@ test("Office totals preserve explicit zero and reject missing amounts and wrong 
     fiscalYear: 2026,
     approvedAmount: null,
     spentAmount: 0,
+    budgetReleasedAmount: 25000,
+    heldAmount: 25000,
   };
   expect(await officeFinancialSummary("office", 2026)).toEqual({
     approved: undefined,
+    released: 25000,
+    pending: 25000,
     settled: 0,
     available: undefined,
   });
   await expect(officeFinancialSummary("other", 2026)).rejects.toThrow(
     /Office and fiscal year/,
   );
+});
+
+test("scheduled Office Budget releases are shown separately from the unchanged total", async () => {
+  for (const released of [0, 25000, 50000]) {
+    mockSummary = {
+      id: "budget",
+      orgId: "office",
+      fiscalYear: 2026,
+      approvedAmount: 50000,
+      budgetReleasedAmount: released,
+      heldAmount: 50000 - released,
+      availableAmount: released,
+      spentAmount: 0,
+    };
+    expect(await officeFinancialSummary("office", 2026)).toEqual({
+      approved: 50000,
+      released,
+      pending: 50000 - released,
+      available: released,
+      settled: 0,
+    });
+  }
 });

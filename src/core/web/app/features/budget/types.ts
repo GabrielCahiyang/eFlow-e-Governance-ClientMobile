@@ -115,7 +115,21 @@ export interface BudgetSection {
   retired?: boolean;
   committedAmount?: number;
   spentAmount?: number;
+  protectedAmount?: number;
+  reservations?: BudgetReservation[];
   releaseSchedule?: BudgetScheduledRelease[];
+}
+
+export interface BudgetScheduledRelease {
+  id: string;
+  date: string;
+  amount: number;
+  status: 'pending' | 'confirmed';
+  confirmedAt?: string;
+  confirmedBy?: string;
+  confirmedByName?: string;
+  automatic?: boolean;
+  reference?: string;
 }
 
 export interface BudgetCommitment {
@@ -171,6 +185,7 @@ export interface PettyCashRequest {
   taskLeaderId?: string;
   cashRecipientId?: string;
   requesterName?: string;
+  requesterIsAccountingStaff?: boolean;
   taskLeaderName?: string;
   cashRecipientName?: string;
   taskTitle?: string;
@@ -264,6 +279,8 @@ export interface PettyCashLiquidation {
   status: "pending" | "pending_leader_review" | "pending_department_settlement" | "approved" | "changes_requested";
   submittedBy: string;
   submittedAt: number;
+  leaderDecidedBy?: string;
+  leaderDecidedAt?: number;
   departmentDecidedBy?: string;
   departmentDecidedAt?: number;
   decisionReason?: string;
@@ -360,9 +377,38 @@ export interface TaskFundingContext {
   taskLeaderId?: string;
   cap?: SubtaskFundingCap;
   lines: TaskFundingLine[];
+  distribution?: SubtaskBudgetDistribution;
+  canManageDistribution?: boolean;
+  subtaskBudgets?: SubtaskBudgetRow[];
+  parentSources?: { id: string; name: string; available: number }[];
+}
+
+export interface SubtaskBudgetDistribution {
+  allocated: number;
+  unallocated: number;
+  available: number;
+  released: number;
+  spent: number;
+}
+
+export interface SubtaskBudgetRow {
+  id: string;
+  title: string;
+  capId?: string;
+  sourceId?: string;
+  amount: number;
+  returnable: number;
+  reason?: string;
+  finished: boolean;
+  hasHistory: boolean;
+  blocked: boolean;
 }
 
 export interface DepartmentBudgetBundle {
+  budgetVersions?: OfficeBudgetVersion[];
+  canAdjustBudget?: boolean;
+  readjustmentBlockedByProjects?: boolean;
+  releaseScheduleAvailable?: boolean;
   summary: DepartmentBudgetSummary | null;
   sections?: BudgetSection[];
   sectionsAvailable?: boolean;
@@ -381,6 +427,11 @@ export interface DepartmentBudgetBundle {
   schemaWarnings?: string[];
 }
 
+export interface BudgetReservation {id:string;name:string;amount:number}
+export interface BudgetProtection {kind:'budget_account_protected';account:string;entered:number;minimum:number;sources:BudgetReservation[]}
+export interface BudgetAccountSnapshot {releaseSchedule?:BudgetScheduledRelease[];id:string;name:string;parentId?:string|null;accountCode?:string|null;amount:number;heldAmount:number;position:number}
+export interface OfficeBudgetVersion {q4Target?:number;version:number;total:number;actorName:string;createdAt:string;reason:string;accounts:BudgetAccountSnapshot[]}
+
 export interface ReceiptDraft {
   id: string;
   vendor: string;
@@ -397,6 +448,7 @@ export interface CashReviewFocus {
   recordId: string;
   orgId: string;
   fiscalYear: number;
+  independentReview?: boolean;
 }
 
 export interface TaskCashBlocker {
@@ -409,21 +461,5 @@ export interface TaskCashBlocker {
   location: string;
   reviewTarget?: { recordId: string; role: "leader" | "department" };
   liquidation?: PettyCashLiquidation;
+  settlement?: { eligibleSettlers: number; headNotified: boolean; headApproved: boolean };
 }
-
-export interface BudgetScheduledRelease {
-  id: string;
-  date: string;
-  amount: number;
-  status: 'pending' | 'confirmed';
-  confirmedAt?: string;
-  confirmedBy?: string;
-  confirmedByName?: string;
-  reference?: string;
-}
-
-
-export interface BudgetReservation {id:string;name:string;amount:number}
-export interface BudgetProtection {kind:'budget_account_protected';account:string;entered:number;minimum:number;sources:BudgetReservation[]}
-export interface BudgetAccountSnapshot {releaseSchedule?:BudgetScheduledRelease[];id:string;name:string;parentId?:string|null;accountCode?:string|null;amount:number;heldAmount:number;position:number}
-export interface OfficeBudgetVersion {q4Target?:number;version:number;total:number;actorName:string;createdAt:string;reason:string;accounts:BudgetAccountSnapshot[]}

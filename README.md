@@ -2,7 +2,7 @@
 
 eFlow Mobile is the Expo and React Native companion to eFlow Web for LGU Ormoc City. It supports Android and iOS for Heads, Members, and Accounting Staff. System administration is handled in eFlow Web.
 
-The v1 product is **eFlow Mobile — Work, Updates & Approvals**: assigned work, tasks and nested subitems, evidence, reviews, communication, project/Office context and focused authorized finance. Its contract is shared backend contracts and business-rule parity, intentional mobile feature selection, and native mobile UX. Advanced desktop workspaces stay on eFlow Web.
+The v1 product is **eFlow Mobile — Work, Updates & Approvals**: assigned work, tasks and nested subtasks, evidence, reviews, communication, project/Office context and focused authorized finance. Its contract is shared backend contracts and business-rule parity, intentional mobile feature selection, and native mobile UX. Advanced desktop workspaces stay on eFlow Web.
 
 The redesign is at **M4**, evidence, reviews, activity and text communication. See the [M4 personal QA package](docs/mobile-redesign/M4-personal-qa.md) and the [phase tracker](docs/mobile-redesign/phase-progress.md).
 

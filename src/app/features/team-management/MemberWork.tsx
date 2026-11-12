@@ -1,4 +1,5 @@
 import { statusLabel } from "../../shared/statusLabels";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 import {
   Button,
   Card,
@@ -21,6 +22,7 @@ export function MemberWork({
   facts: TeamWorkflowFacts;
   navigate: Navigate;
 }) {
+  const resolveStatus = useWorkStatus();
   const work = tasks.filter((task) =>
       taskParticipantIds(task).includes(employee),
     ),
@@ -56,7 +58,7 @@ export function MemberWork({
         ) : (
           work.map((task) => (
             <Card key={task.id} title={task.title}>
-              <LabelValue label="Status" value={statusLabel(task.status)} />
+              <LabelValue label="Status" value={resolveStatus(task.status, task.customStatusId).label} />
               <LabelValue
                 label="Responsibility"
                 value={
@@ -85,7 +87,7 @@ export function MemberWork({
         ) : (
           nested.map((item) => (
             <Card key={item.id} title={item.title}>
-              <LabelValue label="Status" value={statusLabel(item.status)} />
+              <LabelValue label="Status" value={resolveStatus(item.status).label} />
               <LabelValue label="Progress" value={`${item.percentComplete}%`} />
               <Button
                 variant="outline"

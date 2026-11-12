@@ -1,4 +1,6 @@
 import { expect, jest, test } from "@jest/globals";
+import { parseMessage } from "../../../../core/web/app/features/chat-calls/services/chatMessageCodec";
+import { mergeMessages, messagePreview } from "../messageHistory";
 import { loadMessages, sendChat, type Message } from "../services";
 
 type Stored = Message & { channel_id: string };
@@ -135,4 +137,42 @@ test("an image-only message uses the same private image and message identity on 
       "qa-thread/worker/other.png",
     ),
   ).rejects.toThrow("original message receipt");
+});
+
+test("both fixture participants read the same typed mention after a lost reply and deletion hides the original", async () => {
+  const body = "  @QA Reviewer please check.";
+  const mention = [{ id: "reviewer", label: "@QA Reviewer", start: 2 }];
+  const before = mockInsert.mock.calls.length;
+  const send = () =>
+    sendChat(
+      "mention-message",
+      "mention-thread",
+      "worker",
+      "QA Worker",
+      body,
+      undefined,
+      mention,
+    );
+  await expect(send()).rejects.toThrow("Reply lost");
+  await send();
+  expect(mockInsert).toHaveBeenCalledTimes(before + 1);
+  let original: Message | undefined;
+  for (const actor of ["worker", "reviewer"]) {
+    mockActor = actor;
+    const { rows } = await loadMessages("mention-thread");
+    expect(rows).toHaveLength(1);
+    original = rows[0];
+    expect(parseMessage(original.content)).toMatchObject({
+      text: body.trim(),
+      mentions: [{ ...mention[0], start: 0 }],
+    });
+  }
+  const deleted = {
+    ...original!,
+    content: "Message deleted.",
+    deleted_at: "2026-11-05T00:00:00Z",
+  };
+  expect(mergeMessages([deleted], [original!])).toEqual([deleted]);
+  expect(messagePreview(deleted, "worker")).toBe("You deleted a message");
+  expect(messagePreview(deleted, "reviewer")).toBe("This message was deleted");
 });

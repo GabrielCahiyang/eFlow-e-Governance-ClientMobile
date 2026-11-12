@@ -12,7 +12,6 @@ import {
   branchRows,
   completionMode,
   defaultSubtaskLead,
-  isSubtaskContributor,
   personalReviewAllowed,
   workNodeRoute,
   workScope,
@@ -93,7 +92,7 @@ test("completion counts direct accepted children and uses the leaf status when t
   expect(branchCompletion(data, "completed", "n2").percent).toBe(100);
 });
 
-test("an assigned contributor cannot use the direct completion path even if also the Task Lead", () => {
+test("the Task Lead still needs a server completion grant", () => {
   const data = tree([
     node(1, null, {
       assigned_to_ids: ["lead", "root-lead"],
@@ -101,8 +100,6 @@ test("an assigned contributor cannot use the direct completion path even if also
     }),
   ]);
   rememberWorkCapabilityContext(data, "root-lead");
-  expect(isSubtaskContributor(data, "n1", "root-lead")).toBe(true);
-  expect(isSubtaskContributor(data, "n1", "lead")).toBe(false);
   expect(completionMode(data, "n1", "root-lead")).toBeUndefined();
 });
 
@@ -197,7 +194,7 @@ test("direct Office completion and personal submission require distinct current 
   expect(completionMode(office, row.id, "lead")).toBeUndefined();
   rememberWorkCapabilityContext(office, "lead");
   rememberWorkCapabilityContext(personal, "lead");
-  expect(completionMode(office, row.id, "lead")).toBeUndefined();
+  expect(completionMode(office, row.id, "lead")).toBe("direct");
   rememberWorkCapabilityContext(office, "root-lead");
   expect(completionMode(office, row.id, "root-lead")).toBe("direct");
   expect(completionMode(personal, row.id, "lead")).toBe("review");

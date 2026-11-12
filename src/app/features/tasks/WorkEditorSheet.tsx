@@ -1,3 +1,4 @@
+import { subtaskDateLimits } from "../../../core/web/app/features/nested-work/selectors/subtaskDates";
 import { Text } from "../../components/ui/Typography";
 import { useEffect, useRef, useState } from "react";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
@@ -29,6 +30,7 @@ import {
   freezeWorkEditorRequest,
   workEditorCapability,
   workEditorDirty,
+  workEditorDateError,
   sameWorkEditorScope,
 } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
 import {
@@ -54,10 +56,8 @@ import type {
 import { draftStore } from "../../../platform/draftStore";
 import {
   defaultSubtaskLead,
-  isSubtaskContributor,
   personalReviewAllowed,
 } from "./branchInspector";
-import { contributorReviewUnavailable } from "../../shared/userMessages";
 import {
   nodeSchedule,
   plannedSubtaskStartIssue,
@@ -237,6 +237,7 @@ function WorkEditorForm({
     nodeSchedule(data.nodes.find((item) => item.id === baseline.nodeId))
       ?.start_date || "";
   const today = workScheduleToday(data);
+  const sharedDates = !!data.root.scheduleBounds;
   const [plannedStart, setPlannedStart] = useState(
     () =>
       (typeof recovered?.request.payload.start === "string"
@@ -244,8 +245,10 @@ function WorkEditorForm({
         : undefined) ??
       (edit.command === "create" ? today || "" : originalStart),
   );
+  const start = sharedDates ? fields.start || "" : plannedStart;
+  const dateLimits = sharedDates ? subtaskDateLimits(data, fields.parent) : undefined;
   const changedStart =
-    !!today && edit.command === "edit" && plannedStart !== originalStart;
+    (sharedDates || !!today) && edit.command === "edit" && start !== originalStart;
   const request = useRef<WorkRequest | undefined>(recovered?.request),
     action = useAction();
   const context = {
@@ -313,12 +316,6 @@ function WorkEditorForm({
           );
         }
         if (
-          (edit.command === "progress" || edit.command === "submit") &&
-          baseline.nodeId &&
-          isSubtaskContributor(latest, baseline.nodeId, profile.id)
-        )
-          throw new Error(contributorReviewUnavailable);
-        if (
           edit.command === "review" &&
           (!baseline.nodeId ||
             !personalReviewAllowed(
@@ -337,7 +334,9 @@ function WorkEditorForm({
               fields.lead || null,
               fields.people,
             )
-          : subtaskScheduleError(latest, baseline, fields);
+          : latest.root.scheduleBounds
+            ? workEditorDateError(latest, baseline, fields)
+            : subtaskScheduleError(latest, baseline, fields);
         if (issue) throw new PublicMessageError(issue);
         const current = workEditorCapability(latest, baseline, context);
         if (!isStaff && !current.allowed)
@@ -354,7 +353,9 @@ function WorkEditorForm({
         let next = isStaff
           ? createStaffingRequest(staffing, fields.lead, fields.people)
           : freezeWorkEditorRequest(baseline, fields, crypto.randomUUID());
-        if (today && (edit.command === "create" || changedStart)) {
+        if (sharedDates && !latest.root.scheduleBounds)
+          throw new PublicMessageError("Subtask dates are temporarily unavailable. Reopen the subtask and try again.");
+        if (!sharedDates && today && (edit.command === "create" || changedStart)) {
           if (!workScheduleToday(latest))
             throw new PublicMessageError(
               "Refresh to verify subtask scheduling before saving.",
@@ -472,6 +473,10 @@ function WorkEditorForm({
           fields.due === baseline.fields.due
             ? nextBaseline.fields.due
             : fields.due,
+        start:
+          fields.start === baseline.fields.start
+            ? nextBaseline.fields.start
+            : fields.start,
         standalone:
           fields.standalone === baseline.fields.standalone
             ? nextBaseline.fields.standalone
@@ -548,15 +553,17 @@ function WorkEditorForm({
             onChangeText={(v) => update("title", v)}
             editable={!request.current && !action.busy}
           />
-          {today ? (
+          {sharedDates || today ? (
             <DateField
-              label="Planned start"
-              value={plannedStart}
-              onChange={setPlannedStart}
+              label="Start date"
+              value={start}
+              min={dateLimits?.earliest}
+              max={dateLimits?.latest}
+              onChange={(value) => sharedDates ? update("start", value) : setPlannedStart(value)}
               disabled={
                 !!request.current ||
                 action.busy ||
-                !!nodeSchedule(node)?.started_at
+                (!sharedDates && !!nodeSchedule(node)?.started_at)
               }
             />
           ) : edit.command === "create" ? (
@@ -565,6 +572,8 @@ function WorkEditorForm({
           <DateField
             label="Due date"
             value={fields.due}
+            min={sharedDates ? start || dateLimits?.earliest : undefined}
+            max={dateLimits?.latest}
             onChange={(v) => update("due", v)}
             disabled={!!request.current || action.busy}
           />

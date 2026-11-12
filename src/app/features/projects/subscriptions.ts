@@ -33,7 +33,17 @@ export function netProjectUpdates(project: string, onChange: () => void) {
       },
       onChange,
     )
-    .subscribe();
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "project_offices",
+        filter: "project_id=eq." + project,
+      },
+      onChange,
+    )
+    .subscribe((state) => { if (state === "SUBSCRIBED") onChange(); });
   const app = AppState.addEventListener("change", (state) => {
     if (state === "active") onChange();
   });

@@ -66,7 +66,6 @@ export function SubtaskCompletionSheet({
         if (
           tree.root.project !== projectId ||
           tree.root.office !== officeId ||
-          tree.root.lead !== actorId ||
           (completionMode(tree, node.id, actorId) !== "direct" &&
             (!attempt ||
               needsUpload ||

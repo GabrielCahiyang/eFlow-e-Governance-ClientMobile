@@ -25,7 +25,7 @@ export async function fetchDepartmentBudgetBundle(orgId: string, fiscalYear: num
   const summaryResult = await supabase.rpc("department_budget_summary", { p_org_id: orgId, p_fiscal_year: fiscalYear });
   if (summaryResult.error) {
     if (/not found|schema cache/i.test(summaryResult.error.message)) throw new Error("Apply the office budget migration, then refresh this page.");
-    throw new Error(summaryResult.error.message);
+    throw Object.assign(new Error(summaryResult.error.message), { code: summaryResult.error.code, status: summaryResult.status });
   }
   if(summaryResult.data&&(Array.isArray(summaryResult.data)||!summaryResult.data.id||!summaryResult.data.orgId))throw new Error('Office financial scope could not be verified. Retry budget facts.');
   const summary = summaryResult.data ? mapBudgetSummary(summaryResult.data as Record<string, unknown>) : null;
@@ -47,7 +47,7 @@ export async function fetchDepartmentBudgetBundle(orgId: string, fiscalYear: num
   const taskIds = uniqueIds(requestRows.map((row) => row.task_id));
   const subtaskIds = uniqueIds(requestRows.map((row) => row.subtask_id));
   const [profilesResult, tasksResult, requestSubtasksResult] = await Promise.all([
-    profileIds.length ? budgetReportRead(selected=>supabase.from("profiles").select("id,full_name",{count:"exact"}).in("id", selected).order("id",{ascending:true}), profileIds) : Promise.resolve({ data: [], error: null }),
+    profileIds.length ? budgetReportRead(selected=>supabase.from("profiles").select("id,full_name,role",{count:"exact"}).in("id", selected).order("id",{ascending:true}), profileIds) : Promise.resolve({ data: [], error: null }),
     taskIds.length ? budgetReportRead(selected=>supabase.from("tasks").select("id,title",{count:"exact"}).in("id", selected).order("id",{ascending:true}), taskIds) : Promise.resolve({ data: [], error: null }),
     subtaskIds.length ? budgetReportRead(selected=>supabase.from("subtasks").select("id,title",{count:"exact"}).in("id", selected).order("id",{ascending:true}), subtaskIds) : Promise.resolve({ data: [], error: null }),
   ]);
@@ -198,6 +198,10 @@ export async function fetchTaskFundingContext(taskId: string, subtaskId?: string
     taskBudget: Number(row.taskBudget || 0),
     available: Number(row.available || 0),
     taskLeaderId: row.taskLeaderId ? String(row.taskLeaderId) : undefined,
+    distribution: row.distribution as TaskFundingContext["distribution"],
+    canManageDistribution: row.canManageDistribution === true,
+    subtaskBudgets: Array.isArray(row.subtaskBudgets) ? row.subtaskBudgets as TaskFundingContext["subtaskBudgets"] : undefined,
+    parentSources: Array.isArray(row.parentSources) ? row.parentSources as TaskFundingContext["parentSources"] : undefined,
     cap: cap ? {
       id: String(cap.id), amount: Number(cap.amount || 0), available: Number(cap.available || 0),
       allocationLineId: String(cap.allocationLineId || ""), reason: String(cap.reason || ""),

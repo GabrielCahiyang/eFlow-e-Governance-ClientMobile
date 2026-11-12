@@ -68,6 +68,9 @@ const knownRoutes = new Set([
 ]);
 const advancedProject = new Set([
   "analytics",
+  "project_setup",
+  "task_templates",
+  "ai_draft",
   "gantt",
   "milestones",
   "sharing",
@@ -199,10 +202,19 @@ export function resolveMobileRoute(
       reason:
         "Open an authorized cash request from its work item or Inbox update.",
     };
+  const webProjectSteps: Record<string, string> = {
+    project_setup: route.name === "projects"
+      ? "Choose Create project or open an existing planning project."
+      : "Choose Continue project setup or Edit project details in Settings.",
+    task_templates: "Open Edit project details, then Draft tasks to choose shared templates.",
+    ai_draft: "Open Edit project details, then Draft tasks to generate tasks and subtasks with AI.",
+    import: "Choose Import PDF in the project header.",
+  };
   if (
     webOnly[route.name] ||
     (route.name === "reports" && (role !== "head" || route.view === "web")) ||
-    (route.name === "project" && advancedProject.has(route.view || "")) ||
+    (route.name === "project" && !!route.id && advancedProject.has(route.view || "")) ||
+    (route.name === "projects" && route.view === "project_setup" && role === "head") ||
     (route.name === "task" &&
       ["planning", "funding_configuration", "file_management"].includes(
         route.view || "",
@@ -217,6 +229,7 @@ export function resolveMobileRoute(
       ...result,
       disposition: "web",
       reason:
+        (route.view && webProjectSteps[route.view]) ||
         "This workspace is managed in eFlow Web. Your permissions and original destination still apply.",
     };
   if (deferred.has(route.name))

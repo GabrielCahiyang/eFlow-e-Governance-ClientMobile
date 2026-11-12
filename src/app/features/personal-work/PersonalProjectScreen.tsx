@@ -1,4 +1,4 @@
-import { statusLabel } from "../../shared/statusLabels";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import {
@@ -41,6 +41,7 @@ export function PersonalProjectScreen({
   navigate: Navigate;
   initialTaskId?: string;
 }) {
+  const resolveStatus = useWorkStatus();
   const { profile } = useAuth(),
     workspace = useWorkspace(),
     facts = useFacts("personal-project:" + profile?.id + ":" + id, () =>
@@ -146,7 +147,7 @@ export function PersonalProjectScreen({
               renderItem: ({ item: task }) => (
                 <NavigationRow
                   title={task.title}
-                  description={`${statusLabel(task.status)} · ${name(task.lead_id)}`}
+                  description={`${resolveStatus(task.status).label} · ${name(task.lead_id)}`}
                   onPress={() =>
                     navigate({
                       name: "personal_project",
@@ -192,7 +193,7 @@ export function PersonalProjectScreen({
       ) : (
         <>
           <Row>
-            <Status value={data.project.status} />
+            <Status value={data.project.status} work />
             <Text>Owner: {name(data.owner)}</Text>
           </Row>
           {!initialTaskId && (
@@ -280,7 +281,7 @@ export function PersonalProjectScreen({
               {task && (
                 <Card key={task.id} title={task.title}>
                   <Row>
-                    <Status value={task.status} />
+                    <Status value={task.status} work />
                   </Row>
                   <LabelValue
                     label="Progress"

@@ -1,6 +1,7 @@
 import { View } from "../../components/ui/Primitives";
 import { colors } from "../../components/ui";
 import { Card, LabelValue, Notice, peso } from "../../components/ui";
+import { recordedPeso } from "../../components/ui/theme";
 import type { DepartmentBudgetBundle } from "../../../core/web/app/features/budget/types";
 import { sectionTotal } from "../../../core/web/app/features/budget/selectors/budgetSections";
 export function BudgetOverview({ data }: { data: DepartmentBudgetBundle }) {
@@ -58,7 +59,11 @@ export function BudgetOverview({ data }: { data: DepartmentBudgetBundle }) {
           value={peso(summary.approvedAmount)}
         />
         <LabelValue
-          label="Held / unreleased"
+          label="Budget released"
+          value={recordedPeso(summary.budgetReleasedAmount)}
+        />
+        <LabelValue
+          label="Pending release"
           value={peso(summary.heldAmount || 0)}
         />
         <LabelValue

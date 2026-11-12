@@ -5,15 +5,19 @@ import X from "lucide-react-native/icons/x";
 import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { Empty } from "../../components/ui";
+import Pin from "lucide-react-native/icons/pin";
+import { parseMessage } from "../../../core/web/app/features/chat-calls/services/chatMessageCodec";
 import { ChatAvatar } from "./ChatAvatar";
 import {
   conversationFilters,
   conversationKindLabel,
+  pinnedConversation,
   type ConversationFilter,
 } from "./chatPresentation";
 import type { Channel } from "./services";
 
 export function ConversationList({
+  actor,
   channels,
   total,
   query,
@@ -25,6 +29,7 @@ export function ConversationList({
   composeDisabled,
   searchable = true,
 }: {
+  actor: string;
   channels: Channel[];
   total: number;
   query: string;
@@ -37,6 +42,14 @@ export function ConversationList({
   searchable?: boolean;
 }) {
   const palette = useTheme();
+  const pinned = channels
+    .filter(pinnedConversation)
+    .sort(
+      (a, b) =>
+        Number(b.kind === "project") - Number(a.kind === "project") ||
+        (b.personalPin ?? "").localeCompare(a.personalPin ?? ""),
+    );
+  const regular = channels.filter((item) => !pinnedConversation(item));
   return (
     <View style={{ gap: 12 }}>
       {onCompose && (
@@ -126,86 +139,134 @@ export function ConversationList({
         <Empty
           kind="messages"
           title={
-            query.trim() || filter !== "all"
-              ? "No matching conversations"
-              : "No conversations yet"
+            filter === "archive" && !query.trim()
+              ? "No archived chats yet"
+              : query.trim() || filter !== "all"
+                ? "No matching conversations"
+                : "No conversations yet"
           }
           description={
-            total
-              ? "Try another search or filter."
-              : "Your authorized direct, Office and task conversations appear here."
+            filter === "archive" && !query.trim()
+              ? "Completed projects and their task chats appear here."
+              : total
+                ? "Try another search or filter."
+                : "Your authorized direct, Office and task conversations appear here."
           }
         />
       ) : (
         <View>
-          {channels.map((item) => (
-            <Pressable
-              key={item.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.name}. ${
-                item.unread ? "Unread. " : ""
-              }${item.lastMessage || conversationKindLabel(item.kind)}`}
-              onPress={() => onOpen(item)}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                minHeight: 68,
-                paddingVertical: 8,
-                paddingHorizontal: 8,
-                marginHorizontal: -8,
-                borderRadius: 14,
-                backgroundColor: pressed ? palette.glassSurface : "transparent",
-              })}
-            >
-              <ChatAvatar name={item.name} kind={item.kind} size={52} />
-              <View style={{ flex: 1, gap: 1 }}>
+          {[...pinned, ...regular].map((item, index) => (
+            <View key={item.id}>
+              {index === 0 && pinned.length > 0 && (
                 <Text
-                  numberOfLines={1}
+                  accessibilityRole="header"
                   style={{
-                    fontSize: 16,
-                    fontWeight: item.unread ? "700" : "600",
-                    color: palette.text,
+                    color: palette.mutedLabel,
+                    fontWeight: "700",
+                    marginBottom: 4,
                   }}
                 >
-                  {item.name}
+                  Pinned
                 </Text>
-                {!!item.projectTitle && item.kind !== "direct" && (
+              )}
+              {index === pinned.length && index > 0 && (
+                <Text
+                  accessibilityRole="header"
+                  style={{
+                    color: palette.mutedLabel,
+                    fontWeight: "700",
+                    marginVertical: 4,
+                  }}
+                >
+                  Conversations
+                </Text>
+              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${item.name}. ${
+                  item.unread && !item.archived ? "Unread. " : ""
+                }${conversationKindLabel(item.kind)}${item.kind === "task" && item.projectTitle ? " in " + item.projectTitle : ""}`}
+                onPress={() => onOpen(item)}
+                style={({ pressed }) => ({
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  minHeight: 68,
+                  paddingVertical: 8,
+                  paddingHorizontal: 8,
+                  marginHorizontal: -8,
+                  borderRadius: 14,
+                  backgroundColor: pressed
+                    ? palette.glassSurface
+                    : "transparent",
+                })}
+              >
+                <ChatAvatar
+                  name={item.name}
+                  kind={item.kind}
+                  size={52}
+                  actor={actor}
+                  path={item.avatarPath}
+                />
+                <View style={{ flex: 1, gap: 1 }}>
                   <Text
                     numberOfLines={1}
                     style={{
-                      fontSize: 12,
-                      lineHeight: 16,
-                      color: palette.mutedLabel,
+                      fontSize: 16,
+                      fontWeight: item.unread ? "700" : "600",
+                      color: palette.text,
                     }}
                   >
-                    {item.projectTitle}
+                    {item.name}
                   </Text>
+                  {(item.kind === "task" || item.kind === "project") && (
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        fontSize: 12,
+                        lineHeight: 16,
+                        color: palette.mutedLabel,
+                      }}
+                    >
+                      {item.kind === "task"
+                        ? `Task chat${item.projectTitle ? " · " + item.projectTitle : ""}`
+                        : `Project chat${item.defaultName && item.defaultName !== item.name ? " · " + item.defaultName : ""}`}
+                    </Text>
+                  )}
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 20,
+                      fontWeight: item.unread ? "600" : "400",
+                      color: item.unread ? palette.text : palette.muted,
+                    }}
+                  >
+                    {item.lastMessage
+                      ? parseMessage(item.lastMessage).text
+                      : "No messages yet"}
+                  </Text>
+                </View>
+                {pinnedConversation(item) && (
+                  <Pin
+                    size={14}
+                    color={palette.mutedLabel}
+                    accessibilityLabel="Pinned conversation"
+                  />
                 )}
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 14,
-                    lineHeight: 20,
-                    fontWeight: item.unread ? "600" : "400",
-                    color: item.unread ? palette.text : palette.muted,
-                  }}
-                >
-                  {item.lastMessage || conversationKindLabel(item.kind)}
-                </Text>
-              </View>
-              {item.unread && (
-                <View
-                  accessibilityLabel="Unread"
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
-                    backgroundColor: palette.primary,
-                  }}
-                />
-              )}
-            </Pressable>
+                {item.unread && !item.archived && (
+                  <View
+                    accessibilityLabel="Unread"
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: palette.primary,
+                    }}
+                  />
+                )}
+              </Pressable>
+            </View>
           ))}
         </View>
       )}

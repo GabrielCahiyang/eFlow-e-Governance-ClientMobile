@@ -12,8 +12,19 @@ let mockRole = "accounting_staff";
 let mockLoading = false;
 let mockError: Error | undefined;
 const mockRun = jest.fn();
+const mockApproval = jest.fn<
+  (name: string, args: Record<string, unknown>) => Promise<{ data: string; error: null }>
+>();
+const mockReadReview = jest.fn<() => Promise<SettlementReview>>();
 
-jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
+jest.mock("../../../../platform/supabase", () => ({
+  supabase: {
+    rpc: (...args: Parameters<typeof mockApproval>) => mockApproval(...args),
+  },
+}));
+jest.mock("../../../shared/confirm", () => ({
+  confirmAction: async () => true,
+}));
 jest.mock("../../authentication", () => ({
   useAuth: () => ({
     profile: {
@@ -40,7 +51,7 @@ jest.mock("../useFinancialCommand", () => ({
 jest.mock(
   "../../../../core/web/app/features/budget/services/independentReviewService",
   () => ({
-    getIndependentReview: jest.fn(),
+    getIndependentReview: () => mockReadReview(),
     routeIndependentReview: jest.fn(),
     decideIndependentReview: jest.fn(),
     independentReviewAllowsPosting: () => false,
@@ -57,6 +68,7 @@ jest.mock(
 
 const request = {
   id: "request-a",
+  taskId: "task-a",
   fundingOrgId: "office-a",
   taskLeaderId: "lead-a",
 } as PettyCashRequest;
@@ -78,6 +90,8 @@ beforeEach(() => {
   mockLoading = false;
   mockError = undefined;
   mockRun.mockClear();
+  mockApproval.mockReset();
+  mockReadReview.mockReset();
   mockContext = {
     liquidationId: liquidation.id,
     version: 1,
@@ -107,6 +121,42 @@ test("the appointed Head gets the server-authorized fallback posting action", as
   expect(
     screen.queryByRole("button", { name: /^Settle and post$/ }),
   ).toBeNull();
+});
+
+test("Head fallback reports posting only after the same liquidation version is confirmed", async () => {
+  mockRole = "head";
+  mockContext!.headEscalationFingerprint = "current-package";
+  mockContext!.headCanPostSettlement = true;
+  mockApproval.mockResolvedValue({ data: "command", error: null });
+  mockReadReview
+    .mockResolvedValueOnce(mockContext!)
+    .mockResolvedValueOnce({ ...mockContext!, headSettlementPosted: false })
+    .mockResolvedValueOnce(mockContext!)
+    .mockResolvedValueOnce({ ...mockContext!, headSettlementPosted: true });
+  await render(renderPanel());
+  await fireEvent.changeText(
+    screen.getByLabelText("Review note"),
+    "Verified receipts.",
+  );
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Approve and post settlement" }),
+  );
+  const [post, message] = mockRun.mock.calls[0] as [
+    () => Promise<void>,
+    string,
+  ];
+  expect(message).toBe("Settlement posted.");
+  await expect(post()).rejects.toThrow(/could not be verified/);
+  await expect(post()).resolves.toBeUndefined();
+  expect(mockApproval).toHaveBeenCalledWith(
+    "approve_liquidation_staffing_escalation",
+    expect.objectContaining({
+      p_liquidation_id: liquidation.id,
+      p_version: 1,
+      p_fingerprint: "current-package",
+      p_reason: "Verified receipts.",
+    }),
+  );
 });
 
 test("a notified conflicted Accounting Officer gets the escalation status and no posting action", async () => {

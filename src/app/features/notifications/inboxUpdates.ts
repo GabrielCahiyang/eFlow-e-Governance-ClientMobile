@@ -4,8 +4,27 @@ import {
   type Notification,
 } from "../../../core/web/app/services/notificationService";
 
+export type InboxNotification = Notification & {
+  conversationId?: string;
+  conversationMessageId?: string;
+};
+
+export function readInboxNotification(
+  row: Record<string, unknown>,
+): InboxNotification {
+  return {
+    ...rowToNotif(row),
+    ...(typeof row.conversation_id === "string" && {
+      conversationId: row.conversation_id,
+    }),
+    ...(typeof row.conversation_message_id === "string" && {
+      conversationMessageId: row.conversation_message_id,
+    }),
+  };
+}
+
 type Cursor = { createdAt: string; id: string };
-export type InboxUpdatePage = { items: Notification[]; next?: Cursor };
+export type InboxUpdatePage = { items: InboxNotification[]; next?: Cursor };
 const pageSize = 50;
 
 export async function fetchInboxUpdatePage(
@@ -29,7 +48,7 @@ export async function fetchInboxUpdatePage(
     .limit(pageSize + 1);
   if (error) throw error;
   const rows = data.slice(0, pageSize);
-  const items = rows.map(rowToNotif);
+  const items = rows.map(readInboxNotification);
   if (data.length <= pageSize) return { items };
   const { created_at: createdAt, id } = rows[pageSize - 1];
   // Keep the original timestamp precision and validate both values before

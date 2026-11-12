@@ -149,7 +149,7 @@ export function TaskReviewPanel({
   return (
     <>
       <Card title="Evidence and review">
-        <Status value={task.status} />
+        <Status value={task.status} work customId={task.customStatusId} />
         {submissions.loading && !submissions.data ? (
           <Loading label="Loading evidence" layout="summary" rows={3} />
         ) : submissions.error ? (

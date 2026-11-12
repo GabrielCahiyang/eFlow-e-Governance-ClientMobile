@@ -101,6 +101,14 @@ export function SettlementPanel({
   );
   const refresh = async () => {
     nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
+    nativeWindow.dispatchEvent({
+      type: "eflow:finance-updated",
+      detail: {
+        taskId: request.taskId,
+        orgId: request.fundingOrgId,
+        requestId: request.id,
+      },
+    });
     await Promise.all([onSaved(), independent.refresh()]);
   };
   const settle = (approve: boolean) =>
@@ -172,23 +180,31 @@ export function SettlementPanel({
           );
         assertAccess(profile.id);
         const commandId = crypto.randomUUID();
+        let uncertain: unknown;
         try {
           await approveStaffingEscalation(fresh, reason.trim(), commandId);
         } catch (error) {
           if (!financialFailureIsUncertain(error)) throw error;
-          const recorded = await getSettlementReview(liquidation.id).catch(
-            () => undefined,
-          );
-          if (
-            recorded?.version !== fresh.version ||
-            !(headAction === "post"
-              ? recorded.headSettlementPosted === true
-              : recorded.headEscalationCommandId === commandId)
-          )
-            throw error;
+          uncertain = error;
         }
+        const recorded = await getSettlementReview(liquidation.id).catch(
+          () => undefined,
+        );
+        if (
+          recorded?.liquidationId === liquidation.id &&
+          recorded.version === fresh.version &&
+          (posts
+            ? recorded.headSettlementPosted === true
+            : recorded.headEscalationCommandId === commandId)
+        )
+          return;
+        if (uncertain) throw uncertain;
+        await refresh();
+        throw new Error(
+          "The settlement result could not be verified. Check the current request status.",
+        );
       },
-      "Head decision recorded.",
+      headAction === "post" ? "Settlement posted." : "Head decision recorded.",
       refresh,
     );
   const settlementBlocked = pending && currentReview?.eligibleSettlers === 0;

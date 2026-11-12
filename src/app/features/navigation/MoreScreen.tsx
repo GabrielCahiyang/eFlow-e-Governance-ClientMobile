@@ -25,7 +25,7 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
   const chats = useConversationDirectory(profile?.id || "");
   const { openFavorites } = useWorkspaceNavigation();
   const unreadMessages =
-    !chats.error && chats.data?.some((chat) => chat.unread);
+    !chats.error && chats.data?.some((chat) => chat.unread && !chat.archived);
 
   const entries: {
     title: string;
@@ -119,7 +119,26 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
                   accessibilityHint={
                     unread ? "You have unread messages." : undefined
                   }
-                  icon={<Icon size={20} color={palette.primary} />}
+                  icon={
+                    <View>
+                      <Icon size={20} color={palette.primary} />
+                      {unread && (
+                        <View
+                          pointerEvents="none"
+                          testID="messages-unread-indicator"
+                          style={{
+                            position: "absolute",
+                            top: -2,
+                            right: -3,
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: palette.primary,
+                          }}
+                        />
+                      )}
+                    </View>
+                  }
                   onPress={() => navigate(route)}
                 />
               );

@@ -22,6 +22,8 @@ export async function officeFinancialSummary(office: string, year: number) {
       : undefined;
   return {
     approved: amount(data.approvedAmount),
+    released: amount(data.budgetReleasedAmount),
+    pending: amount(data.heldAmount),
     settled: amount(data.spentAmount),
     available: amount(data.availableAmount),
   };

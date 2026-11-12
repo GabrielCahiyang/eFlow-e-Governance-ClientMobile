@@ -3,12 +3,13 @@ import { Text } from "./Typography";
 import { useTheme } from "./Appearance";
 import { type ThemeColors } from "./theme";
 import { statusLabel } from "../../shared/statusLabels";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 
-export function statusIndicatorColor(
-  value: string,
-  palette: ThemeColors,
-): string {
-  return statusColors(value, palette).foreground;
+export function workStatusTone(value: string, palette: ThemeColors, color?: string) {
+  const tone = statusColors(value, palette);
+  if (!color || !/^#[0-9a-f]{6}$/i.test(color))
+    return { ...tone, accent: tone.foreground };
+  return { background: color + "26", foreground: palette.text, accent: color };
 }
 
 export function statusColors(value: string, palette: ThemeColors) {
@@ -39,14 +40,21 @@ export function Status({
   value,
   variant = "monday",
   domain,
+  work = false,
+  customId,
 }: {
   value: string;
   variant?: "default" | "monday";
   domain?: "finance";
+  work?: boolean;
+  customId?: string | null;
 }) {
+  const resolve = useWorkStatus();
+  const presentation = work ? resolve(value, customId) : undefined;
+  const label = presentation?.label ?? statusLabel(value, domain);
   const palette = useTheme(),
-    tone = statusColors(value, palette),
-    accent = tone.foreground;
+    tone = workStatusTone(value, palette, presentation?.color),
+    accent = tone.accent;
 
   if (variant === "monday") {
     return (
@@ -81,7 +89,7 @@ export function Status({
             color: tone.foreground,
           }}
         >
-          {statusLabel(value, domain)}
+          {label}
         </Text>
       </View>
     );
@@ -119,7 +127,7 @@ export function Status({
           color: tone.foreground,
         }}
       >
-        {statusLabel(value, domain)}
+        {label}
       </Text>
     </View>
   );

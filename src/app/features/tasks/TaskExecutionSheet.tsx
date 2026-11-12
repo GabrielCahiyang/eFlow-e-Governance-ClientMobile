@@ -1,4 +1,4 @@
-import { Text } from "../../components/ui/Typography";
+import { nativeWindow } from "../../../platform/webRuntime";
 import { useState } from "react";
 import {
   Button,
@@ -7,7 +7,6 @@ import {
   Field,
   LabelValue,
   Sheet,
-  colors,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { useAuth } from "../authentication";
@@ -38,7 +37,8 @@ export function TaskExecutionSheet({
   const save = () =>
     action.run(async () => {
       if (!profile) throw new Error("Sign in again.");
-      if (!note.trim()) throw new Error("A work note is required.");
+      if (category !== "None" && !blocker.trim())
+        throw new Error("Describe what is blocking the work.");
       await verifyAccess();
       await submitProgressUpdate({
         taskId,
@@ -49,6 +49,7 @@ export function TaskExecutionSheet({
         note,
         attachment: files[0] ? await asServiceFile(files[0]) : null,
       });
+      nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       await onSaved().catch(() => {});
       onClose();
     });
@@ -82,11 +83,12 @@ export function TaskExecutionSheet({
           label="Blocker"
           value={blocker}
           onChangeText={setBlocker}
+          maxLength={3000}
           multiline
         />
       )}
-      <Field label="Next step" value={next} onChangeText={setNext} />
-      <Field label="Work note" value={note} onChangeText={setNote} multiline />
+      <Field label="Next step (optional)" value={next} onChangeText={setNext} maxLength={300} />
+      <Field label="Work note" value={note} onChangeText={setNote} maxLength={3000} multiline />
       <Button
         variant="outline"
         onPress={() =>

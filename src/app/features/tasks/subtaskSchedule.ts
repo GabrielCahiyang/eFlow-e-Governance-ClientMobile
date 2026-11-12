@@ -46,7 +46,6 @@ export function subtaskScheduleError(
 type ScheduledNode = WorkNode & {
   start_date?: string | null;
   started_at?: string | null;
-  effective_status?: WorkNode["status"];
 };
 
 export const nodeSchedule = (node?: WorkNode) =>

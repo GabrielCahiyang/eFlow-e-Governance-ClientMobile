@@ -4,16 +4,18 @@ import {
   Choice,
   ErrorState,
   Field,
+  LabelValue,
+  Row,
   Notice,
   Sheet,
 } from "../../components/ui";
+import { asServiceFile, chooseFiles, type PickedFile } from "../../../platform/files";
 import { useAction } from "../../shared/useAction";
 import { saveSubtaskWorkUpdate } from "../../../core/web/app/features/subtasks/services/subtaskWorkflowService";
 import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
-import { isSubtaskContributor, workScope } from "./branchInspector";
-import { contributorReviewUnavailable } from "../../shared/userMessages";
+import { workScope } from "./branchInspector";
 
 export function OfficeSubitemUpdateSheet({
   tree,
@@ -35,13 +37,12 @@ export function OfficeSubitemUpdateSheet({
   const [note, setNote] = useState("");
   const [blocker, setBlocker] = useState("");
   const [nextStep, setNextStep] = useState("");
+  const [attachment, setAttachment] = useState<PickedFile>();
   const [attempted, setAttempted] = useState(false);
   const action = useAction();
   const save = () =>
     action.run(async () => {
       if (attempted) return;
-      if (!note.trim() && state !== "stuck")
-        throw new Error("Enter a work note.");
       if (state === "stuck" && !blocker.trim())
         throw new Error("Describe what is blocking the work.");
       const latest = await fetchWorkTree(baseline.root.id);
@@ -62,8 +63,7 @@ export function OfficeSubitemUpdateSheet({
           "Work access or revision changed. Reopen this subtask and review the current work.",
         );
       }
-      if (isSubtaskContributor(latest, nodeId, actorId))
-        throw new Error(contributorReviewUnavailable);
+      const file = attachment ? await asServiceFile(attachment) : null;
       setAttempted(true);
       await saveSubtaskWorkUpdate({
         subtaskId: nodeId,
@@ -71,6 +71,7 @@ export function OfficeSubitemUpdateSheet({
         blocker: state === "stuck" ? blocker : undefined,
         note,
         nextStep,
+        attachment: file,
       });
       await onSaved(latest).catch(() => {});
       onClose();
@@ -122,6 +123,20 @@ export function OfficeSubitemUpdateSheet({
         onChangeText={setNextStep}
         maxLength={300}
       />
+      {attachment ? (
+        <Row>
+          <LabelValue label="Attachment" value={attachment.name} />
+          <Button variant="outline" disabled={attempted || readOnly || action.busy} onPress={() => setAttachment(undefined)}>
+            Remove attachment
+          </Button>
+        </Row>
+      ) : (
+        <Button variant="outline" disabled={attempted || readOnly || action.busy} onPress={() =>
+          void action.run(async () => setAttachment((await chooseFiles("*/*", false))[0]))
+        }>
+          Attach evidence (optional)
+        </Button>
+      )}
       {!!action.error && <ErrorState context="action" error={action.error} />}
       {attempted && !!action.error && (
         <Notice>

@@ -65,7 +65,11 @@ jest.mock("../../../../platform/supabase", () => ({
   },
 }));
 jest.mock("../../../../platform/webRuntime", () => ({
-  nativeWindow: { dispatchEvent: jest.fn() },
+  nativeWindow: {
+    dispatchEvent: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  },
 }));
 jest.mock("../taskEvidence", () => ({
   assertEvidenceActor: jest.fn(async () => {}),

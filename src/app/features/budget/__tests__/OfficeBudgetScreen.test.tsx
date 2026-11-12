@@ -14,6 +14,9 @@ jest.mock("../financialScope", () => ({ financialOffices: async () => [] }));
 jest.mock("../useBudget", () => ({
   useBudget: () => ({ refresh: jest.fn() }),
 }));
+jest.mock("../useOfficeFinanceUpdates", () => ({
+  useOfficeFinanceUpdates: jest.fn(),
+}));
 jest.mock("../CashRequestCard", () => ({ CashRequestCard: () => null }));
 jest.mock("../../../../platform/supabase", () => ({
   supabase: {
@@ -61,7 +64,11 @@ jest.mock(
 test("Accounting shows only the cash work entry points even when the Office summary fails", async () => {
   const navigate = jest.fn();
   await render(<OfficeBudgetScreen navigate={navigate} />);
-  expect(await screen.findByText("We couldn't load this information. Please try again.")).toBeOnTheScreen();
+  expect(
+    await screen.findByText(
+      "We couldn't load this information. Please try again.",
+    ),
+  ).toBeOnTheScreen();
   for (const label of [
     "Annual budget",
     "General Journal",

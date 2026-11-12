@@ -1,0 +1,18 @@
+{
+  "apk": "C:\\Users\\gabri\\OneDrive\\Desktop\\EflowMobile\\artifacts\\M7\\eFlow-Mobile-Subtask-Dates-v51-arm64-x86_64.apk",
+  "versionCode": 51,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5343332,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "4fdd4decd5d1c10e45ee6293446dcf79b01948f3d6fc525ca2e95564a5329089",
+  "bytes": 99185361
+}

@@ -44,11 +44,17 @@ import { useNavigationFavorites } from "../../../core/web/app/shared/navigationP
 import { nativeWindow } from "../../../platform/webRuntime";
 import { netProjectUpdates } from "./subscriptions";
 import { ProjectTaskEditor, useTaskStructure } from "./ProjectTaskEditor";
+import { readProjectSetup } from "./projectAccess";
+import { ProjectAnalysisSummary } from "./ProjectAnalysisSummary";
 import { ProjectPeople } from "./ProjectPeople";
 import { ProjectFiles } from "./ProjectFiles";
 import { ProjectOffices } from "./ProjectOffices";
+import { ProjectAuditTrail } from "./ProjectAuditTrail";
+import { ProjectCloseoutSheet } from "./ProjectCloseoutSheet";
+import { ProjectFundingCloseout } from "./ProjectFundingCloseout";
 import { ProjectFundingSummary } from "./ProjectFundingSummary";
 import { taskSections, type ProjectWorkView } from "./mobileProjects";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { completionPercent } from "../../shared/completion";
 import { fetchProjectTaskFinance } from "./projectTaskFinance";
 import {
@@ -62,6 +68,8 @@ const views = [
   { id: "tasks", label: "Main table" },
   { id: "board", label: "Board" },
   { id: "calendar", label: "Agenda" },
+  { id: "analysis", label: "Analysis" },
+  { id: "audit_trail", label: "Audit Trail" },
 ];
 const pageGutter = 16;
 const taskDateLabel = (value: string) => {
@@ -76,8 +84,14 @@ const tools = [
   { id: "funding", title: "Funding" },
   { id: "gantt", title: "Planning on eFlow Web" },
   { id: "settings", title: "Project settings on eFlow Web" },
-  { id: "import", title: "PDF import on eFlow Web" },
+  { id: "audit_trail", title: "Audit Trail" },
 ];
+const setupTools = [
+  { id: "project_setup", title: "Project setup on eFlow Web" },
+  { id: "task_templates", title: "Shared task templates on eFlow Web" },
+  { id: "ai_draft", title: "AI task drafting on eFlow Web" },
+];
+const importTool = { id: "import", title: "PDF import on eFlow Web" };
 
 export function ProjectScreen({
   id,
@@ -91,6 +105,7 @@ export function ProjectScreen({
   const { profile } = useAuth();
   const workspace = useWorkspace();
   const palette = useTheme();
+  const resolveStatus = useWorkStatus();
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const scope = JSON.stringify([
@@ -104,6 +119,7 @@ export function ProjectScreen({
     !!profile?.id,
   );
   const [view, setView] = useState(initialView || "tasks");
+  const [closeout, setCloseout] = useState<"complete" | "archive">();
   const [menu, setMenu] = useState(false);
   const [people, setPeople] = useState(false);
   const [addTask, setAddTask] = useState(false);
@@ -112,7 +128,7 @@ export function ProjectScreen({
   const workView: ProjectWorkView =
     view === "board" || view === "calendar" ? view : "tasks";
   const main = workView === "tasks";
-  const auxiliary = ["offices", "files", "funding"].includes(view);
+  const auxiliary = ["offices", "files", "funding", "analysis", "audit_trail"].includes(view);
   const closed = ["completed", "archived"].includes(facts.data?.status ?? "");
   const needle = query.trim().toLowerCase();
   useEffect(() => {
@@ -121,7 +137,12 @@ export function ProjectScreen({
     return () => clearTimeout(timer);
   }, [needle, serverSearch]);
   const searchPending = needle !== serverSearch;
-  const projectReady = !!facts.data && !facts.error;
+  const setup = useFacts(
+    "project-setup:" + scope,
+    () => readProjectSetup(id),
+    !!facts.data && !facts.error && !closed,
+  );
+  const projectReady = !!facts.data && !facts.error && (closed || (setup.data?.ready === true && !setup.error));
   const groupFacts = useFacts(
     "project-groups:" + scope,
     () => fetchProjectGroups(id),
@@ -130,7 +151,7 @@ export function ProjectScreen({
   const groups = groupFacts.error ? [] : (groupFacts.data ?? []);
   const taskScope = { actor: profile?.id || "", project: id, office: facts.data?.orgId || "" };
   const createAccess = useTaskStructure(taskScope, projectReady && !!taskScope.office && facts.data?.status === "active" && profile?.role === "head" && main && !auxiliary);
-  const canAdd = createAccess.data === true && !createAccess.loading && !createAccess.error && !facts.loading && !groupFacts.loading && !!groups.length;
+  const canAdd = createAccess.data === "head" && !createAccess.loading && !createAccess.error && !facts.loading && !groupFacts.loading && !!groups.length;
   const pages = useProjectTaskPages({
     scope,
     project: id,
@@ -162,6 +183,8 @@ export function ProjectScreen({
   const refresh = useCallback(async () => {
     await Promise.all([
       facts.refresh(),
+      setup.refresh(),
+      createAccess.refresh(),
       groupFacts.refresh(),
       pages.refresh(),
       totals.refresh(),
@@ -169,6 +192,8 @@ export function ProjectScreen({
     ]);
   }, [
     facts.refresh,
+    setup.refresh,
+    createAccess.refresh,
     groupFacts.refresh,
     pages.refresh,
     totals.refresh,
@@ -223,6 +248,30 @@ export function ProjectScreen({
   }
 
   const project = facts.data;
+  const workspaceId = workspace.selected?.workspace.id;
+  const canCloseout = profile?.role === "head" && profile.is_active !== false &&
+    (profile.org_id === project.orgId || !!project.sourceCollaborationDraftId) &&
+    project.status !== "archived";
+  const openWeb = (view: string, title: string) =>
+    navigate({ name: "project", id, workspaceId, view, title });
+  if (!projectReady && view !== "audit_trail") {
+    return (
+      <Screen title={project.title}>
+        {setup.error ? (
+          <ErrorState error={setup.error} retry={() => void setup.refresh()} />
+        ) : !setup.data ? (
+          <Loading label="Checking project setup" layout="project" />
+        ) : (
+          <Notice>Finish project details, lead, dates, and funding before adding tasks or people.</Notice>
+        )}
+        {setup.data?.canAuthorize && !setup.error && (
+          <Button onPress={() => openWeb("project_setup", "Finish project setup")}>
+            Finish setup on eFlow Web
+          </Button>
+        )}
+      </Screen>
+    );
+  }
   const completion = totals.error ? undefined : totals.data;
   const percent = completion
     ? completionPercent(
@@ -283,7 +332,7 @@ export function ProjectScreen({
       </View>
       <Card style={{ padding: 10, gap: 6 }}>
         <Row>
-          <Status value={project.status} />
+          <Status value={project.status} work />
         </Row>
         <LabelValue
           label="Tasks completed"
@@ -334,8 +383,8 @@ export function ProjectScreen({
         </Button>
         {canAdd && <Button onPress={() => setAddTask(true)}>Add task</Button>}
       </Row>
-      {!auxiliary && (
-        <Tabs items={views} value={main ? "tasks" : view} onChange={setView} />
+      {(!auxiliary || view === "analysis" || view === "audit_trail") && (
+        <Tabs items={views} value={auxiliary ? view : main ? "tasks" : view} onChange={setView} />
       )}
       {!auxiliary && (
         <SearchField
@@ -502,7 +551,7 @@ export function ProjectScreen({
                     : section.title
                   : main
                     ? `Group: ${section.title}`
-                    : section.title}
+                    : view === "board" ? resolveStatus(section.key).label : section.title}
               </Text>
               <Text
                 style={{
@@ -549,6 +598,7 @@ export function ProjectScreen({
           <MondayTableRow
             title={item.title}
             status={item.status}
+            customStatusId={item.customStatusId}
             due={due ? taskDateLabel(due) : null}
             assignee={item.assigneeName || null}
             isLast={index === section.data.length - 1}
@@ -567,6 +617,13 @@ export function ProjectScreen({
       {auxiliary ? (
         <Screen compact onRefresh={refresh}>
           {header}
+          {view === "analysis" && (
+            <ProjectAnalysisSummary project={project} onOpenWeb={() => openWeb("analytics", "Project analytics")} />
+          )}
+          {view === "audit_trail" && profile?.id && (
+            <ProjectAuditTrail key={scope} actor={profile.id} project={id}
+              timezone={workspace.selected?.workspace.timezone || "Asia/Manila"} />
+          )}
           {view === "offices" && (
             <ProjectOffices project={project} canManage={false} />
           )}
@@ -584,11 +641,20 @@ export function ProjectScreen({
             />
           )}
           {view === "funding" && (
-            <ProjectFundingSummary
-              key={profile?.id + ":" + id}
-              projectId={id}
-              showCloseout={profile?.role === "head" && !closed}
-            />
+            <>
+              <ProjectFundingSummary
+                key={profile?.id + ":" + id}
+                projectId={id}
+                workspaceId={workspaceId}
+                showCloseout={canCloseout && !closed}
+                navigate={navigate}
+              />
+              {!closed && project.orgId && profile?.id &&
+                (canCloseout || project.projectLeadId === profile.id) && (
+                  <ProjectFundingCloseout key={scope} actor={profile.id}
+                    project={id} office={project.orgId} onChanged={refresh} />
+                )}
+            </>
           )}
         </Screen>
       ) : (
@@ -627,7 +693,13 @@ export function ProjectScreen({
       <SelectionSheet
         open={menu}
         title="Project options"
-        options={tools}
+        options={[
+          ...tools,
+          ...(canCloseout ? [{ id: "closeout", title: project.status === "completed" ? "Archive project" : "Complete project" }] : []),
+          ...(setup.data?.canAuthorize && !closed && !project.sourceCollaborationDraftId
+            ? [...setupTools, importTool]
+            : []),
+        ]}
         onClose={() => setMenu(false)}
         onSelect={(option) => {
           setMenu(false);
@@ -638,17 +710,19 @@ export function ProjectScreen({
               projectId: id,
               title: "Project conversations",
             });
-          else if (["offices", "files", "funding"].includes(option))
+          else if (option === "closeout") setCloseout(project.status === "completed" ? "archive" : "complete");
+          else if (["offices", "files", "funding", "audit_trail"].includes(option))
             setView(option);
           else
-            navigate({
-              name: "project",
-              id,
-              view: option,
-              title: project.title,
-            });
+            openWeb(option, [...tools, ...setupTools, importTool].find(tool => tool.id === option)?.title ?? project.title);
         }}
       />
+      {closeout && canCloseout && profile?.id && (
+        <ProjectCloseoutSheet key={scope + ":" + closeout} project={project} actor={profile.id} mode={closeout}
+          workspaceId={workspaceId} navigate={navigate}
+          onOpenFunding={() => { setCloseout(undefined); setView("funding"); }}
+          onClose={() => setCloseout(undefined)} onSaved={refresh} />
+      )}
       {addTask && <ProjectTaskEditor scope={taskScope} groups={groups} onClose={() => setAddTask(false)} onSaved={refresh} />}
       {people && (
         <ProjectPeople
@@ -656,12 +730,7 @@ export function ProjectScreen({
           onClose={() => setPeople(false)}
           onManage={() => {
             setPeople(false);
-            navigate({
-              name: "project",
-              id,
-              view: "people_management",
-              title: "Project people",
-            });
+            openWeb("people_management", "Manage project people");
           }}
         />
       )}

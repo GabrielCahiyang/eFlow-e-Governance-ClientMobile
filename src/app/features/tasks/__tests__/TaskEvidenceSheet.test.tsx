@@ -103,3 +103,22 @@ test("selection and camera failure are local, then a confirmed submission resume
   );
   expect(onSaved).toHaveBeenCalledTimes(1);
 });
+
+test("a task lead can submit for review with a note and no attachment", async () => {
+  jest.mocked(confirmAction).mockResolvedValueOnce(true);
+  jest.mocked(sendTaskEvidence).mockClear().mockResolvedValueOnce(undefined);
+  await render(
+    <TaskEvidenceSheet
+      actor="worker"
+      taskId="root"
+      saved={null}
+      verifyAccess={jest.fn<() => Promise<void>>()}
+      onSaved={jest.fn<() => Promise<void>>().mockResolvedValue(undefined)}
+      onClose={jest.fn()}
+    />,
+  );
+  await fireEvent.changeText(screen.getByLabelText("Completion note"), "Ready for review");
+  await fireEvent.press(screen.getByRole("button", { name: "Submit for review" }));
+  expect(jest.mocked(sendTaskEvidence).mock.calls[0][0].request.files).toEqual([]);
+  expect(await screen.findByText("Submitted for approval")).toBeOnTheScreen();
+});

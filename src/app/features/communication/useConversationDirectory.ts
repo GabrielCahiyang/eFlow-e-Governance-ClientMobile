@@ -24,7 +24,8 @@ export function useConversationDirectory(actor: string) {
     for (const table of [
       "chat_messages",
       "chat_channels",
-      "chat_channel_members",
+      "projects",
+      "tasks",
     ]) {
       live.on(
         "postgres_changes",

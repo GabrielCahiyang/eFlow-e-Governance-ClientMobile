@@ -4,6 +4,7 @@ import {
   conversationGroup,
   filterConversations,
   initials,
+  pinnedConversation,
   reactionSummary,
   separatorLabel,
 } from "../chatPresentation";
@@ -78,4 +79,36 @@ test("reaction summary marks the actor's own reactions", () => {
   expect(reactionSummary(m, "me")).toEqual([
     { emoji: "👍", count: 2, mine: true },
   ]);
+});
+
+test("only active chats can be pinned and completion moves both project and task chats out of All", () => {
+  const project: Channel = {
+    id: "p",
+    kind: "project",
+    name: "Seminar",
+    projectId: "seminar",
+  };
+  const task: Channel = {
+    id: "t",
+    kind: "task",
+    name: "Book venue",
+    projectTitle: "Seminar",
+    parentProjectId: "seminar",
+    personalPin: "2026-11-10",
+    unread: true,
+  };
+  const direct: Channel = { id: "d", kind: "direct", name: "Andres" };
+  expect(
+    [project, task, direct].filter(pinnedConversation).map((row) => row.id),
+  ).toEqual(["p", "t"]);
+  const completed = [
+    direct,
+    { ...project, archived: true },
+    { ...task, archived: true },
+  ];
+  expect(filterConversations(completed, "all", "")).toEqual([direct]);
+  expect(
+    filterConversations(completed, "archive", "Seminar").map((row) => row.id),
+  ).toEqual(["p", "t"]);
+  expect(completed.filter(pinnedConversation)).toEqual([]);
 });

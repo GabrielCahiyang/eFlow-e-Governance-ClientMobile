@@ -262,7 +262,7 @@ export function TeamScreen({
                     {Object.entries({
                       "Active tasks": metric.activeTasks,
                       Leading: metric.leadingTasks,
-                      Subitems: metric.activeSubtasks,
+                      Subtasks: metric.activeSubtasks,
                       "Review waiting": metric.awaitingReview,
                       Overdue: metric.overdue,
                       Blocked: metric.blocked,

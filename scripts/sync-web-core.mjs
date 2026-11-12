@@ -20,9 +20,13 @@ const walk = (p) =>
     .flatMap((e) =>
       e.isDirectory() ? walk(path.join(p, e.name)) : [path.join(p, e.name)],
     );
+const requested = process.argv.slice(2);
 const files = walk(source).filter(
-  (p) => p.endsWith(".ts") && !p.endsWith(".d.ts"),
+  (p) => p.endsWith(".ts") && !p.endsWith(".d.ts") &&
+    (!requested.length || requested.includes(path.relative(source, p).replaceAll("\\", "/"))),
 );
+if (requested.length && files.length !== new Set(requested).size)
+  throw new Error("Specify existing Web TypeScript modules relative to src.");
 const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
 function resolve(file, spec) {
   const p = path.resolve(path.dirname(file), spec);
@@ -142,7 +146,7 @@ for (const file of files) {
 }
 // Type-only dependencies on presentation models are extracted without their UI.
 const copied = new Set(manifest.map((m) => m.native));
-for (const file of files) {
+for (const file of requested.length ? [] : files) {
   const ast = ts.createSourceFile(
     file,
     fs.readFileSync(file, "utf8"),
@@ -206,16 +210,29 @@ for (const file of files) {
   }
 }
 fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+const manifestPath = path.join(root, "docs/WEB_CORE_MANIFEST.json");
+const previous = requested.length ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : null;
+const refreshed = new Set(manifest.map((entry) => entry.native));
+const refreshedFiles = new Map(manifest.map((entry) => [entry.native, entry]));
 fs.writeFileSync(
-  path.join(root, "docs/WEB_CORE_MANIFEST.json"),
+  manifestPath,
   JSON.stringify(
     {
       source: web,
       generatedAt: new Date().toISOString(),
-      files: manifest,
-      serviceExports: services,
-      browserAdapterReview: browser,
-      externalPackages: [...external].sort(),
+      files: previous ? [
+        ...previous.files.map((entry) => refreshedFiles.get(entry.native) ?? entry),
+        ...manifest.filter((entry) => !previous.files.some((old) => old.native === entry.native)),
+      ] : manifest,
+      serviceExports: previous ? [
+        ...previous.serviceExports.filter((entry) => !refreshed.has(entry.module)),
+        ...services,
+      ] : services,
+      browserAdapterReview: previous ? [
+        ...previous.browserAdapterReview.filter((entry) => !refreshed.has(entry)),
+        ...browser,
+      ] : browser,
+      externalPackages: [...new Set([...(previous?.externalPackages ?? []), ...external])].sort(),
     },
     null,
     2,

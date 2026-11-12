@@ -21,6 +21,7 @@ import {
 } from "../../shared/sharedWorkRequest";
 import { PublicMessageError } from "../../shared/userMessages";
 import { nativeWindow } from "../../../platform/webRuntime";
+import { isAllocationReceipt } from "./subtaskDistribution";
 
 type Source = {
   id: string;
@@ -34,32 +35,27 @@ type AllocationContext = {
   funds?: Source[];
   lines?: (Source & { sourceId?: string; fiscalYear?: number })[];
 };
-const isAllocationReceipt = (value: unknown): value is string =>
-  typeof value === "string" &&
-  /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
 
 export function WorkAllocationCard({
   task,
-  node,
   readOnly,
   showWebSetup,
   onSaved,
 }: {
   task: string;
-  node?: string;
   readOnly: boolean;
   showWebSetup: boolean;
   onSaved: () => Promise<void>;
 }) {
   const actor = useAuth().profile?.id || "";
-  const key = JSON.stringify([actor, task, node]);
-  const scope = "work-allocation:" + task + ":" + (node || "");
+  const key = JSON.stringify([actor, task]);
+  const scope = "work-allocation:" + task + ":";
   const facts = useFacts(
     "work-allocation:" + key,
     () =>
       sharedWorkRpc<AllocationContext>("m7_work_allocation_context", {
         p_task: task,
-        p_node: node ?? null,
+        p_node: null,
       }),
     !!actor && !readOnly,
   );
@@ -77,16 +73,16 @@ export function WorkAllocationCard({
   const lines = context?.lines ?? [];
   const allocated = new Set(lines.map((line) => line.sourceId));
   const year = lines[0]?.fiscalYear;
-  const sources = (node ? lines : (context?.funds ?? [])).filter(
+  const sources = (context?.funds ?? []).filter(
     (source) =>
       source.available > 0 &&
-      (node ||
-        (!allocated.has(source.id) && (!year || year === source.fiscal_year))),
+      !allocated.has(source.id) &&
+      (!year || year === source.fiscal_year),
   );
   const chosen = sources.find((source) => source.id === sourceId);
   const ready =
     context?.canAllocate &&
-    (node || context.ready) &&
+    context.ready &&
     !readOnly &&
     !facts.error &&
     !facts.loading &&
@@ -113,28 +109,16 @@ export function WorkAllocationCard({
         const id = crypto.randomUUID();
         request = {
           id,
-          args: node
-            ? {
-                p_task_id: task,
-                p_subtask_id: node,
-                p_parent_allocation_line_id: chosen.id,
-                p_amount: Number(amount),
-                p_reason: reason.trim(),
-                p_idempotency_key: id,
-              }
-            : {
-                p_task: task,
-                p_lines: [{ sourceId: chosen.id, amount: Number(amount) }],
-                p_reason: reason.trim(),
-                p_key: id,
-              },
+          args: {
+            p_task: task,
+            p_lines: [{ sourceId: chosen.id, amount: Number(amount) }],
+            p_reason: reason.trim(),
+            p_key: id,
+          },
         };
       }
-      const matchesScope = node
-        ? request.args.p_task_id === task &&
-          request.args.p_subtask_id === node &&
-          request.args.p_idempotency_key === request.id
-        : request.args.p_task === task && request.args.p_key === request.id;
+      const matchesScope =
+        request.args.p_task === task && request.args.p_key === request.id;
       if (!matchesScope)
         throw new PublicMessageError(
           "The saved allocation belongs to different work.",
@@ -143,7 +127,7 @@ export function WorkAllocationCard({
         await saveSharedWork(
           actor,
           scope,
-          node ? "set_subtask_budget_cap" : "allocate_project_task_funding",
+          "allocate_project_task_funding",
           request,
           isAllocationReceipt,
           retry,
@@ -164,11 +148,7 @@ export function WorkAllocationCard({
       <Notice>Set up funding in eFlow Web.</Notice>
     ) : null;
   return (
-    <Card
-      title={
-        node ? "Allocate from the parent task" : "Allocate from the project"
-      }
-    >
+    <Card title="Allocate from the project">
       {retry ? (
         <Button variant="outline" busy={action.busy} onPress={submit}>
           Verify saved allocation
@@ -181,7 +161,7 @@ export function WorkAllocationCard({
             setOpen(true);
           }}
         >
-          {node ? "Set Subtask funding cap" : "Allocate Task funding"}
+          Allocate Task funding
         </Button>
       ) : (
         <Notice>
@@ -197,7 +177,7 @@ export function WorkAllocationCard({
       {open && (
         <Sheet
           open
-          title={node ? "Set Subtask funding cap" : "Allocate Task funding"}
+          title="Allocate Task funding"
           busy={action.busy}
           onClose={() => {
             if (!action.busy) setOpen(false);
@@ -220,7 +200,7 @@ export function WorkAllocationCard({
             />
           )}
           <Field
-            label={node ? "Total cap" : "Amount to allocate"}
+            label="Amount to allocate"
             value={amount}
             onChangeText={setAmount}
             keyboardType="decimal-pad"

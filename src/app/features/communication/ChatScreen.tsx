@@ -1,4 +1,5 @@
-import { KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
+import { AppState, KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useTheme } from "../../components/ui/Appearance";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,7 +18,6 @@ import { retryTransientRead } from "../../shared/retryTransientRead";
 import { readWithTimeout } from "../../shared/readTimeout";
 import { authoritativeReadEpoch } from "../../shared/displayCache";
 import { useAction } from "../../shared/useAction";
-import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
 import { draftStore } from "../../../platform/draftStore";
 import { chooseFiles } from "../../../platform/files";
@@ -31,6 +31,8 @@ import {
   listChatPeople,
   openDirectConversation,
   readConversation,
+  readChatMessage,
+  removeConversationMessage,
   setMessagePin,
   toggleMessageReaction,
   type Message,
@@ -41,10 +43,16 @@ import {
   type MessageDraft,
 } from "./messageHistory";
 import { filterConversationContext } from "./conversationContext";
-import { chatImageTypes, uploadChatImage } from "./chatImages";
+import {
+  chatImageTypes,
+  cleanupChatImage,
+  uploadChatImage,
+} from "./chatImages";
 import { useComposerDraft } from "./useComposerDraft";
+import { useChatHistorySync, type ChatHistory } from "./useChatHistorySync";
 import { useChatAttachment } from "./useChatAttachment";
 import { conversationLoadState } from "./conversationLoadState";
+import { MentionedMessage } from "./MentionedMessage";
 import { ConversationInfo } from "./ConversationInfo";
 import { ChatAvatar } from "./ChatAvatar";
 import { ConversationList } from "./ConversationList";
@@ -77,6 +85,13 @@ export function ChatScreen({
   } = useAuth();
   const palette = useTheme();
   const actor = profile!.id;
+  const focusedScreen = useIsFocused();
+  const [appState, setAppState] = useState(AppState.currentState);
+  const visible = focusedScreen && appState !== "background" && appState !== "inactive";
+  useEffect(() => {
+    const listener = AppState.addEventListener("change", setAppState);
+    return () => listener.remove();
+  }, []);
   const assertAccess = useAccountActionAccess();
   const contextual = !!(route.projectId || route.taskId);
   const [newChat, setNewChat] = useState(false);
@@ -84,6 +99,7 @@ export function ChatScreen({
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [personQuery, setPersonQuery] = useState("");
   const [info, setInfo] = useState(false);
+  const [dismissedMention, setDismissedMention] = useState<string>();
   const [pending, setPending] = useState<{
     scope: string;
     item: MessageDraft;
@@ -115,16 +131,17 @@ export function ChatScreen({
     () => listChatPeople(),
     newChat,
   );
+  const members = useFacts(
+    "chat-people:" + actor + ":" + channel?.id,
+    () => listChatPeople(channel!.id),
+    !!channel,
+  );
   const messages = useFacts(
     "chat-messages:" + actor + ":" + channel?.id,
     () => retryTransientRead(() => loadMessages(channel!.id)),
     !!channel,
   );
-  const [history, setHistory] = useState<{
-    scope: string;
-    rows: Message[];
-    hasOlder?: boolean;
-  }>({ scope: "", rows: [] });
+  const [history, setHistory] = useState<ChatHistory>({ scope: "", rows: [] });
   const accessEpoch = authoritativeReadEpoch();
   const scope = JSON.stringify([actor, channel?.id, accessEpoch]);
   const composer = useComposerDraft(actor, channel?.id);
@@ -138,6 +155,14 @@ export function ChatScreen({
         messages.data?.rows ?? [],
       ),
     [history, messages.data, scope],
+  );
+  const focusId =
+    route.recordId !== dismissedMention ? route.recordId : undefined;
+  const inHistory = shown.find((message) => message.id === focusId);
+  const focused = useFacts(
+    `chat-focus:${actor}:${channel?.id}:${focusId}`,
+    () => readChatMessage(channel!.id, focusId!),
+    !!channel && !!focusId && !inHistory,
   );
   const olderAvailable =
     !!shown.length &&
@@ -251,70 +276,49 @@ export function ChatScreen({
   const original = pending?.scope === scope ? pending.item : recovery.data;
   useEffect(() => {
     setInfo(false);
+    setDismissedMention(undefined);
   }, [scope]);
-  useEffect(() => {
-    if (!channel) return;
-    const live = createPostgresChannel("native-chat:" + channel.id)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chat_messages",
-          filter: "channel_id=eq." + channel.id,
-        },
-        (payload) => {
-          if (
-            currentScope.current !== scope ||
-            accessEpoch !== authoritativeReadEpoch()
-          )
-            return;
-          if (payload.eventType === "DELETE") {
-            const id = (payload.old as any).id;
-            setHistory((previous) =>
-              previous.scope === scope
-                ? {
-                    ...previous,
-                    rows: previous.rows.filter((row) => row.id !== id),
-                  }
-                : previous,
-            );
-          } else if ((payload.new as any).id) {
-            setHistory((previous) => ({
-              scope,
-              rows: mergeMessages(
-                previous.scope === scope ? previous.rows : [],
-                [payload.new as Message],
-              ),
-              hasOlder:
-                previous.scope === scope ? previous.hasOlder : undefined,
-            }));
-          }
-          void messages.refresh();
-        },
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") void messages.refresh();
-      });
-    return () => {
-      void supabase.removeChannel(live);
-    };
-  }, [channel?.id, actor, scope]);
+  useChatHistorySync({
+    channelId: visible ? channel?.id : undefined,
+    scope,
+    accessEpoch,
+    shown,
+    recent: messages.data?.rows,
+    setHistory,
+    refreshRecent: messages.refresh,
+    refreshPeople: members.refresh,
+    focusId,
+    refreshFocus: focused.refresh,
+  });
   const send = () =>
     action.run(async () => {
-      if (!channel || composer.loading || recovery.loading || recovery.error)
+      if (
+        !channel ||
+        channel.archived ||
+        composer.loading ||
+        recovery.loading ||
+        recovery.error
+      )
         return;
       const session = await supabase.auth.getSession();
       if (session.error || session.data.session?.user.id !== actor)
         throw new Error("Sign in again.");
-      if (!(await loadChannels()).some((item) => item.id === channel.id))
+      const current = (await loadChannels()).find(
+        (item) => item.id === channel.id,
+      );
+      if (!current)
         throw new Error(
           "This conversation is no longer available to your account.",
         );
+      if (current.archived) {
+        void channels.refresh();
+        throw new Error("This project chat is archived.");
+      }
       assertAccess(actor);
       const item = original || {
         id: crypto.randomUUID(),
         text: draft,
+        mentions: composer.draft.mentions,
         imagePath: image
           ? await uploadChatImage(channel.id, actor, image)
           : undefined,
@@ -330,6 +334,7 @@ export function ChatScreen({
         profile!.full_name,
         item.text,
         item.imagePath,
+        item.mentions,
       );
       await composer.clear();
       await attachment.set();
@@ -356,7 +361,11 @@ export function ChatScreen({
   // Opening an unread conversation marks it read, as Messenger does.
   // Failure leaves the unread state intact and retries on the next open.
   useEffect(() => {
-    if (!channel?.unread || !lastCreated) return;
+    if (!visible) {
+      readMarker.current = undefined;
+      return;
+    }
+    if (!channel?.unread || !lastCreated || messages.error || checkingAccess || accessError) return;
     const marker = channel.id + ":" + lastCreated;
     if (readMarker.current === marker) return;
     readMarker.current = marker;
@@ -366,10 +375,11 @@ export function ChatScreen({
         await readConversation(channel.id, lastCreated);
         nativeWindow.dispatchEvent({ type: conversationDirectoryChanged });
       } catch {
-        // The directory keeps showing the authoritative unread state.
+        if (readMarker.current === marker) readMarker.current = undefined;
+        // The next focus or successful thread read can retry.
       }
     })();
-  }, [channel?.id, channel?.unread, lastCreated]);
+  }, [visible, channel?.id, channel?.unread, lastCreated, messages.error, checkingAccess, accessError]);
   const openPerson = (personId: string, name?: string | null) =>
     action.run(async () => {
       const session = await supabase.auth.getSession();
@@ -468,6 +478,7 @@ export function ChatScreen({
             />
           ) : (
             <ConversationList
+              actor={actor}
               channels={matching}
               total={available.length}
               query={query}
@@ -520,6 +531,7 @@ export function ChatScreen({
   return (
     <ThreadFrame>
       <ThreadHeader
+        actor={actor}
         channel={channel}
         onInfo={() => setInfo(true)}
         shortcut={
@@ -530,7 +542,10 @@ export function ChatScreen({
                   navigate({
                     name: "task",
                     id: channel.taskId,
-                    projectId: channel.projectId || route.projectId,
+                    projectId:
+                      channel.parentProjectId ||
+                      channel.projectId ||
+                      route.projectId,
                   }),
               }
             : channel.projectId
@@ -542,11 +557,21 @@ export function ChatScreen({
               : undefined
         }
       />
+      {!!focusId && !messages.error && !accessError && (
+        <MentionedMessage
+          actor={actor}
+          message={inHistory ?? focused.data}
+          pending={focused.loading}
+          unavailable={!!focused.error}
+          onClose={() => setDismissedMention(focusId)}
+        />
+      )}
       <MessageThread
         key={scope}
         actor={actor}
         channel={channel}
         messages={shown}
+        people={members.error ? [] : (members.data ?? [])}
         busy={action.busy}
         placeholder={
           historyState === "unavailable" ? (
@@ -561,7 +586,7 @@ export function ChatScreen({
               kind="messages"
               compact
               title="No messages yet"
-              description="Use the message field below to start the conversation."
+              description={channel.archived ? undefined : "Use the message field below to start the conversation."}
             />
           ) : undefined
         }
@@ -575,6 +600,7 @@ export function ChatScreen({
         onReact={(message, emoji) =>
           void action.run(async () => {
             assertAccess(actor);
+            if (channel.archived) return;
             await toggleMessageReaction(message.id, emoji);
             await messages.refresh();
           })
@@ -582,59 +608,104 @@ export function ChatScreen({
         onPin={(message) =>
           void action.run(async () => {
             assertAccess(actor);
+            if (channel.archived) return;
             await setMessagePin(message.id, !message.pinned_at);
             await messages.refresh();
           })
         }
-      />
-      <Composer
-        value={original?.text ?? draft}
-        onChange={composer.setValue}
-        onBlur={composer.onBlur}
-        editable={
-          !original &&
-          !action.busy &&
-          !composer.loading &&
-          !recovery.loading &&
-          !recovery.error
-        }
-        imageName={image?.name}
-        onPickImage={original ? undefined : pickImage}
-        pickDisabled={action.busy || picker.busy || attachment.loading}
-        busy={action.busy}
-        sendDisabled={sendDisabled}
-        onSend={() => void send()}
-        notice={
-          original ? (
-            <Notice>
-              A pending message is retained. Send again to retry the same
-              message identity.
-            </Notice>
-          ) : undefined
-        }
-        error={
-          <>
-            {!!recovery.error && <ErrorState error={recovery.error} />}
-            {!!composer.error && <ErrorState error={composer.error} />}
-            {!!(picker.error || attachment.error) && (
-              <ErrorState error={picker.error || attachment.error} />
-            )}
-            {!!action.error && (
-              <ErrorState
-                context="action"
-                error={action.error}
-                retry={() => void retryConversation()}
-              />
-            )}
-          </>
+        onRemove={(message) =>
+          action.run(async () => {
+            assertAccess(actor);
+            if (channel.archived || message.sender_id !== actor)
+              throw new Error("This message cannot be deleted.");
+            const path = await removeConversationMessage(message.id);
+            if (path) void cleanupChatImage(path).catch(() => {});
+            const deleted = await readChatMessage(channel.id, message.id);
+            if (deleted && currentScope.current === scope)
+              setHistory((previous) =>
+                previous.scope === scope
+                  ? {
+                      ...previous,
+                      rows: mergeMessages(previous.rows, [deleted]),
+                    }
+                  : previous,
+              );
+            await Promise.all([
+              messages.refresh(),
+              channels.refresh(),
+              focused.refresh(),
+            ]);
+          })
         }
       />
+      {channel.archived ? (
+        <Notice>
+          This project chat is archived. You can still read its messages.
+        </Notice>
+      ) : (
+        <Composer
+          key={scope}
+          value={original?.text ?? draft}
+          mentionDraft={composer.draft}
+          onMention={composer.setDraft}
+          people={members.error ? [] : (members.data ?? [])}
+          actor={actor}
+          group={channel.kind !== "direct"}
+          onChange={composer.setValue}
+          onBlur={composer.onBlur}
+          editable={
+            !original &&
+            !action.busy &&
+            !composer.loading &&
+            !recovery.loading &&
+            !recovery.error
+          }
+          imageName={image?.name}
+          onPickImage={original ? undefined : pickImage}
+          pickDisabled={action.busy || picker.busy || attachment.loading}
+          busy={action.busy}
+          sendDisabled={sendDisabled}
+          onSend={() => void send()}
+          notice={
+            original ? (
+              <Notice>
+                A pending message is retained. Send again to retry the same
+                message identity.
+              </Notice>
+            ) : undefined
+          }
+          error={
+            <>
+              {!!recovery.error && <ErrorState error={recovery.error} />}
+              {!!composer.error && <ErrorState error={composer.error} />}
+              {!!(picker.error || attachment.error) && (
+                <ErrorState error={picker.error || attachment.error} />
+              )}
+              {!!action.error && (
+                <ErrorState
+                  context="action"
+                  error={action.error}
+                  retry={() => void retryConversation()}
+                />
+              )}
+            </>
+          }
+        />
+      )}
       <ConversationInfo
         actor={actor}
         channel={channel}
         messages={shown}
-        open={info}
+        open={info && !messages.error && !accessError}
         onClose={() => setInfo(false)}
+        onChanged={async () => {
+          nativeWindow.dispatchEvent({ type: conversationDirectoryChanged });
+          await Promise.all([
+            channels.refresh(),
+            messages.refresh(),
+            members.refresh(),
+          ]);
+        }}
       />
       {peopleSheet}
     </ThreadFrame>

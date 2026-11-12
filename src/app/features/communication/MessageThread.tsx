@@ -36,7 +36,17 @@ import {
   timeLabel,
   type ThreadItem,
 } from "./chatPresentation";
-import type { Channel, Message } from "./services";
+import type { Channel, ChatPerson, Message } from "./services";
+import { parseMessage } from "../../../core/web/app/features/chat-calls/services/chatMessageCodec";
+import {
+  CHAT_TEXT_LIMIT,
+  findMentionQuery,
+  insertChatMention,
+  mentionHighlights,
+  type ChatDraft,
+} from "../../../core/web/app/features/chat-calls/services/chatMentions";
+import { messagePreview } from "./messageHistory";
+import { MentionSuggestions } from "./MentionSuggestions";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function useKeyboardVisible() {
@@ -90,10 +100,12 @@ export function ThreadFrame({ children }: { children: ReactNode }) {
 }
 
 export function ThreadHeader({
+  actor,
   channel,
   onInfo,
   shortcut,
 }: {
+  actor: string;
   channel: Channel;
   onInfo: () => void;
   shortcut?: { label: string; onPress: () => void };
@@ -112,7 +124,13 @@ export function ThreadHeader({
         borderColor: palette.border,
       }}
     >
-      <ChatAvatar name={channel.name} kind={channel.kind} size={40} />
+      <ChatAvatar
+        name={channel.name}
+        kind={channel.kind}
+        size={40}
+        actor={actor}
+        path={channel.avatarPath}
+      />
       <View style={{ flex: 1 }}>
         <Text
           numberOfLines={1}
@@ -125,7 +143,9 @@ export function ThreadHeader({
           numberOfLines={1}
           style={{ fontSize: 12, lineHeight: 16, color: palette.mutedLabel }}
         >
-          {channel.projectTitle || conversationKindLabel(channel.kind)}
+          {channel.kind === "task" && channel.projectTitle
+            ? `Task chat · ${channel.projectTitle}`
+            : conversationKindLabel(channel.kind)}
         </Text>
       </View>
       {shortcut && (
@@ -176,6 +196,8 @@ export function MessageThread({
   olderError,
   onReact,
   onPin,
+  onRemove,
+  people,
   busy,
 }: {
   actor: string;
@@ -188,11 +210,24 @@ export function MessageThread({
   olderError?: Error;
   onReact: (message: Message, emoji: string) => void;
   onPin: (message: Message) => void;
+  onRemove: (message: Message) => Promise<boolean>;
+  people: ChatPerson[];
   busy?: boolean;
 }) {
   const palette = useTheme();
   const [stamped, setStamped] = useState<string>();
-  const [selected, setSelected] = useState<Message>();
+  const [selected, setSelected] = useState<string>();
+  const [confirmRemoval, setConfirmRemoval] = useState(false);
+  const [removeFailed, setRemoveFailed] = useState(false);
+  const nicknames = useMemo(
+    () => new Map(people.map((person) => [person.id, person.nickname])),
+    [people],
+  );
+  const closeActions = () => {
+    setSelected(undefined);
+    setConfirmRemoval(false);
+    setRemoveFailed(false);
+  };
   // Inverted list: newest at the bottom, scroll position anchored there.
   const data = useMemo(
     () => buildThreadItems(messages, actor).reverse(),
@@ -219,9 +254,11 @@ export function MessageThread({
         {placeholder}
       </View>
     );
-  const current = selected
-    ? messages.find((m) => m.id === selected.id) || selected
-    : undefined;
+  const current = channel.archived
+    ? undefined
+    : messages.find(
+        (m) => m.id === selected && !m.deleted_at && !m.activity_kind,
+      );
   return (
     <>
       <FlatList
@@ -279,13 +316,15 @@ export function MessageThread({
             item={item}
             actor={actor}
             direct={channel.kind === "direct"}
+            readOnly={!!channel.archived}
+            nickname={nicknames.get(item.message.sender_id)}
             showTime={stamped === item.message.id}
             onTap={() =>
               setStamped((id) =>
                 id === item.message.id ? undefined : item.message.id,
               )
             }
-            onMore={() => setSelected(item.message)}
+            onMore={() => setSelected(item.message.id)}
             onReact={(emoji) => onReact(item.message, emoji)}
           />
         )}
@@ -294,59 +333,94 @@ export function MessageThread({
         open={!!current}
         title="Message"
         busy={busy}
-        onClose={() => setSelected(undefined)}
+        onClose={closeActions}
       >
-        {current && (
-          <View style={{ gap: 16 }}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                gap: 4,
-              }}
-            >
-              {quickReactions.map((emoji) => {
-                const mine = !!current.reaction_users?.[emoji]?.[actor];
-                return (
-                  <Pressable
-                    key={emoji}
-                    accessibilityRole="button"
-                    accessibilityLabel={`React ${emoji}`}
-                    accessibilityState={{ selected: mine }}
-                    disabled={busy}
-                    onPress={() => {
-                      onReact(current, emoji);
-                      setSelected(undefined);
-                    }}
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 24,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: mine
-                        ? palette.primarySoft
-                        : palette.glassSurface,
-                    }}
-                  >
-                    <Text style={{ fontSize: 24, lineHeight: 30 }}>
-                      {emoji}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+        {current && confirmRemoval ? (
+          <View style={{ gap: 12 }}>
+            <Text>Delete this message for everyone in the conversation?</Text>
+            {removeFailed && (
+              <ErrorState error="Could not confirm deletion. Try again." />
+            )}
             <Button
               variant="outline"
               disabled={busy}
-              onPress={() => {
-                onPin(current);
-                setSelected(undefined);
+              onPress={() => setConfirmRemoval(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={busy}
+              onPress={async () => {
+                if (await onRemove(current)) closeActions();
+                else setRemoveFailed(true);
               }}
             >
-              {current.pinned_at ? "Unpin message" : "Pin message"}
+              Delete message
             </Button>
           </View>
+        ) : (
+          current && (
+            <View style={{ gap: 16 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  gap: 4,
+                }}
+              >
+                {quickReactions.map((emoji) => {
+                  const mine = !!current.reaction_users?.[emoji]?.[actor];
+                  return (
+                    <Pressable
+                      key={emoji}
+                      accessibilityRole="button"
+                      accessibilityLabel={`React ${emoji}`}
+                      accessibilityState={{ selected: mine }}
+                      disabled={busy}
+                      onPress={() => {
+                        onReact(current, emoji);
+                        closeActions();
+                      }}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: mine
+                          ? palette.primarySoft
+                          : palette.glassSurface,
+                      }}
+                    >
+                      <Text style={{ fontSize: 24, lineHeight: 30 }}>
+                        {emoji}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onPress={() => {
+                  onPin(current);
+                  closeActions();
+                }}
+              >
+                {current.pinned_at ? "Unpin message" : "Pin message"}
+              </Button>
+              {current.sender_id === actor && (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onPress={() => setConfirmRemoval(true)}
+                >
+                  Delete for everyone
+                </Button>
+              )}
+            </View>
+          )
         )}
       </Sheet>
     </>
@@ -357,6 +431,8 @@ function Bubble({
   item,
   actor,
   direct,
+  readOnly,
+  nickname,
   showTime,
   onTap,
   onMore,
@@ -365,6 +441,8 @@ function Bubble({
   item: ThreadItem;
   actor: string;
   direct: boolean;
+  readOnly: boolean;
+  nickname?: string | null;
   showTime: boolean;
   onTap: () => void;
   onMore: () => void;
@@ -373,7 +451,32 @@ function Bubble({
   const palette = useTheme();
   const { isDark } = useAppearance();
   const { message, mine, first, last, separator } = item;
-  const hasText = !!message.content?.trim();
+  const sender = nickname || message.sender_name;
+  const parsed = parseMessage(message.content);
+  const body = parsed.text;
+  const hasText = !!body.trim();
+  if (message.deleted_at || message.activity_kind)
+    return (
+      <Text
+        style={{
+          alignSelf: message.activity_kind
+            ? "center"
+            : mine
+              ? "flex-end"
+              : "flex-start",
+          color: palette.mutedLabel,
+          fontSize: 13,
+          fontStyle: message.deleted_at ? "italic" : "normal",
+          marginHorizontal: 12,
+          marginVertical: 8,
+          padding: 8,
+          borderRadius: 12,
+          backgroundColor: palette.glassSurface,
+        }}
+      >
+        {messagePreview(message, actor)}
+      </Text>
+    );
   const reactions = reactionSummary(message, actor);
   const fill = mine
     ? isDark
@@ -396,8 +499,8 @@ function Bubble({
         borderTopLeftRadius: first ? big : small,
         borderBottomLeftRadius: last ? big : small,
       };
-  const label = `${mine ? "You" : message.sender_name}: ${
-    message.content || "Image attachment"
+  const label = `${mine ? "You" : sender}: ${
+    body || "Image attachment"
   }, ${timeLabel(message.created_at)}`;
   return (
     <View style={{ marginTop: first ? 8 : 2 }}>
@@ -426,7 +529,7 @@ function Bubble({
             color: palette.mutedLabel,
           }}
         >
-          {message.sender_name}
+          {sender}
         </Text>
       )}
       <View
@@ -438,7 +541,7 @@ function Bubble({
       >
         {!mine && (
           <View style={{ width: 32 }}>
-            {last && <ChatAvatar name={message.sender_name} size={32} />}
+            {last && <ChatAvatar name={sender} size={32} />}
           </View>
         )}
         <View
@@ -450,15 +553,19 @@ function Bubble({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={label}
-            accessibilityHint="Double tap to show the time. Hold for reactions and pinning."
-            accessibilityActions={[
-              { name: "longpress", label: "Reactions and pin" },
-            ]}
+            accessibilityHint={
+              readOnly
+                ? "Double tap to show the time."
+                : "Double tap for the time. Hold for message actions."
+            }
+            accessibilityActions={
+              readOnly ? [] : [{ name: "longpress", label: "Message actions" }]
+            }
             onAccessibilityAction={(event: AccessibilityActionEvent) => {
               if (event.nativeEvent.actionName === "longpress") onMore();
             }}
             onPress={onTap}
-            onLongPress={onMore}
+            onLongPress={readOnly ? undefined : onMore}
             delayLongPress={280}
             style={({ pressed }) => ({
               opacity: pressed ? 0.85 : 1,
@@ -471,12 +578,21 @@ function Bubble({
               ...corners,
             })}
           >
+            {!!parsed.replyToText && (
+              <Text
+                numberOfLines={2}
+                style={{ color: ink, fontSize: 12, opacity: 0.8 }}
+              >
+                {parsed.replyToName ? `${parsed.replyToName}: ` : ""}
+                {parsed.replyToText}
+              </Text>
+            )}
             {hasText && (
               <Text
                 selectable={false}
                 style={{ color: ink, fontSize: 15, lineHeight: 21 }}
               >
-                {message.content}
+                {highlightMentions(body, parsed.mentions ?? [], !direct)}
               </Text>
             )}
             {!!message.image_path && (
@@ -526,6 +642,7 @@ function Bubble({
                 <Pressable
                   key={r.emoji}
                   accessibilityRole="button"
+                  disabled={readOnly}
                   accessibilityLabel={`${r.emoji} ${r.count}${
                     r.mine ? ", your reaction. Double tap to remove" : ""
                   }`}
@@ -581,9 +698,34 @@ function Bubble({
   );
 }
 
+function highlightMentions(
+  text: string,
+  mentions: NonNullable<ReturnType<typeof parseMessage>["mentions"]>,
+  group: boolean,
+) {
+  const spans: ReactNode[] = [];
+  let offset = 0;
+  for (const { start, label } of mentionHighlights(text, mentions, group)) {
+    if (start < offset) continue;
+    spans.push(
+      text.slice(offset, start),
+      <Text key={start} style={{ fontWeight: "800" }}>
+        {label}
+      </Text>,
+    );
+    offset = start + label.length;
+  }
+  return offset ? [...spans, text.slice(offset)] : text;
+}
+
 export function Composer({
   value,
   onChange,
+  mentionDraft,
+  onMention,
+  people,
+  actor,
+  group,
   onBlur,
   editable,
   imageName,
@@ -597,6 +739,11 @@ export function Composer({
 }: {
   value: string;
   onChange: (text: string) => void;
+  mentionDraft: ChatDraft;
+  onMention: (value: ChatDraft) => void;
+  people: ChatPerson[];
+  actor: string;
+  group: boolean;
   onBlur?: () => void;
   editable: boolean;
   imageName?: string;
@@ -614,6 +761,23 @@ export function Composer({
   const inset = useSafeAreaInsets();
   const accent = isDark ? palette.primary : brandColors.blue;
   const hasContent = !sendDisabled;
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [forced, setForced] = useState<typeof selection>();
+  const query =
+    editable && selection.start === selection.end
+      ? findMentionQuery(value, Math.min(selection.end, value.length))
+      : undefined;
+  const insert = (label: string, id?: string) => {
+    if (!query) return;
+    const result = insertChatMention(mentionDraft, query, label, id);
+    if (!result) return;
+    onMention(result.draft);
+    const caret = { start: result.caret, end: result.caret };
+    setSelection(caret);
+    setForced(caret);
+    input.current?.focus();
+  };
   return (
     <View
       style={{
@@ -630,6 +794,15 @@ export function Composer({
     >
       {notice}
       {error}
+      {query && (
+        <MentionSuggestions
+          query={query.term}
+          people={people}
+          actor={actor}
+          group={group}
+          onSelect={insert}
+        />
+      )}
       {!!imageName && (
         <View
           style={{
@@ -696,15 +869,30 @@ export function Composer({
           }}
         >
           <TextInput
+            ref={input}
             accessibilityLabel="Message"
             placeholder="Write a message…"
             placeholderTextColor={palette.mutedLabel}
             value={value}
-            onChangeText={onChange}
+            onChangeText={(text) => {
+              setForced(undefined);
+              onChange(text);
+            }}
+            selection={forced}
+            onSelectionChange={(event) => {
+              const next = event.nativeEvent.selection;
+              if (
+                forced &&
+                (next.start !== forced.start || next.end !== forced.end)
+              )
+                return;
+              setForced(undefined);
+              setSelection(next);
+            }}
             onBlur={onBlur}
             editable={editable}
             multiline
-            maxLength={5000}
+            maxLength={CHAT_TEXT_LIMIT}
             style={{
               fontSize: 15,
               color: palette.text,

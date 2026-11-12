@@ -1,4 +1,3 @@
-import { nodeSchedule, workScheduleToday } from "./subtaskSchedule";
 import { buildWorkDisplayTree } from "../../../core/web/app/features/nested-work/selectors/displayTree";
 import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
@@ -29,34 +28,6 @@ export function defaultSubtaskLead(tree: WorkTreeSnapshot) {
     tree.people.find(
       (person) => person.id === tree.root.lead && person.eligible !== false,
     )?.id || ""
-  );
-}
-
-export function isSubtaskContributor(
-  tree: WorkTreeSnapshot,
-  nodeId: string,
-  actorId: string | null,
-) {
-  const node = tree.nodes.find(
-    (item) => item.id === nodeId && item.task_id === tree.root.id,
-  );
-  return (
-    !!actorId &&
-    !!node &&
-    node.lead_id !== actorId &&
-    (!Array.isArray(node.assigned_to_ids) ||
-      node.assigned_to_ids.includes(actorId))
-  );
-}
-
-export function officeSubtaskPublished(
-  rootStatus: string | undefined,
-  rootLead: string | null | undefined,
-  actorId: string | null | undefined,
-) {
-  return (
-    (!!actorId && rootLead === actorId) ||
-    (rootStatus !== "todo" && rootStatus !== "pending_assignment")
   );
 }
 
@@ -120,28 +91,13 @@ export function completionMode(
   if (
     !node ||
     !actorId ||
-    isSubtaskContributor(tree, nodeId, actorId) ||
     !["todo", "in_progress", "changes_requested"].includes(node.status)
   )
     return;
   const scope = workScope(tree, actorId, readOnly);
-  if (tree.root.kind === "personal") {
-    if (
-      workScheduleToday(tree) &&
-      (tree.root.lead !== actorId || node.lead_id !== actorId)
-    )
-      return;
-    if (selectNodeWorkCapability(tree, nodeId, "submit", scope).allowed)
-      return "review";
-  } else if (
-    tree.root.lead === actorId &&
-    (!workScheduleToday(tree) ||
-      (node.lead_id === actorId &&
-        (!nodeSchedule(node)?.start_date ||
-          !!nodeSchedule(node)?.started_at))) &&
-    selectNodeWorkCapability(tree, nodeId, "submit", scope).allowed
-  )
-    return "direct";
+  if (!selectNodeWorkCapability(tree, nodeId, "submit", scope).allowed) return;
+  if (tree.root.kind === "personal") return "review";
+  if (tree.root.lead === actorId || node.lead_id === actorId) return "direct";
 }
 
 export function personalReviewAllowed(

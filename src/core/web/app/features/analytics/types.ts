@@ -1,11 +1,12 @@
 import type { Task } from "../tasks";
-import type { TeamWorkflowFacts } from "../team-management/types";
+import type { TeamWorkflowFacts } from "../team-management";
 export interface AnalyticsProject {
   id: string;
   title: string;
   projectLeadId?: string;
   startDate?: string;
   targetDate?: string;
+  completedAt?: string;
   status: string;
 }
 export interface AnalyticsPerson {

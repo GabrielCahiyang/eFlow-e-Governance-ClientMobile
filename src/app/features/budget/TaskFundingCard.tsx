@@ -22,6 +22,7 @@ import { CashRequestCard } from "./CashRequestCard";
 import { linkedFundingSubitem, taskCashRequests } from "./mobileFinanceScope";
 import { readFocusedSubtaskFunding } from "./focusedSubtaskFunding";
 import { useCashRequestUpdates } from "./useCashRequestUpdates";
+import { SubtaskBudgetDistribution } from "./SubtaskBudgetDistribution";
 
 export function TaskFundingCard({
   task,
@@ -32,7 +33,7 @@ export function TaskFundingCard({
   showWebSetup,
   onOpenLinkedSubitem,
 }: {
-  task: Pick<Task, "id" | "orgId">;
+  task: Pick<Task, "id" | "orgId"> & Partial<Pick<Task, "status">>;
   subtaskId?: string;
   recordId?: string;
   canManage: boolean;
@@ -54,6 +55,7 @@ export function TaskFundingCard({
         throw new Error("Could not verify the funding record for this work.");
       return context;
     },
+    !!profile?.id,
   );
   const context = funding.error ? undefined : funding.data;
   const officeBudget = useBudget(
@@ -92,9 +94,10 @@ export function TaskFundingCard({
   }, [funding.refresh, budget.refresh]);
   useCashRequestUpdates(
     task.id,
-    !!subtaskId && !!context && !readOnly,
-    refresh,
+    !!profile,
+    subtaskId ? refresh : funding.refresh,
     subtaskId,
+    true,
   );
   const locked =
     readOnly ||
@@ -124,7 +127,7 @@ export function TaskFundingCard({
                 value={String(context.fiscalYear)}
               />
             )}
-            {context.funded && (
+            {context.funded && !context.distribution && (
               <LabelValue
                 label={
                   subtaskId ? "Authorized task budget" : "Authorized budget"
@@ -132,7 +135,7 @@ export function TaskFundingCard({
                 value={recordedPeso(context.taskBudget)}
               />
             )}
-            {context.funded && (
+            {context.funded && !context.distribution && (
               <LabelValue
                 label={
                   subtaskId && !context.cap
@@ -142,10 +145,21 @@ export function TaskFundingCard({
                 value={recordedPeso(context.available)}
               />
             )}
-            {!!context.cap && (
+            {!!context.cap && !context.distribution && (
               <LabelValue
                 label="Subtask funding cap"
                 value={recordedPeso(context.cap.amount)}
+              />
+            )}
+            {!!context.distribution && (
+              <SubtaskBudgetDistribution
+                context={context}
+                actor={profile?.id ?? ""}
+                readOnly={readOnly || !!recordId}
+                taskFinished={
+                  task.status === "completed" || task.status === "cancelled"
+                }
+                onSaved={refresh}
               />
             )}
             {!context.funded && (
@@ -167,11 +181,10 @@ export function TaskFundingCard({
               )}
           </>
         )}
-        {!recordId && (
+        {!recordId && !subtaskId && (
           <WorkAllocationCard
-            key={task.id + ":" + (subtaskId || "")}
+            key={task.id}
             task={task.id}
-            node={subtaskId}
             readOnly={readOnly || funding.loading || !!funding.error}
             showWebSetup={!!showWebSetup}
             onSaved={refresh}

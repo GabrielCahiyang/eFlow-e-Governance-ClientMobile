@@ -1,11 +1,11 @@
-import { statusLabel } from "../../shared/statusLabels";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
-import { statusColors } from "../../components/ui/Status";
+import { workStatusTone } from "../../components/ui/Status";
 import { dateLabel, peso } from "../../components/ui/theme";
 import {
   SkeletonBlock,
@@ -66,10 +66,12 @@ export function ProjectTableCells({
   header?: boolean;
 }) {
   const due = task?.deadline || task?.dueDate;
+  const resolve = useWorkStatus();
+  const status = task && resolve(task.status, task.customStatusId);
   const values = task
     ? [
         task.title,
-        statusLabel(task.status),
+        status?.label ?? "",
         task.assigneeName || "Unassigned",
         task.startDate ? dateLabel(task.startDate + "T12:00:00") : "—",
         due ? dateLabel(due) : "—",
@@ -82,6 +84,7 @@ export function ProjectTableCells({
       columns={taskColumns.map(({ label }) => label)}
       values={values}
       status={task?.status}
+      statusColor={status?.color}
       widths={widths}
       accent={accent}
       onOpen={onOpen}
@@ -102,11 +105,13 @@ export function ProjectDirectoryCells({
   onOpen?: () => void;
 }) {
   const palette = useTheme();
+  const resolve = useWorkStatus();
+  const status = project && resolve(project.status);
   const type = project?.kind === "personal" ? "Personal" : "Office";
   const compact = widths.length === 2;
   const detail = type + (project?.shortcut ? " shortcut" : "");
   const values = project
-    ? [project.title, statusLabel(project.status), ...(compact ? [] : [detail])]
+    ? [project.title, status?.label ?? "", ...(compact ? [] : [detail])]
     : undefined;
   return (
     <WorkTableRow
@@ -114,6 +119,7 @@ export function ProjectDirectoryCells({
       titleDetail={compact && project ? detail : undefined}
       values={values}
       status={project?.status}
+      statusColor={status?.color}
       widths={widths}
       accent={palette.primary}
       onOpen={onOpen}
@@ -127,6 +133,7 @@ function WorkTableRow({
   columns,
   values,
   status,
+  statusColor,
   onOpen,
   pinStyle,
   skeleton,
@@ -139,13 +146,14 @@ function WorkTableRow({
   values?: string[];
   titleDetail?: string;
   status?: string;
+  statusColor?: string;
   onOpen?: () => void;
   pinStyle?: ComponentProps<typeof Animated.View>["style"];
   skeleton?: boolean;
   header?: boolean;
 }) {
   const palette = useTheme();
-  const tone = status ? statusColors(status, palette) : undefined;
+  const tone = status ? workStatusTone(status, palette, statusColor) : undefined;
   const content = values || columns;
   const cell = (value: string, index: number) => (
     <View

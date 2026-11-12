@@ -47,7 +47,7 @@ export function groupAssignedWork(
     if (!row.mine || (workspace && workspace !== row.workspaceId)) continue;
     const group = workGroup(row, now);
     if (
-      !row.actionable &&
+      !(row.listedAsOpen ?? row.actionable) &&
       !row.history &&
       !["Completed", "Other history"].includes(group) &&
       !["for_review", "submitted"].includes(row.status)
