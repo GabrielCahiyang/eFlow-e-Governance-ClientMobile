@@ -1,11 +1,12 @@
 import {
+  EditorialMetadataStrip,
   Empty,
   ErrorState,
   LabelValue,
   Loading,
   Screen,
-  Status,
 } from "../../components/ui";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
 import { supabase } from "../../../platform/supabase";
@@ -31,6 +32,7 @@ export function LinkedWorkNodeScreen({
 }) {
   const { profile } = useAuth();
   const actor = profile?.id;
+  const resolveStatus = useWorkStatus();
   const personal = route.name === "personal_project";
   const rootId = personal ? route.taskId : route.id;
   const nodeId = route.nodeId;
@@ -49,11 +51,15 @@ export function LinkedWorkNodeScreen({
           throw new Error(
             "This subtask is outside the linked project context.",
           );
-        if (!personal) await fetchProject(tree.root.project);
+        let projectStatus: string | undefined;
+        if (!personal && tree.root.project) {
+          const proj = await fetchProject(tree.root.project);
+          projectStatus = proj?.status;
+        }
         const node = tree.nodes.find(
           (item) => item.id === nodeId && item.task_id === rootId,
         );
-        return { tree, node };
+        return { tree, node, projectStatus };
       } catch (error) {
         if (!(error instanceof WorkTreeUnavailable) || personal) throw error;
         {
@@ -83,7 +89,10 @@ export function LinkedWorkNodeScreen({
         if (result.error) throw new Error(result.error.message);
         return {
           legacy: result.data ? rowToSubtask(result.data) : undefined,
-          customStatusId: typeof result.data?.custom_status_id === "string" ? result.data.custom_status_id : undefined,
+          customStatusId:
+            typeof result.data?.custom_status_id === "string"
+              ? result.data.custom_status_id
+              : undefined,
         };
       }
     },
@@ -106,6 +115,8 @@ export function LinkedWorkNodeScreen({
           navigate={navigate}
           focusNodeId={data.node.id}
           readOnly={!data.tree.root.open || facts.loading}
+          projectStatus={data.projectStatus}
+          projectOnHold={data.projectStatus === "on_hold"}
           funding={
             !personal && data.tree.root.office ? (
               <TaskFundingCard
@@ -113,9 +124,11 @@ export function LinkedWorkNodeScreen({
                 task={{
                   id: data.tree.root.id,
                   orgId: data.tree.root.office,
-                  status: data.tree.root.status === "completed" || data.tree.root.status === "cancelled"
-                    ? data.tree.root.status
-                    : undefined,
+                  status:
+                    data.tree.root.status === "completed" ||
+                    data.tree.root.status === "cancelled"
+                      ? data.tree.root.status
+                      : undefined,
                 }}
                 subtaskId={data.node.id}
                 canManage={false}
@@ -130,14 +143,26 @@ export function LinkedWorkNodeScreen({
         />
       ) : data.legacy ? (
         <>
-          <Status value={data.legacy.status} work customId={data.customStatusId} />
+          <EditorialMetadataStrip
+            items={[
+              {
+                label: "Status",
+                value: resolveStatus(data.legacy.status, data.customStatusId)
+                  .label,
+                accent: resolveStatus(data.legacy.status, data.customStatusId)
+                  .color,
+                status: data.legacy.status,
+              },
+              {
+                label: "Progress",
+                value:
+                  data.legacy.status === "completed" ? "100%" : "Unavailable",
+              },
+            ]}
+          />
           <LabelValue
             label="Due date"
             value={workDateLabel(data.legacy.dueDate, "Asia/Manila")}
-          />
-          <LabelValue
-            label="Progress"
-            value={data.legacy.status === "completed" ? "100%" : "Unavailable"}
           />
           <OfficeSubitemActivity
             rootId={rootId}

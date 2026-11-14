@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Button,
   Choice,
-  ErrorState,
   Field,
   LabelValue,
   Sheet,
@@ -55,13 +54,14 @@ export function TaskExecutionSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Update work"
       onClose={onClose}
       busy={action.busy}
       footer={
         <Button busy={action.busy} onPress={() => void save()}>
-          Save work update
+          Post update
         </Button>
       }
     >
@@ -104,7 +104,6 @@ export function TaskExecutionSheet({
           value={`${Math.ceil(file.size / 1024)} KB`}
         />
       ))}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

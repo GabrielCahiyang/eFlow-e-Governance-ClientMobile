@@ -119,7 +119,9 @@ export function resolveMobileRoute(
       : route.name === "task"
         ? "work"
         : route.name === "overview"
-          ? "home"
+          ? role === "accounting_staff"
+            ? "accounting"
+            : "home"
           : [
                 "personal_work",
                 "subtasks",
@@ -146,7 +148,7 @@ export function resolveMobileRoute(
         projects: "Projects",
         project: "Project",
         personal_project: "Personal project",
-        task: "Task",
+        task: route.nodeId ? "Subtask details" : "Task details",
         inbox: "Inbox",
         office_team: "Office Team",
         accounting_overview: "Accounting",

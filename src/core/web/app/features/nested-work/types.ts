@@ -18,7 +18,7 @@ export interface WorkNodeDisplayMetadata extends WorkPeopleDisplay {
 }
 export type RootWorkAction='manage_contributors'|'appoint_lead'|'create_child'|'order_children';
 export type NodeWorkAction=RootWorkAction|'edit_details'|'move'|'delete'|'execute'|'submit'|'review';
-export type WorkCapabilityReasonCode='access_unavailable'|'read_only'|'branch_denied'|'appointment_denied'|'lifecycle_blocked'|'history_blocked';
+export type WorkCapabilityReasonCode='access_unavailable'|'read_only'|'branch_denied'|'appointment_denied'|'lifecycle_blocked'|'history_blocked'|'project_on_hold';
 export type WorkCapabilityEntry={allowed:true;reason_code:null}|{allowed:false;reason_code:WorkCapabilityReasonCode};
 export type WorkCapabilityMap<Action extends NodeWorkAction>=Partial<Record<Action,WorkCapabilityEntry>>;
 /** Current caller/scope, independent of any previously loaded snapshot. */

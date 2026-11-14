@@ -1,5 +1,11 @@
 import { brandColors, withOpacity } from "./theme";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentRef,
+  type ReactNode,
+} from "react";
 import {
   AccessibilityInfo,
   KeyboardAvoidingView,
@@ -27,6 +33,7 @@ import {
 import { colors } from "./theme";
 import { Text } from "./Typography";
 import { useAppearance, useTheme, themedStyle } from "./Appearance";
+import { ErrorState } from "./Screen";
 
 export function Sheet({
   title,
@@ -35,6 +42,7 @@ export function Sheet({
   children,
   footer,
   busy,
+  actionError,
   description,
   presentation = "dialog",
   maxWidth = 900,
@@ -42,9 +50,10 @@ export function Sheet({
   title: string;
   open: boolean;
   onClose: () => void;
-  children: ReactNode;
+  children?: ReactNode;
   footer?: ReactNode;
   busy?: boolean;
+  actionError?: unknown;
   description?: string;
   presentation?: "dialog" | "inspector";
   maxWidth?: number;
@@ -55,6 +64,14 @@ export function Sheet({
     { width, height } = useWindowDimensions(),
     { reduced } = useMotionPreferences();
   const [present, setPresent] = useState(open);
+  const body = useRef<ComponentRef<typeof ScrollView>>(null);
+  useEffect(() => {
+    if (!open || !actionError) return;
+    const frame = requestAnimationFrame(() =>
+      body.current?.scrollTo({ y: 0, animated: !reduced }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [open, actionError, reduced]);
   const progress = useSharedValue(0);
   useEffect(() => {
     cancelAnimation(progress);
@@ -158,9 +175,11 @@ export function Sheet({
             </Pressable>
           </View>
           <ScrollView
+            ref={body}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={s.content}
           >
+            {!!actionError && <ErrorState context="action" error={actionError} />}
             {children}
           </ScrollView>
           {!!footer && <View style={s.footer}>{footer}</View>}

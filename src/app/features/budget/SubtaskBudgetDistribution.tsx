@@ -244,6 +244,7 @@ function DistributionSheet({
 
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Subtask budget"
       description={row.title}
@@ -263,16 +264,13 @@ function DistributionSheet({
         />
       )}
       {recovery.data ? (
-        <>
-          <Notice>A budget change is awaiting confirmation.</Notice>
           <Button
             busy={action.busy}
             disabled={readOnly || recovery.loading || !!recovery.error}
             onPress={submit}
           >
-            Verify saved change
+            {"p_cap_allocation_id" in recovery.data.args ? "Confirm return" : "Save budget"}
           </Button>
-        </>
       ) : ready && (canSave || canReturn) ? (
         <>
           {canSave && canReturn && (
@@ -355,7 +353,6 @@ function DistributionSheet({
           </Notice>
         )
       )}
-      {!!action.error && <ErrorState error={action.error} context="action" />}
       <Button variant="outline" disabled={action.busy} onPress={onClose}>
         Cancel
       </Button>

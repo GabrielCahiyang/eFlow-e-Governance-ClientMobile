@@ -26,7 +26,7 @@ export async function recoverWorkRequest(
     p_command: request.command,
     p_payload: request.payload,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
   if (data === true) return fetchWorkTree(rootId);
   if (data !== false)
     throw new Error("The original work receipt could not be verified.");

@@ -1,7 +1,26 @@
 import { expect, test } from "@jest/globals";
 import type { WorkTreeSnapshot } from "../../../../core/web/app/features/nested-work/types";
 import { captureWorkEditorBaseline, freezeWorkEditorRequest, workEditorDateError } from "../../../../core/web/app/features/nested-work/selectors/editorDraft";
-import { subtaskScheduleError } from "../subtaskSchedule";
+import {
+  earliestSubtaskStart,
+  plannedSubtaskStartIssue,
+  subtaskScheduleError,
+} from "../subtaskSchedule";
+
+test("M7 start validation respects the latest Task or ancestor start", () => {
+  const tree = {
+    nodes: [
+      { id: "parent", start_date: "2026-11-18", parent_subtask_id: "grandparent" },
+      { id: "grandparent", start_date: "2026-11-20", parent_subtask_id: null },
+    ],
+  } as WorkTreeSnapshot;
+  const earliest = earliestSubtaskStart(tree, "parent", "2026-11-19");
+  expect(earliest).toBe("2026-11-20");
+  expect(plannedSubtaskStartIssue("2026-11-13", "2026-11-30", true, earliest))
+    .toBe("Choose a start date on or after the parent start date.");
+  expect(plannedSubtaskStartIssue("2026-11-20", "2026-11-30", true, earliest))
+    .toBe("");
+});
 
 test("overdue parents permit their existing date without permitting a later subtask deadline", () => {
   const tree = {

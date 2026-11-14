@@ -66,10 +66,33 @@ export function plannedSubtaskStartIssue(
   start: string,
   due: string,
   requireDate: boolean,
+  earliest?: string,
 ) {
   if (!start && !requireDate) return "";
   if (!isCalendarDate(start)) return "Choose a planned start date.";
+  if (earliest && start < earliest)
+    return "Choose a start date on or after the parent start date.";
   return due && due < start
     ? "Choose a start date on or before the due date, or reschedule the parent first."
     : "";
+}
+
+export function earliestSubtaskStart(
+  tree: WorkTreeSnapshot,
+  parent: string,
+  taskStart?: unknown,
+) {
+  const dates = [taskStart];
+  const seen = new Set<string>();
+  while (parent && !seen.has(parent)) {
+    seen.add(parent);
+    const node = nodeSchedule(tree.nodes.find((item) => item.id === parent));
+    if (!node) break;
+    dates.push(node.start_date);
+    parent = node.parent_subtask_id || "";
+  }
+  return dates
+    .filter((date): date is string => typeof date === "string" && isCalendarDate(date))
+    .sort()
+    .at(-1);
 }

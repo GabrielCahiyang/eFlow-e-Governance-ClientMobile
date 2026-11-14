@@ -5,7 +5,6 @@ import {
   Card,
   Choice,
   DateField,
-  ErrorState,
   Field,
   LabelValue,
   Loading,
@@ -56,6 +55,7 @@ export function PdfImportSheet({
     items = review || imp.session?.state.draft?.offices || [];
   return (
     <Sheet
+      actionError={action.error || (!imp.result ? imp.error : undefined)}
       open
       title={"Import PDF into " + title}
       busy={imp.busy || action.busy}
@@ -221,8 +221,6 @@ export function PdfImportSheet({
           recovery after a refresh or restart.
         </Notice>
       )}
-      {!!(imp.error && !imp.result) && <ErrorState error={imp.error} />}{" "}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

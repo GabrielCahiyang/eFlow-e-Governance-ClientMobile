@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Button,
   Choice,
-  ErrorState,
   Field,
   Notice,
   Sheet,
@@ -114,6 +113,7 @@ export function PersonalTaskSheet({
   };
   return (
     <Sheet
+      actionError={error}
       open
       title={
         mode === "create"
@@ -204,7 +204,6 @@ export function PersonalTaskSheet({
           maxLength={4000}
         />
       )}
-      {!!error && <ErrorState error={error} />}
     </Sheet>
   );
 }

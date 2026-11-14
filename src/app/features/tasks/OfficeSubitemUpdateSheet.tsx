@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import {
   Button,
   Choice,
-  ErrorState,
   Field,
   LabelValue,
   Row,
@@ -78,6 +77,7 @@ export function OfficeSubitemUpdateSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Update subtask work"
       busy={action.busy}
@@ -88,7 +88,7 @@ export function OfficeSubitemUpdateSheet({
           disabled={attempted || readOnly}
           onPress={() => void save()}
         >
-          Save work update
+          Post update
         </Button>
       }
     >
@@ -137,7 +137,6 @@ export function OfficeSubitemUpdateSheet({
           Attach evidence (optional)
         </Button>
       )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
       {attempted && !!action.error && (
         <Notice>
           Close this sheet and refresh the subtask before trying again. Check

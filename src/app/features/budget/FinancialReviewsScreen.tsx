@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import {
   Card,
   Button,
+  EditorialMetadataStrip,
   ErrorState,
   Screen,
   Loading,
@@ -12,6 +13,7 @@ import {
   Notice,
   Status,
 } from "../../components/ui";
+import { statusLabel } from "../../shared/statusLabels";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
@@ -123,7 +125,22 @@ export function FinancialReviewsScreen({
       ) : (
         packages.map((pack) => (
           <Card key={pack.liquidation.id} title={pack.request.purpose}>
-            <Status value={pack.request.status} domain="finance" />
+            <EditorialMetadataStrip
+              variant="card"
+              items={[
+                {
+                  label: "Status",
+                  value: statusLabel(pack.request.status, "finance"),
+                  status: pack.request.status,
+                  domain: "finance",
+                },
+                {
+                  label: "Declared",
+                  value: peso(pack.liquidation.declaredSpent),
+                },
+              ]}
+              style={{ marginBottom: 6 }}
+            />
             <LabelValue
               label="Request"
               value={cashRequestReference(pack.request.requestNumber)}

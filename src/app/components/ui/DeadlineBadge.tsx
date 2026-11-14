@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { AppState } from "react-native";
+import { AppState, View } from "react-native";
+import Clock from "lucide-react-native/icons/clock";
 import { Text } from "./Typography";
 import { deadlinePresentation } from "../../../core/web/app/shared/deadlinePresentation";
 import { dateLabel } from "./theme";
 import { useTheme } from "./Appearance";
+
 export function DeadlineBadge({
   value,
   status,
@@ -13,10 +15,10 @@ export function DeadlineBadge({
 }) {
   const palette = useTheme();
   const tones = {
-    green: { backgroundColor: palette.successSoft, color: palette.success },
-    yellow: { backgroundColor: palette.warningSoft, color: palette.warning },
-    red: { backgroundColor: palette.dangerSoft, color: palette.danger },
-    neutral: { backgroundColor: palette.background, color: palette.muted },
+    green: { color: palette.success },
+    yellow: { color: palette.warning },
+    red: { color: palette.danger },
+    neutral: { color: palette.mutedLabel },
   };
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -31,20 +33,29 @@ export function DeadlineBadge({
     };
   }, []);
   const d = deadlinePresentation(value, status, now);
+  const tone = tones[d.tone] || tones.neutral;
+  const labelText = (d.date ? dateLabel(d.date) + " · " : "") + d.label;
+
   return (
-    <Text
-      style={[
-        {
-          alignSelf: "flex-start",
-          paddingHorizontal: 8,
-          paddingVertical: 5,
-          borderRadius: 7,
-        },
-        tones[d.tone],
-      ]}
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        alignSelf: "flex-start",
+      }}
+      accessibilityLabel={`Deadline: ${labelText}`}
     >
-      {d.date ? dateLabel(d.date) + " · " : ""}
-      {d.label}
-    </Text>
+      <Clock size={12} color={tone.color} />
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: "600",
+          color: tone.color,
+        }}
+      >
+        {labelText}
+      </Text>
+    </View>
   );
 }

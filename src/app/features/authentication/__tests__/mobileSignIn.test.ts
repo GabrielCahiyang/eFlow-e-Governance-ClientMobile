@@ -34,7 +34,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test("the enabled native path sends a single request to the Supabase function and stores its tokens", async () => {
+test("the enabled protected path sends a single request to the Supabase function and stores its tokens", async () => {
   const tokens = { access_token: "test-access", refresh_token: "test-refresh" };
   const fetch = jest.spyOn(globalThis, "fetch").mockResolvedValue({
     ok: true,

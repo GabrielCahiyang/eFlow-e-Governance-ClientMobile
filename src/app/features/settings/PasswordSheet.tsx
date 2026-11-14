@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, ErrorState, Field, Notice, Sheet } from "../../components/ui";
+import { Button, Field, Notice, Sheet } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
@@ -87,6 +87,7 @@ export function PasswordSheet({
   };
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Change your password"
       description="Confirm your current password before choosing a new one."
@@ -126,7 +127,6 @@ export function PasswordSheet({
         editable={!action.busy}
       />
       <Notice>Use 12 to 128 characters. Keep your password private.</Notice>
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

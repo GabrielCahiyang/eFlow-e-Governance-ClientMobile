@@ -250,6 +250,7 @@ export function LiquidationSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Receipts and cash return"
       description={cashRequestReference(request.requestNumber)}
@@ -273,11 +274,7 @@ export function LiquidationSheet({
             }
             onPress={confirmed ? onClose : () => void submit()}
           >
-            {confirmed
-              ? "Done"
-              : intent
-                ? "Retry saved receipt package"
-                : "Submit receipts for review"}
+            {confirmed ? "Done" : "Submit receipts for review"}
           </Button>
         </>
       }
@@ -291,14 +288,7 @@ export function LiquidationSheet({
           retry={() => void recovery.refresh()}
         />
       )}
-      {confirmed ? (
-        <Notice>Receipt package submitted.</Notice>
-      ) : intent ? (
-        <Notice>
-          A saved receipt package is ready to check. Retrying uses the original
-          submission ID and files.
-        </Notice>
-      ) : null}
+      {confirmed && <Notice>Receipt package submitted.</Notice>}
       <LabelValue
         label="Cash released"
         value={recordedPeso(request.releasedAmount)}
@@ -544,7 +534,6 @@ export function LiquidationSheet({
           )}
         </>
       ) : null}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

@@ -188,6 +188,7 @@ function SealSheet({
   const retryConsent = seal?.state === "failed" && !!seal.approved_at;
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Project publication"
       onClose={() => {
@@ -208,7 +209,6 @@ function SealSheet({
           retry={() => void preview.refresh()}
         />
       )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
       {state.data && (
         <>
           <Notice>

@@ -279,6 +279,7 @@ export function ProjectSetupSheet({
   );
   return (
     <Sheet
+      actionError={action.error}
       open
       footer={footer}
       title={projectId ? "Project setup" : "Create project"}
@@ -462,7 +463,6 @@ export function ProjectSetupSheet({
           )}
         </>
       )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

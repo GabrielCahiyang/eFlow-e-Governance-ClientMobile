@@ -1,16 +1,18 @@
 import type { PersonalCommand } from "../../../core/web/app/features/workspaces/types";
+export type MobilePersonalCommand = PersonalCommand | "start_task";
 export interface PersonalRequest {
   schema: 1;
   actor: string;
   project: string;
   request: string;
-  command: PersonalCommand;
+  command: MobilePersonalCommand;
   payload: Record<string, unknown>;
 }
-const commands: PersonalCommand[] = [
+const commands: MobilePersonalCommand[] = [
   "set_member",
   "create_task",
   "staff_task",
+  "start_task",
   "progress_task",
   "submit_task",
   "review_task",

@@ -67,7 +67,12 @@ export function workScope(
   tree: WorkTreeSnapshot,
   actorId: string | null,
   readOnly = false,
+  executionBlocked = false,
 ) {
+  const isHold =
+    executionBlocked ||
+    (tree.root as unknown as { project_status?: string }).project_status ===
+      "on_hold";
   return {
     actorId,
     rootId: tree.root.id,
@@ -76,6 +81,7 @@ export function workScope(
     kind: tree.root.kind,
     revision: tree.revision,
     readOnly,
+    executionBlocked: isHold,
   };
 }
 
@@ -84,7 +90,13 @@ export function completionMode(
   nodeId: string,
   actorId: string | null,
   readOnly = false,
+  executionBlocked = false,
 ) {
+  const isHold =
+    executionBlocked ||
+    (tree.root as unknown as { project_status?: string }).project_status ===
+      "on_hold";
+  if (isHold || readOnly) return;
   const node = tree.nodes.find(
     (item) => item.id === nodeId && item.task_id === tree.root.id,
   );

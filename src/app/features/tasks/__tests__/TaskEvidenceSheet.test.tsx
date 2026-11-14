@@ -89,7 +89,7 @@ test("selection and camera failure are local, then a confirmed submission resume
   const request = jest.mocked(sendTaskEvidence).mock.calls[0][0].request;
   expect(request.files.map((file) => file.name)).toEqual(["safe.pdf"]);
   await fireEvent.press(
-    screen.getByRole("button", { name: "Check and resume submission" }),
+    screen.getByRole("button", { name: "Submit for review" }),
   );
   await waitFor(() =>
     expect(screen.getByText("Submitted for approval")).toBeOnTheScreen(),

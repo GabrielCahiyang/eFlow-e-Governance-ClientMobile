@@ -280,6 +280,7 @@ function JournalAdjustment({
   };
   return (
     <Sheet
+      actionError={command.error}
       open
       title="Balanced journal adjustment"
       onClose={onClose}
@@ -359,7 +360,6 @@ function JournalAdjustment({
         Add journal line
       </Button>
       {!!validation && <ErrorState error={validation} />}
-      {!!command.error && <ErrorState context="action" error={command.error} />}
     </Sheet>
   );
 }

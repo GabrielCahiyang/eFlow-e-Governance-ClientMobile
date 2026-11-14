@@ -17,6 +17,7 @@ import {
   Button,
   Card,
   Empty,
+  EditorialMetadataStrip,
   ErrorState,
   LabelValue,
   Loading,
@@ -24,7 +25,6 @@ import {
   Row,
   Screen,
   SearchField,
-  Status,
   Tabs,
   dateLabel,
   MondayTableRow,
@@ -128,7 +128,13 @@ export function ProjectScreen({
   const workView: ProjectWorkView =
     view === "board" || view === "calendar" ? view : "tasks";
   const main = workView === "tasks";
-  const auxiliary = ["offices", "files", "funding", "analysis", "audit_trail"].includes(view);
+  const auxiliary = [
+    "offices",
+    "files",
+    "funding",
+    "analysis",
+    "audit_trail",
+  ].includes(view);
   const closed = ["completed", "archived"].includes(facts.data?.status ?? "");
   const needle = query.trim().toLowerCase();
   useEffect(() => {
@@ -142,16 +148,37 @@ export function ProjectScreen({
     () => readProjectSetup(id),
     !!facts.data && !facts.error && !closed,
   );
-  const projectReady = !!facts.data && !facts.error && (closed || (setup.data?.ready === true && !setup.error));
+  const projectReady =
+    !!facts.data &&
+    !facts.error &&
+    (closed || (setup.data?.ready === true && !setup.error));
   const groupFacts = useFacts(
     "project-groups:" + scope,
     () => fetchProjectGroups(id),
     projectReady && main && !auxiliary,
   );
   const groups = groupFacts.error ? [] : (groupFacts.data ?? []);
-  const taskScope = { actor: profile?.id || "", project: id, office: facts.data?.orgId || "" };
-  const createAccess = useTaskStructure(taskScope, projectReady && !!taskScope.office && facts.data?.status === "active" && profile?.role === "head" && main && !auxiliary);
-  const canAdd = createAccess.data === "head" && !createAccess.loading && !createAccess.error && !facts.loading && !groupFacts.loading && !!groups.length;
+  const taskScope = {
+    actor: profile?.id || "",
+    project: id,
+    office: facts.data?.orgId || "",
+  };
+  const createAccess = useTaskStructure(
+    taskScope,
+    projectReady &&
+      !!taskScope.office &&
+      facts.data?.status === "active" &&
+      profile?.role === "head" &&
+      main &&
+      !auxiliary,
+  );
+  const canAdd =
+    createAccess.data === "head" &&
+    !createAccess.loading &&
+    !createAccess.error &&
+    !facts.loading &&
+    !groupFacts.loading &&
+    !!groups.length;
   const pages = useProjectTaskPages({
     scope,
     project: id,
@@ -249,8 +276,11 @@ export function ProjectScreen({
 
   const project = facts.data;
   const workspaceId = workspace.selected?.workspace.id;
-  const canCloseout = profile?.role === "head" && profile.is_active !== false &&
-    (profile.org_id === project.orgId || !!project.sourceCollaborationDraftId) &&
+  const canCloseout =
+    profile?.role === "head" &&
+    profile.is_active !== false &&
+    (profile.org_id === project.orgId ||
+      !!project.sourceCollaborationDraftId) &&
     project.status !== "archived";
   const openWeb = (view: string, title: string) =>
     navigate({ name: "project", id, workspaceId, view, title });
@@ -262,10 +292,15 @@ export function ProjectScreen({
         ) : !setup.data ? (
           <Loading label="Checking project setup" layout="project" />
         ) : (
-          <Notice>Finish project details, lead, dates, and funding before adding tasks or people.</Notice>
+          <Notice>
+            Finish project details, lead, dates, and funding before adding tasks
+            or people.
+          </Notice>
         )}
         {setup.data?.canAuthorize && !setup.error && (
-          <Button onPress={() => openWeb("project_setup", "Finish project setup")}>
+          <Button
+            onPress={() => openWeb("project_setup", "Finish project setup")}
+          >
             Finish setup on eFlow Web
           </Button>
         )}
@@ -330,19 +365,24 @@ export function ProjectScreen({
           />
         </Pressable>
       </View>
-      <Card style={{ padding: 10, gap: 6 }}>
-        <Row>
-          <Status value={project.status} work />
-        </Row>
-        <LabelValue
-          label="Tasks completed"
-          value={
-            completion
-              ? `${completion.completed} of ${completion.required} · ${percent}%`
-              : totals.error
-                ? "Unavailable"
-                : "Loading…"
-          }
+      <Card style={{ padding: 10, gap: 10 }}>
+        <EditorialMetadataStrip
+          variant="flush"
+          items={[
+            {
+              label: "Status",
+              value: resolveStatus(project.status).label,
+              status: project.status,
+            },
+            {
+              label: "Tasks completed",
+              value: completion
+                ? `${completion.completed} of ${completion.required} · ${percent}%`
+                : totals.error
+                  ? "Unavailable"
+                  : "Loading…",
+            },
+          ]}
         />
         {completion && (
           <View
@@ -384,7 +424,11 @@ export function ProjectScreen({
         {canAdd && <Button onPress={() => setAddTask(true)}>Add task</Button>}
       </Row>
       {(!auxiliary || view === "analysis" || view === "audit_trail") && (
-        <Tabs items={views} value={auxiliary ? view : main ? "tasks" : view} onChange={setView} />
+        <Tabs
+          items={views}
+          value={auxiliary ? view : main ? "tasks" : view}
+          onChange={setView}
+        />
       )}
       {!auxiliary && (
         <SearchField
@@ -551,7 +595,9 @@ export function ProjectScreen({
                     : section.title
                   : main
                     ? `Group: ${section.title}`
-                    : view === "board" ? resolveStatus(section.key).label : section.title}
+                    : view === "board"
+                      ? resolveStatus(section.key).label
+                      : section.title}
               </Text>
               <Text
                 style={{
@@ -618,11 +664,18 @@ export function ProjectScreen({
         <Screen compact onRefresh={refresh}>
           {header}
           {view === "analysis" && (
-            <ProjectAnalysisSummary project={project} onOpenWeb={() => openWeb("analytics", "Project analytics")} />
+            <ProjectAnalysisSummary
+              project={project}
+              onOpenWeb={() => openWeb("analytics", "Project analytics")}
+            />
           )}
           {view === "audit_trail" && profile?.id && (
-            <ProjectAuditTrail key={scope} actor={profile.id} project={id}
-              timezone={workspace.selected?.workspace.timezone || "Asia/Manila"} />
+            <ProjectAuditTrail
+              key={scope}
+              actor={profile.id}
+              project={id}
+              timezone={workspace.selected?.workspace.timezone || "Asia/Manila"}
+            />
           )}
           {view === "offices" && (
             <ProjectOffices project={project} canManage={false} />
@@ -649,10 +702,17 @@ export function ProjectScreen({
                 showCloseout={canCloseout && !closed}
                 navigate={navigate}
               />
-              {!closed && project.orgId && profile?.id &&
+              {!closed &&
+                project.orgId &&
+                profile?.id &&
                 (canCloseout || project.projectLeadId === profile.id) && (
-                  <ProjectFundingCloseout key={scope} actor={profile.id}
-                    project={id} office={project.orgId} onChanged={refresh} />
+                  <ProjectFundingCloseout
+                    key={scope}
+                    actor={profile.id}
+                    project={id}
+                    office={project.orgId}
+                    onChanged={refresh}
+                  />
                 )}
             </>
           )}
@@ -695,8 +755,20 @@ export function ProjectScreen({
         title="Project options"
         options={[
           ...tools,
-          ...(canCloseout ? [{ id: "closeout", title: project.status === "completed" ? "Archive project" : "Complete project" }] : []),
-          ...(setup.data?.canAuthorize && !closed && !project.sourceCollaborationDraftId
+          ...(canCloseout
+            ? [
+                {
+                  id: "closeout",
+                  title:
+                    project.status === "completed"
+                      ? "Archive project"
+                      : "Complete project",
+                },
+              ]
+            : []),
+          ...(setup.data?.canAuthorize &&
+          !closed &&
+          !project.sourceCollaborationDraftId
             ? [...setupTools, importTool]
             : []),
         ]}
@@ -710,20 +782,47 @@ export function ProjectScreen({
               projectId: id,
               title: "Project conversations",
             });
-          else if (option === "closeout") setCloseout(project.status === "completed" ? "archive" : "complete");
-          else if (["offices", "files", "funding", "audit_trail"].includes(option))
+          else if (option === "closeout")
+            setCloseout(
+              project.status === "completed" ? "archive" : "complete",
+            );
+          else if (
+            ["offices", "files", "funding", "audit_trail"].includes(option)
+          )
             setView(option);
           else
-            openWeb(option, [...tools, ...setupTools, importTool].find(tool => tool.id === option)?.title ?? project.title);
+            openWeb(
+              option,
+              [...tools, ...setupTools, importTool].find(
+                (tool) => tool.id === option,
+              )?.title ?? project.title,
+            );
         }}
       />
       {closeout && canCloseout && profile?.id && (
-        <ProjectCloseoutSheet key={scope + ":" + closeout} project={project} actor={profile.id} mode={closeout}
-          workspaceId={workspaceId} navigate={navigate}
-          onOpenFunding={() => { setCloseout(undefined); setView("funding"); }}
-          onClose={() => setCloseout(undefined)} onSaved={refresh} />
+        <ProjectCloseoutSheet
+          key={scope + ":" + closeout}
+          project={project}
+          actor={profile.id}
+          mode={closeout}
+          workspaceId={workspaceId}
+          navigate={navigate}
+          onOpenFunding={() => {
+            setCloseout(undefined);
+            setView("funding");
+          }}
+          onClose={() => setCloseout(undefined)}
+          onSaved={refresh}
+        />
       )}
-      {addTask && <ProjectTaskEditor scope={taskScope} groups={groups} onClose={() => setAddTask(false)} onSaved={refresh} />}
+      {addTask && (
+        <ProjectTaskEditor
+          scope={taskScope}
+          groups={groups}
+          onClose={() => setAddTask(false)}
+          onSaved={refresh}
+        />
+      )}
       {people && (
         <ProjectPeople
           project={project}

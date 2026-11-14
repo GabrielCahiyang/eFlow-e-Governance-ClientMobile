@@ -29,6 +29,7 @@ export function MilestoneTasks({
         Link milestone tasks
       </Button>
       <Sheet
+        actionError={action.error}
         open={open}
         title="Milestone tasks"
         busy={action.busy}
@@ -72,7 +73,6 @@ export function MilestoneTasks({
         >
           Save linked tasks
         </Button>
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     </>
   );

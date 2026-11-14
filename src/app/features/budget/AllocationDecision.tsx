@@ -37,6 +37,7 @@ export function AllocationDecision({
         </Button>
       </Row>
       <Sheet
+        actionError={action.error}
         open={!!decision}
         title={
           decision === "approve" ? "Approve allocation" : "Reject allocation"
@@ -71,7 +72,6 @@ export function AllocationDecision({
         >
           Confirm {decision}
         </Button>
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
       {!decision && !!action.error && <ErrorState context="action" error={action.error} />}
     </>

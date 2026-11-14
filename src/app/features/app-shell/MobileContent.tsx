@@ -12,7 +12,7 @@ import { ActionInbox } from "../notifications";
 import { ChatScreen, AnnouncementsScreen } from "../communication";
 import { ProfileScreen } from "../profile";
 import { SettingsScreen } from "../settings";
-import { OverviewScreen } from "../dashboard";
+import { AccountingHome, OverviewScreen } from "../dashboard";
 import { OfficeBudgetScreen, FinancialReviewsScreen } from "../budget";
 import { OfficePettyCash } from "../office-petty-cash";
 import {
@@ -99,6 +99,8 @@ export function MobileContent({
     content =
       view === "reviews" ? (
         <FinancialReviewsScreen recordId={current.recordId || current.id} />
+      ) : view === "overview" && profile?.role === "accounting_staff" ? (
+        <AccountingHome navigate={navigate} />
       ) : view ? (
         <OfficeBudgetScreen
           key={current.name + ":" + view}
@@ -153,12 +155,21 @@ export function MobileContent({
   else if (
     current.name === "personal_work" ||
     current.name === "subtasks" ||
-    current.name === "history"
+    current.name === "history" ||
+    current.name === "deadlines"
   )
     content = (
       <PersonalWorkFeedScreen
         key={current.name + ":" + (current.view || "")}
-        dueOnly={current.view === "deadlines"}
+        dueOnly={current.view === "deadlines" || current.name === "deadlines"}
+        initialFilter={
+          current.view === "overdue"
+            ? "Overdue"
+            : current.view === "today"
+              ? "Today"
+              : "All work"
+        }
+        awaitingOnly={current.view === "awaiting"}
         initial={
           current.name === "subtasks"
             ? "Subtasks"

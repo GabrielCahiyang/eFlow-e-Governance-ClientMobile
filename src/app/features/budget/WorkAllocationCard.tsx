@@ -151,7 +151,7 @@ export function WorkAllocationCard({
     <Card title="Allocate from the project">
       {retry ? (
         <Button variant="outline" busy={action.busy} onPress={submit}>
-          Verify saved allocation
+          Save allocation
         </Button>
       ) : ready && sources.length ? (
         <Button
@@ -176,6 +176,7 @@ export function WorkAllocationCard({
       )}
       {open && (
         <Sheet
+          actionError={action.error}
           open
           title="Allocate Task funding"
           busy={action.busy}
@@ -214,9 +215,6 @@ export function WorkAllocationCard({
             maxLength={3000}
             multiline
           />
-          {!!action.error && (
-            <ErrorState error={action.error} context="action" />
-          )}
           <Button
             busy={action.busy}
             disabled={
@@ -224,7 +222,7 @@ export function WorkAllocationCard({
             }
             onPress={submit}
           >
-            {retry ? "Verify saved allocation" : "Save allocation"}
+            Save allocation
           </Button>
         </Sheet>
       )}

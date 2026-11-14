@@ -3,8 +3,7 @@ import { userErrorMessage } from "../../shared/userMessages";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 import { draftStore } from "../../../platform/draftStore";
 import { sendPersonalRequest, PersonalCommandFailure } from "./services";
-import type { PersonalCommand } from "../../../core/web/app/features/workspaces/types";
-import { isPersonalRequest, type PersonalRequest } from "./requestRecovery";
+import { isPersonalRequest, type MobilePersonalCommand, type PersonalRequest } from "./requestRecovery";
 export function usePersonalActions(
   actor: string,
   project: string,
@@ -59,7 +58,7 @@ export function usePersonalActions(
     };
   }, [actor, project]);
   const execute = async (
-    command?: PersonalCommand,
+    command?: MobilePersonalCommand,
     payload?: Record<string, unknown>,
   ) => {
     if (
@@ -156,7 +155,7 @@ export function usePersonalActions(
         if (version === generation.current) setBusy(false);
       }
     },
-    run: (command: PersonalCommand, payload: Record<string, unknown>) =>
+    run: (command: MobilePersonalCommand, payload: Record<string, unknown>) =>
       execute(command, payload),
     retry: () => execute(),
   };

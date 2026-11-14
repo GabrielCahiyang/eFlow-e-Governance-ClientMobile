@@ -2,6 +2,16 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Subtask visibility follow-up
+
+Use an authorized Head, the appointed Task Lead, an appointed Subtask contributor and a read-only Task viewer. Add a Subtask under a future-dated Task as Head and verify the editor closes and the row appears without a manual refresh. Check **See all** at five rows. Verify the waiting notice wraps on a narrow screen with large fonts and appears only for appointed people. Check that the start defaults to the parent date and neither picker offers dates outside the parent range. Repeat on Android and iOS after the backend follow-ups are applied.
+
+For the explicit-start follow-up, use the appointed Task Lead, a Subtask Lead and an authorized viewer. On Office and Personal Tasks in **To do**, verify only the Task Lead sees **Start work**, and that Subtask details show **Waiting for the parent task**. Start the Task as the Lead, then check eligible Subtasks, a future-dated Subtask and the viewer's read-only controls. Repeat **Resume work** with a returned Office Task. The explicit-start migration and device acceptance are pending on hosted and native environments.
+
+After the follow-up migration is applied in an authorized environment, have a Task Lead create a future-dated Subtask under a Task in **To do**. Check the parent Task on Web and Mobile using an authorized viewer with no appointment on that Subtask, the Subtask Lead, and a Member from a second Office without access to the parent Task. Repeat with a nested Personal Subtask and an authorized project Member. The authorized viewers can read each Subtask immediately. Progress and completion controls depend on current assignment and execution eligibility. Verify the existing assignment notice at activation and check that My Work still lists actual assignments.
+
+The hosted rule remains pending. The disposable PostgreSQL tests passed 88 assertions on the M7 baseline, 97 with the hosted budget-distribution replay, and 35 with the On Hold and execution follow-up. Native device acceptance is pending. [Rules for Web and Mobile](M7-task-subtask-rules.md)
+
 ## Follow-up Phases 3–4 — Audit Trail, budget releases and project closeout
 
 - Projects now has a native **Audit Trail** tab and Project options entry. It reads the same authorized, paginated project history as Web and shows the change, actor and time in the workspace timezone.

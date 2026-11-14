@@ -1,6 +1,9 @@
 import { useEffect } from "react";
-import { Button, Card, Empty, ErrorState, Loading } from "../../components/ui";
+import { View } from "react-native";
+import Clock from "lucide-react-native/icons/clock";
+import { Button, ErrorState, Loading } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
+import { useTheme } from "../../components/ui/Appearance";
 import { useFacts } from "../../shared/useFacts";
 import { statusLabel } from "../../shared/statusLabels";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -130,8 +133,33 @@ function SubtaskTimeline({
   }
   entries.sort((a, b) => b.time - a.time || a.id.localeCompare(b.id));
   const loading = events.loading || history.loading;
+  const palette = useTheme();
+
   return (
-    <Card title="Activity">
+    <View
+      style={{
+        backgroundColor: palette.surface,
+        borderWidth: 1,
+        borderColor: palette.border,
+        borderRadius: 14,
+        padding: 16,
+        gap: 12,
+        marginBottom: 12,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text style={{ fontSize: 16, fontWeight: "700", color: palette.text }}>
+          Activity
+        </Text>
+        <Clock size={16} color={palette.mutedLabel} />
+      </View>
+
       {!!events.error && (
         <ErrorState error={events.error} retry={() => void events.refresh()} />
       )}
@@ -145,7 +173,14 @@ function SubtaskTimeline({
         <Loading label="Loading activity" layout="activity" />
       )}
       {!loading && !entries.length && !events.error && !history.error && (
-        <Empty compact kind="activity" title="No activity yet" />
+        <View style={{ gap: 4, paddingVertical: 4 }}>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: palette.text }}>
+            No activity yet
+          </Text>
+          <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
+            Work updates and decisions will appear here.
+          </Text>
+        </View>
       )}
       {entries.map((entry, index) => (
         <ActivityEntry
@@ -165,6 +200,6 @@ function SubtaskTimeline({
           {events.paging.error ? "Retry older activity" : "Load older activity"}
         </Button>
       )}
-    </Card>
+    </View>
   );
 }

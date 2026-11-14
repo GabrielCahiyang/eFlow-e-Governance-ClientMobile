@@ -60,8 +60,19 @@ test("login uses plain offline/timeout/account guidance, never the supplied acco
     "Enter a work note.",
   );
   expect(userErrorMessage(new Error("Network request failed"), "action")).toBe(
-    feedback.action,
+    "The connection was lost. Reconnect and check whether your changes were saved before trying again.",
   );
+});
+
+test.each([
+  [{ code: "42501", message: "Only the appointed Task Lead can start this task" }, /appointed Task Lead/],
+  [{ code: "22023", message: "Choose a start date within the parent schedule, or reschedule the parent first" }, /parent schedule/],
+  [{ code: "P0001", message: "Project is on hold" }, /project is on hold/],
+  [{ code: "22023", message: "Only 1,234.50 is available to protect on this budget line" }, /₱1,234.50/],
+  [{ code: "40001", message: "unrecognized database detail" }, /item has changed/],
+  [{ code: "XX000", message: "unexpected private implementation detail" }, /couldn't confirm/],
+])("uses an actionable reason before the generic fallback: %j", (error, message) => {
+  expect(userErrorMessage(error, "action")).toMatch(message);
 });
 
 test("the work display projection strips every source record and capability while retaining destination labels", () => {

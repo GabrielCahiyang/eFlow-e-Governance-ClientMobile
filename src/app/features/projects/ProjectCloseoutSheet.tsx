@@ -102,6 +102,7 @@ export function ProjectCloseoutSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title={label}
       description={project.title}
@@ -208,7 +209,6 @@ export function ProjectCloseoutSheet({
         editable={!action.busy}
         multiline
       />
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

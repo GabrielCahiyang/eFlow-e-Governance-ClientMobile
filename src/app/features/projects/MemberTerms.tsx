@@ -45,6 +45,7 @@ function Editor({
     action = useAction();
   return (
     <Sheet
+      actionError={action.error}
       open
       title={"Access terms · " + member.name}
       busy={action.busy}
@@ -99,15 +100,8 @@ function Editor({
           })
         }
       >
-        {locked ? "Retry original terms" : "Save access terms"}
+        Save access terms
       </Button>
-      {locked && (
-        <Notice>
-          Your previous attempt is saved. Check the current membership before
-          trying a different change.
-        </Notice>
-      )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

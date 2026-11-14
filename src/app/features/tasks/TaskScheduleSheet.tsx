@@ -80,6 +80,7 @@ export function TaskScheduleSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Dates and prerequisites"
       description={task.title}
@@ -143,7 +144,6 @@ export function TaskScheduleSheet({
           ]}
         />
       )}{" "}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

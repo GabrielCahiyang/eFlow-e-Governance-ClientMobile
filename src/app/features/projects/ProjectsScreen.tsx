@@ -36,6 +36,8 @@ import { projectSections } from "./mobileProjects";
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 
+const rail = 4;
+
 export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const { profile } = useAuth();
   const workspace = useWorkspace();
@@ -268,7 +270,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               borderBottomWidth: 1,
               borderColor: palette.border,
               minHeight: 42,
-              alignItems: "center",
+              alignItems: "stretch",
             }}
           >
             <Animated.View
@@ -276,13 +278,23 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                 {
                   width: pinnedWidth,
                   backgroundColor: palette.background,
-                  paddingHorizontal: 10,
                   zIndex: 2,
+                  flexDirection: "row",
+                  alignItems: "stretch",
                 },
                 pinned,
               ]}
             >
-              <Text>Project</Text>
+              <View style={{ width: rail, backgroundColor: palette.primary }} />
+              <View
+                style={{
+                  flex: 1,
+                  paddingHorizontal: 10,
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ color: palette.mutedLabel }}>Project</Text>
+              </View>
             </Animated.View>
             {[
               "Status",
@@ -292,16 +304,22 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               "Schedule",
               "Target date",
             ].map((label, index) => (
-              <Text
+              <View
                 key={label}
                 style={{
                   width: [140, 175, 150, 150, 135, 150][index],
                   paddingHorizontal: 8,
-                  color: palette.mutedLabel,
+                  justifyContent: "center",
                 }}
               >
-                {label}
-              </Text>
+                <Text
+                  style={{
+                    color: palette.mutedLabel,
+                  }}
+                >
+                  {label}
+                </Text>
+              </View>
             ))}
           </View>
         </View>
@@ -329,11 +347,12 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                   backgroundColor: palette.surface,
                   zIndex: 2,
                   flexDirection: "row",
-                  alignItems: "center",
+                  alignItems: "stretch",
                 },
                 pinned,
               ]}
             >
+              <View style={{ width: rail, backgroundColor: palette.primary }} />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open project ${item.title}`}
@@ -373,8 +392,6 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                 style={{
                   width: 44,
                   minHeight: 48,
-                  borderBottomWidth: 0.5,
-                  borderColor: palette.border,
                   alignItems: "center",
                   justifyContent: "center",
                 }}

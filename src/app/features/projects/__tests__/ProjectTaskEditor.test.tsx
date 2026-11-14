@@ -48,11 +48,8 @@ jest.mock("../../../../platform/supabase", () => ({
     },
   },
 }));
-jest.mock("../../../components/ui/Sheet", () => ({
-  Sheet: ({ children }: { children: React.ReactNode }) => children,
-}));
 jest.mock("../services", () => ({
-  fetchProject: async () => ({ status: "active" }),
+  fetchProject: async () => ({ status: "active", startDate: "2026-11-01", targetDate: "2026-11-30" }),
 }));
 jest.mock(
   "../../../../core/web/app/features/project-table/services/workspaceService",
@@ -98,7 +95,7 @@ test("task creation rechecks both Web permissions and never writes when one is d
 test("an unconfirmed Web create receipt locks submission instead of creating a duplicate", async () => {
   mockRpc.mockReset().mockImplementation(async (name) => ({
     data:
-      name === "phase3_create_task"
+      name === "m7_create_scheduled_task"
         ? null
         : name === "project_flow_snapshot"
           ? { project: { id: "project" }, ready: true }
@@ -125,14 +122,16 @@ test("an unconfirmed Web create receipt locks submission instead of creating a d
   expect(
     await view.findByText(/The save could not be confirmed/),
   ).toBeOnTheScreen();
-  expect(mockRpc).toHaveBeenLastCalledWith("phase3_create_task", {
-    p_project_id: "project",
-    p_group_id: "group",
+  expect(mockRpc).toHaveBeenLastCalledWith("m7_create_scheduled_task", {
+    p_project: "project",
+    p_group: "group",
     p_title: "Survey site",
+    p_start: "2026-11-01",
+    p_due: "2026-11-30",
   });
   await fireEvent.press(view.getByRole("button", { name: "Add task" }));
   expect(
-    mockRpc.mock.calls.filter(([name]) => name === "phase3_create_task"),
+    mockRpc.mock.calls.filter(([name]) => name === "m7_create_scheduled_task"),
   ).toHaveLength(1);
   expect(saved).not.toHaveBeenCalled();
 });
@@ -189,7 +188,7 @@ test("a saved project editor uses the delegated task command and a revoked edito
       view.getByLabelText("Task title"),
       "Updated survey",
     );
-    await fireEvent.press(view.getByRole("button", { name: "Save changes" }));
+    await fireEvent.press(view.getByRole("button", { name: "Save task" }));
     if (can_edit) await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
     else
       expect(
@@ -236,6 +235,6 @@ test("unfinished project setup blocks native task creation", async () => {
     await view.findByText(/Finish project setup on eFlow Web/),
   ).toBeOnTheScreen();
   expect(
-    mockRpc.mock.calls.some(([name]) => name === "phase3_create_task"),
+    mockRpc.mock.calls.some(([name]) => name === "m7_create_scheduled_task"),
   ).toBe(false);
 });

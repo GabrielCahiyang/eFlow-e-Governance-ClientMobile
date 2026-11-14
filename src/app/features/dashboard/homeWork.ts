@@ -93,7 +93,9 @@ export function memberHome(
       open(row) &&
       (!row.kind.startsWith("personal-") || !!row.projectId),
   );
-  const executable = own.filter((row) => assignmentActionable(row, actor));
+  // Contributors must not lose visibility simply because they are not Task Lead.
+  // Evaluate all open assigned work that is not awaiting review.
+  const actionableCandidates = own.filter((row) => !awaiting(row));
   const isToday = (row: WorkRow) =>
     day(row) != null && day(row) === workDay(now, row.timezone);
   const rank = (row: WorkRow) =>
@@ -106,47 +108,126 @@ export function memberHome(
           : row.blocker?.trim()
             ? 3
             : 4;
+
+  const sortedPriorities = [...actionableCandidates].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      (day(a) ?? Infinity) - (day(b) ?? Infinity) ||
+      a.key.localeCompare(b.key),
+  );
+
+  const topPriorities = sortedPriorities.slice(0, 3);
+
+  const getActionLabel = (row: WorkRow) => {
+    const isActionable = assignmentActionable(row, actor);
+    if (isActionable) {
+      if (row.status === "changes_requested") return "Review requested changes";
+      return "Continue work";
+    }
+    if (row.kind.endsWith("-node")) return "Open assigned subtask";
+    return "Open assigned task";
+  };
+
+  const priorities = topPriorities.map((row) => {
+    const detail = [
+      "Changes requested",
+      "Overdue",
+      "Due today",
+      "Blocker reported",
+      "Action required",
+    ][rank(row)];
+    const rowDay = day(row);
+    return {
+      ...homeWorkRow(row, detail),
+      id: row.id,
+      projectTitle: row.projectTitle,
+      workspaceName: row.workspaceName,
+      status: row.status,
+      due: row.due,
+      dueLabel:
+        rowDay != null ? workDateLabel(row.due, row.timezone) : undefined,
+      isOverdue: overdue(row, now),
+      isToday: isToday(row),
+      relation: row.relation.replace("Subitem Lead", "Subtask Lead"),
+      isLead: !!row.leading,
+      actionable: assignmentActionable(row, actor),
+      actionLabel: getActionLabel(row),
+      blocker: row.blocker,
+      kind: row.kind,
+    };
+  });
+
+  const priorityKeys = new Set(topPriorities.map((row) => row.key));
+  const comingUp = own
+    .filter((row) => {
+      if (priorityKeys.has(row.key)) return false;
+      if (awaiting(row)) return false;
+      const rowDay = day(row);
+      const todayDay = workDay(now, row.timezone);
+      if (rowDay == null || todayDay == null) return false;
+      return rowDay >= todayDay && rowDay <= todayDay + 7;
+    })
+    .sort(
+      (a, b) =>
+        (day(a) ?? Infinity) - (day(b) ?? Infinity) ||
+        a.title.localeCompare(b.title) ||
+        a.key.localeCompare(b.key),
+    )
+    .slice(0, 3)
+    .map((row) => {
+      const rowDay = day(row);
+      const todayDay = workDay(now, row.timezone);
+      const daysUntil =
+        rowDay != null && todayDay != null ? rowDay - todayDay : 0;
+      return {
+        key: row.key,
+        id: row.id,
+        title: row.title,
+        projectTitle: row.projectTitle || row.workspaceName,
+        status: row.status,
+        due: row.due,
+        dueLabel:
+          rowDay != null ? workDateLabel(row.due, row.timezone) : undefined,
+        daysUntil,
+        route: workDestination(row),
+      };
+    });
+
+  const waiting = own
+    .filter(
+      (row) =>
+        awaiting(row) ||
+        (!assignmentActionable(row, actor) && !!row.blocker?.trim()),
+    )
+    .sort(
+      (a, b) =>
+        (day(a) ?? Infinity) - (day(b) ?? Infinity) ||
+        a.key.localeCompare(b.key),
+    )
+    .slice(0, 3)
+    .map((row) => ({
+      ...homeWorkRow(
+        row,
+        awaiting(row) ? "Awaiting review" : "Blocker reported",
+      ),
+      id: row.id,
+      projectTitle: row.projectTitle || row.workspaceName,
+      workspaceName: row.workspaceName,
+      status: row.status,
+      reason: awaiting(row)
+        ? "Awaiting independent review"
+        : row.blocker?.trim()
+          ? `Blocked: ${row.blocker.trim()}`
+          : "Waiting on dependencies",
+      route: workDestination(row),
+    }));
+
   return {
-    priorities: executable
-      .sort(
-        (a, b) =>
-          rank(a) - rank(b) ||
-          (day(a) ?? Infinity) - (day(b) ?? Infinity) ||
-          a.key.localeCompare(b.key),
-      )
-      .slice(0, 5)
-      .map((row) =>
-        homeWorkRow(
-          row,
-          [
-            "Changes requested",
-            "Overdue",
-            "Due today",
-            "Blocker reported",
-            "Action required",
-          ][rank(row)],
-        ),
-      ),
-    waiting: own
-      .filter(
-        (row) =>
-          awaiting(row) ||
-          (!assignmentActionable(row, actor) && row.blocker?.trim()),
-      )
-      .sort(
-        (a, b) =>
-          (day(a) ?? Infinity) - (day(b) ?? Infinity) ||
-          a.key.localeCompare(b.key),
-      )
-      .slice(0, 5)
-      .map((row) =>
-        homeWorkRow(
-          row,
-          awaiting(row) ? "Awaiting review" : "Blocker reported",
-        ),
-      ),
-    overdue: executable.filter((row) => overdue(row, now)).length,
-    today: executable.filter(isToday).length,
+    priorities,
+    comingUp,
+    waiting,
+    overdue: actionableCandidates.filter((row) => overdue(row, now)).length,
+    today: actionableCandidates.filter(isToday).length,
     awaiting: own.filter(awaiting).length,
   };
 }
@@ -160,7 +241,13 @@ export function officeHomeWork(
   const risk = new Map<string, Set<string>>();
   const relevantProjects = new Set<string>();
   if (!scope)
-    return { attention: [], risk, relevantProjects, overdueOrBlocked: 0 };
+    return {
+      attention: [],
+      risk,
+      riskItems: [],
+      relevantProjects,
+      overdueOrBlocked: 0,
+    };
   const projectIds = new Set(
     scope.projects
       .filter((project) => project.kind === "office")
@@ -220,9 +307,36 @@ export function officeHomeWork(
       },
     ];
   });
+  const riskCandidates = candidates
+    .filter(
+      (row) => !!row.blocker?.trim() || (!awaiting(row) && overdue(row, now)),
+    )
+    .sort(
+      (a, b) =>
+        (day(a) ?? Infinity) - (day(b) ?? Infinity) ||
+        a.key.localeCompare(b.key),
+    )
+    .slice(0, 3)
+    .map((row) => ({
+      key: row.key,
+      id: row.id,
+      title: row.title,
+      projectTitle: row.projectTitle || row.workspaceName,
+      status: row.status,
+      isBlocker: !!row.blocker?.trim(),
+      isOverdue: !awaiting(row) && overdue(row, now),
+      reason: row.blocker?.trim()
+        ? `Blocked · ${row.blocker.trim()}`
+        : day(row) != null
+          ? `Overdue · Due ${workDateLabel(row.due, row.timezone)}`
+          : "Overdue work",
+      route: workDestination(row),
+    }));
+
   return {
     attention,
     risk,
+    riskItems: riskCandidates,
     relevantProjects,
     overdueOrBlocked: candidates.filter(
       (row) => !!row.blocker?.trim() || (!awaiting(row) && overdue(row, now)),

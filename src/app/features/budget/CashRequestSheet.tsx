@@ -4,10 +4,8 @@ import {
   Card,
   Choice,
   DateField,
-  ErrorState,
   Field,
   LabelValue,
-  Notice,
   Row,
   Sheet,
   peso,
@@ -167,22 +165,17 @@ export function CashRequestSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title={correction ? "Correct cash request" : "Request task cash"}
       onClose={onClose}
       busy={action.busy}
       footer={
         <Button busy={action.busy} disabled={readOnly} onPress={() => void save()}>
-          {intent.current ? "Retry same request" : "Submit cash request"}
+          Submit cash request
         </Button>
       }
     >
-      {!!intent.current && (
-        <Notice>
-          The submitted terms are retained. A retry uses the same request and
-          does not reserve funding twice.
-        </Notice>
-      )}
       {lines.map((line, i) => (
         <Card key={i}>
           <Choice
@@ -265,7 +258,6 @@ export function CashRequestSheet({
         <LabelValue label="Attachment" value={attachment.name} />
       )}
       <LabelValue label="Total cash requested" value={peso(total)} />
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

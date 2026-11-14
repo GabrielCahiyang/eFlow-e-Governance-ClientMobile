@@ -67,7 +67,7 @@ test("Office subitem update checks revision and current actor scope before sendi
     "Safe test note",
   );
   await fireEvent.press(
-    screen.getByRole("button", { name: "Save work update" }),
+    screen.getByRole("button", { name: "Post update" }),
   );
   await waitFor(() =>
     expect(screen.getByText(/This item has changed/)).toBeOnTheScreen(),
@@ -77,7 +77,7 @@ test("Office subitem update checks revision and current actor scope before sendi
   rememberWorkCapabilityContext(initial, "member");
   jest.mocked(fetchWorkTree).mockResolvedValue(initial);
   await fireEvent.press(
-    screen.getByRole("button", { name: "Save work update" }),
+    screen.getByRole("button", { name: "Post update" }),
   );
   await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   expect(saveSubtaskWorkUpdate).toHaveBeenCalledTimes(1);
@@ -109,7 +109,7 @@ test("a contributor with a current execute grant saves an update directly", asyn
   );
   await fireEvent.changeText(screen.getByLabelText("Work note"), "Draft");
   await fireEvent.press(
-    screen.getByRole("button", { name: "Save work update" }),
+    screen.getByRole("button", { name: "Post update" }),
   );
   await waitFor(() =>
     expect(saveSubtaskWorkUpdate).toHaveBeenCalledWith(expect.objectContaining({

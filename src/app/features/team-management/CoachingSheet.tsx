@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, ErrorState, Field, Notice, Sheet } from "../../components/ui";
+import { Button, Field, Notice, Sheet } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import type { Employee } from "../../../core/web/app/services/employeeService";
@@ -72,6 +72,7 @@ export function CoachingSheet({
   };
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Member coaching context"
       description={employee.name}
@@ -110,7 +111,6 @@ export function CoachingSheet({
         These are manager observations, separate from verified task activity. Do
         not use them as an automatic personnel rating.
       </Notice>
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

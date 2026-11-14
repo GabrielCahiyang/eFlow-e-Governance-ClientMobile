@@ -144,6 +144,7 @@ export function ProjectSettings({
         </Card>
       )}
       <Sheet
+        actionError={action.error}
         open={!!operation}
         title={
           operation === "delete"
@@ -205,7 +206,6 @@ export function ProjectSettings({
             onChangeText={setConfirmation}
           />
         )}
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     </>
   );

@@ -2,7 +2,6 @@ import { userErrorMessage } from "../../shared/userMessages";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
-  ErrorState,
   Field,
   Loading,
   Notice,
@@ -145,6 +144,7 @@ export function WorkspaceCreateSheet({
   };
   return (
     <Sheet
+      actionError={error}
       open
       title={`Create personal ${kind}`}
       onClose={onClose}
@@ -157,8 +157,6 @@ export function WorkspaceCreateSheet({
         >
           {pending?.created
             ? "Open created record"
-            : pending
-              ? "Retry same creation"
               : `Create ${kind}`}
         </Button>
       }
@@ -178,15 +176,8 @@ export function WorkspaceCreateSheet({
             Personal work uses its own review process. Your Office affiliation
             and financial authority remain unchanged.
           </Notice>
-          {!!pending && (
-            <Notice>
-              A saved request is retained. Retry uses its original name and
-              identity.
-            </Notice>
-          )}
         </>
       )}
-      {!!error && <ErrorState error={error} />}
     </Sheet>
   );
 }

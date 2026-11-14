@@ -96,6 +96,7 @@ export function ProjectReadinessSheet({
   };
   return (
     <Sheet
+      actionError={action.error}
       open
       title={mode === "setup" ? "Project setup" : "Completion requirements"}
       description={project.title}
@@ -227,7 +228,6 @@ export function ProjectReadinessSheet({
           The current project and financial requirements must be met before saving.
         </Text>
       )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

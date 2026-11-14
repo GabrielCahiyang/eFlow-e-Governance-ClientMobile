@@ -53,7 +53,7 @@ test("reopening a lost creation retries its original name and request rather tha
     expect(screen.getByDisplayValue("Original project")).toBeTruthy(),
   );
   await fireEvent.press(
-    screen.getByRole("button", { name: "Retry same creation" }),
+    screen.getByRole("button", { name: "Create project" }),
   );
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith("created"));
   expect(createPersonalProject).toHaveBeenCalledWith(

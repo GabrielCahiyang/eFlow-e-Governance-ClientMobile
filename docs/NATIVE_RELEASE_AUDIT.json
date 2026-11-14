@@ -1,14 +1,13 @@
 {
-  "at": "2026-11-12T20:46:33.547Z",
+  "at": "2026-11-13T07:25:18.208Z",
   "method": "Exact Hermes string-table entries; quoted literals for JavaScript. Numeric substrings are not credential matches.",
   "platforms": [
     "android",
     "ios"
   ],
   "bundles": [
-    "dist/android/_expo/static/js/android/index-cef41720af9f81c381efce452c17ddae.hbc",
-    "dist/ios/_expo/static/js/ios/index-85b8ebc9647601d49256ac7bc988b2fa.hbc",
-    "C:/Users/gabri/OneDrive/Desktop/EflowMobile/artifacts/embedded-android-v52.hbc"
+    "dist/android/_expo/static/js/android/index-c8c497555d6a709cac70fda14d183e98.hbc",
+    "dist/ios/_expo/static/js/ios/index-902fa90674c15c38d2fb360c9bab288f.hbc"
   ],
   "developmentAccountLiteralCount": 6,
   "developmentAccountLiteralsFound": 0

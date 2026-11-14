@@ -39,25 +39,31 @@ function groupAccentColor(title: string, palette: ThemeColors): string {
 export function PersonalWorkFeedScreen({
   initial = "Assigned work",
   dueOnly = false,
+  initialFilter = "All work",
+  awaitingOnly = false,
   navigate,
 }: {
   initial?: WorkDestination;
   dueOnly?: boolean;
+  initialFilter?: WorkGroup | "All work";
+  awaitingOnly?: boolean;
   navigate: Navigate;
 }) {
   const facts = useMobileWorkFeed();
   const pull = usePullRefresh(facts.refresh);
   const palette = useTheme();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<WorkGroup | "All work">("All work");
+  const [filter, setFilter] = useState<WorkGroup | "All work">(initialFilter);
   const workspace = useWorkspace();
   const selected = workspace.error ? undefined : workspace.selected;
   const workspaceId = selected?.workspace.id;
   const filters = dueOnly
     ? (["Overdue", "Today", "Upcoming"] as const)
-    : workGroups.filter((group) => initial === "History"
-      ? group === "Completed" || group === "Other history"
-      : group !== "Completed" && group !== "Other history");
+    : workGroups.filter((group) =>
+        initial === "History"
+          ? group === "Completed" || group === "Other history"
+          : group !== "Completed" && group !== "Other history",
+      );
   const [filterOpen, setFilterOpen] = useState(false);
   const [openError, setOpenError] = useState<Error>();
 
@@ -72,6 +78,8 @@ export function PersonalWorkFeedScreen({
     () =>
       groupAssignedWork(
         (workspaceId ? (rows ?? []) : []).filter((row) => {
+          if (awaitingOnly)
+            return ["for_review", "submitted"].includes(row.status);
           if (initial === "History") return row.history;
           if (row.history) return false;
           if (dueOnly) return true;
@@ -83,7 +91,7 @@ export function PersonalWorkFeedScreen({
         workspaceId,
         new Date(minute * 60_000),
       ),
-    [rows, initial, dueOnly, workspaceId, minute],
+    [rows, initial, dueOnly, workspaceId, minute, awaitingOnly],
   );
   const needle = query.trim().toLocaleLowerCase();
   const matches = useMemo(
@@ -243,7 +251,7 @@ export function PersonalWorkFeedScreen({
               />
             </View>
             <FilterChip
-              label={filter === "All work" ? "Filter" : filter}
+              label={filter}
               icon
               onPress={() => setFilterOpen(true)}
               selected={filter !== "All work"}

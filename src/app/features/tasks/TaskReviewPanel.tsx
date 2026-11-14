@@ -4,6 +4,7 @@ import { EvidenceAttachment } from "./EvidenceAttachment";
 import {
   Button,
   Card,
+  EditorialMetadataStrip,
   Empty,
   ErrorState,
   Field,
@@ -168,16 +169,32 @@ export function TaskReviewPanel({
           />
         ) : (
           <>
-            <LabelValue label="Evidence version" value={selected.version} />
+            <EditorialMetadataStrip
+              variant="card"
+              items={[
+                {
+                  label: "Review Status",
+                  value: statusLabel(
+                    selected.status === "pending"
+                      ? "for_review"
+                      : selected.status,
+                  ),
+                  status:
+                    selected.status === "pending"
+                      ? "for_review"
+                      : selected.status,
+                },
+                {
+                  label: "Version",
+                  value: `v${selected.version}`,
+                },
+              ]}
+              style={{ marginVertical: 6 }}
+            />
             <LabelValue label="Submitted by" value={selected.submitterName} />
             <LabelValue
               label="Submitted"
               value={dateLabel(selected.submittedAt)}
-            />
-            <Status
-              value={
-                selected.status === "pending" ? "for_review" : selected.status
-              }
             />
             <Text selectable>{selected.note}</Text>
             {!!selected.decidedByName && (

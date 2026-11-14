@@ -339,8 +339,9 @@ export function OfficePettyCash({
       )}
       {!!(edit || pending) && (
         <Sheet
+          actionError={action.error}
           open
-          title={pending ? "Verify saved transaction" : labels[edit!.kind]}
+          title={labels[pending?.action ?? edit!.kind]}
           busy={action.busy}
           onClose={() => {
             if (!pending && !action.busy) setEdit(undefined);
@@ -351,15 +352,11 @@ export function OfficePettyCash({
               disabled={!pending && !ready}
               onPress={save}
             >
-              {pending ? "Check saved transaction" : labels[edit!.kind]}
+              {labels[pending?.action ?? edit!.kind]}
             </Button>
           }
         >
-          {pending ? (
-            <Notice>
-              The saved request will be checked using the same transaction ID.
-            </Notice>
-          ) : (
+          {!pending && (
             <>
               {!!edit?.request && (
                 <Notice>
@@ -491,9 +488,6 @@ export function OfficePettyCash({
                 </>
               )}
             </>
-          )}
-          {!!action.error && (
-            <ErrorState context="action" error={action.error} />
           )}
         </Sheet>
       )}

@@ -164,3 +164,87 @@ test("unexpected or oversized inputs cannot report their own outcome or reach up
     422,
   );
 });
+
+test("approved Figma browser origins receive a narrow preflight response", async () => {
+  const handler = createMobileSignIn(
+    { url: base, serviceKey: "test-server-key" },
+    async () => {
+      throw new Error("preflight must not reach upstream");
+    },
+  );
+  const response = await handler(
+    new Request(base, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://example.figma.site",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "apikey,content-type",
+      },
+    }),
+  );
+
+  assert.equal(response.status, 204);
+  assert.equal(
+    response.headers.get("access-control-allow-origin"),
+    "https://example.figma.site",
+  );
+  assert.equal(
+    response.headers.get("access-control-allow-methods"),
+    "POST, OPTIONS",
+  );
+  assert.equal(
+    response.headers.get("access-control-allow-headers"),
+    "apikey, content-type",
+  );
+  assert.equal(response.headers.get("vary"), "Origin");
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test("unapproved browser origins fail before credentials or upstream access", async () => {
+  let upstreamCalls = 0;
+  const handler = createMobileSignIn(
+    { url: base, serviceKey: "test-server-key" },
+    async () => {
+      upstreamCalls += 1;
+      throw new Error("unapproved origins must not reach upstream");
+    },
+  );
+  const response = await handler(
+    new Request(base, {
+      method: "POST",
+      headers: { Origin: "https://malicious.example" },
+      body: JSON.stringify({
+        email: "person@example.test",
+        password: "test-value",
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 403);
+  assert.equal(response.headers.get("access-control-allow-origin"), null);
+  assert.equal(upstreamCalls, 0);
+});
+
+test("approved browser responses expose only the requesting origin", async () => {
+  const handler = createMobileSignIn(
+    { url: base, serviceKey: "test-server-key" },
+    async () => Response.json({ status: "unknown" }),
+  );
+  const response = await handler(
+    new Request(base, {
+      method: "POST",
+      headers: { Origin: "http://localhost:3000" },
+      body: JSON.stringify({
+        email: "person@example.test",
+        password: "wrong-value",
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 503);
+  assert.equal(
+    response.headers.get("access-control-allow-origin"),
+    "http://localhost:3000",
+  );
+  assert.equal(response.headers.get("vary"), "Origin");
+});

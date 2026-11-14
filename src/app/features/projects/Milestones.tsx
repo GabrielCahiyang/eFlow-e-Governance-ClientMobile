@@ -131,6 +131,7 @@ export function Milestones({
         })
       )}
       <Sheet
+        actionError={action.error}
         open={editing !== undefined}
         title={editing ? "Edit milestone" : "Add milestone"}
         onClose={() => {
@@ -189,9 +190,9 @@ export function Milestones({
         >
           Save milestone
         </Button>
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
       <Sheet
+        actionError={action.error}
         open={ordering}
         title="Milestone order"
         onClose={() => setOrdering(false)}
@@ -207,7 +208,6 @@ export function Milestones({
             });
           }}
         />
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
       {!!action.error && editing === undefined && !ordering && (
         <ErrorState context="action" error={action.error} />

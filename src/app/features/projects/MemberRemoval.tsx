@@ -45,6 +45,7 @@ export function MemberRemoval({
         Review removal of {name}
       </Button>
       <Sheet
+        actionError={action.error}
         open={!!preview}
         title={"Remove " + name}
         busy={action.busy}
@@ -76,7 +77,6 @@ export function MemberRemoval({
         >
           Confirm reviewed removal
         </Button>
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
       {!preview && !!action.error && <ErrorState context="action" error={action.error} />}
     </>

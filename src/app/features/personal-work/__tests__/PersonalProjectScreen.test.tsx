@@ -110,8 +110,10 @@ test("a direct task link resolves the task beyond the first page", async () => {
     />,
   );
   expect(
-    await screen.findByRole("button", { name: "Record progress" }),
+    await screen.findByRole("button", { name: "Start work" }),
   ).toBeOnTheScreen();
+  expect(screen.queryByRole("button", { name: "Record progress" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Mark done" })).toBeNull();
   expect(screen.getAllByText("Personal task 45")).toHaveLength(2);
   expect(screen.queryByText("Personal task 1")).toBeNull();
   expect(screen.queryByPlaceholderText("Search personal tasks")).toBeNull();

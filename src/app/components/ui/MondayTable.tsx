@@ -5,8 +5,9 @@ import Calendar from "lucide-react-native/icons/calendar";
 import User from "lucide-react-native/icons/user";
 import { Text } from "./Typography";
 import { useTheme } from "./Appearance";
-import { Status, workStatusTone } from "./Status";
+import { workStatusTone } from "./Status";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
+import { EditorialMetadataInline } from "./EditorialMetadata";
 
 export function MondayTableSection({
   title,
@@ -87,7 +88,9 @@ export function MondayTableRow({
 }) {
   const palette = useTheme();
   const resolve = useWorkStatus();
-  const accent = workStatusTone(status, palette, resolve(status, customStatusId).color).accent;
+  const presentation = resolve(status, customStatusId);
+  const tone = workStatusTone(status, palette, presentation.color);
+  const accent = tone.accent;
 
   return (
     <Pressable
@@ -108,19 +111,17 @@ export function MondayTableRow({
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
           {!!tag && (
-            <View
-              style={[
-                styles.tagBadge,
-                {
-                  backgroundColor: palette.background,
-                  borderColor: palette.border,
-                },
-              ]}
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: "700",
+                color: palette.mutedLabel,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
             >
-              <Text style={[styles.tagText, { color: palette.mutedLabel }]}>
-                {tag}
-              </Text>
-            </View>
+              {tag}
+            </Text>
           )}
         </View>
 
@@ -130,46 +131,28 @@ export function MondayTableRow({
           </Text>
         )}
 
-        <View style={styles.columnsRow}>
-          <Status value={status} customId={customStatusId} work variant="monday" />
-
-          {!!due && (
-            <View
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: palette.background,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <Calendar size={12} color={palette.mutedLabel} />
-              <Text style={[styles.chipText, { color: palette.mutedLabel }]}>
-                {due}
-              </Text>
-            </View>
-          )}
-
-          {!!assignee && (
-            <View
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: palette.background,
-                  borderColor: palette.border,
-                },
-              ]}
-            >
-              <User size={12} color={palette.mutedLabel} />
-              <Text
-                style={[styles.chipText, { color: palette.text }]}
-                numberOfLines={1}
-              >
-                {assignee}
-              </Text>
-            </View>
-          )}
-        </View>
+        <EditorialMetadataInline
+          items={[
+            {
+              value: presentation.label,
+              accent: tone.foreground,
+              status,
+            },
+            due
+              ? {
+                  icon: <Calendar size={12} color={palette.mutedLabel} />,
+                  value: due,
+                }
+              : null,
+            assignee
+              ? {
+                  icon: <User size={12} color={palette.mutedLabel} />,
+                  value: assignee,
+                }
+              : null,
+          ]}
+          style={{ marginTop: 4 }}
+        />
 
         {!!blocker && (
           <Text style={[styles.blocker, { color: palette.warning }]}>
@@ -262,31 +245,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-  columnsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 2,
-  },
-  chip: {
-    maxWidth: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  chipText: {
-    flexShrink: 1,
-    fontSize: 12,
-    lineHeight: 16,
-  },
   blocker: {
     fontSize: 12,
     fontWeight: "500",
+    marginTop: 2,
   },
   chevronSlot: {
     paddingRight: 12,

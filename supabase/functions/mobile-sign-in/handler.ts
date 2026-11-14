@@ -14,6 +14,36 @@ function reply(status: number, body: string | Record<string, string>) {
   });
 }
 
+function browserOrigin(request: Request) {
+  const raw = request.headers.get("Origin");
+  if (!raw) return { requested: false, allowed: "" };
+  try {
+    const origin = new URL(raw);
+    const local =
+      origin.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname);
+    const figmaPreview =
+      origin.protocol === "https:" &&
+      (origin.hostname === "figma.site" ||
+        origin.hostname.endsWith(".figma.site"));
+    return { requested: true, allowed: local || figmaPreview ? raw : "" };
+  } catch {
+    return { requested: true, allowed: "" };
+  }
+}
+
+function addBrowserCors(response: Response, origin: string) {
+  if (!origin) return response;
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "apikey, content-type",
+  );
+  response.headers.set("Vary", "Origin");
+  return response;
+}
+
 async function readCredentials(request: Request) {
   const stream = request.body;
   if (!stream) return;
@@ -126,7 +156,7 @@ export function createMobileSignIn(
     return reply(423, lockedMessage);
   }
 
-  return async (request: Request) => {
+  async function handlePost(request: Request) {
     if (request.method !== "POST") return reply(405, "Use POST to sign in.");
     if (!base || !serviceKey) return reply(503, unavailable);
     const credentials = await readCredentials(request);
@@ -201,5 +231,26 @@ export function createMobileSignIn(
       await abort(lease);
       return reply(503, unavailable);
     }
+  }
+
+  return async (request: Request) => {
+    const origin = browserOrigin(request);
+    if (origin.requested && !origin.allowed)
+      return reply(403, "This browser origin is not allowed.");
+    if (request.method === "OPTIONS") {
+      const requestedMethod = request.headers.get(
+        "Access-Control-Request-Method",
+      );
+      if (requestedMethod?.toUpperCase() !== "POST")
+        return addBrowserCors(reply(405, "Use POST to sign in."), origin.allowed);
+      return addBrowserCors(
+        new Response(null, {
+          status: 204,
+          headers: { "Cache-Control": "no-store" },
+        }),
+        origin.allowed,
+      );
+    }
+    return addBrowserCors(await handlePost(request), origin.allowed);
   };
 }

@@ -1,22 +1,24 @@
-import { ProjectTaskEditor, useTaskStructure } from "../projects/ProjectTaskEditor";
-import { DeadlineBadge } from "../../components/ui/DeadlineBadge";
+import {
+  ProjectTaskEditor,
+  useTaskStructure,
+} from "../projects/ProjectTaskEditor";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { Text } from "../../components/ui/Typography";
 import { useCallback, useState } from "react";
 import { CustomWorkStatusControl } from "../work-status";
 import { useWorkRecordUpdates } from "./useWorkRecordUpdates";
+import { View, useWindowDimensions } from "react-native";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
+  EditorialMetadataStrip,
   ErrorState,
-  LabelValue,
   Loading,
   Notice,
-  Row,
   Screen,
-  Status,
-  dateLabel,
 } from "../../components/ui";
+import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
 import { useAuth } from "../authentication";
@@ -30,7 +32,6 @@ import {
   WorkTreeUnavailable,
 } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import {
-  getTaskLeadId,
   getTaskTeamMemberIds,
 } from "../../../core/web/app/features/tasks/selectors/teamMembership";
 import { updateTaskStatus } from "../../../core/web/app/features/tasks/services/taskService";
@@ -45,15 +46,45 @@ import { TaskReviewPanel } from "./TaskReviewPanel";
 import { TaskActivity } from "./TaskActivity";
 import { WorkTreePanel } from "./WorkTreePanel";
 import { WorkEditorSheet } from "./WorkEditorSheet";
-import { NavigationRow } from "../../components/ui/NavigationRow";
-import { branchCompletion } from "./branchInspector";
-function canPostTaskUpdate(task: ReturnType<typeof rowToTask>, actorId: string) {
-  return getTaskTeamMemberIds(task).includes(actorId) &&
-    (task.status === "todo" ||
-      task.status === "in_progress" ||
-      (task.status === "changes_requested" && getTaskLeadId(task) === actorId));
+import { WorkProposalReview, WorkProposalSheet } from "./WorkProposalSheet";
+import { workScheduleToday } from "./subtaskSchedule";
+import { getPhilippineCalendarDate } from "../../../core/web/app/shared/calendarDates";
+import { PublicMessageError } from "../../shared/userMessages";
+function canPostTaskUpdate(
+  task: ReturnType<typeof rowToTask>,
+  actorId: string,
+) {
+  return (
+    getTaskTeamMemberIds(task).includes(actorId) &&
+    task.status === "in_progress"
+  );
 }
 
+import { branchRows, branchCompletion, workNodeRoute } from "./branchInspector";
+import {
+  BentoActionButtons,
+  BentoBlockerCard,
+  BentoDependenciesCard,
+  BentoEditButton,
+  BentoProjectOnHoldCard,
+  BentoScheduleCards,
+  BentoAssignedTeamCard,
+  BentoSubtasksCard,
+  BentoSupportingGrid,
+  CircularProgressRing,
+  type DependencyItemData,
+  type SubtaskItemData,
+} from "./TaskBentoComponents";
+import type { WorkPerson } from "../../../core/web/app/features/nested-work/types";
+
+export function priorityLabel(priority?: string): string {
+  if (!priority || priority === "normal" || priority === "medium")
+    return "Medium priority";
+  if (priority === "high") return "High priority";
+  if (priority === "urgent") return "Urgent priority";
+  if (priority === "low") return "Low priority";
+  return priority.charAt(0).toUpperCase() + priority.slice(1) + " priority";
+}
 export function TaskDetailsScreen({
   id,
   projectId,
@@ -94,9 +125,45 @@ export function TaskDetailsScreen({
       if (project.error) throw project.error;
       projectStatus = project.data?.status || "unavailable";
     }
-    if (projectStatus === "unavailable")
-      throw new Error("Task unavailable.");
-    return { task, projectStatus };
+    if (projectStatus === "unavailable") throw new Error("Task unavailable.");
+    const dependencyIds = Array.isArray(task.dependencyIds)
+      ? task.dependencyIds
+      : [];
+    let dependencyItems: DependencyItemData[] = [];
+    let missingDependencyCount = 0;
+    if (dependencyIds.length > 0) {
+      const depsResult = await supabase
+        .from("tasks")
+        .select("id,title,status,linked_project_id")
+        .in("id", dependencyIds)
+        .is("deleted_at", null);
+      if (depsResult.error) {
+        missingDependencyCount = dependencyIds.length;
+      } else {
+        const rows = (depsResult.data || []) as Array<{
+          id: string;
+          title: string;
+          status: string;
+          linked_project_id?: string | null;
+        }>;
+        const byId = new Map(rows.map((r) => [r.id, r]));
+        dependencyItems = dependencyIds
+          .map((depId) => byId.get(depId))
+          .filter((row): row is NonNullable<typeof row> => Boolean(row))
+          .map((row) => ({
+            id: row.id,
+            title: row.title,
+            status: row.status,
+            completed: row.status === "completed",
+            projectId: row.linked_project_id || undefined,
+          }));
+        missingDependencyCount = Math.max(
+          0,
+          dependencyIds.length - dependencyItems.length,
+        );
+      }
+    }
+    return { task, projectStatus, dependencyItems, missingDependencyCount };
   };
   const facts = useFacts(
     "task:" + [profile?.id, id, projectId].join(":"),
@@ -130,9 +197,13 @@ export function TaskDetailsScreen({
       !facts.error,
   );
   const overview = view === "details";
+  const palette = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const resolveStatus = useWorkStatus();
   const [execution, setExecution] = useState<"progress" | "submit">();
-  const [taskActions, setTaskActions] = useState(false);
+  const [proposal, setProposal] = useState<"progress" | "completion">();
   const [editingTask, setEditingTask] = useState(false);
+  const [creatingSubtask, setCreatingSubtask] = useState(false);
   const loadedTask = facts.data?.task;
   const taskScope = {
     actor: profile?.id || "",
@@ -143,8 +214,14 @@ export function TaskDetailsScreen({
   };
   const editAccess = useTaskStructure(
     taskScope,
-    overview && !!taskScope.project && !!taskScope.office && !!taskScope.actor && (profile?.role === "head" || taskScope.canDelegateEdit) &&
-      !facts.error && ["active", "on_hold"].includes(facts.data?.projectStatus ?? "") && !loadedTask?.archivedAt &&
+    overview &&
+      !!taskScope.project &&
+      !!taskScope.office &&
+      !!taskScope.actor &&
+      (profile?.role === "head" || taskScope.canDelegateEdit) &&
+      !facts.error &&
+      ["active", "on_hold"].includes(facts.data?.projectStatus ?? "") &&
+      !loadedTask?.archivedAt &&
       !["completed", "cancelled"].includes(loadedTask?.status || ""),
   );
   const [staff, setStaff] = useState(false);
@@ -168,11 +245,19 @@ export function TaskDetailsScreen({
       </Screen>
     );
   const { task, projectStatus } = facts.data;
-  const canEditTask = !facts.loading && !editAccess.loading && !editAccess.error && !!editAccess.data;
+  const today = (tree.data && workScheduleToday(tree.data)) ?? getPhilippineCalendarDate();
+  const canStartToday = task.startDate?.slice(0, 10) === today;
+  const isProjectOnHold = projectStatus === "on_hold";
+  const canEditTask =
+    !facts.loading &&
+    !editAccess.loading &&
+    !editAccess.error &&
+    !!editAccess.data;
   const readOnly =
       ["completed", "archived", "unavailable"].includes(projectStatus) ||
       !!task.archivedAt,
-    executionBlocked = readOnly || !!task.proposedOfficeIdentityId,
+    executionBlocked =
+      readOnly || isProjectOnHold || !!task.proposedOfficeIdentityId,
     head =
       isAppointedOfficeHead(profile, organization ? [organization] : []) &&
       profile?.org_id === task.orgId,
@@ -218,32 +303,40 @@ export function TaskDetailsScreen({
       ["completed", "archived", "unavailable"].includes(latest.projectStatus)
     )
       throw new Error("This task is no longer editable in the current scope.");
-    return { latest: latest.task, actorId: profile.id };
+    return {
+      latest: latest.task,
+      actorId: profile.id,
+      projectStatus: latest.projectStatus,
+    };
   };
   const verifyExecution = async (mode: "start" | "progress" | "submit") => {
-    const { latest, actorId } = await verifyCurrentTask();
+    const {
+      latest,
+      actorId,
+      projectStatus: currentProjectStatus,
+    } = await verifyCurrentTask();
     const status = latest.status;
-    const allowed = !latest.proposedOfficeIdentityId &&
+    if (currentProjectStatus === "on_hold")
+      throw new PublicMessageError("This project is on hold. Work can continue once it resumes.");
+    if (mode !== "start" && ["todo", "pending_assignment", "changes_requested"].includes(status))
+      throw new PublicMessageError(
+        status === "changes_requested"
+          ? "The Task Lead must resume work before posting progress or submitting completion."
+          : "The Task Lead must start work before posting progress or submitting completion.",
+      );
+    const allowed =
+      !latest.proposedOfficeIdentityId &&
       (mode === "progress"
         ? canPostTaskUpdate(latest, actorId)
         : latest.assigneeId === actorId &&
           (mode === "submit"
-            ? ["todo", "in_progress", "changes_requested"].includes(status)
+            ? status === "in_progress"
             : ["todo", "changes_requested"].includes(status)));
     if (!allowed)
       throw new Error(
         "Current task status or responsibility no longer allows this action.",
       );
   };
-  const leadershipActions = [
-    ...(mayStaff ? [{ id: "people", title: "Choose people" }] : []),
-    ...(head &&
-    !readOnly &&
-    !facts.loading &&
-    !["completed", "cancelled"].includes(task.status)
-      ? [{ id: "planning", title: "Planning on eFlow Web" }]
-      : []),
-  ];
   const savedTree = async (_receipt: WorkTreeSnapshot) => {
     await refresh();
   };
@@ -310,174 +403,415 @@ export function TaskDetailsScreen({
         )}
       </Screen>
     );
-  return (
-    <Screen
-      compact
-      title={task.title}
-      description={overview ? task.projectTitle || task.department : undefined}
-      onRefresh={() => refresh()}
+  const isRootOverview = overview && !nodeId;
 
-      actions={
-        overview &&
-        !!leadershipActions.length && (
-          <Button variant="outline" onPress={() => setTaskActions(true)}>
-            Task actions
-          </Button>
-        )
+  const { children } = tree.data
+    ? branchRows(tree.data, undefined)
+    : { children: [] };
+  const subtaskItems: SubtaskItemData[] = children.map((child) => {
+    const record = tree.data?.nodes.find((item) => item.id === child.id);
+    const effectiveStatus = record ? record.status : "todo";
+    const subtaskComp =
+      record && tree.data
+        ? branchCompletion(tree.data, record.status, record.id)
+        : { percent: 0 };
+    const memberIds = [
+      ...new Set([
+        ...(record?.lead_id ? [record.lead_id] : []),
+        ...(record?.assigned_to_ids || []),
+      ]),
+    ];
+    const members = memberIds
+      .map((mId) => tree.data?.people.find((p) => p.id === mId))
+      .filter((p): p is WorkPerson => !!p);
+
+    return {
+      id: child.id,
+      title: child.title,
+      status: effectiveStatus,
+      customStatusId: record?.custom_status_id,
+      percent: isProjectOnHold ? undefined : subtaskComp.percent,
+      members,
+    };
+  });
+
+  const canCreateSubtask =
+    !readOnly &&
+    !tree.loading &&
+    !facts.loading &&
+    !!tree.data &&
+    !!context &&
+    selectRootWorkCapability(tree.data, "create_child", context).allowed;
+
+  const contributorList: { id?: string; name: string; office?: string }[] = [];
+  const seenContributorNames = new Set<string>();
+
+  if (tree.data) {
+    tree.data.root.people
+      .filter((mId) => mId !== task.assigneeId)
+      .forEach((mId) => {
+        const p = tree.data!.people.find((person) => person.id === mId);
+        if (p && !seenContributorNames.has(p.name)) {
+          contributorList.push(p);
+          seenContributorNames.add(p.name);
+        }
+      });
+  }
+  (task.teamMemberNames || [])
+    .filter((name) => name !== task.assigneeName)
+    .forEach((name) => {
+      if (!seenContributorNames.has(name)) {
+        contributorList.push({ id: name, name });
+        seenContributorNames.add(name);
       }
-    >
-      {overview && (
-        <Row>
-          <Status value={task.status} work customId={task.customStatusId} />
-          <Status value={task.priority || "normal"} />
-          <DeadlineBadge
-            value={task.deadline || task.dueDate}
-            status={task.status}
-          />
-        </Row>
-      )}
-      {overview && profile?.id && (lead || task.teamMemberIds?.includes(profile.id)) && !facts.loading && !readOnly &&
-          task.linkedProjectId && projectStatus === "active" && task.status === "in_progress" && !tree.data?.root.blocker && (
-            <CustomWorkStatusControl actor={profile.id} taskId={id} customId={task.customStatusId} />
-          )}
-      {overview && (
+    });
+
+  const completionText = completion?.total
+    ? `${completion.completed} of ${completion.total} ${completion.total === 1 ? "subtask" : "subtasks"} completed`
+    : task.status === "completed"
+      ? "Task completed"
+      : `${completion?.percent ?? 0}% completed`;
+
+  return (
+    <Screen compact onRefresh={() => refresh()}>
+      {isRootOverview ? (
         <>
-          <LabelValue
-            label="Start date"
-            value={
-              task.startDate ? dateLabel(task.startDate + "T12:00:00") : "—"
-            }
-          />
-          <LabelValue
-            label="Progress"
-            value={
-              completion
-                ? completion.total
-                  ? `${completion.completed}/${completion.total} complete · ${completion.percent}%`
-                  : `${completion.percent}%`
-                : tree.loading
-                  ? "Loading…"
-                  : "Unavailable"
-            }
-          />
-        </>
-      )}
-      {readOnly && <Notice>This work is read-only.</Notice>}
-      {overview && canEditTask && (
-        <Button variant="outline" onPress={() => setEditingTask(true)}>Edit task</Button>
-      )}
-      {editingTask && (
-        <ProjectTaskEditor scope={taskScope} groups={[]} onClose={() => setEditingTask(false)} onSaved={refresh} />
-      )}
-      {!!(view === "details") && (
-        <>
-          <Row>
-            {!!(
-              !executionBlocked &&
-              lead &&
-              !facts.loading &&
-              ["todo", "changes_requested"].includes(task.status)
-            ) && (
-              <Button
-                busy={action.busy}
-                onPress={() =>
-                  void action.run(async () => {
-                    await verifyExecution("start");
-                    await updateTaskStatus(id, "in_progress");
-                    await refresh();
-                  })
-                }
+          {/* 1. Task header */}
+          <View style={{ gap: 4, marginBottom: 4 }}>
+            <View
+              style={{
+                flexDirection: fontScale > 1.8 ? "column" : "row",
+                alignItems: fontScale > 1.8 ? "flex-start" : "flex-start",
+                justifyContent: "space-between",
+                gap: 10,
+              }}
+            >
+              <Text
+                accessibilityRole="header"
+                style={{
+                  flex: fontScale > 1.8 ? undefined : 1,
+                  fontSize: 26,
+                  fontWeight: "700",
+                  color: palette.text,
+                  lineHeight: 32,
+                }}
               >
-                {task.status === "todo" ? "Start work" : "Resume work"}
-              </Button>
-            )}
-            {!!(!executionBlocked && !facts.loading && profile?.id && canPostTaskUpdate(task, profile.id)) && (
-              <Button
-                variant="outline"
-                onPress={() => setExecution("progress")}
+                {task.title}
+              </Text>
+              {canEditTask && (
+                <BentoEditButton
+                  accessibilityLabel="Edit task"
+                  onPress={() => setEditingTask(true)}
+                />
+              )}
+            </View>
+            {!!(task.projectTitle || task.department) && (
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: palette.mutedLabel,
+                  lineHeight: 20,
+                }}
               >
-                Update progress
-              </Button>
+                {task.projectTitle || task.department}
+              </Text>
             )}
-            {!!(
-              !executionBlocked &&
-              lead &&
-              ["todo", "in_progress", "changes_requested"].includes(task.status)
-            ) && (
-              <Button
-                variant={task.status === "in_progress" ? "primary" : "outline"}
-                disabled={facts.loading || evidence.loading || !!evidence.error}
-                onPress={() => setExecution("submit")}
-              >
-                Mark as complete
-              </Button>
+
+            {/* Work action buttons immediately below project context */}
+            {isProjectOnHold ? (
+              <BentoProjectOnHoldCard
+                projectId={task.linkedProjectId || tree.data?.root.project}
+                style={{ marginTop: 8, marginBottom: 8 }}
+              />
+            ) : (
+              <BentoActionButtons
+                actions={[
+                  !executionBlocked &&
+                  lead &&
+                  !facts.loading &&
+                  ["todo", "changes_requested"].includes(task.status)
+                  && (task.status === "changes_requested" || canStartToday)
+                    ? {
+                        label:
+                          task.status === "todo" ? "Start work" : "Resume work",
+                        variant: "secondary",
+                        icon: "pencil",
+                        busy: action.busy,
+                        onPress: () =>
+                          void action.run(async () => {
+                            await verifyExecution("start");
+                            await updateTaskStatus(id, "in_progress");
+                            await refresh();
+                          }),
+                      }
+                    : null,
+                  !executionBlocked &&
+                  !facts.loading &&
+                  profile?.id &&
+                  canPostTaskUpdate(task, profile.id)
+                    ? {
+                        label: "Update progress",
+                        variant: "secondary",
+                        icon: "pencil",
+                        onPress: () => lead ? setExecution("progress") : setProposal("progress"),
+                      }
+                    : null,
+                  !executionBlocked &&
+                  participant &&
+                  task.status === "in_progress"
+                    ? {
+                        label: lead ? "Mark as complete" : "Submit for review",
+                        variant: "primary",
+                        icon: "check",
+                        disabled:
+                          facts.loading || evidence.loading || !!evidence.error,
+                        onPress: () => lead ? setExecution("submit") : setProposal("completion"),
+                      }
+                    : null,
+                ]}
+                style={{ marginTop: 8, marginBottom: 8 }}
+              />
             )}
-          </Row>
-        </>
-      )}
-      {(overview || view === "subitems") &&
-        (tree.error ? (
-          <ErrorState error={tree.error} retry={() => void tree.refresh()} />
-        ) : tree.data ? (
-          <WorkTreePanel
-            data={tree.data}
-            navigate={navigate}
-            onSaved={savedTree}
-            readOnly={readOnly || tree.loading || facts.loading}
-            focusNodeId={nodeId}
-            funding={branch ? funding : undefined}
-          />
-        ) : (
-          <Loading label="Loading subtasks" layout="tree" />
-        ))}
-      {overview && (
-        <Card title="Details and records">
-          {!!task.description && <Text selectable>{task.description}</Text>}
-          <LabelValue
-            label="Lead"
-            value={task.assigneeName || "Needs assignment"}
-          />
-          <LabelValue
-            label="Contributors"
-            value={
-              (task.teamMemberNames || [])
-                .filter((name) => name !== task.assigneeName)
-                .join(", ") || "None"
-            }
-          />
-          {!!task.definitionOfDone && (
-            <LabelValue
-              label="Definition of done"
-              value={task.definitionOfDone}
+
+            {/* Editorial Status / Priority metadata strip */}
+            <EditorialMetadataStrip
+              variant="card"
+              items={[
+                {
+                  label: "Status",
+                  value: resolveStatus(task.status, task.customStatusId).label,
+                  accent: resolveStatus(task.status, task.customStatusId).color,
+                  status: task.status,
+                },
+                {
+                  label: "Priority",
+                  value: priorityLabel(task.priority),
+                  accent:
+                    task.priority === "high" ? palette.danger : palette.text,
+                },
+              ]}
+              style={{ marginTop: 2, marginBottom: 10 }}
             />
-          )}
-          {task.acceptanceCriteria?.map((criterion, index) => (
-            <Text key={index}>• {criterion}</Text>
-          ))}
-          {!!task.feedback && <Notice>{task.feedback}</Notice>}
-          {[
-            { view: "activity", title: "Activity" },
-            { view: "review", title: "Evidence & review" },
-            { view: "budget", title: "Funding" },
-            ...(task.linkedProjectId
-              ? [{ view: "files", title: "Files" }]
-              : []),
-          ].map((item) => (
-            <NavigationRow
-              key={item.view}
-              title={item.title}
-              onPress={() =>
-                navigate({
-                  name: "task",
-                  id,
-                  projectId: task.linkedProjectId,
-                  view: item.view,
-                  title: item.title,
-                })
+          </View>
+
+          {/* 2. Task completion */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginVertical: 12,
+            }}
+          >
+            <View style={{ gap: 4, flex: 1, paddingRight: 12 }}>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "700",
+                  color: palette.text,
+                }}
+              >
+                Task completion
+              </Text>
+              <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
+                {completionText}
+              </Text>
+            </View>
+            <CircularProgressRing percent={completion?.percent ?? 0} />
+          </View>
+
+          {/* 3. Schedule bento cards */}
+          <BentoScheduleCards
+            startDate={task.startDate}
+            dueDate={task.deadline || task.dueDate}
+          />
+
+          {/* Conditional Dependencies card */}
+          <BentoDependenciesCard
+            items={facts.data.dependencyItems}
+            missingCount={facts.data.missingDependencyCount}
+            onPressItem={(dep) =>
+              navigate({
+                name: "task",
+                id: dep.id,
+                projectId: dep.projectId || projectId || task.linkedProjectId,
+                title: dep.title,
+              })
+            }
+          />
+
+          {/* Conditional Blocker card */}
+          {!!(
+            (task as unknown as { blocker?: string }).blocker ||
+            tree.data?.root.blocker ||
+            (task.status === "changes_requested" &&
+              (task.feedback || task.rejectionNote))
+          ) && (
+            <BentoBlockerCard
+              blocker={
+                (task as unknown as { blocker?: string }).blocker ||
+                tree.data?.root.blocker ||
+                task.feedback ||
+                task.rejectionNote
               }
             />
-          ))}
-        </Card>
+          )}
+
+          {/* 4. Assigned team bento card */}
+          <BentoAssignedTeamCard
+            leadName={task.assigneeName}
+            leadRoleLabel="Task Lead"
+            contributors={contributorList}
+            onChoosePeople={mayStaff ? () => setStaff(true) : undefined}
+          />
+
+          {/* 5. Subtasks bento card */}
+          <BentoSubtasksCard
+            subtasks={subtaskItems}
+            canAdd={canCreateSubtask}
+            onAddSubtask={() => setCreatingSubtask(true)}
+            onPressSubtask={(item) =>
+              navigate(workNodeRoute(tree.data!, item.id, item.title))
+            }
+          />
+
+          {/* 6. Supporting features 2x2 bento grid */}
+          <BentoSupportingGrid
+            onPressActivity={() =>
+              navigate({
+                name: "task",
+                id,
+                projectId: task.linkedProjectId,
+                view: "activity",
+                title: "Activity",
+              })
+            }
+            onPressReview={() =>
+              navigate({
+                name: "task",
+                id,
+                projectId: task.linkedProjectId,
+                view: "review",
+                title: "Evidence & review",
+              })
+            }
+            onPressFunding={() =>
+              navigate({
+                name: "task",
+                id,
+                projectId: task.linkedProjectId,
+                view: "budget",
+                title: "Funding",
+              })
+            }
+            onPressFiles={() =>
+              navigate({
+                name: "task",
+                id,
+                projectId: task.linkedProjectId,
+                view: "files",
+                title: "Files",
+              })
+            }
+          />
+
+          {profile?.id &&
+            !executionBlocked &&
+            !facts.loading &&
+            (lead || task.teamMemberIds?.includes(profile.id)) &&
+            task.linkedProjectId &&
+            projectStatus === "active" &&
+            task.status === "in_progress" &&
+            !tree.data?.root.blocker && (
+              <CustomWorkStatusControl
+                actor={profile.id}
+                taskId={id}
+                customId={task.customStatusId}
+              />
+            )}
+
+          {readOnly && <Notice>This work is read-only.</Notice>}
+          {!!task.feedback && <Notice>{task.feedback}</Notice>}
+
+          {editingTask && (
+            <ProjectTaskEditor
+              scope={taskScope}
+              groups={[]}
+              onClose={() => setEditingTask(false)}
+              onSaved={refresh}
+            />
+          )}
+
+          {!!task.description && (
+            <View
+              style={{
+                backgroundColor: palette.surface,
+                borderWidth: 1,
+                borderColor: palette.border,
+                borderRadius: 14,
+                padding: 14,
+                marginTop: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: palette.mutedLabel,
+                  marginBottom: 4,
+                  fontWeight: "600",
+                }}
+              >
+                Description
+              </Text>
+              <Text
+                selectable
+                style={{ color: palette.text, fontSize: 14, lineHeight: 20 }}
+              >
+                {task.description}
+              </Text>
+            </View>
+          )}
+
+          {(!!task.definitionOfDone || !!task.acceptanceCriteria?.length) && (
+            <Card title="Definition of done">
+              {!!task.definitionOfDone && (
+                <Text selectable>{task.definitionOfDone}</Text>
+              )}
+              {task.acceptanceCriteria?.map((criterion, index) => (
+                <Text key={index}>• {criterion}</Text>
+              ))}
+            </Card>
+          )}
+        </>
+      ) : (
+        /* When inspecting a subtask (nodeId) or view === "subitems" */
+        <>
+          {(overview || view === "subitems") &&
+            (tree.error ? (
+              <ErrorState
+                error={tree.error}
+                retry={() => void tree.refresh()}
+              />
+            ) : tree.data ? (
+              <WorkTreePanel
+                data={tree.data}
+                navigate={navigate}
+                onSaved={savedTree}
+                readOnly={readOnly || tree.loading || facts.loading}
+                projectStatus={projectStatus}
+                projectOnHold={isProjectOnHold}
+                focusNodeId={nodeId}
+                funding={branch ? funding : undefined}
+                parentTitle={task.title}
+                rootPriority={task.priority}
+                taskDescription={task.description}
+                taskDefinitionOfDone={task.definitionOfDone}
+                taskAcceptanceCriteria={task.acceptanceCriteria}
+              />
+            ) : (
+              <Loading label="Loading subtasks" layout="tree" />
+            ))}
+        </>
       )}
       {!!(view === "activity") && (
         <>
@@ -567,6 +901,13 @@ export function TaskDetailsScreen({
           }}
         />
       )}
+      {overview && lead && !executionBlocked && task.status === "in_progress" && profile && (
+        <WorkProposalReview actor={profile.id} root={id} onSaved={refresh} />
+      )}
+      {proposal && profile && (
+        <WorkProposalSheet actor={profile.id} root={id} kind={proposal}
+          onClose={() => setProposal(undefined)} onSaved={refresh} />
+      )}
       {execution === "progress" && (
         <TaskExecutionSheet
           taskId={id}
@@ -575,24 +916,15 @@ export function TaskDetailsScreen({
           onSaved={refresh}
         />
       )}
-      <SelectionSheet
-        open={taskActions && !!leadershipActions.length}
-        title="Task actions"
-        options={leadershipActions}
-        onClose={() => setTaskActions(false)}
-        onSelect={(choice) => {
-          setTaskActions(false);
-          if (choice === "people") setStaff(true);
-          if (choice === "planning")
-            navigate({
-              name: "task",
-              id,
-              projectId: task.linkedProjectId,
-              title: task.title,
-              view: "planning",
-            });
-        }}
-      />
+      {!!(creatingSubtask && tree.data) && (
+        <WorkEditorSheet
+          data={tree.data}
+          edit={{ command: "create" }}
+          readOnly={readOnly || tree.loading || !!tree.error || facts.loading}
+          onClose={() => setCreatingSubtask(false)}
+          onSaved={savedTree}
+        />
+      )}
       {!!(staff && tree.data) && (
         <WorkEditorSheet
           data={tree.data}

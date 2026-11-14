@@ -254,8 +254,9 @@ export function ProjectFundingCloseout({
       {!!action.notice && <Notice>{action.notice}</Notice>}
       {!!selected && (
         <Sheet
+          actionError={action.error}
           open
-          title={pending ? "Check funding return" : "Confirm funding return"}
+          title="Confirm funding return"
           busy={action.busy}
           onClose={() => {
             if (!pending && !action.busy) setSelection(undefined);
@@ -268,7 +269,7 @@ export function ProjectFundingCloseout({
               }
               onPress={() => void save()}
             >
-              {pending ? "Retry saved return" : "Confirm return"}
+              Confirm return
             </Button>
           }
         >
@@ -286,9 +287,6 @@ export function ProjectFundingCloseout({
             maxLength={3000}
             multiline
           />
-          {!!action.error && (
-            <ErrorState context="action" error={action.error} />
-          )}
         </Sheet>
       )}
     </Card>

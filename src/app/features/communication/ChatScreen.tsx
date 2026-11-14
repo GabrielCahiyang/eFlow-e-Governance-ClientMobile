@@ -666,14 +666,6 @@ export function ChatScreen({
           busy={action.busy}
           sendDisabled={sendDisabled}
           onSend={() => void send()}
-          notice={
-            original ? (
-              <Notice>
-                A pending message is retained. Send again to retry the same
-                message identity.
-              </Notice>
-            ) : undefined
-          }
           error={
             <>
               {!!recovery.error && <ErrorState error={recovery.error} />}

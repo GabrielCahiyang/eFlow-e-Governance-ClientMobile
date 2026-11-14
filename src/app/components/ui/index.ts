@@ -8,3 +8,4 @@ export * from "./Tabs";
 export * from "./DataTable";
 export * from "./MondayTable";
 export * from "./GlassCard";
+export * from "./EditorialMetadata";

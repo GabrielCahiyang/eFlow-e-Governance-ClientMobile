@@ -5,7 +5,6 @@ import {
   Button,
   Choice,
   DateField,
-  ErrorState,
   Field,
   Sheet,
 } from "../../components/ui";
@@ -82,8 +81,14 @@ export function ProjectTaskEditor({
   const [task] = useState(scope.task);
   const [title, setTitle] = useState(task?.title ?? "");
   const [timeline, setTimeline] = useState(() =>
-    task ? timelineDraft(task) : undefined,
+    task ? timelineDraft(task) : { start: "", end: "", time: "" },
   );
+  const projectDates = useFacts("task-project-dates:" + scope.project,
+    () => fetchProject(scope.project), !task);
+  const projectStart = projectDates.data?.startDate?.slice(0, 10);
+  const projectDue = projectDates.data?.targetDate?.slice(0, 10);
+  const start = timeline.start || (!task ? projectStart : undefined) || "";
+  const due = timeline.end || (!task ? projectDue : undefined) || "";
   const [group, setGroup] = useState(
     (groups.find((item) => item.isDefault) || groups[0])?.id ?? "",
   );
@@ -108,6 +113,9 @@ export function ProjectTaskEditor({
           "Current project access does not allow this change.",
         );
       await requireProjectSetup(scope.project);
+      if (!task && (!project.startDate || !project.targetDate || !start || !due ||
+        start < project.startDate.slice(0, 10) || due > project.targetDate.slice(0, 10) || due < start))
+        throw new PublicMessageError("Choose task dates within the project schedule.");
       if (
         !task &&
         !(await fetchProjectGroups(scope.project)).some(
@@ -164,10 +172,12 @@ export function ProjectTaskEditor({
             p_task_id: task.id,
             p_patch: { title: name, ...schedule },
           })
-        : await supabase.rpc("phase3_create_task", {
-            p_project_id: scope.project,
-            p_group_id: group,
+        : await supabase.rpc("m7_create_scheduled_task", {
+            p_project: scope.project,
+            p_group: group,
             p_title: name,
+            p_start: start,
+            p_due: due,
           });
       if (result.error) {
         const code = result.error.code || "";
@@ -201,6 +211,7 @@ export function ProjectTaskEditor({
     });
   return (
     <Sheet
+      actionError={action.error ?? projectDates.error}
       open
       title={task ? "Edit task" : "Add task"}
       onClose={onClose}
@@ -217,17 +228,21 @@ export function ProjectTaskEditor({
         <>
           <DateField
             label="Start date"
-            value={timeline.start}
+            value={start}
+            min={!task ? projectStart : undefined}
+            max={!task ? due || projectDue : undefined}
             onChange={(start) => setTimeline({ ...timeline, start })}
-            disabled={action.busy || unconfirmed}
+            disabled={action.busy || unconfirmed || (!task && (!projectStart || !projectDue))}
           />
           <DateField
             label="Due date"
-            value={timeline.end}
+            value={due}
+            min={!task ? start || projectStart : undefined}
+            max={!task ? projectDue : undefined}
             onChange={(end) =>
               setTimeline({ ...timeline, end, time: end ? timeline.time : "" })
             }
-            disabled={action.busy || unconfirmed}
+            disabled={action.busy || unconfirmed || (!task && (!projectStart || !projectDue))}
           />
           <Field
             label="Due time (24-hour HH:mm)"
@@ -249,13 +264,12 @@ export function ProjectTaskEditor({
           disabled={action.busy || unconfirmed}
         />
       )}
-      {!!action.error && <ErrorState error={action.error} context="action" />}
       <Button
         busy={action.busy}
         disabled={unconfirmed || !title.trim() || (!task && !group)}
         onPress={save}
       >
-        {task ? "Save changes" : "Add task"}
+        {task ? "Save task" : "Add task"}
       </Button>
     </Sheet>
   );

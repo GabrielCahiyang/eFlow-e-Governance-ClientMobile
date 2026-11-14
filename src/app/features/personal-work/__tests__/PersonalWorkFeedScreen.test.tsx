@@ -1,5 +1,5 @@
 import { expect, jest, test } from "@jest/globals";
-import { act, render, fireEvent } from "@testing-library/react-native";
+import { act, render, fireEvent, within } from "@testing-library/react-native";
 import { PersonalWorkFeedScreen } from "../PersonalWorkFeedScreen";
 import type { SectionListProps } from "react-native";
 import type { WorkRow } from "../../../../core/web/app/features/personal-work/types";
@@ -173,16 +173,18 @@ test("Today uses the due date and My Work keeps assignments in the selected work
   try {
     const view = await render(<PersonalWorkFeedScreen navigate={jest.fn()} />);
     expect(view.queryByText("Other workspace")).toBeNull();
+    expect(view.getByText("All work")).toBeOnTheScreen();
     await fireEvent.press(
       view.getByRole("button", { name: "Filter assignments: All work" }),
     );
     expect(view.queryByText("All workspaces")).toBeNull();
     expect(view.queryByText("Other history")).toBeNull();
     await fireEvent.press(view.getByRole("radio", { name: "Today" }));
-    expect(
-      view.getByRole("button", { name: "Filter assignments: Today" }).props
-        .accessibilityState.selected,
-    ).toBe(true);
+    const todayFilterButton = view.getByRole("button", {
+      name: "Filter assignments: Today",
+    });
+    expect(todayFilterButton.props.accessibilityState.selected).toBe(true);
+    expect(within(todayFilterButton).getByText("Today")).toBeOnTheScreen();
     expect(
       view.getByRole("button", {
         name: /Inspect today, Starts 5 Oct 2026, Due/,

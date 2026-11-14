@@ -23,9 +23,17 @@ export function useAction({ requireAccess = true } = {}) {
       onDone?.();
       return true;
     } catch (e) {
-      setError(
-        e instanceof Error ? e : new Error("The operation did not finish."),
-      );
+      if (e instanceof Error) setError(e);
+      else {
+        const failure = e as { message?: unknown; code?: unknown; status?: unknown } | null;
+        setError(Object.assign(
+          new Error(typeof failure?.message === "string" ? failure.message : "The operation did not finish."),
+          {
+            code: typeof failure?.code === "string" ? failure.code : undefined,
+            status: typeof failure?.status === "number" ? failure.status : undefined,
+          },
+        ));
+      }
       return false;
     } finally {
       pending.current = false;

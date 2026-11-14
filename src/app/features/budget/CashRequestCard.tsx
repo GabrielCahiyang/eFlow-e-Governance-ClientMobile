@@ -1,11 +1,13 @@
 import { Text } from "../../components/ui/Typography";
 import { recordedPeso } from "../../components/ui/theme";
+import { statusLabel } from "../../shared/statusLabels";
 import { useState } from "react";
 import { Linking } from "react-native";
 import {
   Button,
   Card,
   Choice,
+  EditorialMetadataStrip,
   ErrorState,
   Field,
   LabelValue,
@@ -193,16 +195,26 @@ export function CashRequestCard({
     }, "Financial action recorded.");
   return (
     <Card title={cashRequestReference(request.requestNumber)}>
-      <Status value={request.status} domain="finance" />
+      <EditorialMetadataStrip
+        variant="card"
+        items={[
+          {
+            label: "Status",
+            value: statusLabel(request.status, "finance"),
+            status: request.status,
+            domain: "finance",
+          },
+          {
+            label: amount.label,
+            value: recordedPeso(amount.value),
+          },
+        ]}
+        style={{ marginBottom: 8 }}
+      />
       <Text style={{ color: colors.text, lineHeight: 21 }}>
         {request.purpose}
       </Text>
       <LabelValue label="Work" value={request.taskTitle || "Authorized work"} />
-      <LabelValue
-        stacked
-        label={amount.label}
-        value={recordedPeso(amount.value)}
-      />
       <LabelValue label="Needed by" value={dateLabel(request.neededBy)} />
       <Row>
         {!!(!readOnly && canCorrect && onCorrect) && (
@@ -230,12 +242,26 @@ export function CashRequestCard({
       </Row>
       {releases.map((release) => (
         <Card key={release.id} title={release.voucherNumber || "Cash release"}>
+          <EditorialMetadataStrip
+            variant="card"
+            items={[
+              {
+                label: "Status",
+                value: statusLabel(release.status, "finance"),
+                status: release.status,
+                domain: "finance",
+              },
+              {
+                label: "Amount",
+                value: peso(release.amount),
+              },
+            ]}
+            style={{ marginBottom: 6 }}
+          />
           <LabelValue
             label="Scheduled"
             value={dateLabel(release.scheduledDate)}
           />
-          <LabelValue label="Amount" value={peso(release.amount)} />
-          <Status value={release.status} />
           <Row>
             {!!(
               !readOnly &&
@@ -348,11 +374,21 @@ export function CashRequestCard({
             key={liquidation.id}
             title={`Receipt package · version ${liquidation.version}`}
           >
-            <Status value={liquidation.status} />
-            <LabelValue
-              stacked
-              label="Declared spending"
-              value={peso(liquidation.declaredSpent)}
+            <EditorialMetadataStrip
+              variant="card"
+              items={[
+                {
+                  label: "Status",
+                  value: statusLabel(liquidation.status, "finance"),
+                  status: liquidation.status,
+                  domain: "finance",
+                },
+                {
+                  label: "Declared",
+                  value: peso(liquidation.declaredSpent),
+                },
+              ]}
+              style={{ marginBottom: 6 }}
             />
             <LabelValue
               stacked
@@ -415,6 +451,7 @@ export function CashRequestCard({
         />
       )}
       <Sheet
+        actionError={action.error}
         open={!!operation}
         title={
           operation === "cancel"
@@ -479,7 +516,6 @@ export function CashRequestCard({
             multiline
           />
         )}
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     </Card>
   );

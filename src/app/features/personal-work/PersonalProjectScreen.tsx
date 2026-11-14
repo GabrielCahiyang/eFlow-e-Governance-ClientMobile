@@ -226,12 +226,8 @@ export function PersonalProjectScreen({
           )}
           {!!action.pending && (
             <Card title="Saved request needs verification">
-              <Text>
-                A previous attempt still needs to be checked. Retry original
-                request checks that attempt before you make another change.
-              </Text>
               <Button busy={action.busy} onPress={() => void action.retry()}>
-                Retry original request
+                Check previous changes
               </Button>
               {!!action.canDiscard && (
                 <Button variant="outline" onPress={() => void action.discard()}>
@@ -308,9 +304,21 @@ export function PersonalProjectScreen({
                   {!!task.review_note && <Notice>{task.review_note}</Notice>}
                   {!!(active && eligible) && (
                     <Row>
+                      {task.lead_id === profile?.id && task.status === "todo" && (
+                        <Button
+                          variant="outline"
+                          disabled={blocked}
+                          onPress={() => void action.run("start_task", {
+                            task_id: task.id,
+                            revision: task.revision,
+                          })}
+                        >
+                          Start work
+                        </Button>
+                      )}
                       {!!(
                         task.lead_id === profile?.id &&
-                        ["todo", "in_progress"].includes(task.status)
+                        task.status === "in_progress"
                       ) && (
                         <>
                           <Button

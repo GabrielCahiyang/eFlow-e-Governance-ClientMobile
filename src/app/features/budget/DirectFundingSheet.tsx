@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Choice,
-  ErrorState,
   Field,
   LabelValue,
   Sheet,
@@ -100,6 +99,7 @@ export function DirectFundingSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Authorize task Budget"
       description={task.title}
@@ -107,9 +107,7 @@ export function DirectFundingSheet({
       busy={action.busy}
       footer={
         <Button busy={action.busy} onPress={() => void save()}>
-          {frozen.current
-            ? "Retry same authorization"
-            : "Authorize work funding"}
+          Authorize work funding
         </Button>
       }
     >
@@ -188,7 +186,6 @@ export function DirectFundingSheet({
         editable={!frozen.current && !action.busy}
       />
       <LabelValue label="Funding total" value={peso(total)} />
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

@@ -734,7 +734,6 @@ export function Composer({
   onSend,
   sendDisabled,
   busy,
-  notice,
   error,
 }: {
   value: string;
@@ -752,7 +751,6 @@ export function Composer({
   onSend: () => void;
   sendDisabled: boolean;
   busy?: boolean;
-  notice?: ReactNode;
   error?: ReactNode;
 }) {
   const palette = useTheme();
@@ -792,7 +790,6 @@ export function Composer({
         gap: 8,
       }}
     >
-      {notice}
       {error}
       {query && (
         <MentionSuggestions

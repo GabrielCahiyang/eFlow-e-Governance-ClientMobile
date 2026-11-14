@@ -130,6 +130,7 @@ export function SubtaskCompletionSheet({
   }
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Complete subtask"
       busy={action.busy}
@@ -163,17 +164,12 @@ export function SubtaskCompletionSheet({
           retry={() => void recovery.refresh()}
         />
       )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
       <Button
         busy={action.busy}
         disabled={recovery.loading || !!recovery.error}
         onPress={() => void action.run(complete, "", onClose)}
       >
-        {committed
-          ? "Refresh work list"
-          : frozen
-            ? "Retry completion"
-            : "Mark complete"}
+        {committed ? "Refresh work list" : "Mark as complete"}
       </Button>
     </Sheet>
   );

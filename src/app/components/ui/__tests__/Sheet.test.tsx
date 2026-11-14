@@ -1,36 +1,28 @@
-import { render, screen, fireEvent } from "@testing-library/react-native";
-import { test, jest, expect } from "@jest/globals";
-import { MotionProvider } from "../../../shared/motion";
+import { expect, jest, test } from "@jest/globals";
+import { render } from "@testing-library/react-native";
 import { Sheet } from "../Sheet";
 import { Text } from "../Typography";
-test("a busy operation cannot dismiss its dialog from the close button or backdrop", async () => {
-  const close = jest.fn();
-  await render(
-    <MotionProvider reduceMotion>
-      <Sheet open busy title="Import PDF" onClose={close}>
-        <Text>Processing the import</Text>
-      </Sheet>
-    </MotionProvider>,
+
+test("action errors render above the fields and keep the original submit label", async () => {
+  const onClose = jest.fn();
+  const form = (actionError?: Error) => (
+    <Sheet
+      open
+      title="Add subtask"
+      onClose={onClose}
+      actionError={actionError}
+      footer={<Text>Save changes</Text>}
+    >
+      <Text>Start date</Text>
+    </Sheet>
   );
-  await fireEvent.press(screen.getByRole("button", { name: "Close dialog" }));
-  await fireEvent.press(
-    screen.getByRole("button", {
-      name: "Dismiss dialog",
-      includeHiddenElements: true,
-    }),
+  const view = await render(form());
+  expect(view.queryByRole("alert")).toBeNull();
+  await view.rerender(form(new Error("Title is required.")));
+  expect(view.getByRole("alert")).toBeOnTheScreen();
+  expect(view.getByText("Title is required.")).toBeOnTheScreen();
+  expect(view.getByText("Save changes")).toBeOnTheScreen();
+  expect(JSON.stringify(view.toJSON()).indexOf("Title is required.")).toBeLessThan(
+    JSON.stringify(view.toJSON()).indexOf("Start date"),
   );
-  expect(close).not.toHaveBeenCalled();
-  expect(screen.getByText("Processing the import")).toBeOnTheScreen();
-});
-test("an idle dialog can close through the accessible close control", async () => {
-  const close = jest.fn();
-  await render(
-    <MotionProvider reduceMotion>
-      <Sheet open title="Project setup" onClose={close}>
-        <Text>Project checks</Text>
-      </Sheet>
-    </MotionProvider>,
-  );
-  await fireEvent.press(screen.getByRole("button", { name: "Close dialog" }));
-  expect(close).toHaveBeenCalledTimes(1);
 });

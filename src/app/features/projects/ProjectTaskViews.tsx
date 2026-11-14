@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   DataTable,
+  EditorialMetadataInline,
   LabelValue,
   Row,
   Status,
@@ -77,7 +78,9 @@ export function ProjectTaskTable({
       id: "status",
       title: "Status",
       width: 150,
-      render: (t: Task) => <Status value={t.status} work customId={t.customStatusId} />,
+      render: (t: Task) => (
+        <Status value={t.status} work customId={t.customStatusId} />
+      ),
     },
     {
       id: "timeline",
@@ -192,13 +195,27 @@ export function ProjectBoard({
                 onPress={() => navigate({ name: "task", id: t.id })}
               >
                 <Card title={t.title}>
-                  <Status value={t.status} work customId={t.customStatusId} />
-                  <Text style={s.muted}>
-                    {t.assigneeName || "Needs assignment"}
-                  </Text>
-                  <Text style={s.muted}>
-                    {dateLabel(t.deadline || t.dueDate)}
-                  </Text>
+                  <EditorialMetadataInline
+                    items={[
+                      {
+                        value: resolve(t.status, t.customStatusId).label,
+                        accent: resolve(t.status, t.customStatusId).color,
+                        status: t.status,
+                      },
+                      t.assigneeName
+                        ? {
+                            value: t.assigneeName,
+                          }
+                        : {
+                            value: "Needs assignment",
+                          },
+                      t.deadline || t.dueDate
+                        ? {
+                            value: dateLabel(t.deadline || t.dueDate),
+                          }
+                        : null,
+                    ]}
+                  />
                 </Card>
               </Pressable>
             ))}

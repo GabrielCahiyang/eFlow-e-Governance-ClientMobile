@@ -177,11 +177,7 @@ export function ProjectInvitations({ project }: { project: string }) {
               }
               onPress={() => setOpen(true)}
             >
-              {pending
-                ? "Resume saved invitation"
-                : direct
-                  ? "Invite project member"
-                  : "Request project invitation"}
+              {direct ? "Invite project member" : "Request project invitation"}
             </Button>
           )}
           {facts.data?.can_designate && (
@@ -329,6 +325,7 @@ export function ProjectInvitations({ project }: { project: string }) {
       )}
       {!!recovery.error && <ErrorState error={recovery.error} />}
       <Sheet
+        actionError={action.error}
         open={open}
         title={direct ? "Invite project member" : "Request project invitation"}
         busy={action.busy}
@@ -379,13 +376,10 @@ export function ProjectInvitations({ project }: { project: string }) {
           disabled={recovery.loading || !!recovery.error}
           onPress={() => void submit()}
         >
-          {pending
-            ? "Retry original request"
-            : direct
+          {direct
               ? "Send invitation"
               : "Submit for Head approval"}
         </Button>
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
       {!!action.error && !open && <ErrorState context="action" error={action.error} />}
     </Card>

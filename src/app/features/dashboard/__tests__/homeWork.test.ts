@@ -57,7 +57,7 @@ const row = (key: string, extra: Partial<WorkRow> = {}) =>
     ...extra,
   }) as WorkRow;
 
-test("Member priorities rank returned and local overdue work ahead of due-today work, and exclude contributors", () => {
+test("Member priorities rank returned and local overdue work ahead of due-today work, while separating waiting items", () => {
   const data = memberHome(
     [
       row("today", { due: "2026-11-25" }),
@@ -79,6 +79,62 @@ test("Member priorities rank returned and local overdue work ahead of due-today 
   ]);
   expect(data.waiting.map((item) => item.key)).toEqual(["submitted"]);
   expect([data.overdue, data.today, data.awaiting]).toEqual([1, 1, 1]);
+});
+
+test("Member Home preserves contributor visibility without granting unauthorized lead execution", () => {
+  const data = memberHome(
+    [
+      row("contrib-returned", {
+        status: "changes_requested",
+        due: "2026-11-28",
+        leading: false,
+        relation: "Contributor",
+      }),
+      row("contrib-overdue", {
+        due: "2026-11-24",
+        leading: false,
+        relation: "Contributor",
+      }),
+      row("contrib-subtask", {
+        kind: "office-node",
+        due: "2026-11-25",
+        leading: false,
+        relation: "Contributor",
+      }),
+      row("contrib-upcoming", {
+        due: "2026-11-28", // +3 days
+        leading: false,
+        relation: "Contributor",
+      }),
+    ],
+    "actor",
+    "office-workspace",
+    now,
+  );
+
+  // Top 3 priority items: returned, overdue, due-today
+  expect(data.priorities.map((item) => item.key)).toEqual([
+    "contrib-returned",
+    "contrib-overdue",
+    "contrib-subtask",
+  ]);
+
+  // Contributor items retain visibility but cannot execute lead actions
+  expect(data.priorities[0].actionable).toBe(false);
+  expect(data.priorities[0].actionLabel).toBe("Open assigned task");
+  expect(data.priorities[0].relation).toBe("Contributor");
+
+  expect(data.priorities[2].actionable).toBe(false);
+  expect(data.priorities[2].actionLabel).toBe("Open assigned subtask");
+
+  // Upcoming within 7 days appears in comingUp, deduplicated from priorities
+  expect(data.comingUp.map((item) => item.key)).toEqual(["contrib-upcoming"]);
+  expect(data.comingUp[0].daysUntil).toBe(3);
+
+  // Accurate summary indicators (returned is due 11-28 so not overdue)
+  expect(data.overdue).toBe(1);
+  expect(data.today).toBe(1);
+  expect(data.awaiting).toBe(0);
 });
 
 test("Office Home uses recorded risk and ignores records outside the Office and workspace", () => {

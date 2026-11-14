@@ -6,7 +6,6 @@ import {
 import { useRef, useState } from "react";
 import {
   Button,
-  ErrorState,
   Field,
   LabelValue,
   Notice,
@@ -216,6 +215,7 @@ export function AnnualBudgetSheet({
   };
   return (
     <Sheet
+      actionError={financial.error || validationError}
       open
       title={`FY ${year} · Annual budget`}
       description={
@@ -243,8 +243,6 @@ export function AnnualBudgetSheet({
               Save and lock budget
             </Button>
           )}
-          {!!financial.error && <ErrorState context="action" error={financial.error} />}
-          {!!validationError && <ErrorState error={validationError} />}
         </>
       }
     >

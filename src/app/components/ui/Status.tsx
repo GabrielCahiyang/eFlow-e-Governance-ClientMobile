@@ -5,7 +5,11 @@ import { type ThemeColors } from "./theme";
 import { statusLabel } from "../../shared/statusLabels";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 
-export function workStatusTone(value: string, palette: ThemeColors, color?: string) {
+export function workStatusTone(
+  value: string,
+  palette: ThemeColors,
+  color?: string,
+) {
   const tone = statusColors(value, palette);
   if (!color || !/^#[0-9a-f]{6}$/i.test(color))
     return { ...tone, accent: tone.foreground };
@@ -36,15 +40,19 @@ export function statusColors(value: string, palette: ThemeColors) {
   return { background: palette.background, foreground: palette.muted };
 }
 
+export function statusIndicatorColor(value: string, palette: ThemeColors) {
+  return statusColors(value, palette).foreground;
+}
+
 export function Status({
   value,
-  variant = "monday",
+  variant = "editorial",
   domain,
   work = false,
   customId,
 }: {
   value: string;
-  variant?: "default" | "monday";
+  variant?: "default" | "monday" | "editorial";
   domain?: "finance";
   work?: boolean;
   customId?: string | null;
@@ -99,31 +107,16 @@ export function Status({
     <View
       style={{
         alignSelf: "flex-start",
-        paddingHorizontal: 9,
-        paddingVertical: 5,
-        borderRadius: 999,
         flexDirection: "row",
         alignItems: "center",
-        gap: 6,
-        backgroundColor: tone.background,
       }}
+      accessibilityLabel={`Status: ${label}`}
     >
-      {accent !== palette.muted && (
-        <View
-          accessible={false}
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: accent,
-          }}
-        />
-      )}
       <Text
         style={{
           fontSize: 12,
           lineHeight: 16,
-          fontWeight: "500",
+          fontWeight: "600",
           color: tone.foreground,
         }}
       >

@@ -1,4 +1,3 @@
-import { Platform } from "react-native";
 import { backendConfig, configurationError } from "../../../platform/config";
 import { supabase } from "../../../platform/supabase";
 import {
@@ -10,9 +9,6 @@ const unavailable =
   "The secure sign-in service is unavailable. Please try again shortly.";
 
 export async function signInOnMobile(email: string, password: string) {
-  if (Platform.OS === "web") {
-    return signInWithAccountProtection(email, password);
-  }
   if (configurationError) throw new Error(configurationError);
   if (!backendConfig.mobileSignIn) {
     return signInWithAccountProtection(email, password);

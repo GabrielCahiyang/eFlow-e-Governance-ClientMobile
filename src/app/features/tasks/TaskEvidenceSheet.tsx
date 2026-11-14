@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, ErrorState, Field, Notice, Sheet } from "../../components/ui";
+import { Button, Field, Notice, Sheet } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { draftStore } from "../../../platform/draftStore";
@@ -69,6 +69,7 @@ export function TaskEvidenceSheet({
     });
   return (
     <Sheet
+      actionError={action.error}
       open
       title="Complete task"
       busy={action.busy}
@@ -79,11 +80,7 @@ export function TaskEvidenceSheet({
           disabled={!confirmed && !request && !note.trim()}
           onPress={confirmed ? onClose : () => void save()}
         >
-          {confirmed
-            ? "Done"
-            : request
-              ? "Check and resume submission"
-              : "Submit for review"}
+          {confirmed ? "Done" : "Submit for review"}
         </Button>
       }
     >
@@ -104,14 +101,7 @@ export function TaskEvidenceSheet({
           />
         </>
       )}
-      {!!request && !confirmed && (
-        <Notice>
-          The original note and files are retained on this device. Resume checks
-          the same submission before sending it again.
-        </Notice>
-      )}
       {!!stage && <Notice>{stage}</Notice>}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
     </Sheet>
   );
 }

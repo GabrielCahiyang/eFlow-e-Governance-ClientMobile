@@ -1,7 +1,7 @@
 import { Text } from "../../components/ui/Typography";
 import { useRef, useState } from "react";
 import Sparkles from "lucide-react-native/icons/sparkles";
-import { Button, ErrorState, Notice, colors } from "../../components/ui";
+import { Button, ErrorState, colors } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
@@ -75,7 +75,7 @@ export function AutoAssignButton({
         disabled={disabled}
         onPress={() => void assign()}
       >
-        {request.current ? "Retry AI assignment" : "AI auto assign"}
+        AI auto assign
       </Button>
       {!!stage && (
         <Text

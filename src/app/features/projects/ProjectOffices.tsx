@@ -201,6 +201,7 @@ export function ProjectOffices({
       )}
       {!!action.error && <ErrorState context="action" error={action.error} />}
       <Sheet
+        actionError={action.error}
         open={open}
         title={invite ? "Invite project Office contact" : "Add project Office"}
         onClose={() => setOpen(false)}
@@ -255,7 +256,6 @@ export function ProjectOffices({
             </Notice>
           </>
         )}
-        {!!action.error && <ErrorState context="action" error={action.error} />}
       </Sheet>
     </>
   );

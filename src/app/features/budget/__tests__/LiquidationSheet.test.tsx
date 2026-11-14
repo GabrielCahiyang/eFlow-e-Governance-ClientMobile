@@ -120,7 +120,7 @@ test("an unconfirmed receipt package keeps the original key for retry", async ()
     screen.getByRole("button", { name: "Submit receipts for review" }),
   );
   const retry = await screen.findByRole("button", {
-    name: "Retry saved receipt package",
+    name: "Submit receipts for review",
   });
   expect(onSaved).not.toHaveBeenCalled();
   await fireEvent.press(retry);
