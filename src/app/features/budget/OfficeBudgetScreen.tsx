@@ -123,7 +123,7 @@ export function OfficeBudgetScreen({
             return page;
           }),
       }));
-      if (result.error) throw new Error(result.error.message);
+      if (result.error) throw result.error;
       return (result.data || []).map((row) => ({
         id: String(row.id),
         requestNumber: Number(row.request_number),
@@ -138,7 +138,7 @@ export function OfficeBudgetScreen({
           row.actual_spent == null ? undefined : Number(row.actual_spent),
       }));
     },
-    !!fiscalBudgetId && !recordId && focused,
+    !!fiscalBudgetId && !recordId,
   );
   const summary = useFacts(
     `mobile-financial-summary:${profile?.id}:${orgId}:${year}`,
@@ -300,21 +300,6 @@ export function OfficeBudgetScreen({
               <Notice>
                 Only released budget can be committed. Scheduled releases use Philippine time.
               </Notice>
-              {profile?.role === "head" && can("navigation.projects") && (
-                <Button
-                  variant="outline"
-                  onPress={() =>
-                    navigate({
-                      name: "budget",
-                      view: "annual",
-                      financialOfficeId: orgId,
-                      fiscalYear: year,
-                    })
-                  }
-                >
-                  Open Office Budget in eFlow Web
-                </Button>
-              )}
             </>
           ) : summary.loading ? (
             <Loading label="Loading Office summary" layout="summary" />
@@ -386,9 +371,9 @@ export function OfficeBudgetScreen({
                 bundle={data}
                 focusedReleaseId={releaseId}
                 readOnly={
-                  detail.loading ||
+                  (detail.loading && !data) ||
                   !!detail.error ||
-                  !!(otherOffice && (scopes.loading || scopes.error))
+                  !!(otherOffice && ((scopes.loading && !scopes.data) || scopes.error))
                 }
                 onSaved={detail.refresh}
                 onCorrect={() =>
@@ -403,7 +388,7 @@ export function OfficeBudgetScreen({
               />
             </>
           ) : recordId ? (
-            detail.loading ? (
+            detail.loading && !data ? (
               <Loading label="Loading cash request" layout="request" />
             ) : (
               !detail.error && (

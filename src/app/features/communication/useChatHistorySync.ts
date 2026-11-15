@@ -1,7 +1,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
-import { AppState } from "react-native";
 import { supabase } from "../../../platform/supabase";
 import { authoritativeReadEpoch } from "../../shared/displayCache";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { readWithTimeout } from "../../shared/readTimeout";
 import { mergeMessages } from "./messageHistory";
@@ -81,12 +81,10 @@ export function useChatHistorySync(props: Props) {
         }
       }
     };
-    const app = AppState.addEventListener("change", (state) => {
-      if (state === "active") void recheck();
+    const sync = createLiveRefreshController({
+      onRefresh: () => void recheck(),
+      hasRealtime: true,
     });
-    const fallback = setInterval(() => {
-      if (AppState.currentState === "active") void recheck();
-    }, 30_000);
     const live = createPostgresChannel("native-chat:" + channelId)
       .on(
         "postgres_changes",
@@ -123,13 +121,10 @@ export function useChatHistorySync(props: Props) {
           void latest.current.refreshRecent();
         },
       )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") void recheck();
-      });
+      .subscribe(sync.onChannelStatus);
     return () => {
       stopped = true;
-      app.remove();
-      clearInterval(fallback);
+      sync.dispose();
       void supabase.removeChannel(live);
     };
   }, [channelId, scope, accessEpoch, setHistory]);

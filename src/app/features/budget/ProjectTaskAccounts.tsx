@@ -11,6 +11,8 @@ import {
   peso,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
 import { useAuth } from "../authentication";
 import { supabase } from "../../../platform/supabase";
@@ -79,6 +81,7 @@ export function ProjectTaskAccounts({
   const [returnAmount, setReturnAmount] = useState("");
   const [retry, setRetry] = useState(false);
   const attempt = useRef<Attempt | null>(null);
+  const { toast } = useToast();
   const action = useAction();
   const data = facts.data;
   const lines = (data?.taskFunding || []).filter(
@@ -106,12 +109,12 @@ export function ProjectTaskAccounts({
   async function save() {
     if (!attempt.current) {
       if (!editable || !reason.trim())
-        throw new Error("Enter a reason before saving.");
+        throw new PublicMessageError("Enter a reason before saving.");
       const key = crypto.randomUUID();
       if (returning) {
         const amount = amountValue(returnAmount);
         if (amount <= 0 || amount > returning.available)
-          throw new Error("Enter an amount within the unused balance.");
+          throw new PublicMessageError("Enter an amount within the unused balance.");
         attempt.current = {
           name: "release_project_task_funding",
           args: {
@@ -123,17 +126,17 @@ export function ProjectTaskAccounts({
         };
       } else {
         if (!data?.ready || (lines.length && !data.canExtendTaskFunding))
-          throw new Error("Task allocation is unavailable.");
+          throw new PublicMessageError("Task allocation is unavailable.");
         if (new Set(rows.map((r) => r.sourceId)).size !== rows.length)
-          throw new Error("Choose each account only once.");
+          throw new PublicMessageError("Choose each account only once.");
         const years = new Set<number>();
         const allocations = rows.map((r) => {
           const source = sources.find((s) => s.id === r.sourceId),
             amount = amountValue(r.amount);
           if (!source || !amount || !Number.isFinite(amount))
-            throw new Error("Choose an account and enter a positive amount.");
+            throw new PublicMessageError("Choose an account and enter a positive amount.");
           if (amount > source.available)
-            throw new Error(
+            throw new PublicMessageError(
               source.name +
                 " has only " +
                 peso(source.available) +
@@ -143,7 +146,7 @@ export function ProjectTaskAccounts({
           return { sourceId: r.sourceId, amount };
         });
         if (years.size !== 1)
-          throw new Error("Choose accounts from the same fiscal year.");
+          throw new PublicMessageError("Choose accounts from the same fiscal year.");
         attempt.current = {
           name: "allocate_project_task_funding",
           args: {
@@ -170,11 +173,16 @@ export function ProjectTaskAccounts({
       setRetry(!!attempt.current);
       throw error;
     }
+    const wasReturning = attempt.current?.name === "release_project_task_funding";
     attempt.current = null;
     setRetry(false);
     setRows([blank()]);
     setReason("");
     setReturning(undefined);
+    toast(
+      wasReturning ? "Task funding returned." : "Task budget saved.",
+      "success",
+    );
     await facts.refresh();
     await onSaved().catch(() => {});
   }

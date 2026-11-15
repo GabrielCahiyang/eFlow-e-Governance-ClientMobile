@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, ErrorState, Notice, Sheet } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import {
   previewRemoval,
   removePerson,
@@ -22,6 +23,7 @@ export function MemberRemoval({
   onSaved: () => Promise<unknown>;
   office?: string | null;
 }) {
+  const { toast } = useToast();
   const action = useAction(),
     [preview, setPreview] = useState<{
       impact: RemovalImpact;
@@ -49,7 +51,12 @@ export function MemberRemoval({
         open={!!preview}
         title={"Remove " + name}
         busy={action.busy}
-        onClose={() => setPreview(undefined)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setPreview(undefined);
+          }
+        }}
       >
         <Notice>
           Check the listed responsibilities before removing this person. Their assignments on this work may be cleared.
@@ -70,6 +77,7 @@ export function MemberRemoval({
           onPress={() =>
             void action.run(async () => {
               await removePerson(preview!.impact, preview!.request);
+              toast("Project member removed.", "success");
               setPreview(undefined);
               await onSaved();
             })

@@ -20,6 +20,8 @@ import {
   peso,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useAuth } from "../authentication";
 import { confirmAction } from "../../shared/confirm";
 import {
@@ -62,10 +64,24 @@ export function CashRequestCard({
     [operation, setOperation] = useState<
       "cancel" | "approve" | "reject" | "release"
     >(),
-    [reason, setReason] = useState(""),
-    [method, setMethod] = useState<"cash" | "cheque">("cash"),
-    [cheque, setCheque] = useState(""),
     [releaseId, setReleaseId] = useState("");
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      profile?.id,
+      "cash-decision:" +
+        request.id +
+        ":" +
+        (operation ?? "none") +
+        (operation === "release" ? ":" + releaseId : ""),
+    ),
+    !!operation,
+    () => ({
+      reason: "",
+      method: "cash" as "cash" | "cheque",
+      cheque: "",
+    }),
+  );
+  const { reason, method, cheque } = draft;
   const action = useFinancialAction(
     profile?.id || "",
     `cash:${request.id}:${JSON.stringify([request.status, bundle.releases.filter((r) => r.requestId === request.id).map((r) => [r.id, r.status, r.acknowledgedAt]), bundle.liquidations.filter((l) => l.requestId === request.id).map((l) => [l.id, l.version, l.status])])}`,
@@ -131,9 +147,9 @@ export function CashRequestCard({
     action.run(async () => {
       if (!operation) return;
       if (readOnly)
-        throw new Error("Refresh to verify current cash request access.");
+        throw new PublicMessageError("Refresh to verify current cash request access.");
       if (operation !== "release" && !reason.trim())
-        throw new Error("Record a reason for this decision.");
+        throw new PublicMessageError("Record a reason for this decision.");
       if (operation === "cancel")
         await cancelContextualCashRequest(request.id, reason);
       if (operation === "approve" || operation === "reject") {
@@ -173,7 +189,7 @@ export function CashRequestCard({
       if (operation === "release") {
         const release = releases.find((item) => item.id === releaseId);
         if (!canReleaseCash || release?.status !== "scheduled")
-          throw new Error("This release is no longer available to record.");
+          throw new PublicMessageError("This release is no longer available to record.");
         if (
           !(await confirmAction(
             "Record cash release?",
@@ -188,8 +204,8 @@ export function CashRequestCard({
           chequeNumber: cheque || undefined,
         });
       }
+      clearDraft();
       setOperation(undefined);
-      setReason("");
       nativeWindow.dispatchEvent({ type: "eflow:finance-updated" });
       await onSaved();
     }, "Financial action recorded.");
@@ -304,7 +320,7 @@ export function CashRequestCard({
                       type: "eflow:finance-updated",
                     });
                     await onSaved();
-                  })
+                  }, "Cash receipt acknowledged.")
                 }
               >
                 Acknowledge receipt
@@ -430,7 +446,9 @@ export function CashRequestCard({
           onSaved={onSaved}
         />
       )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
+      {!operation && !!action.error && (
+        <ErrorState context="action" error={action.error} />
+      )}
       {!!readAction.error && <ErrorState error={readAction.error} />}
       {!!action.notice && (
         <Text style={{ color: colors.success }}>{action.notice}</Text>
@@ -466,7 +484,12 @@ export function CashRequestCard({
                   ? "Forward for Office approval"
                   : "Authorize cash request"
         }
-        onClose={() => setOperation(undefined)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setOperation(undefined);
+          }
+        }}
         busy={action.busy}
         footer={
           <Button
@@ -493,7 +516,7 @@ export function CashRequestCard({
             <Choice
               label="Release method"
               value={method}
-              onChange={setMethod}
+              onChange={(next) => updateDraft({ method: next })}
               options={[
                 { value: "cash", label: "Cash" },
                 { value: "cheque", label: "Cheque" },
@@ -503,7 +526,7 @@ export function CashRequestCard({
               <Field
                 label="Cheque number"
                 value={cheque}
-                onChangeText={setCheque}
+                onChangeText={(next) => updateDraft({ cheque: next })}
               />
             )}
           </>
@@ -512,7 +535,7 @@ export function CashRequestCard({
           <Field
             label="Reason / required correction"
             value={reason}
-            onChangeText={setReason}
+            onChangeText={(next) => updateDraft({ reason: next })}
             multiline
           />
         )}

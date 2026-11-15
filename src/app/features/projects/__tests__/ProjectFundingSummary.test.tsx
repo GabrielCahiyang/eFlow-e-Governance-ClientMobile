@@ -76,15 +76,7 @@ test("closeout names the subtask that holds unused funding and links to the corr
     workspaceId: "workspace-a",
     view: "budget",
   });
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Open project budget in eFlow Web" }),
-  );
-  expect(navigate).toHaveBeenCalledWith(
-    expect.objectContaining({
-      name: "project",
-      id: "project-a",
-      workspaceId: "workspace-a",
-      view: "funding_configuration",
-    }),
-  );
+  expect(
+    screen.queryByRole("button", { name: "Open project budget in eFlow Web" }),
+  ).toBeNull();
 });

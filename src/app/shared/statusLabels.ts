@@ -4,12 +4,21 @@ const shared: Readonly<Record<string, string>> = {
   pending_assignment: "Needs assignment",
   todo: "To do",
   in_progress: "In progress",
+  stuck: "Stuck",
   for_review: "Awaiting approval",
   pending_review: "Awaiting approval",
   changes_requested: "Changes requested",
   completed: "Completed",
   done: "Completed",
 };
+
+/** Returns UI-only `"stuck"` when active execution has a blocker without changing DB status. */
+export function workDisplayStatus(
+  status: string,
+  blocker?: string | null,
+): string {
+  return status === "in_progress" && blocker?.trim() ? "stuck" : status;
+}
 
 const finance: Readonly<Record<string, string>> = {
   pending: "Requested",

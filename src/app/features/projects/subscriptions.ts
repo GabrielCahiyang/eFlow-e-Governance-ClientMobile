@@ -1,7 +1,11 @@
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
-import { AppState } from "react-native";
 import { supabase } from "../../../platform/supabase";
 export function netProjectUpdates(project: string, onChange: () => void) {
+  const live = createLiveRefreshController({
+    onRefresh: onChange,
+    hasRealtime: true,
+  });
   const channel = createPostgresChannel("native-project:" + project)
     .on(
       "postgres_changes",
@@ -11,7 +15,7 @@ export function netProjectUpdates(project: string, onChange: () => void) {
         table: "projects",
         filter: "id=eq." + project,
       },
-      onChange,
+      live.schedule,
     )
     .on(
       "postgres_changes",
@@ -21,7 +25,7 @@ export function netProjectUpdates(project: string, onChange: () => void) {
         table: "tasks",
         filter: "linked_project_id=eq." + project,
       },
-      onChange,
+      live.schedule,
     )
     .on(
       "postgres_changes",
@@ -31,7 +35,7 @@ export function netProjectUpdates(project: string, onChange: () => void) {
         table: "project_groups",
         filter: "project_id=eq." + project,
       },
-      onChange,
+      live.schedule,
     )
     .on(
       "postgres_changes",
@@ -41,14 +45,11 @@ export function netProjectUpdates(project: string, onChange: () => void) {
         table: "project_offices",
         filter: "project_id=eq." + project,
       },
-      onChange,
+      live.schedule,
     )
-    .subscribe((state) => { if (state === "SUBSCRIBED") onChange(); });
-  const app = AppState.addEventListener("change", (state) => {
-    if (state === "active") onChange();
-  });
+    .subscribe(live.onChannelStatus);
   return () => {
-    app.remove();
+    live.dispose();
     void supabase.removeChannel(channel);
   };
 }

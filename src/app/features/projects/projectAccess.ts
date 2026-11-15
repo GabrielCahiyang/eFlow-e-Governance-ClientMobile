@@ -46,6 +46,6 @@ export async function projectEditorAccess(
 export async function requireProjectSetup(project: string) {
   if (!(await readProjectSetup(project)).ready)
     throw new PublicMessageError(
-      "Finish project setup on eFlow Web before adding or editing work.",
+      "Finish project setup before adding or editing work.",
     );
 }

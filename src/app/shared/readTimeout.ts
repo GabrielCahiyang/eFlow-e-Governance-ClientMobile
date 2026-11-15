@@ -1,7 +1,9 @@
+export const DEFAULT_READ_TIMEOUT_MS = 60_000;
+
 /** Bound waiting in read-only views. No retry and no write is performed here. */
 export async function readWithTimeout<T>(
   load: () => Promise<T>,
-  milliseconds = 25_000,
+  milliseconds = DEFAULT_READ_TIMEOUT_MS,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

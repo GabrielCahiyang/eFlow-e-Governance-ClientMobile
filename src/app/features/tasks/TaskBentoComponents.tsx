@@ -22,13 +22,25 @@ import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import ListCollapse from "lucide-react-native/icons/list-collapse";
 import Link2 from "lucide-react-native/icons/link-2";
 import CircleIcon from "lucide-react-native/icons/circle";
+import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
 import { Sheet } from "../../components/ui/Sheet";
 import { statusIndicatorColor } from "../../components/ui/Status";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
+import { isRawEntityId } from "../../shared/entityId";
 import { dateLabel } from "../../components/ui/theme";
+import { workDay } from "../../../core/web/app/shared/workCalendar";
 import type { WorkPerson } from "../../../core/web/app/features/nested-work/types";
+
+export function priorityLabel(priority?: string): string {
+  if (!priority || priority === "normal" || priority === "medium")
+    return "Medium";
+  if (priority === "high") return "High";
+  if (priority === "urgent") return "Urgent";
+  if (priority === "low") return "Low";
+  return priority.charAt(0).toUpperCase() + priority.slice(1);
+}
 
 export function getInitials(name?: string | null): string {
   if (!name) return "?";
@@ -95,10 +107,12 @@ export function CircularProgressRing({
   percent,
   size = 50,
   strokeWidth = 4,
+  accessibilityLabel,
 }: {
   percent: number;
   size?: number;
   strokeWidth?: number;
+  accessibilityLabel?: string;
 }) {
   const palette = useTheme();
   const radius = (size - strokeWidth) / 2;
@@ -110,7 +124,7 @@ export function CircularProgressRing({
     <View
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: clamped }}
-      accessibilityLabel={`Task completion: ${clamped}%`}
+      accessibilityLabel={accessibilityLabel || `Task completion: ${clamped}%`}
       style={{
         width: size,
         height: size,
@@ -171,7 +185,7 @@ export interface BentoAction {
   label: string;
   onPress: () => void;
   variant?: "primary" | "secondary";
-  icon?: "pencil" | "check";
+  icon?: "pencil" | "check" | "plus" | "sliders";
   disabled?: boolean;
   busy?: boolean;
   accessibilityLabel?: string;
@@ -242,6 +256,12 @@ export function BentoActionButtons({
             )}
             {action.icon === "check" && (
               <Check size={16} color={iconColor} strokeWidth={2.4} />
+            )}
+            {action.icon === "plus" && (
+              <Plus size={16} color={iconColor} strokeWidth={2.2} />
+            )}
+            {action.icon === "sliders" && (
+              <SlidersHorizontal size={15} color={iconColor} strokeWidth={2.2} />
             )}
             <Text
               numberOfLines={1}
@@ -325,10 +345,12 @@ export interface DependencyItemData {
 export function BentoDependenciesCard({
   items,
   missingCount = 0,
+  pendingCount,
   onPressItem,
 }: {
   items: DependencyItemData[];
   missingCount?: number;
+  pendingCount?: number;
   onPressItem?: (item: DependencyItemData) => void;
 }) {
   const palette = useTheme();
@@ -338,7 +360,9 @@ export function BentoDependenciesCard({
   const completedCount = items.filter(
     (item) => item.completed || item.status === "completed",
   ).length;
-  const allComplete = completedCount === total && missingCount === 0;
+  const allComplete = pendingCount === undefined
+    ? completedCount === total && missingCount === 0
+    : pendingCount === 0;
 
   return (
     <View
@@ -381,7 +405,9 @@ export function BentoDependenciesCard({
             color: allComplete ? palette.success : palette.warning,
           }}
         >
-          {completedCount} of {total} complete
+          {pendingCount === undefined
+            ? `${completedCount} of ${total} complete`
+            : `${pendingCount} pending`}
         </Text>
       </View>
 
@@ -504,13 +530,17 @@ export function BentoBlockerCard({ blocker }: { blocker?: string | null }) {
 export function BentoProjectOnHoldCard({
   projectId,
   onNavigateReadiness,
+  onNavigateParentTask,
   style,
   waitingForTask = false,
+  isTaskLead = false,
 }: {
   projectId?: string;
   onNavigateReadiness?: () => void;
+  onNavigateParentTask?: () => void;
   style?: StyleProp<ViewStyle>;
   waitingForTask?: boolean;
+  isTaskLead?: boolean;
 }) {
   const palette = useTheme();
 
@@ -581,9 +611,37 @@ export function BentoProjectOnHoldCard({
         }}
       >
         {waitingForTask
-          ? "The Task Lead must start the parent task before you can update or complete this subtask."
+          ? isTaskLead
+            ? "You're the Task Lead. Start the parent task first before you can update or complete this subtask."
+            : "The Task Lead must start the parent task before you can update or complete this subtask."
           : "Work updates are paused while the project is under review."}
       </Text>
+      {waitingForTask && onNavigateParentTask && (
+        <Pressable
+          onPress={onNavigateParentTask}
+          accessibilityRole="button"
+          accessibilityLabel="Go to Task details"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            alignSelf: "flex-start",
+            marginTop: 4,
+            paddingVertical: 2,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "600",
+              color: palette.primary,
+            }}
+          >
+            Go to Task details
+          </Text>
+          <ChevronRight size={14} color={palette.primary} />
+        </Pressable>
+      )}
       {onNavigateReadiness && (
         <Pressable
           onPress={onNavigateReadiness}
@@ -617,18 +675,23 @@ export function BentoProjectOnHoldCard({
 export function BentoScheduleCards({
   startDate,
   dueDate,
+  workTimezone,
 }: {
   startDate?: string | null;
   dueDate?: string | null;
+  workTimezone?: string;
 }) {
   const palette = useTheme();
   const { fontScale } = useWindowDimensions();
-  const formattedStart = startDate
-    ? dateLabel(startDate.includes("T") ? startDate : startDate + "T12:00:00")
-    : "—";
-  const formattedDue = dueDate
-    ? dateLabel(dueDate.includes("T") ? dueDate : dueDate + "T12:00:00")
-    : "—";
+  const format = (value?: string | null) => {
+    if (!value) return "—";
+    if (!workTimezone)
+      return dateLabel(value.includes("T") ? value : value + "T12:00:00");
+    const day = workDay(value, workTimezone);
+    return day === null ? "—" : new Intl.DateTimeFormat("en-PH", {
+      timeZone: "UTC", year: "numeric", month: "short", day: "numeric",
+    }).format(day * 86400000);
+  };
 
   return (
     <View
@@ -665,7 +728,7 @@ export function BentoScheduleCards({
           numberOfLines={1}
           style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
         >
-          {formattedStart}
+          {format(startDate)}
         </Text>
       </View>
 
@@ -696,7 +759,7 @@ export function BentoScheduleCards({
           numberOfLines={1}
           style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
         >
-          {formattedDue}
+          {format(dueDate)}
         </Text>
       </View>
     </View>
@@ -750,7 +813,10 @@ export function ContributorsSheet({
                   {person.name}
                 </Text>
                 <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-                  Contributor{person.office ? ` · ${person.office}` : ""}
+                  Contributor
+                  {person.office && !isRawEntityId(person.office) && person.office !== person.id
+                    ? ` · ${person.office}`
+                    : ""}
                 </Text>
               </View>
             </View>
@@ -1112,8 +1178,8 @@ export function BentoSubtasksCard({
 
       {subtasks.length > 0 ? (
         <View>
-          {rows(subtasks.slice(0, 4))}
-          {subtasks.length > 4 && (
+          {rows(subtasks.slice(0, 3))}
+          {subtasks.length > 3 && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`See all ${subtasks.length} subtasks`}
@@ -1296,15 +1362,19 @@ export function BentoSupportingGrid({
 }
 
 export function BentoSubtaskSupportingGrid({
+  onPressActivity,
   onPressReview,
   onPressFunding,
   onPressFiles,
   onPressPlanning,
+  showFunding = true,
 }: {
+  onPressActivity?: () => void;
   onPressReview: () => void;
-  onPressFunding: () => void;
+  onPressFunding?: () => void;
   onPressFiles: () => void;
   onPressPlanning: () => void;
+  showFunding?: boolean;
 }) {
   const palette = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -1320,106 +1390,257 @@ export function BentoSubtaskSupportingGrid({
     justifyContent: "space-between" as const,
   };
 
-  return (
-    <View style={{ gap: 12, marginBottom: 16 }}>
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Evidence & review, Submissions"
-          onPress={onPressReview}
-          style={cardStyle}
-        >
-          <ShieldCheck size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
-              Evidence & review
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Submissions
-            </Text>
-          </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Funding, Financial records"
-          onPress={onPressFunding}
-          style={cardStyle}
-        >
-          <Wallet size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
-              Funding
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Financial records
-            </Text>
-          </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
-        </Pressable>
+  const renderTile = (
+    icon: ReactNode,
+    title: string,
+    subtitle: string,
+    onPress: () => void,
+  ) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}, ${subtitle}`}
+      onPress={onPress}
+      style={({ pressed }) => [cardStyle, pressed && { opacity: 0.78 }]}
+    >
+      {icon}
+      <View style={{ gap: 2, marginTop: 8 }}>
+        <Text style={{ fontSize: 15, fontWeight: "700", color: palette.text }}>
+          {title}
+        </Text>
+        <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+          {subtitle}
+        </Text>
       </View>
+      <ChevronRight
+        size={14}
+        color={palette.mutedLabel}
+        style={{ alignSelf: "flex-end" }}
+      />
+    </Pressable>
+  );
 
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Files, Attachments"
-          onPress={onPressFiles}
-          style={cardStyle}
-        >
-          <Files size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
-              Files
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Attachments
-            </Text>
-          </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
-        </Pressable>
+  const hasFunding = showFunding && !!onPressFunding;
+  const activityTile = onPressActivity
+    ? renderTile(
+        <Activity size={20} color={palette.text} />,
+        "Activity",
+        "Updates & history",
+        onPressActivity,
+      )
+    : null;
+  const reviewTile = renderTile(
+    <ShieldCheck size={20} color={palette.text} />,
+    "Evidence & review",
+    "Submissions",
+    onPressReview,
+  );
+  const fundingTile = hasFunding
+    ? renderTile(
+        <Wallet size={20} color={palette.text} />,
+        "Funding",
+        "Financial records",
+        onPressFunding!,
+      )
+    : null;
+  const filesTile = renderTile(
+    <Files size={20} color={palette.text} />,
+    "Files",
+    "Attachments",
+    onPressFiles,
+  );
+  const planningTile = renderTile(
+    <ListCollapse size={20} color={palette.text} />,
+    "Planning details",
+    "Additional fields",
+    onPressPlanning,
+  );
 
+  if (activityTile && hasFunding) {
+    return (
+      <View style={{ gap: 12, marginBottom: 16 }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Planning details, Additional fields"
           onPress={onPressPlanning}
-          style={cardStyle}
+          style={({ pressed }) => ({
+            backgroundColor: palette.surface,
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 14,
+            padding: 14,
+            minHeight: 56,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            opacity: pressed ? 0.78 : 1,
+          })}
         >
-          <ListCollapse size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              backgroundColor: palette.primarySoft,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <ListCollapse size={18} color={palette.primary} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 15, fontWeight: "700", color: palette.text }}>
               Planning details
             </Text>
             <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
               Additional fields
             </Text>
           </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
+          <ChevronRight size={16} color={palette.mutedLabel} />
         </Pressable>
+
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          {activityTile}
+          {reviewTile}
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          {fundingTile}
+          {filesTile}
+        </View>
+      </View>
+    );
+  }
+
+  if (activityTile) {
+    return (
+      <View style={{ gap: 12, marginBottom: 16 }}>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          {activityTile}
+          {reviewTile}
+        </View>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          {filesTile}
+          {planningTile}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 12, marginBottom: 16 }}>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        {reviewTile}
+        {fundingTile ?? filesTile}
+      </View>
+
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        {hasFunding ? filesTile : null}
+        {planningTile}
+      </View>
+    </View>
+  );
+}
+
+export function PlanningDetailsView({
+  description,
+  definitionOfDone,
+  acceptanceCriteria,
+}: {
+  description?: string | null;
+  definitionOfDone?: string | null;
+  acceptanceCriteria?: readonly string[] | null;
+}) {
+  const palette = useTheme();
+
+  return (
+    <View style={{ gap: 16 }}>
+      <View style={{ gap: 6 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "700",
+            color: palette.mutedLabel,
+            letterSpacing: 0.5,
+          }}
+        >
+          DESCRIPTION
+        </Text>
+        <Text
+          selectable
+          style={{
+            fontSize: 14,
+            color: description ? palette.text : palette.mutedLabel,
+            lineHeight: 20,
+          }}
+        >
+          {description || "No description provided."}
+        </Text>
+      </View>
+
+      <View style={{ gap: 6 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "700",
+            color: palette.mutedLabel,
+            letterSpacing: 0.5,
+          }}
+        >
+          DEFINITION OF DONE
+        </Text>
+        <Text
+          selectable
+          style={{
+            fontSize: 14,
+            color: definitionOfDone ? palette.text : palette.mutedLabel,
+            lineHeight: 20,
+          }}
+        >
+          {definitionOfDone || "No definition of done specified."}
+        </Text>
+      </View>
+
+      {!!acceptanceCriteria?.length && (
+        <View style={{ gap: 6 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "700",
+              color: palette.mutedLabel,
+              letterSpacing: 0.5,
+            }}
+          >
+            ACCEPTANCE CRITERIA
+          </Text>
+          {acceptanceCriteria.map((criterion, idx) => (
+            <Text
+              key={idx}
+              selectable
+              style={{ fontSize: 14, color: palette.text, lineHeight: 20 }}
+            >
+              • {criterion}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      <View
+        style={{
+          backgroundColor: palette.surface,
+          borderWidth: 1,
+          borderColor: palette.border,
+          borderRadius: 10,
+          padding: 12,
+          marginTop: 4,
+        }}
+      >
+        <Text
+          style={{ fontSize: 12, color: palette.mutedLabel, lineHeight: 18 }}
+        >
+          Advanced planning, custom fields, dependencies, and branch
+          configuration are managed on eFlow Web.
+        </Text>
       </View>
     </View>
   );
@@ -1438,8 +1659,6 @@ export function PlanningDetailsSheet({
   definitionOfDone?: string | null;
   acceptanceCriteria?: readonly string[] | null;
 }) {
-  const palette = useTheme();
-
   return (
     <Sheet
       open={open}
@@ -1449,95 +1668,13 @@ export function PlanningDetailsSheet({
     >
       <ScrollView
         style={{ maxHeight: 420 }}
-        contentContainerStyle={{ gap: 16, paddingVertical: 12 }}
+        contentContainerStyle={{ paddingVertical: 12 }}
       >
-        <View style={{ gap: 6 }}>
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "700",
-              color: palette.mutedLabel,
-              letterSpacing: 0.5,
-            }}
-          >
-            DESCRIPTION
-          </Text>
-          <Text
-            selectable
-            style={{
-              fontSize: 14,
-              color: description ? palette.text : palette.mutedLabel,
-              lineHeight: 20,
-            }}
-          >
-            {description || "No description provided."}
-          </Text>
-        </View>
-
-        <View style={{ gap: 6 }}>
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "700",
-              color: palette.mutedLabel,
-              letterSpacing: 0.5,
-            }}
-          >
-            DEFINITION OF DONE
-          </Text>
-          <Text
-            selectable
-            style={{
-              fontSize: 14,
-              color: definitionOfDone ? palette.text : palette.mutedLabel,
-              lineHeight: 20,
-            }}
-          >
-            {definitionOfDone || "No definition of done specified."}
-          </Text>
-        </View>
-
-        {!!acceptanceCriteria?.length && (
-          <View style={{ gap: 6 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "700",
-                color: palette.mutedLabel,
-                letterSpacing: 0.5,
-              }}
-            >
-              ACCEPTANCE CRITERIA
-            </Text>
-            {acceptanceCriteria.map((criterion, idx) => (
-              <Text
-                key={idx}
-                selectable
-                style={{ fontSize: 14, color: palette.text, lineHeight: 20 }}
-              >
-                • {criterion}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        <View
-          style={{
-            backgroundColor: palette.surface,
-            borderWidth: 1,
-            borderColor: palette.border,
-            borderRadius: 10,
-            padding: 12,
-            marginTop: 4,
-          }}
-        >
-          <Text
-            style={{ fontSize: 12, color: palette.mutedLabel, lineHeight: 18 }}
-          >
-            Advanced planning, custom fields, dependencies, and branch
-            configuration are managed on eFlow Web.
-          </Text>
-        </View>
+        <PlanningDetailsView
+          description={description}
+          definitionOfDone={definitionOfDone}
+          acceptanceCriteria={acceptanceCriteria}
+        />
       </ScrollView>
     </Sheet>
   );

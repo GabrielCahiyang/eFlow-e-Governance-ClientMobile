@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
-import { AppState } from "react-native";
 import type { StatusDefinition } from "../../../core/web/app/features/work-status/statusDefinitions";
 import { supabase } from "../../../platform/supabase";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { useFacts } from "../../shared/useFacts";
 import {
@@ -31,24 +31,19 @@ export function WorkStatusProvider({
   useEffect(() => {
     if (!actor) return;
     const update = () => void refresh();
+    const live = createLiveRefreshController({
+      onRefresh: update,
+      hasRealtime: true,
+    });
     const channel = createPostgresChannel("native-work-status:" + actor)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "work_status_definitions" },
-        update,
+        live.schedule,
       )
-      .subscribe((state) => {
-        if (state === "SUBSCRIBED") update();
-      });
-    const app = AppState.addEventListener("change", (state) => {
-      if (state === "active") update();
-    });
-    const fallback = setInterval(() => {
-      if (AppState.currentState === "active") update();
-    }, 60_000);
+      .subscribe(live.onChannelStatus);
     return () => {
-      app.remove();
-      clearInterval(fallback);
+      live.dispose();
       void supabase.removeChannel(channel);
     };
   }, [actor, refresh]);

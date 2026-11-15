@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
+import { useToast } from "../../components/ui/Toast";
 import { draftStore } from "../../../platform/draftStore";
 import { feedback, PublicMessageError } from "../../shared/userMessages";
 import {
@@ -11,6 +12,7 @@ import * as Crypto from "expo-crypto";
 const activeScopes = new Set<string>();
 export function useFinancialCommand(actorId: string, scope: string) {
   const assertAccess = useAccountActionAccess();
+  const { toast } = useToast();
   const pending = useRef(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<Error>(),
@@ -31,7 +33,8 @@ export function useFinancialCommand(actorId: string, scope: string) {
     let saved = false;
     try {
       assertAccess(actorId);
-      if (!actorId) throw new Error("Current work access is required.");
+      if (!actorId)
+        throw new PublicMessageError("Current work access is required.");
       const scopeHash = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
         scope,
@@ -53,6 +56,7 @@ export function useFinancialCommand(actorId: string, scope: string) {
       );
       saved = true;
       setNotice(success);
+      if (success) toast(success, "success");
       await refresh?.();
       return true;
     } catch (e) {

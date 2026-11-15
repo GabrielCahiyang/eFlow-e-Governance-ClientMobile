@@ -1,6 +1,6 @@
 import { supabase } from "../../platform/supabase";
 import { draftStore } from "../../platform/draftStore";
-import { PublicMessageError } from "./userMessages";
+import { isDeterministicRejection, PublicMessageError } from "./userMessages";
 
 export async function sharedWorkRpc<T>(
   name: string,
@@ -40,8 +40,7 @@ export async function saveSharedWork<T>(
     await draftStore.remove(actor, scope).catch(() => {});
     return receipt;
   } catch (error) {
-    const code = (error as { code?: string })?.code;
-    if (!recovering && code && /^(22|23|42501|40001)/.test(code))
+    if (!recovering && isDeterministicRejection(error))
       await draftStore.remove(actor, scope).catch(() => {});
     throw error;
   }

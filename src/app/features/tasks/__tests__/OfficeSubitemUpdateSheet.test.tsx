@@ -119,3 +119,76 @@ test("a contributor with a current execute grant saves an update directly", asyn
     })),
   );
 });
+
+test("defaults to in_progress even when the subtask has an active blocker, while retaining user-edited draft values on reopen", async () => {
+  const tree = snapshot(5);
+  (tree.nodes[0] as { blocker?: string | null }).blocker = "Existing blocker on record";
+  rememberWorkCapabilityContext(tree, "lead");
+  jest.mocked(fetchWorkTree).mockResolvedValue(tree);
+  const onClose = jest.fn();
+
+  const view = await render(
+    <OfficeSubitemUpdateSheet
+      tree={tree}
+      nodeId="node"
+      actorId="lead"
+      readOnly={false}
+      onSaved={async () => {}}
+      onClose={onClose}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent("In progress");
+  expect(screen.queryByLabelText("Blocker")).toBeNull();
+
+  await fireEvent.press(screen.getByRole("button", { name: "Work state" }));
+  expect(screen.queryByLabelText("Search options")).toBeNull();
+  await fireEvent.press(await screen.findByRole("radio", { name: "Blocked" }));
+  await fireEvent.changeText(await screen.findByLabelText("Blocker"), "New user blocker");
+  await fireEvent.changeText(screen.getByLabelText("Work note"), "User draft note");
+  await fireEvent.press(screen.getByLabelText("Close dialog"));
+  expect(onClose).toHaveBeenCalled();
+
+  await view.unmount();
+
+  const view2 = await render(
+    <OfficeSubitemUpdateSheet
+      tree={tree}
+      nodeId="node"
+      actorId="lead"
+      readOnly={false}
+      onSaved={async () => {}}
+      onClose={jest.fn()}
+    />,
+  );
+  expect(await screen.findByDisplayValue("New user blocker")).toBeOnTheScreen();
+  expect(screen.getByDisplayValue("User draft note")).toBeOnTheScreen();
+  await view2.unmount();
+});
+
+test("rejects subtask work update when actor is not Task Lead, Subtask Lead, or Subtask Contributor even if execute is granted", async () => {
+  const tree = snapshot(6);
+  (tree.root as { lead?: string | null }).lead = "other-task-lead";
+  tree.nodes[0].lead_id = "other-sub-lead";
+  tree.nodes[0].assigned_to_ids = ["other-worker"];
+  rememberWorkCapabilityContext(tree, "project-lead");
+  jest.mocked(fetchWorkTree).mockResolvedValue(tree);
+  jest.mocked(saveSubtaskWorkUpdate).mockClear();
+
+  const view = await render(
+    <OfficeSubitemUpdateSheet
+      tree={tree}
+      nodeId="node"
+      actorId="project-lead"
+      readOnly={false}
+      onSaved={async () => {}}
+      onClose={jest.fn()}
+    />,
+  );
+  await fireEvent.changeText(await view.findByLabelText("Work note"), "Attempted override");
+  await fireEvent.press(view.getByRole("button", { name: "Post update" }));
+
+  await waitFor(() =>
+    expect(view.getByText(/Work access or revision changed|This item has changed/i)).toBeOnTheScreen(),
+  );
+  expect(saveSubtaskWorkUpdate).not.toHaveBeenCalled();
+});

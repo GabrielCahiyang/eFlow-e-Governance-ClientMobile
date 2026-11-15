@@ -24,7 +24,7 @@ export async function signInOnMobile(email: string, password: string) {
     body: JSON.stringify({ email: email.trim(), password }),
     cache: "no-store",
     redirect: "error",
-    signal: AbortSignal.timeout(55_000),
+    signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) {
     const message =

@@ -17,8 +17,12 @@ import {
   Status,
   colors,
 } from "../../components/ui";
+import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { PublicMessageError } from "../../shared/userMessages";
 import {
   fetchProjectOffices,
   confirmProjectOffice,
@@ -49,26 +53,41 @@ export function ProjectOffices({
     ]);
     return { participation, identities, orgs };
   });
+  const { profile } = useAuth();
+  const { toast } = useToast();
   const action = useAction(),
     [open, setOpen] = useState(false),
-    [name, setName] = useState(""),
-    [email, setEmail] = useState(""),
-    [officeId, setOfficeId] = useState(""),
-    [access, setAccess] = useState<"collaborating" | "observer">(
-      "collaborating",
-    ),
     [invite, setInvite] = useState<{ id: string; identity: boolean }>();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      profile?.id,
+      "project-office:" +
+        project.id +
+        ":" +
+        (invite ? "invite:" + invite.id : "add"),
+    ),
+    open,
+    () => ({
+      name: "",
+      email: "",
+      officeId: "",
+      access: "collaborating" as "collaborating" | "observer",
+    }),
+  );
+  const { name, email, officeId, access } = draft;
   const closed = ["completed", "archived"].includes(project.status);
   const save = () =>
     action.run(
       async () => {
         if (invite) {
-          if (!email.trim()) throw new Error("Email is required.");
+          if (!email.trim())
+            throw new PublicMessageError("Email is required.");
           if (invite.identity)
             await inviteOfficeIdentity(invite.id, email, access);
           else await inviteProjectOffice(project.id, invite.id, email, access);
         } else {
-          if (!name.trim()) throw new Error("Office name is required.");
+          if (!name.trim())
+            throw new PublicMessageError("Office name is required.");
           const identity = await saveOfficeIdentity(
             project.id,
             crypto.randomUUID(),
@@ -77,10 +96,13 @@ export function ProjectOffices({
           );
           if (officeId) await linkOfficeIdentity(identity.id, officeId);
         }
+        clearDraft();
+        toast(
+          invite ? "Invitation sent." : "Project Office added.",
+          "success",
+        );
         setOpen(false);
         setInvite(undefined);
-        setName("");
-        setEmail("");
         await facts.refresh();
       },
       invite ? "Invitation sent." : "Project Office added.",
@@ -91,6 +113,7 @@ export function ProjectOffices({
         <Button
           icon={<Plus color={palette.onPrimary} size={17} />}
           onPress={() => {
+            action.clear();
             setInvite(undefined);
             setOpen(true);
           }}
@@ -146,6 +169,7 @@ export function ProjectOffices({
                         void action.run(async () => {
                           await confirmProjectOffice(office.id);
                           await facts.refresh();
+                          toast("Office participation confirmed.", "success");
                         })
                       }
                     >
@@ -157,6 +181,7 @@ export function ProjectOffices({
                         void action.run(async () => {
                           await withdrawProjectOffice(office.id);
                           await facts.refresh();
+                          toast("Office invitation withdrawn.", "success");
                         })
                       }
                     >
@@ -187,6 +212,7 @@ export function ProjectOffices({
                     <Button
                       variant="outline"
                       onPress={() => {
+                        action.clear();
                         setInvite({ id: identity.id, identity: true });
                         setOpen(true);
                       }}
@@ -199,12 +225,19 @@ export function ProjectOffices({
           </>
         )
       )}
-      {!!action.error && <ErrorState context="action" error={action.error} />}
+      {!open && !!action.error && (
+        <ErrorState context="action" error={action.error} />
+      )}
       <Sheet
         actionError={action.error}
         open={open}
         title={invite ? "Invite project Office contact" : "Add project Office"}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setOpen(false);
+          }
+        }}
         busy={action.busy}
         footer={
           <Button busy={action.busy} onPress={() => void save()}>
@@ -221,14 +254,16 @@ export function ProjectOffices({
             <Field
               label="Contact email"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(next) => updateDraft({ email: next })}
               keyboardType="email-address"
               autoCapitalize="none"
             />
             <Choice
               label="Project access"
               value={access}
-              onChange={setAccess}
+              onChange={(next) =>
+                updateDraft({ access: next as "collaborating" | "observer" })
+              }
               options={[
                 { value: "collaborating", label: "Collaborating Office" },
                 { value: "observer", label: "Observer" },
@@ -237,11 +272,15 @@ export function ProjectOffices({
           </>
         ) : (
           <>
-            <Field label="Office name" value={name} onChangeText={setName} />
+            <Field
+              label="Office name"
+              value={name}
+              onChangeText={(next) => updateDraft({ name: next })}
+            />
             <Choice
-              label="Link existing Office (optional)"
+              label="Link existing Office"
               value={officeId}
-              onChange={setOfficeId}
+              onChange={(next) => updateDraft({ officeId: next })}
               options={[
                 { value: "", label: "Project-local Office" },
                 ...(facts.data?.orgs || []).map((o) => ({

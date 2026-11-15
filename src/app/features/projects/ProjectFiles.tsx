@@ -17,7 +17,7 @@ export function ProjectFiles({
 }: {
   projectId: string;
   taskId?: string;
-  onManage: () => void;
+  onManage?: () => void;
 }) {
   const { profile } = useAuth();
   const facts = useFacts(`files:${profile?.id}:${projectId}:${taskId}`, () =>
@@ -47,9 +47,6 @@ export function ProjectFiles({
           }
         />
       ))}
-      {facts.data.can_write && (
-        <NavigationRow title="Manage files on eFlow Web" onPress={onManage} />
-      )}
       {!!action.error && <ErrorState context="action" error={action.error} />}
     </>
   );

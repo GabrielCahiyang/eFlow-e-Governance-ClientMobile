@@ -1,3 +1,5 @@
+import { matchDomainErrorMessage } from "./domainErrorMessages";
+
 /** Public feedback only. Never interpolate a transport, database or provider error. */
 export class PublicMessageError extends Error {}
 export const feedback = {
@@ -184,6 +186,86 @@ const workReasons: Record<string, string> = {
   "evidence could not be verified": "The evidence couldn't be verified. Check that the files uploaded before submitting.",
   "evidence does not belong to this work request": "Attach the evidence to this submission before saving.",
   "a subitem with this name already exists here. use a different name": "A subtask with this name already exists here. Use a different name.",
+  "choose today or a future start date": "Choose today or a future start date.",
+  "choose today or a future due date": "Choose today or a future due date.",
+  "enter a valid due date": "Enter a valid due date.",
+  "enter a valid date": "Enter a valid date.",
+  "due date cannot be before the start date": "Due date cannot be before the start date.",
+  "closed project structure is read-only": "This project is closed and its tasks cannot be changed.",
+  "choose a group from this project": "Choose a group from this project.",
+  "enter a task title (up to 300 characters)": "Enter a task title (up to 300 characters).",
+  "complete project details, dates, project lead and funding setup before adding tasks, subtasks or people": "Complete project details, dates, Project Lead, and funding setup before adding tasks, subtasks, or people.",
+  "only the responsible office head can add project work": "Only the responsible Office Head can add project work.",
+  "task request id was reused with different details": "This task request could not be matched to the saved details. Refresh and verify before trying again.",
+  "request identity required": "Refresh the form and try saving again.",
+  "create new unstarted work in the private project": "New tasks in a planning project must start in To do.",
+  "complete project setup and choose open work before allocating funding": "Complete project setup and choose an open task before allocating funding.",
+  "choose project funding sources, amounts and a reason": "Choose a funding account, a positive amount, and a reason.",
+  "finish the pending allocation review before adding accounts": "Finish the pending allocation review before adding accounts.",
+  "this task uses legacy funding. keep its existing funding separate": "This task uses legacy funding. Keep its existing funding separate.",
+  "choose a project funding source and a positive amount in cents": "Choose a funding account and enter a positive amount.",
+  "this task already uses that account. use another account": "This task already uses that account. Choose another account.",
+  "use sources from the same fiscal year for one task allocation": "Use funding accounts from the same fiscal year.",
+  "project funding is no longer available": "Selected project funding is no longer available.",
+  "set the task start and due dates before allocating funding": "Set the task start and due dates before allocating funding.",
+  "choose each project source once": "Choose each project funding account only once.",
+  "funding requires a locked annual budget": "Lock the Office Budget for this fiscal year before allocating funding.",
+  "task funding must belong to its project and selected source": "Task funding must belong to this project and selected funding account.",
+  "task allocation exceeds remaining project source funding": "The requested amount exceeds the remaining balance on this project funding account.",
+  "release request terms changed": "This return request changed. Refresh and check your task funding before trying again.",
+  "choose an approved task source, positive amount and release reason": "Choose an approved task account, a positive amount, and a return reason.",
+  "this subtask already has a cap. use the existing cap adjustment": "This subtask already has a budget cap. Adjust or return the existing cap instead.",
+  "task allocation is unavailable": "Task funding allocation is unavailable.",
+  "enter a reason for this budget change": "Enter a reason for this budget change.",
+  "choose a funding account and enter an amount greater than zero, with up to two decimal places": "Choose a funding account and enter an amount greater than zero.",
+  "this project is closed": "This project is closed.",
+  "this allocation has already changed": "This subtask budget changed. Refresh before trying again.",
+  "only a subtask in to do can be started": "Only a subtask in To do can be started.",
+  "set a planned start date before starting this task": "Set a planned start date before starting this task.",
+  "set a planned start date before starting this subtask": "Set a planned start date before starting this subtask.",
+  "choose a subtask start date": "Choose a subtask start date.",
+  "choose a subtask start date and due date": "Choose a subtask start date and due date.",
+  "choose a subtask due date on or after its start date": "Choose a subtask due date on or after its start date.",
+  "completion note is required": "Enter a completion note.",
+  "this task is no longer open for submission": "This task is no longer open for submission.",
+  "only the assignee or task lead may submit this work": "Only the assignee or Task Lead may submit this work.",
+  "assign an eligible reviewer before submitting": "An eligible reviewer must be assigned before submitting.",
+  "settle all task and subtask cash before approving this task": "Settle all task and subtask cash before approving this task.",
+  "resume or reopen this task before posting progress": "Resume or reopen this task before posting progress.",
+  "only the task lead can resume returned work": "Only the Task Lead can resume returned work.",
+  "use direct completion to finish a subitem": "Use Mark complete to finish a subtask.",
+  "subitems complete directly; review the parent task instead": "Use Mark complete to finish a subtask.",
+  "subitems complete directly. use mark complete in the subitem; final approval belongs to the task": "Use Mark complete to finish a subtask.",
+  "complete every child step first": "Complete every child subtask first.",
+  "complete earlier ordered steps first": "Complete earlier ordered subtasks first.",
+  "complete earlier ordered siblings first": "Complete earlier ordered subtasks first.",
+  "this work is closed or already completed": "This work is closed or already completed.",
+  "root task contributors are read-only for the task lead after the project becomes active": "Root task contributors cannot be changed by the Task Lead once the project is active.",
+  "choose in progress or stuck": "Choose In progress or Stuck.",
+  "a blocker reason is required": "Describe what is blocking the work.",
+  "work update exceeds its text limit": "Work update exceeds the maximum text length.",
+  "this subtask is not assigned to you": "This subtask is not assigned to you.",
+  "explain what must be corrected": "Explain what must be corrected.",
+  "only authorized accounting staff can settle this liquidation": "Only authorized Accounting Staff can settle this liquidation.",
+  "you cannot settle your own liquidation": "You cannot settle your own liquidation.",
+  "leader review and settlement must be performed by different people": "Leader review and settlement must be completed by different people.",
+  "this liquidation is not awaiting accounting settlement": "This liquidation is no longer awaiting Accounting settlement.",
+  "enter a reason and verify the current package": "Enter a reason and refresh the receipt package before trying again.",
+  "only the authorized office head may approve this escalation": "Only the authorized Office Head may approve this escalation.",
+  "the receipt package changed. review the current version": "The receipt package changed. Refresh and review the current version.",
+  "send this package to the available independent reviewer": "Send this package to the available independent reviewer first.",
+  "the head already approved this escalation": "The Office Head already approved this escalation.",
+  "replenishment exceeds the available imprest capacity (outstanding advances cannot be replenished)": "Replenishment exceeds the available imprest capacity.",
+  "this replenishment reference has already been recorded": "This replenishment reference has already been recorded.",
+  "transaction date cannot be in the future": "Transaction date cannot be in the future.",
+  "only the accounting officer can replenish petty cash": "Only Accounting Staff can replenish petty cash.",
+  "you can only readjust the office budget when the office has no projects": "You can only readjust the Office Budget when the Office has no projects.",
+  "this fiscal year is closed": "This fiscal year is closed.",
+  "no account changes to save": "There are no account changes to save.",
+  "project target date must be on or after its start date": "Target date must be on or after the start date.",
+  "needed-by date cannot be earlier than today": "Needed-by date cannot be earlier than today.",
+  "direct subtask check-off is disabled. open the subtask and submit evidence for independent review": "Direct subtask check-off is disabled. Open the subtask to complete or submit evidence.",
+  "progress must be a whole number from 0 to 99. completion requires approval": "Progress must be 0 to 99. Completion requires approval.",
 };
 const internal =
   /https?:\/\/|(?:[a-z\d-]+\.)+(?:com|co|net|org|io|dev)(?:\b|\/)|\b(?:supabase|cloudflare|postgres|postgrest|PGRST\w*|RLS|RPC|SQL|JWT|schema|migration|gateway|endpoint|stack trace|payload|service.role|capabilities?|lease|revision|request ID|server|backend|native build)\b|(?:[A-Z]:\\)|[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}/i;
@@ -240,6 +322,66 @@ export function userErrorMessage(
   }
   if (/account is inactive/i.test(text))
     return "This account is inactive. Contact your Office support team for help.";
+  const fyMismatch = text.match(
+    /^Selected FY (\d{4}) funding does not overlap this task timeline\.?$/i,
+  );
+  if (fyMismatch)
+    return `Selected FY ${fyMismatch[1]} funding does not overlap this task's start and due dates.`;
+  const sourceAvail = text.match(
+    /^Project source has ₱?([0-9.,]+) available; allocation requests ₱?([0-9.,]+)\.?$/i,
+  );
+  if (sourceAvail)
+    return `The selected project account has ₱${sourceAvail[1]} available; allocation requests ₱${sourceAvail[2]}.`;
+  const unusedRelease = text.match(
+    /^Only ₱?([0-9.,]+) is unused; cash obligations and subtask allocations remain protected\.?$/i,
+  );
+  if (unusedRelease)
+    return `Only ₱${unusedRelease[1]} is unused; cash obligations and subtask allocations remain protected.`;
+  const startAfter = text.match(
+    /^You can start this (task|subtask) on or after (\d{4}-\d{2}-\d{2})\.?$/i,
+  );
+  if (startAfter)
+    return `You can start this ${startAfter[1].toLowerCase()} on or after ${startAfter[2]}.`;
+  const subtaskBound = text.match(
+    /^Subtask dates cannot be (before|after) (\d{4}-\d{2}-\d{2})\.?$/i,
+  );
+  if (subtaskBound)
+    return `Subtask dates cannot be ${subtaskBound[1].toLowerCase()} ${subtaskBound[2]}.`;
+  const rescheduleChild = text.match(
+    /^Reschedule subtask "([^"]+)" before changing this timeline\.?$/i,
+  );
+  if (rescheduleChild)
+    return `Reschedule subtask "${rescheduleChild[1]}" before changing this timeline.`;
+  const stepOrder = text.match(
+    /^Complete Step \d+: "([^"]+)" before starting this subtask\.?$/i,
+  );
+  if (stepOrder)
+    return `Complete "${stepOrder[1]}" before starting this subtask.`;
+  const unfinishedChild = text.match(
+    /^Complete (?:and review )?every (?:child step|descendant) first: resolve (?:descendant )?"([^"]+)"/i,
+  );
+  if (unfinishedChild)
+    return `Complete and review "${unfinishedChild[1]}" first.`;
+  const unavailableProject = text.match(
+    /^Project work is unavailable while the project is ([a-z _-]+)\.?$/i,
+  );
+  if (unavailableProject)
+    return `Project work is unavailable while the project is ${unavailableProject[1]}.`;
+  const domainMessage = matchDomainErrorMessage(text, (s) => internal.test(s));
+  if (domainMessage) return domainMessage;
+  if (/^Resolve pending funding requests in Project settings .* Project budget before deleting this project\.?$/i.test(text))
+    return "Resolve pending funding requests in Project settings before deleting this project.";
+  if (item?.code === "22007" && /invalid input syntax for type date/i.test(text))
+    return "Enter a valid date.";
+  if (/mime type .* is not supported|unsupported (?:file|media|mime) type/i.test(text))
+    return "This file type isn't supported. Choose a JPEG, PNG, PDF, or supported document.";
+  if (
+    item?.status === 413 ||
+    /exceeded the maximum allowed size|payload too large|file too large/i.test(text)
+  )
+    return "The selected file is too large. Choose a smaller file and try again.";
+  if (/bucket not found|the resource was not found/i.test(text))
+    return "File upload storage is unavailable right now. Please try again later.";
   if (error instanceof PublicMessageError && !internal.test(text)) return text;
   if (
     item?.status === 401 ||
@@ -252,15 +394,16 @@ export function userErrorMessage(
   if (
     item?.status === 403 ||
     item?.code === "42501" ||
-    /permission denied|not authorized|access denied/i.test(text)
+    /permission denied|not authorized|access denied|row-level security policy/i.test(text)
   )
     return feedback.access;
   if (item?.status === 404 || item?.code === "PGRST116")
     return feedback.unavailable;
   if (
     item?.status === 408 ||
+    item?.code === "57014" ||
     /TimeoutError/.test(item?.name || "") ||
-    (!item?.status && /timed? out/i.test(text))
+    (!item?.status && /\b(?:statement timeout|timed? out)\b/i.test(text))
   )
     return context === "action"
       ? "The request timed out. Check whether your changes were saved before trying again."
@@ -279,4 +422,72 @@ export function userErrorMessage(
   )
     return text;
   return feedback[context];
+}
+
+const uncertainResultPattern =
+  /\b(?:couldn't confirm|could not confirm|could not be confirmed|not confirmed|no confirmed response|couldn't verify|could not verify|could not be verified|could not be loaded|could not refresh|could not respond|uncertain|verify this (?:liquidation|request|saved request)|saved request before|before repeating|already saved|don't submit them again|check whether your changes|check before (?:trying again|retrying)|check the current record|check its status|check and resume|upload stopped|was interrupted|acceptance is already in progress|activation is already in progress|please try again shortly|(?:was|is|returned an) incomplete|timed? out|connection (?:was lost|unavailable))\b/i;
+
+/**
+ * True only when the failure is a clean client/validation/guard rejection whose
+ * server transaction did not commit (never true for timeouts, offline drops,
+ * 5xx errors, or uncertain receipt warnings).
+ */
+export function isDeterministicRejection(error: unknown): boolean {
+  if (!error) return false;
+  const item =
+    typeof error === "object"
+      ? (error as {
+          message?: unknown;
+          code?: unknown;
+          status?: unknown;
+          name?: unknown;
+        })
+      : undefined;
+  const text =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : typeof item?.message === "string"
+          ? item.message
+          : "";
+  const status = typeof item?.status === "number" ? item.status : undefined;
+  const code = typeof item?.code === "string" ? item.code : "";
+  const name = typeof item?.name === "string" ? item.name : "";
+
+  if (
+    status === 408 ||
+    code === "57014" ||
+    (status !== undefined && status >= 500) ||
+    /TimeoutError/.test(name) ||
+    (!status && /\b(?:statement timeout|timed? out)\b/i.test(text)) ||
+    isConnectionFailure(error)
+  ) {
+    return false;
+  }
+
+  const mapped = userErrorMessage(error, "action");
+  if (
+    mapped === feedback.load ||
+    mapped === feedback.timeout ||
+    mapped === feedback.connection ||
+    mapped === feedback.saved
+  ) {
+    return false;
+  }
+  if (
+    (mapped !== feedback.action && uncertainResultPattern.test(mapped)) ||
+    uncertainResultPattern.test(text)
+  ) {
+    return false;
+  }
+  if (error instanceof PublicMessageError) return true;
+  if (mapped !== feedback.action) return true;
+  if (
+    (status !== undefined && [400, 401, 403, 404, 409, 422].includes(status)) ||
+    /^(?:22|23|42501|40001|P000[1-4]|PGRST116|PGRST301)/.test(code)
+  ) {
+    return true;
+  }
+  return false;
 }

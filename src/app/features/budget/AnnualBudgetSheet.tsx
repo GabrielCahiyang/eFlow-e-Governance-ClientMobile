@@ -15,6 +15,11 @@ import {
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { confirmAction } from "../../shared/confirm";
+import {
+  formDraftKey,
+  useRetainedDraft,
+} from "../../shared/formDraftMemory";
+import { PublicMessageError } from "../../shared/userMessages";
 import type {
   BudgetSection,
   DepartmentBudgetBundle,
@@ -61,33 +66,35 @@ export function AnnualBudgetSheet({
     summary = data.summary,
     locked = summary?.status === "locked",
     closed = summary?.status === "closed";
-  const [sections, setSections] = useState<BudgetSection[]>(() =>
-      openingSections(data),
+  const draftKey = formDraftKey(
+    profile?.id,
+    `annual-budget:${orgId}:${year}:${summary?.status || "draft"}`,
+  );
+  const [draft, setDraft, clearDraft] = useRetainedDraft(draftKey, true, () => ({
+    sections: openingSections(data),
+    daily: String(
+      summary?.dailyPettyCashReleaseLimit ??
+        DEFAULT_DAILY_PETTY_CASH_RELEASE_LIMIT,
     ),
-    [daily, setDaily] = useState(
-      String(
-        summary?.dailyPettyCashReleaseLimit ??
-          DEFAULT_DAILY_PETTY_CASH_RELEASE_LIMIT,
-      ),
+    receipt: String(summary?.perReceiptLimit ?? DEFAULT_PER_RECEIPT_LIMIT),
+    days: String(summary?.liquidationDueDays ?? DEFAULT_LIQUIDATION_DUE_DAYS),
+    threshold: String(
+      summary?.underutilizationThreshold ?? DEFAULT_UNDERUTILIZATION_THRESHOLD,
     ),
-    [receipt, setReceipt] = useState(
-      String(summary?.perReceiptLimit ?? DEFAULT_PER_RECEIPT_LIMIT),
-    ),
-    [days, setDays] = useState(
-      String(summary?.liquidationDueDays ?? DEFAULT_LIQUIDATION_DUE_DAYS),
-    ),
-    [threshold, setThreshold] = useState(
-      String(
-        summary?.underutilizationThreshold ??
-          DEFAULT_UNDERUTILIZATION_THRESHOLD,
-      ),
-    ),
-    [override, setOverride] = useState(
-      summary?.allowReceiptLimitOverride ?? false,
-    ),
-    [notes, setNotes] = useState(summary?.notes || ""),
-    [reason, setReason] = useState(""),
-    [validationError, setValidationError] = useState<Error>();
+    override: summary?.allowReceiptLimitOverride ?? false,
+    notes: summary?.notes || "",
+    reason: "",
+  }));
+  const { sections, daily, receipt, days, threshold, override, notes, reason } =
+    draft;
+  const setSections = (
+    next: BudgetSection[] | ((old: BudgetSection[]) => BudgetSection[]),
+  ) =>
+    setDraft((old) => ({
+      ...old,
+      sections: typeof next === "function" ? next(old.sections) : next,
+    }));
+  const [validationError, setValidationError] = useState<Error>();
   const version = useRef(data.sectionsVersion || 0),
     financial = useFinancialCommand(
       profile?.id || "",
@@ -101,24 +108,6 @@ export function AnnualBudgetSheet({
     allowReceiptOverride: override,
     notes,
   };
-  const dirty =
-    JSON.stringify({ sections, settings }) !==
-    JSON.stringify({
-      sections: openingSections(data),
-      settings: {
-        dailyReleaseLimit:
-          summary?.dailyPettyCashReleaseLimit ??
-          DEFAULT_DAILY_PETTY_CASH_RELEASE_LIMIT,
-        perReceiptLimit: summary?.perReceiptLimit ?? DEFAULT_PER_RECEIPT_LIMIT,
-        liquidationDueDays:
-          summary?.liquidationDueDays ?? DEFAULT_LIQUIDATION_DUE_DAYS,
-        threshold:
-          summary?.underutilizationThreshold ??
-          DEFAULT_UNDERUTILIZATION_THRESHOLD,
-        allowReceiptOverride: summary?.allowReceiptLimitOverride ?? false,
-        notes: summary?.notes || "",
-      },
-    });
   const validate = () => {
     const issue =
       validateBudgetSections(sections) ||
@@ -126,11 +115,15 @@ export function AnnualBudgetSheet({
       releaseSchedulesYearError(sections, year) ||
       (locked ? lockedReleaseEditError(openingSections(data), sections) : "") ||
       budgetSettingsError(settings);
-    if (issue) throw new Error(issue);
+    if (issue) throw new PublicMessageError(issue);
     if (locked && !reason.trim())
-      throw new Error("A reason is required to adjust a locked budget.");
+      throw new PublicMessageError(
+        "A reason is required to adjust a locked budget.",
+      );
     if (!data.sectionsAvailable)
-      throw new Error("The office budget sections migration is required.");
+      throw new PublicMessageError(
+        "Office budget sections are unavailable until the required setup update is completed.",
+      );
   };
   const save = (lock = false) => {
     setValidationError(undefined);
@@ -139,7 +132,7 @@ export function AnnualBudgetSheet({
       validate();
       if (lock) {
         issue = validateBudgetSectionsForLock(sections);
-        if (issue) throw new Error(issue);
+        if (issue) throw new PublicMessageError(issue);
       }
     } catch (e) {
       setValidationError(
@@ -188,30 +181,25 @@ export function AnnualBudgetSheet({
           async () => {
             const current = await fetchDepartmentBudgetBundle(orgId, year);
             if (current.summary?.status !== "locked")
-              throw new Error("Budget locking could not be verified.");
+              throw new PublicMessageError(
+                "Budget locking could not be verified.",
+              );
             await onSaved();
           },
           "Annual budget locked.",
         );
         if (!lockSaved) return;
       }
+      clearDraft();
+      financial.clear();
       onClose();
     })();
   };
   const close = () => {
     if (financial.busy) return;
-    if (!dirty) {
-      onClose();
-      return;
-    }
-    void confirmAction(
-      "Discard budget changes?",
-      "Your unsaved changes will be discarded.",
-      "Discard",
-      true,
-    ).then((yes) => {
-      if (yes) onClose();
-    });
+    setValidationError(undefined);
+    financial.clear();
+    onClose();
   };
   return (
     <Sheet
@@ -258,41 +246,41 @@ export function AnnualBudgetSheet({
       <Field
         label="Daily cash release limit"
         value={daily}
-        onChangeText={setDaily}
+        onChangeText={(value) => setDraft({ daily: value })}
         keyboardType="decimal-pad"
         editable={!closed && !financial.busy}
       />
       <Field
         label="Per-receipt limit"
         value={receipt}
-        onChangeText={setReceipt}
+        onChangeText={(value) => setDraft({ receipt: value })}
         keyboardType="decimal-pad"
         editable={!closed && !financial.busy}
       />
       <Field
         label="Liquidation deadline in days"
         value={days}
-        onChangeText={setDays}
+        onChangeText={(value) => setDraft({ days: value })}
         keyboardType="number-pad"
         editable={!closed && !financial.busy}
       />
       <Field
         label="Q4 utilization target (%)"
         value={threshold}
-        onChangeText={setThreshold}
+        onChangeText={(value) => setDraft({ threshold: value })}
         keyboardType="decimal-pad"
         editable={!closed && !financial.busy}
       />
       <Toggle
         label="Allow documented receipt-limit override"
         value={override}
-        onChange={setOverride}
+        onChange={(value) => setDraft({ override: value })}
         disabled={closed || financial.busy}
       />
       <Field
         label="Budget notes"
         value={notes}
-        onChangeText={setNotes}
+        onChangeText={(value) => setDraft({ notes: value })}
         multiline
         editable={!closed && !financial.busy}
       />
@@ -300,7 +288,7 @@ export function AnnualBudgetSheet({
         <Field
           label="Adjustment reason"
           value={reason}
-          onChangeText={setReason}
+          onChangeText={(value) => setDraft({ reason: value })}
           multiline
           editable={!financial.busy}
         />
@@ -314,7 +302,7 @@ export function AnnualBudgetSheet({
           <Field
             label="Reason for fiscal close"
             value={reason}
-            onChangeText={setReason}
+            onChangeText={(value) => setDraft({ reason: value })}
             multiline
           />
           <Button
@@ -339,7 +327,11 @@ export function AnnualBudgetSheet({
                   onSaved,
                   "Fiscal year closed.",
                 );
-                if (saved) onClose();
+                if (saved) {
+                  clearDraft();
+                  financial.clear();
+                  onClose();
+                }
               })()
             }
           >

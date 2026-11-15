@@ -1,121 +1,744 @@
-import { useRef, useState } from "react";
-import { Button, Card, ErrorState, Field, Sheet } from "../../components/ui";
+import { useState } from "react";
+import {
+  Button,
+  Card,
+  Empty,
+  Choice,
+  ErrorState,
+  Field,
+  Loading,
+  Notice,
+  Sheet,
+  dateLabel,
+} from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
-import { saveSharedWork, sharedWorkRpc, type SharedWorkRequest } from "../../shared/sharedWorkRequest";
+import {
+  saveSharedWork,
+  type SharedWorkRequest,
+} from "../../shared/sharedWorkRequest";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { PublicMessageError } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
 import { draftStore } from "../../../platform/draftStore";
+import { nativeWindow } from "../../../platform/webRuntime";
+import { EvidenceAttachment } from "./EvidenceAttachment";
+import { EvidencePicker, evidenceIssue } from "./EvidencePicker";
+import type { EvidenceFile } from "../../../platform/evidenceFiles";
+import { supabase } from "../../../platform/supabase";
+import { confirmAction } from "../../shared/confirm";
+import { fetchAssignedSubtaskReviews } from "./assignedSubtaskReviews";
+import {
+  canResubmit,
+  fetchWorkProposals,
+  sendWorkProposal,
+  type ProposalKind,
+  type ProposalRequest,
+  type WorkProposal,
+} from "./workProposals";
 
-export function WorkProposalReview({ actor, root, node, onSaved }: {
-  actor: string; root: string; node?: string; onSaved: () => Promise<void>;
+export function WorkProposalReview({
+  actor,
+  root,
+  node,
+  proposalId,
+  officeSubtask,
+  readOnly,
+  canDecideProposals = true,
+  canParticipate = true,
+  showEmpty,
+  people,
+  onOpenCash,
+  onSaved,
+}: {
+  actor: string;
+  root: string;
+  node?: string;
+  proposalId?: string;
+  officeSubtask?: boolean;
+  readOnly?: boolean;
+  canDecideProposals?: boolean;
+  canParticipate?: boolean;
+  showEmpty?: boolean;
+  people?: readonly { id: string; name: string }[];
+  onOpenCash?: (recordId: string) => void;
+  onSaved: () => Promise<void>;
 }) {
   const facts = useFacts(`work-proposals:${actor}:${root}:${node ?? ""}`, () =>
-    sharedWorkRpc<{ items: { id: string; canDecide: boolean; kind: string; terms: { note: string } }[] }>(
-      "m7_work_proposals", { p_root: root, p_node: node ?? null },
-    ));
+    fetchWorkProposals(root, node),
+  );
+  const { toast } = useToast();
   const action = useAction();
   const [decision, setDecision] = useState<{ id: string; approve: boolean }>();
-  const [reason, setReason] = useState("");
+  const [resubmission, setResubmission] = useState<WorkProposal>();
+  const items = facts.error ? [] : (facts.data?.items ?? []);
   const scope = `proposal-decision:${root}:${node ?? "task"}`;
   const recovery = useFacts(`decision-recovery:${actor}:${scope}`, () =>
-    draftStore.get<SharedWorkRequest>(actor, scope));
+    draftStore.get<SharedWorkRequest>(actor, scope),
+  );
   const pending = recovery.data;
-  const selected = pending
-    ? { id: String(pending.args.p_proposal), approve: pending.args.p_approve === true }
-    : decision;
-  const submit = () => void action.run(async () => {
-    if (!selected || recovery.loading || recovery.error) return;
-    if (!pending && !selected.approve && !reason.trim())
-      throw new PublicMessageError("Explain what needs to change.");
-    const id = pending?.id ?? crypto.randomUUID();
-    await saveSharedWork(actor, scope, "m7_decide_work", pending ?? {
-      id, args: { p_proposal: selected.id, p_request: id, p_approve: selected.approve, p_note: reason.trim() || null },
-    }, (value): value is { id: string } => !!value && typeof value === "object" && "id" in value && value.id === selected.id, !!pending);
-    setDecision(undefined);
-    await Promise.all([facts.refresh(), recovery.refresh(), onSaved()]);
-  }).then((success) => { if (!success) void recovery.refresh(); });
-  const items = facts.data?.items.filter((item) => item.canDecide) ?? [];
-  if (!items.length && !selected && !recovery.error) return null;
+  const selected =
+    pending && decision
+      ? {
+          id: String(pending.args.p_proposal),
+          approve: pending.args.p_approve === true,
+        }
+      : decision;
+  const [decisionDraft, updateDecisionDraft, clearDecisionDraft] =
+    useRetainedDraft(
+      formDraftKey(
+        actor,
+        "proposal-decision:" +
+          root +
+          ":" +
+          (selected
+            ? selected.id + ":" + (selected.approve ? "approve" : "reject")
+            : "none"),
+      ),
+      !!selected,
+      () => ({ reason: "" }),
+    );
+  const reason = decisionDraft.reason;
+  const needsCashCheck = (item: WorkProposal) =>
+    !!officeSubtask &&
+    item.kind === "completion" &&
+    item.submitted_as_lead === true;
+  const cash = useFacts(
+    `proposal-cash:${actor}:${root}:${node ?? ""}`,
+    fetchAssignedSubtaskReviews,
+    !readOnly && items.some((item) => item.canDecide && needsCashCheck(item)),
+  );
+  const cashBlocked = (item: WorkProposal) =>
+    needsCashCheck(item) &&
+    cash.data?.some((entry) => entry.id === item.id && entry.cash_blocked);
+  const cashRecord = useFacts(
+    `proposal-cash-record:${actor}:${root}:${node ?? ""}`,
+    async () => {
+      const { data, error } = await supabase
+        .from("petty_cash_requests")
+        .select("id")
+        .eq("task_id", root)
+        .eq("subtask_id", node!)
+        .not("status", "in", "(settled,rejected,cancelled)")
+        .order("created_at")
+        .order("id")
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return typeof data?.id === "string" ? data.id : undefined;
+    },
+    !!node && !!onOpenCash && !cash.error && items.some(cashBlocked),
+  );
+  const cashRecordId = cashRecord.error ? undefined : cashRecord.data;
+  const cashUnavailable = (item: WorkProposal) =>
+    needsCashCheck(item) &&
+    (cash.loading ||
+      !!cash.error ||
+      !cash.data?.some((entry) => entry.id === item.id));
+  const refresh = async () => {
+    nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
+    await Promise.allSettled([
+      facts.refresh(),
+      cash.refresh(),
+      recovery.refresh(),
+      onSaved(),
+    ]);
+  };
+  const submit = () =>
+    void action
+      .run(async () => {
+        if (!selected || recovery.loading || recovery.error || readOnly || !canDecideProposals) return;
+        if (!pending && !selected.approve && !reason.trim())
+          throw new PublicMessageError("Explain what needs to change.");
+        const current = (await fetchWorkProposals(root, node)).items.find(
+          (item) => item.id === selected.id,
+        );
+        if (current?.state === "pending") {
+          if (!current.canDecide || current.author_id === actor)
+            throw new PublicMessageError(
+              "This submission is no longer assigned to you.",
+            );
+          if (selected.approve && needsCashCheck(current)) {
+            const cashStatus = (await fetchAssignedSubtaskReviews()).find(
+              (entry) => entry.id === current.id,
+            );
+            if (!cashStatus || cashStatus.cash_blocked)
+              throw new PublicMessageError(
+                "Cash settlement must be verified before approving this work.",
+              );
+          }
+        } else if (!pending || !current)
+          throw new PublicMessageError(
+            "This submission is no longer assigned to you.",
+          );
+        const id = pending?.id ?? crypto.randomUUID();
+        const nextState = selected.approve ? "approved" : "changes_requested";
+        await saveSharedWork(
+          actor,
+          scope,
+          "m7_decide_work",
+          pending ?? {
+            id,
+            args: {
+              p_proposal: selected.id,
+              p_request: id,
+              p_approve: selected.approve,
+              p_note: reason.trim() || null,
+            },
+          },
+          (value): value is WorkProposal =>
+            !!value &&
+            typeof value === "object" &&
+            "id" in value &&
+            value.id === selected.id &&
+            "state" in value &&
+            value.state === nextState &&
+            "decision_request" in value &&
+            value.decision_request === id,
+          !!pending,
+        );
+        clearDecisionDraft();
+        setDecision(undefined);
+        toast(
+          selected.approve ? "Work approved." : "Changes requested.",
+          "success",
+        );
+        await refresh();
+      })
+      .then((success) => {
+        if (!success) void recovery.refresh();
+      });
+  if (
+    !items.length &&
+    !selected &&
+    !recovery.error &&
+    !facts.error &&
+    !proposalId &&
+    !showEmpty
+  )
+    return null;
+  const ordered = proposalId
+    ? [
+        ...items.filter((item) => item.id === proposalId),
+        ...items.filter((item) => item.id !== proposalId),
+      ]
+    : items;
+  const name = (id: string, fallback: string) =>
+    id === actor
+      ? "You"
+      : (people?.find((person) => person.id === id)?.name ?? fallback);
+
   return (
-    <Card title="Work awaiting your review">
-      {!!recovery.error && <ErrorState error={recovery.error} retry={() => void recovery.refresh()} />}
-      {items.map((item) => (
-        <Card key={item.id} title={item.kind === "completion" ? "Completion submission" : "Progress submission"}>
+    <Card title="Work submissions">
+      {!!facts.error && (
+        <ErrorState error={facts.error} retry={() => void facts.refresh()} />
+      )}
+      {!!recovery.error && (
+        <ErrorState
+          error={recovery.error}
+          retry={() => void recovery.refresh()}
+        />
+      )}
+      {!!pending && !readOnly && !selected && (
+        <Button
+          variant="outline"
+          onPress={() =>
+            setDecision({
+              id: String(pending.args.p_proposal),
+              approve: pending.args.p_approve === true,
+            })
+          }
+        >
+          Verify saved decision
+        </Button>
+      )}
+      {!!proposalId && facts.loading && !items.length && (
+        <Loading label="Loading submission" />
+      )}
+      {!!showEmpty &&
+        !facts.loading &&
+        !facts.error &&
+        !items.length &&
+        !proposalId && (
+          <Empty
+            kind="files"
+            compact
+            title="No work submissions yet"
+            description="Submitted updates, completion evidence, and Lead review decisions appear here."
+          />
+        )}
+      {!!proposalId &&
+        !facts.loading &&
+        !facts.error &&
+        !items.some((item) => item.id === proposalId) && (
+          <Notice>
+            This submission is no longer available in your review history.
+          </Notice>
+        )}
+      {ordered.map((item) => (
+        <Card
+          key={item.id}
+          title={
+            item.kind === "completion"
+              ? "Completion submission"
+              : "Progress submission"
+          }
+        >
+          <Text>
+            {name(item.author_id, "Work contributor")} ·{" "}
+            {dateLabel(item.submitted_at)}
+          </Text>
+          <Notice>
+            {item.state === "approved"
+              ? "Accepted"
+              : item.state === "changes_requested"
+                ? "Changes requested"
+                : "Awaiting approval"}
+          </Notice>
+          {!!item.supersedes && <Text>Corrected submission</Text>}
+          {item.terms.progress != null && (
+            <Text>Proposed progress {item.terms.progress}%</Text>
+          )}
+          {!!item.terms.blocker && (
+            <Text selectable>Blocker · {item.terms.blocker}</Text>
+          )}
           <Text selectable>{item.terms.note}</Text>
-          <Button disabled={!!pending || recovery.loading} onPress={() => { setReason(""); setDecision({ id: item.id, approve: true }); }}>Approve</Button>
-          <Button variant="outline" disabled={!!pending || recovery.loading} onPress={() => { setReason(""); setDecision({ id: item.id, approve: false }); }}>Request changes</Button>
+          {item.terms.attachments?.map((file) => (
+            <EvidenceAttachment
+              key={file.filePath}
+              path={file.filePath}
+              name={file.fileName}
+              bucket="m7-work-evidence"
+            />
+          ))}
+          {!!item.decided_at && (
+            <Text>
+              {name(item.reviewer_id, "Assigned reviewer")} ·{" "}
+              {dateLabel(item.decided_at)}
+            </Text>
+          )}
+          {!!item.decision_note && <Text selectable>{item.decision_note}</Text>}
+          {canDecideProposals &&
+            item.canDecide &&
+            item.state === "pending" &&
+            item.author_id !== actor &&
+            !readOnly && (
+              <>
+                {cashBlocked(item) && (
+                  <>
+                    <Notice>Completion is waiting for cash settlement.</Notice>
+                    <Button
+                      variant="outline"
+                      disabled={cash.loading}
+                      onPress={() => void cash.refresh()}
+                    >
+                      Check settlement again
+                    </Button>
+                  </>
+                )}
+                {cashBlocked(item) && onOpenCash && cashRecordId && (
+                  <Button
+                    variant="outline"
+                    onPress={() => onOpenCash(cashRecordId)}
+                  >
+                    View cash request
+                  </Button>
+                )}
+                {cashUnavailable(item) && !cashBlocked(item) && (
+                  <>
+                    <Notice>
+                      {cash.loading
+                        ? "Checking cash settlement"
+                        : "Cash settlement could not be verified."}
+                    </Notice>
+                    {!cash.loading && (
+                      <Button
+                        variant="outline"
+                        onPress={() => void cash.refresh()}
+                      >
+                        Check again
+                      </Button>
+                    )}
+                  </>
+                )}
+                <Button
+                  disabled={
+                    !!pending ||
+                    recovery.loading ||
+                    !!recovery.error ||
+                    facts.loading ||
+                    !!cashBlocked(item) ||
+                    cashUnavailable(item)
+                  }
+                  onPress={() => {
+                    action.clear();
+                    setDecision({ id: item.id, approve: true });
+                  }}
+                >
+                  Approve
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={
+                    !!pending ||
+                    recovery.loading ||
+                    !!recovery.error ||
+                    facts.loading
+                  }
+                  onPress={() => {
+                    action.clear();
+                    setDecision({ id: item.id, approve: false });
+                  }}
+                >
+                  Request changes
+                </Button>
+              </>
+            )}
+          {!readOnly &&
+            canParticipate &&
+            !facts.loading &&
+            canResubmit(item, items, actor) &&
+            (item.kind === "progress"
+              ? facts.data?.canProposeProgress
+              : facts.data?.canProposeCompletion) && (
+              <Button variant="outline" onPress={() => setResubmission(item)}>
+                Resubmit work
+              </Button>
+            )}
         </Card>
       ))}
-      {selected && (
-        <Sheet open title={selected.approve ? "Approve work" : "Request changes"} busy={action.busy}
-          actionError={action.error} onClose={() => setDecision(undefined)}
-          footer={<Button busy={action.busy} onPress={submit}>{selected.approve ? "Approve" : "Request changes"}</Button>}>
-          {!selected.approve && <Field label="Reason" value={pending ? String(pending.args.p_note ?? "") : reason} editable={!pending} onChangeText={setReason} multiline />}
+      {selected && !readOnly && (
+        <Sheet
+          open
+          title={selected.approve ? "Approve work" : "Request changes"}
+          busy={action.busy}
+          actionError={action.error}
+          onClose={() => {
+            if (!action.busy) {
+              action.clear();
+              setDecision(undefined);
+            }
+          }}
+          footer={
+            <Button
+              busy={action.busy}
+              disabled={recovery.loading || !!recovery.error}
+              onPress={submit}
+            >
+              {pending
+                ? "Verify decision"
+                : selected.approve
+                  ? "Approve"
+                  : "Request changes"}
+            </Button>
+          }
+        >
+          <Field
+            label="Review note"
+            required={!selected.approve}
+            maxLength={3000}
+            value={pending ? String(pending.args.p_note ?? "") : reason}
+            editable={!pending}
+            onChangeText={(next) => updateDecisionDraft({ reason: next })}
+            multiline
+          />
         </Sheet>
+      )}
+      {resubmission && !readOnly && canParticipate && (
+        <WorkProposalSheet
+          actor={actor}
+          root={root}
+          node={node}
+          kind={resubmission.kind}
+          supersedes={resubmission.id}
+          canParticipate={canParticipate}
+          onClose={() => setResubmission(undefined)}
+          onSaved={refresh}
+        />
       )}
     </Card>
   );
 }
 
 export function WorkProposalSheet({
-  actor, root, node, kind, onClose, onSaved,
+  actor,
+  root,
+  node,
+  kind,
+  supersedes,
+  initialBlocker,
+  currentProgress,
+  canParticipate = true,
+  onClose,
+  onSaved,
 }: {
   actor: string;
   root: string;
   node?: string;
-  kind: "progress" | "completion";
+  kind: ProposalKind;
+  supersedes?: string;
+  initialBlocker?: string | null;
+  currentProgress?: number | null;
+  canParticipate?: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
   const scope = `work-proposal:${root}:${node ?? "task"}:${kind}`;
   const saved = useFacts(`proposal-recovery:${actor}:${scope}`, () =>
-    draftStore.get<SharedWorkRequest>(actor, scope));
+    draftStore.get<ProposalRequest>(actor, scope),
+  );
+  const { toast } = useToast();
   const action = useAction();
-  const attempt = useRef<SharedWorkRequest | undefined>(undefined);
-  const [note, setNote] = useState("");
-  const [progress, setProgress] = useState("");
-  const needsProgress = kind === "progress" && !node;
-  const request = saved.data ?? attempt.current;
-  const submit = () => void action.run(async () => {
-    if (saved.loading || saved.error) return;
-    let next = request;
-    if (!next) {
-      if (!note.trim()) throw new PublicMessageError("Enter a work note.");
-      if (needsProgress && !/^(?:[0-9]|[1-9][0-9])$/.test(progress))
-        throw new PublicMessageError("Enter progress from 0 to 99.");
-      const id = crypto.randomUUID();
-      next = {
-        id,
-        args: {
-          p_root: root, p_node: node ?? null, p_request: id, p_kind: kind,
-          p_terms: { note: note.trim(), ...(needsProgress ? { progress: Number(progress) } : {}) },
-        },
-      };
-      attempt.current = next;
-    }
-    try {
-      await saveSharedWork(actor, scope, "m7_propose_work", next,
-        (value): value is { id: string } => !!value && typeof value === "object" && "id" in value && value.id === next.id,
-        !!saved.data);
-    } catch (error) {
-      const code = (error as { code?: string })?.code;
-      if (!saved.data && code && /^(22|23|42501|40001)/.test(code)) attempt.current = undefined;
-      throw error;
-    }
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(actor, scope + ":" + (supersedes ?? "new")),
+    true,
+    () => ({
+      state: "in_progress" as "in_progress" | "stuck",
+      blocker: "",
+      note: "",
+      nextStep: "",
+      files: [] as EvidenceFile[],
+    }),
+  );
+  const { state, blocker, note, nextStep, files } = draft;
+  const workState = state === "stuck" ? "stuck" : "in_progress";
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
     onClose();
-    await onSaved();
-  });
-  const terms = request?.args.p_terms as { note?: string; progress?: number } | undefined;
+  };
+  const isProgress = kind === "progress";
+  const request = saved.data;
+  const submit = () =>
+    void action
+      .run(async () => {
+        if (saved.loading || saved.error) return;
+        if (!canParticipate)
+          throw new PublicMessageError(
+            "Only the Lead or contributors of this task or subtask can submit work updates.",
+          );
+        let next = request;
+        if (!next || next.files) {
+          const context = await fetchWorkProposals(root, node);
+          if (
+            !(kind === "progress"
+              ? context.canProposeProgress
+              : context.canProposeCompletion)
+          )
+            throw new PublicMessageError(
+              "You no longer have permission to submit this work for review.",
+            );
+          const originalId = next ? next.args.p_supersedes : supersedes;
+          if (
+            originalId &&
+            !context.items.some(
+              (item) =>
+                item.id === originalId &&
+                item.kind === kind &&
+                canResubmit(item, context.items, actor),
+            )
+          )
+            throw new PublicMessageError(
+              "This submission is no longer available for correction.",
+            );
+        }
+        if (!next) {
+          if (isProgress && workState === "stuck" && !blocker.trim())
+            throw new PublicMessageError(
+              "Describe what is blocking the work.",
+            );
+          const trimmedNote = note.trim();
+          const trimmedNextStep = isProgress ? nextStep.trim() : "";
+          if (!trimmedNote)
+            throw new PublicMessageError(
+              isProgress ? "Enter a work note." : "Enter a completion note.",
+            );
+          const submissionNote = trimmedNextStep
+            ? `${trimmedNote}\n\nNext step: ${trimmedNextStep}`
+            : trimmedNote;
+          if (submissionNote.length > 3000)
+            throw new PublicMessageError(
+              "Work note and next step must be 3000 characters or fewer.",
+            );
+          const issue = evidenceIssue(files);
+          if (issue) throw new PublicMessageError(issue);
+          const preservedProgress =
+            isProgress && !node
+              ? Math.min(99, Math.max(0, Math.round(currentProgress ?? 0)))
+              : undefined;
+          const id = crypto.randomUUID();
+          next = {
+            id,
+            ...(files.length
+              ? {
+                  files: files.map(({ uri, name, size, type }) => ({
+                    uri,
+                    name,
+                    size,
+                    type,
+                  })),
+                }
+              : {}),
+            args: {
+              p_root: root,
+              p_node: node ?? null,
+              p_request: id,
+              p_kind: kind,
+              p_terms: {
+                note: submissionNote,
+                ...(isProgress && workState === "stuck"
+                  ? { blocker: blocker.trim() }
+                  : {}),
+                ...(preservedProgress !== undefined
+                  ? { progress: preservedProgress }
+                  : {}),
+              },
+              p_supersedes: supersedes ?? null,
+            },
+          };
+        }
+        await sendWorkProposal(actor, root, node, scope, next, !!request);
+        clearDraft();
+        toast(
+          kind === "progress"
+            ? "Progress submitted for review."
+            : "Completion submitted for review.",
+          "success",
+        );
+        onClose();
+        nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
+        await Promise.allSettled([onSaved()]);
+      })
+      .then((success) => {
+        if (!success) void saved.refresh();
+      });
+  const terms = request?.args.p_terms as WorkProposal["terms"] | undefined;
+  const activeState = terms
+    ? terms.blocker?.trim()
+      ? "stuck"
+      : "in_progress"
+    : workState;
+  const title = supersedes
+    ? "Resubmit work"
+    : kind === "completion"
+      ? "Submit for review"
+      : "Submit progress for review";
   return (
-    <Sheet open title={kind === "completion" ? "Submit for review" : "Submit progress for review"}
-      actionError={action.error ?? saved.error} busy={action.busy} onClose={onClose}
-      footer={<Button busy={action.busy} disabled={saved.loading || !!saved.error} onPress={submit}>Submit for review</Button>}
+    <Sheet
+      open
+      title={title}
+      actionError={action.error ?? saved.error}
+      busy={action.busy}
+      onClose={close}
+      footer={
+        <Button
+          busy={action.busy}
+          disabled={saved.loading || !!saved.error}
+          onPress={submit}
+        >
+          {request
+            ? request.files
+              ? "Resume submission"
+              : "Verify submission"
+            : title}
+        </Button>
+      }
     >
-      {needsProgress && <Field label="Progress (%)" value={terms?.progress?.toString() ?? progress}
-        keyboardType="numeric" editable={!request && !action.busy} onChangeText={setProgress} />}
-      <Field label="Work note" value={terms?.note ?? note} onChangeText={setNote}
-        editable={!request && !action.busy} multiline maxLength={3000} />
+      {!!request && (
+        <Notice>Continue the saved submission to verify its result.</Notice>
+      )}
+      {!!request?.files && !saved.loading && (
+        <Button
+          variant="outline"
+          disabled={action.busy}
+          onPress={() =>
+            void action.run(async () => {
+              if (
+                !(await confirmAction(
+                  "Discard the saved upload?",
+                  "You can choose your evidence again.",
+                  "Discard upload",
+                ))
+              )
+                return;
+              const current = await draftStore.get<ProposalRequest>(
+                actor,
+                scope,
+              );
+              if (current?.id !== request.id || !current.files)
+                throw new PublicMessageError(
+                  "Verify the saved submission before changing its evidence.",
+                );
+              await draftStore.remove(actor, scope);
+              updateDraft({
+                state: terms?.blocker?.trim() ? "stuck" : "in_progress",
+                blocker: String(terms?.blocker ?? ""),
+                note: String(terms?.note ?? ""),
+                nextStep: "",
+              });
+              await saved.refresh();
+            })
+          }
+        >
+          Discard saved upload
+        </Button>
+      )}
+      {isProgress && (
+        <>
+          <Choice
+            label="Work state"
+            value={activeState}
+            disabled={!!request || action.busy}
+            options={[
+              { value: "in_progress", label: "In progress" },
+              { value: "stuck", label: "Blocked" },
+            ]}
+            onChange={(nextValue) =>
+              updateDraft({
+                state: nextValue === "stuck" ? "stuck" : "in_progress",
+              })
+            }
+          />
+          {activeState === "stuck" && (
+            <Field
+              label="Blocker"
+              required
+              value={terms?.blocker ?? blocker}
+              onChangeText={(nextValue) => updateDraft({ blocker: nextValue })}
+              editable={!request && !action.busy}
+              multiline
+              maxLength={3000}
+            />
+          )}
+        </>
+      )}
+      <Field
+        label={isProgress ? "Work note" : "Completion note"}
+        required
+        value={terms?.note ?? note}
+        onChangeText={(nextValue) => updateDraft({ note: nextValue })}
+        editable={!request && !action.busy}
+        multiline
+        maxLength={3000}
+      />
+      {isProgress && !request && (
+        <Field
+          label="Next step"
+          value={nextStep}
+          onChangeText={(nextValue) => updateDraft({ nextStep: nextValue })}
+          editable={!action.busy}
+          maxLength={300}
+        />
+      )}
+      {!request && (
+        <EvidencePicker
+          files={files}
+          onChange={(nextValue) => updateDraft({ files: nextValue })}
+          disabled={action.busy}
+          run={(pick) => void action.run(pick)}
+        />
+      )}
     </Sheet>
   );
 }

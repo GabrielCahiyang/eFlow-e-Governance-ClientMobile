@@ -1,4 +1,5 @@
 import { confirmAction } from "../../shared/confirm";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useState } from "react";
 import {
   Button,
@@ -33,13 +34,25 @@ export function PersonalTaskSheet({
   ) => Promise<boolean>;
   onClose: () => void;
 }) {
-  const [title, setTitle] = useState(""),
-    [lead, setLead] = useState(task?.lead_id || actor),
-    [reviewer, setReviewer] = useState(task?.reviewer_id || ""),
-    [progress, setProgress] = useState(String(task?.progress || 0)),
-    [note, setNote] = useState(mode === "review" ? "" : task?.note || ""),
-    [decision, setDecision] = useState("approve"),
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+      formDraftKey(actor, "personal-task:" + mode + ":" + (task?.id ?? "new")),
+      true,
+      () => ({
+        title: "",
+        lead: task?.lead_id || actor,
+        reviewer: task?.reviewer_id || "",
+        progress: String(task?.progress || 0),
+        note: mode === "review" ? "" : task?.note || "",
+        decision: "approve",
+      }),
+    ),
+    { title, lead, reviewer, progress, note, decision } = draft,
     [error, setError] = useState("");
+  const close = () => {
+    if (busy) return;
+    setError("");
+    onClose();
+  };
   const eligible = members
     .filter((member) => member.state === "active" && member.eligible)
     .map((member) => ({ value: member.user_id, label: member.name }));
@@ -109,7 +122,10 @@ export function PersonalTaskSheet({
       command = "review_task";
       payload = { ...payload, decision, note };
     }
-    if (await run(command, payload)) onClose();
+    if (await run(command, payload)) {
+      clearDraft();
+      onClose();
+    }
   };
   return (
     <Sheet
@@ -129,7 +145,7 @@ export function PersonalTaskSheet({
                 : "Review personal work"
       }
       description={task?.title}
-      onClose={onClose}
+      onClose={close}
       busy={busy}
       footer={
         <Button busy={busy} onPress={() => void save()}>
@@ -140,8 +156,9 @@ export function PersonalTaskSheet({
       {!!(mode === "create") && (
         <Field
           label="Task name"
+          required
           value={title}
-          onChangeText={setTitle}
+          onChangeText={(next) => updateDraft({ title: next })}
           maxLength={200}
         />
       )}
@@ -150,16 +167,19 @@ export function PersonalTaskSheet({
           <Choice
             label="Task lead"
             value={lead}
-            onChange={(value) => {
-              setLead(value);
-              if (value === reviewer) setReviewer("");
-            }}
+            onChange={(value) =>
+              updateDraft((old) => ({
+                ...old,
+                lead: value,
+                reviewer: value === old.reviewer ? "" : old.reviewer,
+              }))
+            }
             options={eligible}
           />
           <Choice
             label="Independent reviewer"
             value={reviewer}
-            onChange={setReviewer}
+            onChange={(next) => updateDraft({ reviewer: next })}
             options={[
               {
                 value: "",
@@ -179,16 +199,18 @@ export function PersonalTaskSheet({
       {!!(mode === "progress") && (
         <Field
           label="Progress (%)"
+          required
           value={progress}
-          onChangeText={setProgress}
+          onChangeText={(next) => updateDraft({ progress: next })}
           keyboardType="number-pad"
         />
       )}
       {!!(mode === "review") && (
         <Choice
           label="Decision"
+          required
           value={decision}
-          onChange={setDecision}
+          onChange={(next) => updateDraft({ decision: next })}
           options={[
             { value: "approve", label: "Approve personal work" },
             { value: "reject", label: "Return for changes" },
@@ -198,8 +220,9 @@ export function PersonalTaskSheet({
       {!["create", "staff"].includes(mode) && (
         <Field
           label={mode === "review" ? "Review note" : "Work update"}
+          required={mode === "review" && decision !== "approve"}
           value={note}
-          onChangeText={setNote}
+          onChangeText={(next) => updateDraft({ note: next })}
           multiline
           maxLength={4000}
         />

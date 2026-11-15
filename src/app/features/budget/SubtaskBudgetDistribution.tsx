@@ -17,6 +17,8 @@ import {
   type SharedWorkRequest,
 } from "../../shared/sharedWorkRequest";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
 import { PublicMessageError } from "../../shared/userMessages";
 import { draftStore } from "../../../platform/draftStore";
@@ -47,11 +49,14 @@ export function SubtaskBudgetDistribution({
   onSaved: () => Promise<void>;
 }) {
   const [selected, setSelected] = useState<string>();
+  const { toast } = useToast();
   const totals = context.distribution;
   if (!totals) return null;
   const rows = context.subtaskBudgets ?? [];
   const canManage =
-    !!actor && actor === context.taskLeaderId && context.canManageDistribution;
+    !!actor &&
+    actor === context.taskLeaderId &&
+    Boolean(context.canManageDistribution);
   const row = rows.find(({ id }) => id === selected);
   const metrics: [string, number][] = context.subtaskId
     ? [
@@ -84,31 +89,42 @@ export function SubtaskBudgetDistribution({
           {!context.subtaskId && (
             <Notice>Allocations divide the approved task budget.</Notice>
           )}
-          {rows.map((item) => (
-            <Card key={item.id} title={item.title}>
-              <LabelValue label="Allocated" value={recordedPeso(item.amount)} />
-              {!!item.capId && (
+          {rows.map((item) => {
+            const sourceName = context.parentSources?.find(
+              (source) => source.id === item.sourceId,
+            )?.name;
+            return (
+              <Card key={item.id} title={item.title}>
+                {!!sourceName && (
+                  <LabelValue label="Account" value={sourceName} />
+                )}
                 <LabelValue
-                  label="Unused"
-                  value={recordedPeso(item.returnable)}
+                  label="Allocated"
+                  value={recordedPeso(item.amount)}
                 />
-              )}
-              {item.blocked && (
-                <Notice>
-                  Resolve the open cash request before changing this budget.
-                </Notice>
-              )}
-              {canManage && (
-                <Button
-                  variant="outline"
-                  disabled={readOnly}
-                  onPress={() => setSelected(item.id)}
-                >
-                  Manage budget
-                </Button>
-              )}
-            </Card>
-          ))}
+                {!!item.capId && (
+                  <LabelValue
+                    label="Unused"
+                    value={recordedPeso(item.returnable)}
+                  />
+                )}
+                {item.blocked && (
+                  <Notice>
+                    Resolve the open cash request before changing this budget.
+                  </Notice>
+                )}
+                {canManage && (
+                  <Button
+                    variant="outline"
+                    disabled={readOnly}
+                    onPress={() => setSelected(item.id)}
+                  >
+                    Manage budget
+                  </Button>
+                )}
+              </Card>
+            );
+          })}
         </Card>
       )}
       {row && canManage && (
@@ -146,19 +162,29 @@ function DistributionSheet({
   const recovery = useFacts(`distribution-recovery:${actor}:${scope}`, () =>
     draftStore.get<SharedWorkRequest>(actor, scope),
   );
+  const { toast } = useToast();
   const action = useAction();
-  const [preferredMode, setMode] = useState<DistributionMode>("save");
   const [expectedCapId] = useState(row.capId);
   const [expectedAmount] = useState(row.amount);
-  const [source, setSource] = useState(
-    row.sourceId ??
-      context.parentSources?.find(({ available }) => available > 0)?.id ??
-      "",
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(actor, "subtask-budget:" + context.taskId + ":" + row.id),
+    true,
+    () => ({
+      preferredMode: "save" as DistributionMode,
+      source:
+        row.sourceId ??
+        context.parentSources?.find(({ available }) => available > 0)?.id ??
+        "",
+      amount: row.amount > 0 ? String(row.amount) : "",
+      reason: "",
+    }),
   );
-  const [amount, setAmount] = useState(
-    row.amount > 0 ? String(row.amount) : "",
-  );
-  const [reason, setReason] = useState("");
+  const { preferredMode, source, amount, reason } = draft;
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const sources = (context.parentSources ?? []).filter(
     (option) =>
       option.id === row.sourceId ||
@@ -230,6 +256,11 @@ function DistributionSheet({
       } finally {
         await recovery.refresh();
       }
+      clearDraft();
+      toast(
+        returning ? "Subtask funding returned." : "Subtask budget saved.",
+        "success",
+      );
       onClose();
       nativeWindow.dispatchEvent({
         type: "eflow:finance-updated",
@@ -249,7 +280,7 @@ function DistributionSheet({
       title="Subtask budget"
       description={row.title}
       busy={action.busy}
-      onClose={onClose}
+      onClose={close}
     >
       {recovery.loading && !recovery.data && (
         <Loading
@@ -280,7 +311,9 @@ function DistributionSheet({
               disabled={action.busy}
               onChange={(value) => {
                 action.clear();
-                setMode(value === "return" ? "return" : "save");
+                updateDraft({
+                  preferredMode: value === "return" ? "return" : "save",
+                });
               }}
               options={[
                 { value: "save", label: "Edit budget" },
@@ -292,8 +325,9 @@ function DistributionSheet({
             <>
               <Choice
                 label="Funding account"
+                required
                 value={source}
-                onChange={setSource}
+                onChange={(next) => updateDraft({ source: next })}
                 disabled={action.busy || row.hasHistory}
                 options={sources.map((option) => ({
                   value: option.id,
@@ -312,8 +346,9 @@ function DistributionSheet({
               )}
               <Field
                 label="New budget"
+                required
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={(next) => updateDraft({ amount: next })}
                 keyboardType="decimal-pad"
                 editable={!action.busy}
               />
@@ -325,8 +360,9 @@ function DistributionSheet({
           )}
           <Field
             label="Reason"
+            required
             value={reason}
-            onChangeText={setReason}
+            onChangeText={(next) => updateDraft({ reason: next })}
             maxLength={3000}
             multiline
             editable={!action.busy}
@@ -353,7 +389,7 @@ function DistributionSheet({
           </Notice>
         )
       )}
-      <Button variant="outline" disabled={action.busy} onPress={onClose}>
+      <Button variant="outline" disabled={action.busy} onPress={close}>
         Cancel
       </Button>
     </Sheet>

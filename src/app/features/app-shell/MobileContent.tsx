@@ -48,8 +48,7 @@ export function MobileContent({
     );
   else if (
     current.nodeId &&
-    (current.name === "personal_project" ||
-      (current.name === "task" && current.view !== "budget"))
+    (current.name === "personal_project" || current.name === "task")
   )
     content = <LinkedWorkNodeScreen route={current} navigate={navigate} />;
   else if (current.name === "personal_project" && current.id)
@@ -143,7 +142,11 @@ export function MobileContent({
         projectId={current.projectId}
         initialView={current.view}
         nodeId={current.nodeId}
-        submissionId={current.view === "review" ? current.recordId : undefined}
+        submissionId={
+          current.view === "review" || current.recordType === "work_proposal"
+            ? current.recordId
+            : undefined
+        }
         financialRecordId={
           current.view === "budget" ? current.recordId : undefined
         }

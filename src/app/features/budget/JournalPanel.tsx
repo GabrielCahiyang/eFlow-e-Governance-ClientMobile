@@ -19,6 +19,7 @@ import {
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
 import { confirmAction } from "../../shared/confirm";
 import {
@@ -220,18 +221,32 @@ function JournalAdjustment({
   const { profile } = useAuth(),
     accounts = useFacts("journal-account-catalog", fetchAccountingAccounts),
     command = useFinancialCommand(profile?.id || "", `journal:${budgetId}`),
-    [date, setDate] = useState(""),
-    [reference, setReference] = useState(""),
-    [memo, setMemo] = useState(""),
-    [lines, setLines] = useState<JournalAdjustmentLineInput[]>([
-      { accountCode: "", debit: 0, credit: 0 },
-      { accountCode: "", debit: 0, credit: 0 },
-    ]),
     [validation, setValidation] = useState("");
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(profile?.id, "journal-adjustment:" + budgetId),
+    true,
+    () => ({
+      date: "",
+      reference: "",
+      memo: "",
+      lines: [
+        { accountCode: "", debit: 0, credit: 0 },
+        { accountCode: "", debit: 0, credit: 0 },
+      ] as JournalAdjustmentLineInput[],
+    }),
+  );
+  const { date, reference, memo, lines } = draft;
+  const close = () => {
+    if (command.busy) return;
+    command.clear();
+    setValidation("");
+    onClose();
+  };
   const patch = (index: number, values: Partial<JournalAdjustmentLineInput>) =>
-    setLines((old) =>
-      old.map((l, i) => (i === index ? { ...l, ...values } : l)),
-    );
+    updateDraft((old) => ({
+      ...old,
+      lines: old.lines.map((l, i) => (i === index ? { ...l, ...values } : l)),
+    }));
   const save = async () => {
     const debits = lines.reduce((s, l) => s + Math.round(l.debit * 100), 0),
       credits = lines.reduce((s, l) => s + Math.round(l.credit * 100), 0);
@@ -276,14 +291,17 @@ function JournalAdjustment({
       onSaved,
       "Balanced journal adjustment posted.",
     );
-    if (ok) onClose();
+    if (ok) {
+      clearDraft();
+      onClose();
+    }
   };
   return (
     <Sheet
       actionError={command.error}
       open
       title="Balanced journal adjustment"
-      onClose={onClose}
+      onClose={close}
       busy={command.busy}
       footer={
         <Button busy={command.busy} onPress={() => void save()}>
@@ -291,16 +309,20 @@ function JournalAdjustment({
         </Button>
       }
     >
-      <DateField label="Entry date" value={date} onChange={setDate} />
+      <DateField
+        label="Entry date"
+        value={date}
+        onChange={(next) => updateDraft({ date: next })}
+      />
       <Field
         label="Reference number"
         value={reference}
-        onChangeText={setReference}
+        onChangeText={(next) => updateDraft({ reference: next })}
       />
       <Field
         label="Explanation"
         value={memo}
-        onChangeText={setMemo}
+        onChangeText={(next) => updateDraft({ memo: next })}
         multiline
       />
       {accounts.error ? (
@@ -339,7 +361,10 @@ function JournalAdjustment({
                 variant="ghost"
                 disabled={command.busy}
                 onPress={() =>
-                  setLines((old) => old.filter((_, i) => i !== index))
+                  updateDraft((old) => ({
+                    ...old,
+                    lines: old.lines.filter((_, i) => i !== index),
+                  }))
                 }
               >
                 Remove line
@@ -354,7 +379,10 @@ function JournalAdjustment({
         variant="outline"
         disabled={command.busy}
         onPress={() =>
-          setLines((old) => [...old, { accountCode: "", debit: 0, credit: 0 }])
+          updateDraft((old) => ({
+            ...old,
+            lines: [...old.lines, { accountCode: "", debit: 0, credit: 0 }],
+          }))
         }
       >
         Add journal line

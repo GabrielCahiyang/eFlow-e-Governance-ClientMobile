@@ -12,7 +12,10 @@ import {
 } from "../../components/ui";
 import { ProjectSetupSheet } from "./ProjectSetupSheet";
 import { useAuth } from "../authentication";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { PublicMessageError } from "../../shared/userMessages";
 import {
   updateProject,
   archiveProject,
@@ -32,21 +35,30 @@ export function ProjectSettings({
   onDeleted: () => void;
 }) {
   const { profile } = useAuth();
+  const { toast } = useToast();
   const [setup, setSetup] = useState(false);
   const [title, setTitle] = useState(project.title),
     [description, setDescription] = useState(project.description),
     [start, setStart] = useState(project.startDate || ""),
     [target, setTarget] = useState(project.targetDate || ""),
-    [operation, setOperation] = useState<"archive" | "restore" | "delete">(),
-    [reason, setReason] = useState(""),
-    [confirmation, setConfirmation] = useState("");
+    [operation, setOperation] = useState<"archive" | "restore" | "delete">();
+  const [lifecycleDraft, updateLifecycleDraft, clearLifecycleDraft] =
+    useRetainedDraft(
+      formDraftKey(
+        profile?.id,
+        "project-lifecycle:" + project.id + ":" + (operation ?? "none"),
+      ),
+      !!operation,
+      () => ({ reason: "", confirmation: "" }),
+    );
+  const { reason, confirmation } = lifecycleDraft;
   const action = useAction(),
     closed = ["completed", "archived"].includes(project.status);
   const save = () =>
     action.run(async () => {
-      if (!title.trim()) throw new Error("Project name is required.");
+      if (!title.trim()) throw new PublicMessageError("Project name is required.");
       if (start && target && target < start)
-        throw new Error("Target date must be on or after the start date.");
+        throw new PublicMessageError("Target date must be on or after the start date.");
       await updateProject(
         project.id,
         {
@@ -57,20 +69,26 @@ export function ProjectSettings({
         },
         project.metadataVersion,
       );
+      toast("Project details saved.", "success");
       await onSaved();
     }, "Project details saved.");
   const lifecycle = () =>
     action.run(async () => {
       if (operation === "delete") {
-        if (!reason.trim()) throw new Error("Reason for deletion is required.");
+        if (!reason.trim()) throw new PublicMessageError("Reason for deletion is required.");
         if (confirmation !== project.title)
-          throw new Error("Type the project name exactly to confirm.");
+          throw new PublicMessageError("Type the project name exactly to confirm.");
         await deleteProject(project.id, confirmation, reason);
+        toast("Project deleted.", "success");
         onDeleted();
-      } else if (operation === "archive")
+      } else if (operation === "archive") {
         await archiveProject(project.id, reason);
-      else if (operation === "restore")
+        toast("Project archived.", "success");
+      } else if (operation === "restore") {
         await restoreProject(project.id, reason);
+        toast("Project restored.", "success");
+      }
+      clearLifecycleDraft();
       setOperation(undefined);
       await onSaved();
     });
@@ -93,6 +111,7 @@ export function ProjectSettings({
       <Card title="Project settings">
         <Field
           label="Project name"
+          required
           value={title}
           onChangeText={setTitle}
           editable={canManage && !closed}
@@ -124,21 +143,41 @@ export function ProjectSettings({
         {!!action.notice && (
           <Text style={{ color: colors.success }}>{action.notice}</Text>
         )}
-        {!!action.error && <ErrorState context="action" error={action.error} />}
+        {!operation && !!action.error && (
+          <ErrorState context="action" error={action.error} />
+        )}
       </Card>
       {!!canManage && (
         <Card title="Project lifecycle">
           {!!(project.status === "completed") && (
-            <Button variant="outline" onPress={() => setOperation("archive")}>
+            <Button
+              variant="outline"
+              onPress={() => {
+                action.clear();
+                setOperation("archive");
+              }}
+            >
               Archive project
             </Button>
           )}
           {!!(project.status === "archived") && (
-            <Button variant="outline" onPress={() => setOperation("restore")}>
+            <Button
+              variant="outline"
+              onPress={() => {
+                action.clear();
+                setOperation("restore");
+              }}
+            >
               Restore project
             </Button>
           )}
-          <Button variant="danger" onPress={() => setOperation("delete")}>
+          <Button
+            variant="danger"
+            onPress={() => {
+              action.clear();
+              setOperation("delete");
+            }}
+          >
             Permanently delete project
           </Button>
         </Card>
@@ -154,9 +193,10 @@ export function ProjectSettings({
               : "Archive project"
         }
         onClose={() => {
-          setOperation(undefined);
-          setConfirmation("");
-          action.clear();
+          if (!action.busy) {
+            setOperation(undefined);
+            action.clear();
+          }
         }}
         busy={action.busy}
         footer={
@@ -164,7 +204,12 @@ export function ProjectSettings({
             <Button
               variant="outline"
               disabled={action.busy}
-              onPress={() => setOperation(undefined)}
+              onPress={() => {
+                if (!action.busy) {
+                  setOperation(undefined);
+                  action.clear();
+                }
+              }}
             >
               Cancel
             </Button>
@@ -192,18 +237,20 @@ export function ProjectSettings({
         <Field
           label={
             operation === "delete"
-              ? "Reason for deletion *"
+              ? "Reason for deletion"
               : "Reason (optional)"
           }
+          required={operation === "delete"}
           value={reason}
-          onChangeText={setReason}
+          onChangeText={(next) => updateLifecycleDraft({ reason: next })}
           multiline
         />
         {!!(operation === "delete") && (
           <Field
-            label={`Type ${project.title} to confirm *`}
+            label={`Type ${project.title} to confirm`}
+            required
             value={confirmation}
-            onChangeText={setConfirmation}
+            onChangeText={(next) => updateLifecycleDraft({ confirmation: next })}
           />
         )}
       </Sheet>

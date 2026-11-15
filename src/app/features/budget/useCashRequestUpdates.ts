@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { AppState } from "react-native";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -13,14 +13,12 @@ export function useCashRequestUpdates(
 ) {
   useEffect(() => {
     if (!enabled) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = () => {
-      if (timer || AppState.currentState !== "active") return;
-      timer = setTimeout(() => {
-        timer = undefined;
-        void reload();
-      }, 250);
-    };
+    const live = createLiveRefreshController({
+      onRefresh: () => void reload(),
+      debounceMs: 250,
+      hasRealtime: true,
+    });
+    const refresh = live.schedule;
     const channel = createPostgresChannel(`native-task-cash:${taskId}`).on(
       "postgres_changes",
       {
@@ -45,22 +43,14 @@ export function useCashRequestUpdates(
         refresh,
       );
     }
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") refresh();
-    });
+    channel.subscribe(live.onChannelStatus);
     const changed = (event: { detail?: { taskId?: string } }) => {
       if (!event.detail?.taskId || event.detail.taskId === taskId) refresh();
     };
     nativeWindow.addEventListener("eflow:finance-updated", changed);
-    const app = AppState.addEventListener("change", (state) => {
-      if (state === "active") refresh();
-    });
-    const fallback = setInterval(refresh, 30_000);
     return () => {
-      clearTimeout(timer);
-      clearInterval(fallback);
+      live.dispose();
       nativeWindow.removeEventListener("eflow:finance-updated", changed);
-      app?.remove();
       void supabase.removeChannel(channel);
     };
   }, [taskId, subtaskId, enabled, reload, includeAllocations]);

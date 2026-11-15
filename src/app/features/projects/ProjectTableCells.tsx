@@ -1,4 +1,5 @@
 import { useWorkStatus } from "../../shared/workStatusPresentation";
+import { workDisplayStatus } from "../../shared/statusLabels";
 import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -7,6 +8,7 @@ import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
 import { workStatusTone } from "../../components/ui/Status";
 import { dateLabel, peso } from "../../components/ui/theme";
+import { taskDateLabel } from "../tasks/taskDates";
 import {
   SkeletonBlock,
   SkeletonPulse,
@@ -50,6 +52,7 @@ export function ProjectTableCells({
   widths,
   accent,
   task,
+  blocker,
   financial,
   onOpen,
   pinStyle,
@@ -59,6 +62,7 @@ export function ProjectTableCells({
   widths: number[];
   accent: string;
   task?: Task;
+  blocker?: string | null;
   financial?: { budget?: number; expense?: number };
   onOpen?: () => void;
   pinStyle?: ComponentProps<typeof Animated.View>["style"];
@@ -67,14 +71,18 @@ export function ProjectTableCells({
 }) {
   const due = task?.deadline || task?.dueDate;
   const resolve = useWorkStatus();
-  const status = task && resolve(task.status, task.customStatusId);
+  const visualStatus = task ? workDisplayStatus(task.status, blocker) : undefined;
+  const status =
+    task && visualStatus !== undefined
+      ? resolve(visualStatus, task.customStatusId)
+      : undefined;
   const values = task
     ? [
         task.title,
         status?.label ?? "",
         task.assigneeName || "Unassigned",
         task.startDate ? dateLabel(task.startDate + "T12:00:00") : "—",
-        due ? dateLabel(due) : "—",
+        taskDateLabel(due),
         financial?.budget == null ? "—" : peso(financial.budget),
         financial?.expense == null ? "—" : peso(financial.expense),
       ]
@@ -83,7 +91,7 @@ export function ProjectTableCells({
     <WorkTableRow
       columns={taskColumns.map(({ label }) => label)}
       values={values}
-      status={task?.status}
+      status={visualStatus}
       statusColor={status?.color}
       widths={widths}
       accent={accent}

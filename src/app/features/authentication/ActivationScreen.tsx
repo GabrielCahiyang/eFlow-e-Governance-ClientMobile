@@ -12,6 +12,7 @@ import {
 import { EFlowMark } from "../../components/brand/EFlowMark";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
+import { PublicMessageError } from "../../shared/userMessages";
 import {
   completeAccountActivation,
   validateAccountActivation,
@@ -79,6 +80,7 @@ export function ActivationScreen({
           )}
           <Field
             label="New password"
+            required
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -88,6 +90,7 @@ export function ActivationScreen({
           />
           <Field
             label="Confirm password"
+            required
             secureTextEntry
             value={confirmation}
             onChangeText={setConfirmation}
@@ -100,9 +103,11 @@ export function ActivationScreen({
             onPress={() =>
               void action.run(async () => {
                 if (password.length < 12 || password.length > 128)
-                  throw new Error("Use a password with 12 to 128 characters.");
+                  throw new PublicMessageError(
+                    "Use a password with 12 to 128 characters.",
+                  );
                 if (password !== confirmation)
-                  throw new Error("The passwords do not match.");
+                  throw new PublicMessageError("The passwords do not match.");
                 const saved = await completeAccountActivation(
                   token,
                   password,

@@ -3,7 +3,9 @@ import { useRef, useState } from "react";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import { Button, ErrorState, colors } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import { confirmAction } from "../../shared/confirm";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useAuth } from "../authentication";
 import {
   prepareAutoAssignment,
@@ -23,12 +25,13 @@ export function AutoAssignButton({
   disabled?: boolean;
 }) {
   const { profile } = useAuth(),
+    { toast } = useToast(),
     action = useAction();
   const [stage, setStage] = useState("");
   const request = useRef<AutoAssignmentRequest | undefined>(undefined);
   const assign = () =>
     action.run(async () => {
-      if (!profile) throw new Error("Sign in again.");
+      if (!profile) throw new PublicMessageError("Sign in again.");
       if (!request.current)
         request.current =
           (await draftStore.get<AutoAssignmentRequest>(
@@ -63,6 +66,7 @@ export function AutoAssignButton({
       const receipt = await applyAutoAssignment(request.current);
       await draftStore.remove(profile.id, "auto-assign." + rootId);
       request.current = undefined;
+      toast("AI team assigned.", "success");
       await onSaved(receipt);
       setStage("Team saved.");
     });

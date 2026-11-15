@@ -313,7 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          if (subscribed) accessChanged();
+          if (subscribed) void requestRefresh(true);
           subscribed = true;
         }
       });

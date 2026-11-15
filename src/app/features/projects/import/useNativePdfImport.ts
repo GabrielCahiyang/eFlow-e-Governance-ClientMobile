@@ -1,4 +1,4 @@
-import { userErrorMessage } from "../../../shared/userMessages";
+import { PublicMessageError, userErrorMessage } from "../../../shared/userMessages";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../../platform/supabase";
 import {
@@ -45,7 +45,8 @@ export function useNativePdfImport(
     if (alive.current) setSession(next);
   };
   const save = async (state: PdfSessionState) => {
-    if (!current.current) throw new Error("Import session is missing.");
+    if (!current.current)
+      throw new PublicMessageError("Import session is missing.");
     const next = await checkpointPdfImport(
       current.current,
       runner.current,
@@ -124,7 +125,7 @@ export function useNativePdfImport(
         await event("reading", "Reading your PDF");
         const file = await readImportFile(current.current.id);
         if (!file)
-          throw new Error(
+          throw new PublicMessageError(
             "Choose this PDF again to restore its local source file. Your saved progress is kept.",
           );
         const sourceText = await readProjectDocument(file);
@@ -181,13 +182,13 @@ export function useNativePdfImport(
           .select("org_id")
           .eq("id", projectId)
           .single();
-        if (projectError) throw new Error(projectError.message);
+        if (projectError) throw projectError;
         const { data: office, error: officeError } = await supabase
           .from("organizations")
           .select("name,slug")
           .eq("id", project!.org_id)
           .single();
-        if (officeError) throw new Error(officeError.message);
+        if (officeError) throw officeError;
         const normalized = (name: string) =>
           name.toLowerCase().replace(/[^a-z0-9]/g, "");
         const aliases = [

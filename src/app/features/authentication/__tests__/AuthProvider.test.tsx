@@ -4,7 +4,10 @@ import { AppState, type AppStateStatus } from "react-native";
 import { AuthProvider, useAuth } from "../AuthProvider";
 import { useAccountActionAccess } from "../../../shared/AccountActionAccess";
 import { supabase } from "../../../../platform/supabase";
-import { setDisplayCacheActor } from "../../../shared/displayCache";
+import {
+  setDisplayCacheActor,
+  subscribeDisplayCache,
+} from "../../../shared/displayCache";
 
 const actor = { id: "member-a" };
 let mockProfile = {
@@ -15,6 +18,7 @@ let mockProfile = {
 };
 let mockReceive: (event: string, session: unknown) => void;
 let mockAccessChanged: () => void;
+let mockSubscribeStatus: ((status: string) => void) | undefined;
 jest.mock("../../../../platform/supabase", () => ({
   supabase: {
     auth: {
@@ -53,7 +57,8 @@ jest.mock("../../../shared/postgresChannel", () => ({
       mockAccessChanged = callback;
       return this;
     },
-    subscribe() {
+    subscribe(callback?: (status: string) => void) {
+      mockSubscribeStatus = callback;
       return this;
     },
   }),
@@ -201,4 +206,36 @@ test("sign-out during a read prevents a delayed response restoring access", asyn
   expect(view.result.current.auth.profile).toBeNull();
   expect(view.result.current.auth.user).toBeNull();
   expect(() => view.result.current.assert()).toThrow();
+});
+test("realtime reconnect refreshes access without clearing display cache when access is unchanged", async () => {
+  const cacheClears: string[] = [];
+  const unsubscribe = subscribeDisplayCache((reason) => cacheClears.push(reason));
+  try {
+    const view = await setup();
+    await waitFor(() =>
+      expect(view.result.current.auth.profile?.id).toBe(actor.id),
+    );
+    cacheClears.length = 0;
+
+    await act(async () => mockSubscribeStatus?.("SUBSCRIBED"));
+    expect(supabase.auth.getUser).toHaveBeenCalledTimes(1);
+    expect(cacheClears).toEqual([]);
+
+    // Reconnect with unchanged role/org/permissions checks server without clearing display cache.
+    await act(async () => mockSubscribeStatus?.("SUBSCRIBED"));
+    await waitFor(() =>
+      expect(supabase.auth.getUser).toHaveBeenCalledTimes(2),
+    );
+    expect(cacheClears).toEqual([]);
+
+    // If role/access actually changed on reconnect, display cache clears fail-closed.
+    mockProfile = { ...mockProfile, role: "head" };
+    await act(async () => mockSubscribeStatus?.("SUBSCRIBED"));
+    await waitFor(() =>
+      expect(view.result.current.auth.profile?.role).toBe("head"),
+    );
+    expect(cacheClears).toEqual(["access"]);
+  } finally {
+    unsubscribe();
+  }
 });

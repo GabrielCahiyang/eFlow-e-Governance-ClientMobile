@@ -8,6 +8,8 @@ import {
   Sheet,
 } from "../../components/ui";
 import { useAuth } from "../authentication";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useFinancialAction } from "./useFinancialCommand";
 import { decideWorkBudgetAllocation } from "../../../core/web/app/features/budget/services/budgetService";
 import type { WorkBudgetAllocation } from "../../../core/web/app/features/budget/types";
@@ -20,19 +22,38 @@ export function AllocationDecision({
 }) {
   const { profile } = useAuth(),
     [decision, setDecision] = useState<"approve" | "reject">(),
-    [reason, setReason] = useState(""),
     action = useFinancialAction(
       profile!.id,
       "allocation:" + allocation.id,
       JSON.stringify([allocation.id, allocation.status, allocation.decidedAt]),
     );
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      profile?.id,
+      "allocation-decision:" + allocation.id + ":" + (decision ?? "none"),
+    ),
+    !!decision,
+    () => ({ reason: "" }),
+  );
+  const reason = draft.reason;
   return (
     <>
       <Row>
-        <Button onPress={() => setDecision("approve")}>
+        <Button
+          onPress={() => {
+            action.clear();
+            setDecision("approve");
+          }}
+        >
           Approve funding allocation
         </Button>
-        <Button variant="danger" onPress={() => setDecision("reject")}>
+        <Button
+          variant="danger"
+          onPress={() => {
+            action.clear();
+            setDecision("reject");
+          }}
+        >
           Reject funding allocation
         </Button>
       </Row>
@@ -43,7 +64,12 @@ export function AllocationDecision({
           decision === "approve" ? "Approve allocation" : "Reject allocation"
         }
         busy={action.busy}
-        onClose={() => setDecision(undefined)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setDecision(undefined);
+          }
+        }}
       >
         <Notice>
           Funding authorization and cash release are separate. Only an authorized independent reviewer can approve this request.
@@ -52,22 +78,23 @@ export function AllocationDecision({
           label="Decision reason"
           multiline
           value={reason}
-          onChangeText={setReason}
+          onChangeText={(next) => updateDraft({ reason: next })}
         />
         <Button
           variant={decision === "reject" ? "danger" : "primary"}
           busy={action.busy}
           onPress={() =>
             void action.run(async () => {
-              if (!reason.trim()) throw new Error("Record a decision reason.");
+              if (!reason.trim()) throw new PublicMessageError("Record a decision reason.");
               await decideWorkBudgetAllocation(
                 allocation.id,
                 decision === "approve",
                 reason,
               );
+              clearDraft();
               setDecision(undefined);
               await onSaved();
-            })
+            }, decision === "approve" ? "Allocation approved." : "Allocation rejected.")
           }
         >
           Confirm {decision}

@@ -3,6 +3,8 @@ import { View } from "react-native";
 import { Button, ErrorState, Field } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 import { chooseFiles, type PickedFile } from "../../../platform/files";
 import {
@@ -27,6 +29,7 @@ export function EditChatGroup({
   channel: Channel;
   onChanged: () => Promise<void>;
 }) {
+  const { toast } = useToast();
   const action = useAction();
   const assertAccess = useAccountActionAccess();
   const [open, setOpen] = useState(false);
@@ -58,7 +61,7 @@ export function EditChatGroup({
         (item) => item.id === channel.id,
       );
       if (!latest?.canEditGroup || latest.archived)
-        throw new Error("This group can no longer be edited.");
+        throw new PublicMessageError("This group can no longer be edited.");
       const before = baseline.current;
       const expectedPath =
         photo && upload.current?.file === photo
@@ -79,7 +82,7 @@ export function EditChatGroup({
         return;
       }
       if (before?.name !== latest.name || before?.photo !== latest.avatarPath)
-        throw new Error(
+        throw new PublicMessageError(
           "This group changed elsewhere. Reopen the editor before saving.",
         );
       assertAccess(actor);
@@ -94,6 +97,7 @@ export function EditChatGroup({
       if (latest.avatarPath && latest.avatarPath !== next)
         void cleanupChatImage(latest.avatarPath).catch(() => {});
       upload.current = undefined;
+      toast("Group chat updated.", "success");
       setOpen(false);
       await onChanged();
     });
@@ -168,12 +172,17 @@ export function EditChatNickname({
   channel: string;
   onChanged: () => Promise<void>;
 }) {
+  const { toast } = useToast();
   const action = useAction();
   const [value, setValue] = useState<string>();
   const name = person.name || "Team member";
   const save = (nickname: string) =>
     void action.run(async () => {
       await setConversationNickname(channel, person.id, nickname);
+      toast(
+        nickname.trim() ? "Nickname saved." : "Nickname cleared.",
+        "success",
+      );
       setValue(undefined);
       await onChanged();
     });

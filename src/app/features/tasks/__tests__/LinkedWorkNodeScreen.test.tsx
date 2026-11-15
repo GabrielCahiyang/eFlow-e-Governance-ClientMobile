@@ -57,6 +57,25 @@ jest.mock("../../budget/TaskFundingCard", () => ({
     return <Text>{"Funding " + subtaskId}</Text>;
   },
 }));
+jest.mock("../OfficeSubitemActivity", () => ({
+  OfficeSubitemActivity: ({ nodeId }: { nodeId: string }) => {
+    const { Text } = require("react-native");
+    return <Text>{"Activity view " + nodeId}</Text>;
+  },
+}));
+jest.mock("../WorkProposalSheet", () => ({
+  WorkProposalReview: ({ node }: { node?: string }) => {
+    const { Text } = require("react-native");
+    return <Text>{"Review view " + (node || "none")}</Text>;
+  },
+  WorkProposalSheet: () => null,
+}));
+jest.mock("../../projects/ProjectFiles", () => ({
+  ProjectFiles: ({ projectId, taskId }: { projectId: string; taskId?: string }) => {
+    const { Text } = require("react-native");
+    return <Text>{"Files view " + projectId + ":" + (taskId || "")}</Text>;
+  },
+}));
 const tree = {
   root: {
     id: "root",
@@ -119,8 +138,8 @@ test("an assigned Office subtask can be opened before its parent starts", async 
       }}
     />,
   );
-  expect(await screen.findByText("Funding depth-eight")).toBeOnTheScreen();
-  expect(screen.queryByText("Funding sibling")).toBeNull();
+  expect(await screen.findByText("Exact branch")).toBeOnTheScreen();
+  expect(screen.queryByText(/Funding/)).toBeNull();
   expect(screen.queryByText("Open subtask funding")).toBeNull();
   jest.mocked(fetchWorkTree).mockResolvedValue({
     ...office,
@@ -169,4 +188,61 @@ test("a mismatched project or a missing branch never opens another row", async (
     ).toBeOnTheScreen(),
   );
   expect(screen.queryByText(/Focused branch/)).toBeNull();
+});
+
+test("navigates subtask views to dedicated Activity, Evidence & review, Funding, Files, and Planning subpages", async () => {
+  const office = {
+    ...tree,
+    root: {
+      ...tree.root,
+      kind: "office" as const,
+      office: "office",
+      project: "project",
+      status: "in_progress",
+      lead: "actor",
+    },
+    nodes: tree.nodes.map((node) =>
+      node.id === "depth-eight" ? { ...node, assigned_to_ids: ["actor"] } : node,
+    ),
+  };
+  jest.mocked(fetchWorkTree).mockResolvedValue(office);
+
+  const baseRoute = {
+    name: "task" as const,
+    id: "root",
+    projectId: "project",
+    nodeId: "depth-eight",
+  };
+
+  const view = await render(
+    <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "activity" }} />,
+  );
+  expect(await screen.findByText("Activity")).toBeOnTheScreen();
+  expect(screen.getByText("Activity view depth-eight")).toBeOnTheScreen();
+
+  await view.rerender(
+    <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "review" }} />,
+  );
+  expect(await screen.findByText("Evidence & review")).toBeOnTheScreen();
+  expect(screen.getByText("Review view depth-eight")).toBeOnTheScreen();
+
+  await view.rerender(
+    <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "budget" }} />,
+  );
+  expect(await screen.findByText("Funding")).toBeOnTheScreen();
+  expect(screen.getByText("Funding depth-eight")).toBeOnTheScreen();
+  expect(screen.queryByText("Funding sibling")).toBeNull();
+
+  await view.rerender(
+    <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "files" }} />,
+  );
+  expect(await screen.findByText("Files")).toBeOnTheScreen();
+  expect(screen.getByText("Files view project:root")).toBeOnTheScreen();
+
+  await view.rerender(
+    <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "planning" }} />,
+  );
+  expect(await screen.findByText("Planning details")).toBeOnTheScreen();
+  expect(screen.getByText("DESCRIPTION")).toBeOnTheScreen();
+  expect(screen.getByText("DEFINITION OF DONE")).toBeOnTheScreen();
 });

@@ -12,8 +12,13 @@ import {
   peso,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
-import { PublicMessageError } from "../../shared/userMessages";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { draftStore } from "../../../platform/draftStore";
 import { supabase } from "../../../platform/supabase";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -48,7 +53,7 @@ async function loadFunding(project: string): Promise<Funding> {
     !Array.isArray(data.funds) ||
     !Array.isArray(data.taskFunding)
   )
-    throw new Error("Could not verify current project funding.");
+    throw new PublicMessageError("Could not verify current project funding.");
   return data;
 }
 
@@ -69,8 +74,8 @@ export function ProjectFundingCloseout({
     draftStore.get<Attempt>(actor, scope),
   );
   const [selection, setSelection] = useState<Selection>();
-  const [reason, setReason] = useState("");
   const [retry, setRetry] = useState<Attempt>();
+  const { toast } = useToast();
   const action = useAction();
   useEffect(
     () => netProjectUpdates(project, () => void facts.refresh()),
@@ -80,6 +85,15 @@ export function ProjectFundingCloseout({
 
   const pending = retry || draft.data;
   const selected = pending?.selection || selection;
+  const [draftNote, updateDraftNote, clearDraftNote] = useRetainedDraft(
+    formDraftKey(
+      actor,
+      scope + ":" + (selected ? selected.kind + ":" + selected.id : "none"),
+    ),
+    !!selected,
+    () => ({ reason: "" }),
+  );
+  const reason = draftNote.reason;
   const save = () =>
     action.run(async () => {
       if (!selected || draft.error || draft.loading) return;
@@ -143,19 +157,17 @@ export function ProjectFundingCloseout({
               ...terms,
             });
       if (response.error) {
-        if (
-          !pending &&
-          /^(22|23|40|42)[A-Z0-9]{3}$/.test(response.error.code || "")
-        ) {
+        if (!pending && isDeterministicRejection(response.error)) {
           await draftStore.remove(actor, scope);
           setRetry(undefined);
         }
         throw response.error;
       }
+      clearDraftNote();
       await draftStore.remove(actor, scope);
+      toast("Unused funding returned.", "success");
       setRetry(undefined);
       setSelection(undefined);
-      setReason("");
       nativeWindow.dispatchEvent({
         type: "eflow:finance-updated",
         detail: { orgId: office },
@@ -168,7 +180,6 @@ export function ProjectFundingCloseout({
   const data = facts.error ? undefined : facts.data;
   const open = (next: Selection) => {
     action.clear();
-    setReason("");
     setSelection(next);
   };
   return (
@@ -259,7 +270,10 @@ export function ProjectFundingCloseout({
           title="Confirm funding return"
           busy={action.busy}
           onClose={() => {
-            if (!pending && !action.busy) setSelection(undefined);
+            if (!pending && !action.busy) {
+              action.clear();
+              setSelection(undefined);
+            }
           }}
           footer={
             <Button
@@ -283,7 +297,7 @@ export function ProjectFundingCloseout({
             label="Reason"
             value={pending?.reason ?? reason}
             editable={!pending && !action.busy}
-            onChangeText={setReason}
+            onChangeText={(next) => updateDraftNote({ reason: next })}
             maxLength={3000}
             multiline
           />

@@ -173,10 +173,10 @@ describe("TaskBentoComponents", () => {
     expect(subtaskView.getByText("No contributors assigned")).toBeOnTheScreen();
   });
 
-  test("ContributorsSheet renders contributors in modal when open", async () => {
+  test("ContributorsSheet renders contributors in modal when open and omits raw entity IDs", async () => {
     const close = jest.fn();
     const contributors = [
-      { id: "1", name: "Gabriel Cahiyang" },
+      { id: "1", name: "Gabriel Cahiyang", office: "123e4567-e89b-12d3-a456-426614174000" },
       { id: "2", name: "Maria Clara", office: "Accounting" },
     ];
 
@@ -188,6 +188,7 @@ describe("TaskBentoComponents", () => {
     expect(view.getByText("Gabriel Cahiyang")).toBeOnTheScreen();
     expect(view.getByText("Maria Clara")).toBeOnTheScreen();
     expect(view.getByText("Contributor · Accounting")).toBeOnTheScreen();
+    expect(view.queryByText(/123e4567-e89b-12d3-a456-426614174000/)).toBeNull();
   });
 
   test("BentoSubtasksCard renders subtasks with assigned member avatars and Add action", async () => {
@@ -335,6 +336,36 @@ describe("TaskBentoComponents", () => {
     expect(view.getByText("Work actions unavailable")).toBeOnTheScreen();
   });
 
+  test("BentoProjectOnHoldCard distinguishes Task Lead vs non-Task-Lead waiting state and navigates to Task details", async () => {
+    const onNavigateParentTask = jest.fn();
+    const nonLead = await render(
+      <BentoProjectOnHoldCard projectId="p-123" waitingForTask />,
+    );
+    expect(
+      nonLead.getByText(
+        "The Task Lead must start the parent task before you can update or complete this subtask.",
+      ),
+    ).toBeOnTheScreen();
+    expect(nonLead.queryByRole("button", { name: "Go to Task details" })).toBeNull();
+    await nonLead.unmount();
+
+    const lead = await render(
+      <BentoProjectOnHoldCard
+        projectId="p-123"
+        waitingForTask
+        isTaskLead
+        onNavigateParentTask={onNavigateParentTask}
+      />,
+    );
+    expect(
+      lead.getByText(
+        "You're the Task Lead. Start the parent task first before you can update or complete this subtask.",
+      ),
+    ).toBeOnTheScreen();
+    await fireEvent.press(lead.getByRole("button", { name: "Go to Task details" }));
+    expect(onNavigateParentTask).toHaveBeenCalledTimes(1);
+  });
+
   test("BentoEditButton renders Edit label, handles press, and sets accessibility", async () => {
     const onEdit = jest.fn();
     const view = await render(
@@ -377,8 +408,23 @@ describe("TaskBentoComponents", () => {
     );
   });
 
-  test("BentoSubtasksCard shows See all footer row when more than 4 subtasks exist and opens full list", async () => {
-    const subtasks: SubtaskItemData[] = Array.from({ length: 5 }, (_, i) => ({
+  test("BentoSubtasksCard shows See all footer row when more than 3 subtasks exist and opens full list", async () => {
+    const threeSubtasks: SubtaskItemData[] = Array.from({ length: 3 }, (_, i) => ({
+      id: `sub-${i + 1}`,
+      title: `Subtask ${i + 1}`,
+      status: "todo",
+      members: [],
+    }));
+    const threeView = await render(
+      <BentoSubtasksCard
+        subtasks={threeSubtasks}
+        onPressSubtask={jest.fn()}
+      />,
+    );
+    expect(threeView.getByText("Subtask 3")).toBeOnTheScreen();
+    expect(threeView.queryByRole("button", { name: /See all/ })).toBeNull();
+
+    const fourSubtasks: SubtaskItemData[] = Array.from({ length: 4 }, (_, i) => ({
       id: `sub-${i + 1}`,
       title: `Subtask ${i + 1}`,
       status: "todo",
@@ -387,18 +433,86 @@ describe("TaskBentoComponents", () => {
 
     const view = await render(
       <BentoSubtasksCard
-        subtasks={subtasks}
+        subtasks={fourSubtasks}
         onPressSubtask={jest.fn()}
       />,
     );
 
     expect(view.getByText("Subtask 1")).toBeOnTheScreen();
-    expect(view.queryByText("Subtask 5")).toBeNull();
+    expect(view.getByText("Subtask 3")).toBeOnTheScreen();
+    expect(view.queryByText("Subtask 4")).toBeNull();
 
-    const seeAllBtn = view.getByRole("button", { name: "See all 5 subtasks" });
+    const seeAllBtn = view.getByRole("button", { name: "See all 4 subtasks" });
     expect(seeAllBtn).toBeOnTheScreen();
     await fireEvent.press(seeAllBtn);
     expect(view.getByTestId("mock-sheet")).toBeOnTheScreen();
-    expect(view.getByText("Subtask 5")).toBeOnTheScreen();
+    expect(view.getByText("Subtask 4")).toBeOnTheScreen();
+  });
+
+  test("BentoSubtaskSupportingGrid renders 5 tiles when showFunding is true and 4 tiles when false", async () => {
+    const onPressActivity = jest.fn();
+    const onPressReview = jest.fn();
+    const onPressFunding = jest.fn();
+    const onPressFiles = jest.fn();
+    const onPressPlanning = jest.fn();
+
+    const officeView = await render(
+      <BentoSubtaskSupportingGrid
+        showFunding={true}
+        onPressActivity={onPressActivity}
+        onPressReview={onPressReview}
+        onPressFunding={onPressFunding}
+        onPressFiles={onPressFiles}
+        onPressPlanning={onPressPlanning}
+      />,
+    );
+
+    expect(
+      officeView.getByRole("button", { name: "Planning details, Additional fields" }),
+    ).toBeOnTheScreen();
+    expect(
+      officeView.getByRole("button", { name: "Activity, Updates & history" }),
+    ).toBeOnTheScreen();
+    expect(
+      officeView.getByRole("button", { name: "Evidence & review, Submissions" }),
+    ).toBeOnTheScreen();
+    expect(
+      officeView.getByRole("button", { name: "Funding, Financial records" }),
+    ).toBeOnTheScreen();
+    expect(
+      officeView.getByRole("button", { name: "Files, Attachments" }),
+    ).toBeOnTheScreen();
+
+    await fireEvent.press(
+      officeView.getByRole("button", { name: "Activity, Updates & history" }),
+    );
+    expect(onPressActivity).toHaveBeenCalledTimes(1);
+    await officeView.unmount();
+
+    const personalView = await render(
+      <BentoSubtaskSupportingGrid
+        showFunding={false}
+        onPressActivity={onPressActivity}
+        onPressReview={onPressReview}
+        onPressFiles={onPressFiles}
+        onPressPlanning={onPressPlanning}
+      />,
+    );
+
+    expect(
+      personalView.getByRole("button", { name: "Activity, Updates & history" }),
+    ).toBeOnTheScreen();
+    expect(
+      personalView.getByRole("button", { name: "Evidence & review, Submissions" }),
+    ).toBeOnTheScreen();
+    expect(
+      personalView.getByRole("button", { name: "Files, Attachments" }),
+    ).toBeOnTheScreen();
+    expect(
+      personalView.getByRole("button", { name: "Planning details, Additional fields" }),
+    ).toBeOnTheScreen();
+    expect(
+      personalView.queryByRole("button", { name: "Funding, Financial records" }),
+    ).toBeNull();
   });
 });

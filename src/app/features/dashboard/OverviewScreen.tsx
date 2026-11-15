@@ -10,7 +10,7 @@ import CircleCheck from "lucide-react-native/icons/circle-check-big";
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
 import Clock from "lucide-react-native/icons/clock";
 import { useEffect } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, useWindowDimensions } from "react-native";
 import {
   Button,
   EditorialMetadataStrip,
@@ -36,6 +36,7 @@ import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthor
 import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/constants";
 import { HomeLink, HomeMessage, HomeSection } from "./HomeSections";
 import { AccountingHome } from "./AccountingHome";
+import { CircularProgressRing } from "../tasks/TaskBentoComponents";
 import { currentOfficeProjects, memberHome, officeHomeWork } from "./homeWork";
 import { assignedFinanceReviews, headCashDecisions } from "./homeFinance";
 import { fetchInboxUpdatePage } from "../notifications/inboxUpdates";
@@ -71,10 +72,7 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
   const showWork = can("navigation.tasks");
   const showProjects = can("navigation.projects");
   const showAnalytics = appointed && can("navigation.reports");
-  const rows =
-    showWork && scope && !work.stale && !work.error
-      ? work.data?.rows
-      : undefined;
+  const rows = showWork && scope && !work.error ? work.data?.rows : undefined;
   const signals = officeHomeWork(rows ?? [], scope, actor);
   const currentProjects =
     scope && showProjects
@@ -200,8 +198,8 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
     ...signals.attention.filter(
       (row) => row.priority <= 2 && !reviewed.has(row.key),
     ),
-    ...(!cash.error && !cash.loading ? (cash.data ?? []) : []),
-    ...(!reviews.error && !reviews.loading ? (reviews.data ?? []) : []),
+    ...(!cash.error ? (cash.data ?? []) : []),
+    ...(!reviews.error ? (reviews.data ?? []) : []),
   ]
     .sort(
       (a, b) =>
@@ -220,7 +218,9 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
     !!cash.error ||
     !!reviews.error;
   const waiting =
-    (showWork && !rows && work.loading) || cash.loading || reviews.loading;
+    (showWork && !rows && work.loading) ||
+    (cash.loading && !cash.data) ||
+    (reviews.loading && !reviews.data);
   const refresh = async () => {
     await Promise.all([
       workspace.refresh(),
@@ -232,7 +232,7 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
   };
   const palette = useTheme();
   return (
-    <Screen compact onRefresh={refresh}>
+    <Screen compact onRefresh={refresh} style={{ gap: 0 }}>
       {workspace.error ? (
         <ErrorState error={workspace.error} retry={() => void refresh()} />
       ) : !scope && workspace.loading ? (
@@ -255,14 +255,20 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
             }
           />
 
-          <HomeSection
+          <HeadBentoCard
             title="Needs Your Decision"
             badge={attention.length ? String(attention.length) : undefined}
+            badgeTone={
+              attention.some((row) => classifyAttentionRow(row).kind === "action")
+                ? "danger"
+                : "default"
+            }
           >
-            {attention.map((row) => (
+            {attention.map((row, index) => (
               <HeadAttentionCardItem
                 key={row.key}
                 row={row}
+                isFirst={index === 0}
                 navigate={navigate}
               />
             ))}
@@ -278,27 +284,23 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                 (rows || !showWork) && (
                   <View
                     style={{
-                      padding: space.md,
-                      borderRadius: radius.surface,
-                      borderWidth: 1,
-                      borderColor: palette.border,
-                      backgroundColor: palette.surface,
+                      paddingVertical: 10,
                       flexDirection: "row",
                       alignItems: "center",
-                      gap: space.md,
+                      gap: 12,
                     }}
                   >
                     <View
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
+                        width: 34,
+                        height: 34,
+                        borderRadius: 10,
                         backgroundColor: palette.successSoft,
                         alignItems: "center",
                         justifyContent: "center",
                       }}
                     >
-                      <CircleCheck size={18} color={palette.success} />
+                      <CircleCheck size={17} color={palette.success} />
                     </View>
                     <Text
                       style={{
@@ -318,11 +320,12 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                 retry={() => void refresh()}
               />
             )}
-          </HomeSection>
+          </HeadBentoCard>
+
           {showProjects && (
             <>
               {signals.riskItems && signals.riskItems.length > 0 && (
-                <HomeSection
+                <HeadBentoCard
                   title="Office Risks"
                   badge={String(signals.overdueOrBlocked)}
                   onAction={
@@ -332,27 +335,38 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                   }
                   actionAccessibilityLabel="See all office risks in Office Analytics"
                 >
-                  {signals.riskItems.slice(0, 3).map((item) => (
+                  {signals.riskItems.slice(0, 3).map((item, index) => (
                     <HeadRiskCardItem
                       key={item.key}
                       item={item}
+                      isFirst={index === 0}
                       navigate={navigate}
                     />
                   ))}
-                </HomeSection>
+                </HeadBentoCard>
               )}
-              <HomeSection
+
+              <HeadBentoCard
                 title="Current Projects"
                 badge={projects.length ? String(projects.length) : undefined}
                 onAction={() => navigate({ name: "projects" })}
                 actionAccessibilityLabel="See all projects"
               >
                 {!projects.length && (
-                  <HomeMessage>No current Office projects.</HomeMessage>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: palette.mutedLabel,
+                      paddingVertical: 8,
+                    }}
+                  >
+                    No current Office projects.
+                  </Text>
                 )}
-                {projects.map((project) => (
+                {projects.map((project, index) => (
                   <ProjectProgressRow
                     key={project.id}
+                    isFirst={index === 0}
                     title={project.title}
                     totals={
                       progress.error
@@ -382,17 +396,16 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                     Retry project progress
                   </Button>
                 )}
-              </HomeSection>
+              </HeadBentoCard>
             </>
           )}
-          {showAnalytics && (
-            <Button
-              variant="outline"
-              accessibilityLabel="Office Analytics"
-              onPress={() => navigate({ name: "reports" })}
-            >
-              Office Analytics
-            </Button>
+
+          {(showAnalytics || showProjects) && (
+            <HeadSupportingGrid
+              showAnalytics={showAnalytics}
+              showBudget={showProjects}
+              navigate={navigate}
+            />
           )}
         </>
       )}
@@ -407,10 +420,7 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
   const scope = workspace.error ? undefined : workspace.selected?.workspace;
   const showWork = can("navigation.tasks");
   const actor = profile?.id || "";
-  const rows =
-    showWork && scope && !feed.error && !feed.stale
-      ? feed.data?.rows
-      : undefined;
+  const rows = showWork && scope && !feed.error ? feed.data?.rows : undefined;
   const data =
     scope && rows ? memberHome(rows, actor, scope.id) : undefined;
   const incomplete = !!(
@@ -838,41 +848,48 @@ function MemberActionCardItem({
   const palette = useTheme();
 
   const isChangesRequested = item.status === "changes_requested";
+  const isStuck = item.status === "in_progress" && !!item.blocker?.trim();
   const statusColor = isChangesRequested
     ? palette.danger
     : item.isOverdue
       ? palette.danger
-      : item.isToday
-        ? palette.warning
-        : item.blocker
+      : isStuck
+        ? palette.danger
+        : item.isToday
           ? palette.warning
-          : item.status === "in_progress"
-            ? palette.primary
-            : palette.mutedLabel;
+          : item.blocker
+            ? palette.warning
+            : item.status === "in_progress"
+              ? palette.primary
+              : palette.mutedLabel;
 
   const statusBg = isChangesRequested
     ? palette.dangerSoft
     : item.isOverdue
       ? palette.dangerSoft
-      : item.isToday
-        ? palette.warningSoft
-        : item.blocker
+      : isStuck
+        ? palette.dangerSoft
+        : item.isToday
           ? palette.warningSoft
-          : item.status === "in_progress"
-            ? palette.primarySoft
-            : palette.surface;
+          : item.blocker
+            ? palette.warningSoft
+            : item.status === "in_progress"
+              ? palette.primarySoft
+              : palette.surface;
 
   const statusText = isChangesRequested
     ? "Changes requested"
     : item.isOverdue
       ? "Overdue"
-      : item.isToday
-        ? "Due today"
-        : item.blocker
-          ? "Blocker reported"
-          : item.status === "in_progress"
-            ? "In progress"
-            : "To do";
+      : isStuck
+        ? "Stuck"
+        : item.isToday
+          ? "Due today"
+          : item.blocker
+            ? "Blocker reported"
+            : item.status === "in_progress"
+              ? "In progress"
+              : "To do";
 
   return (
     <Pressable
@@ -1301,173 +1318,339 @@ function OfficeCommandOverview({
   onPressRisks?: () => void;
 }) {
   const palette = useTheme();
+  const { fontScale } = useWindowDimensions();
+
   return (
-    <View
-      style={{
-        borderRadius: radius.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        backgroundColor: palette.surface,
-        padding: space.md,
-        gap: space.sm,
-        marginBottom: space.sm,
-      }}
-    >
+    <View style={{ gap: 10, marginBottom: 12 }}>
       <View
         style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
+          backgroundColor: palette.surface,
+          borderWidth: 1,
+          borderColor: palette.border,
+          borderRadius: 14,
+          padding: 16,
+          gap: 10,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: attentionCount > 0 ? palette.warning : palette.primary,
-            }}
-          />
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
           <Text
             style={{
               fontSize: 11,
               fontWeight: "700",
-              letterSpacing: 0.8,
+              letterSpacing: 0.6,
               textTransform: "uppercase",
               color: palette.primary,
             }}
           >
             Office Command Overview
           </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              color: palette.mutedLabel,
+              fontWeight: "500",
+            }}
+          >
+            {officeName} · {projectCount}{" "}
+            {projectCount === 1 ? "project" : "projects"}
+          </Text>
         </View>
-        <Text
-          style={{
-            fontSize: 12,
-            color: palette.mutedLabel,
-            fontWeight: "500",
-          }}
-        >
-          {officeName} · {projectCount} {projectCount === 1 ? "project" : "projects"}
-        </Text>
-      </View>
 
-      <View style={{ gap: 4 }}>
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: "800",
-            color: palette.text,
-            letterSpacing: -0.2,
-          }}
-        >
-          {attentionCount > 0
-            ? `${attentionCount} ${attentionCount === 1 ? "decision awaiting" : "decisions awaiting"} your action`
-            : "All decisions up to date"}
-        </Text>
-        <Text
-          style={{
-            fontSize: 13,
-            color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
-            fontWeight: atRiskCount > 0 ? "600" : "400",
-          }}
-        >
-          {atRiskCount > 0
-            ? `${atRiskCount} work ${atRiskCount === 1 ? "item" : "items"} at risk`
-            : "All office work on schedule"}
-        </Text>
+        <View style={{ gap: 4 }}>
+          <Text
+            accessibilityRole="header"
+            style={{
+              fontSize: 20,
+              fontWeight: "700",
+              color: palette.text,
+              lineHeight: 26,
+              letterSpacing: -0.2,
+            }}
+          >
+            {attentionCount > 0
+              ? `${attentionCount} ${attentionCount === 1 ? "decision awaiting" : "decisions awaiting"} your action`
+              : "All decisions up to date"}
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
+              fontWeight: atRiskCount > 0 ? "600" : "400",
+            }}
+          >
+            {atRiskCount > 0
+              ? `${atRiskCount} work ${atRiskCount === 1 ? "item" : "items"} at risk`
+              : "All office work on schedule"}
+          </Text>
+        </View>
       </View>
 
       <View
         style={{
-          flexDirection: "row",
-          gap: space.sm,
-          paddingTop: space.xs,
-          borderTopWidth: 1,
-          borderTopColor: palette.border,
+          flexDirection: fontScale > 1.8 ? "column" : "row",
+          gap: 10,
         }}
       >
         <View
           style={{
             flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingVertical: 6,
-            paddingHorizontal: space.sm,
-            borderRadius: radius.surface,
-            backgroundColor:
-              attentionCount > 0
-                ? palette.primarySoft
-                : palette.background,
+            backgroundColor: palette.surface,
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 14,
+            padding: 14,
+            gap: 6,
           }}
         >
-          <Text
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <ClipboardCheck
+              size={14}
+              color={attentionCount > 0 ? palette.primary : palette.mutedLabel}
+            />
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "600",
+                color: palette.mutedLabel,
+              }}
+            >
+              Decisions
+            </Text>
+          </View>
+          <View
             style={{
-              fontSize: 12,
-              fontWeight: "600",
-              color: attentionCount > 0 ? palette.primary : palette.mutedLabel,
+              flexDirection: "row",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 6,
             }}
           >
-            Decisions
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "700",
-              color: attentionCount > 0 ? palette.primary : palette.text,
-            }}
-          >
-            {attentionCount}
-          </Text>
+            <Text
+              style={{
+                fontSize: 22,
+                fontWeight: "700",
+                color: attentionCount > 0 ? palette.primary : palette.text,
+              }}
+            >
+              {attentionCount}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: 12,
+                color: palette.mutedLabel,
+                fontWeight: "500",
+              }}
+            >
+              {attentionCount > 0 ? "Awaiting action" : "Up to date"}
+            </Text>
+          </View>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${atRiskCount} work items at risk`}
+          accessibilityLabel={`${atRiskCount} work ${atRiskCount === 1 ? "item" : "items"} at risk`}
           onPress={onPressRisks}
           disabled={!onPressRisks}
           style={({ pressed }) => ({
             flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingVertical: 6,
-            paddingHorizontal: space.sm,
-            borderRadius: radius.surface,
-            backgroundColor: pressed
-              ? palette.dangerSoft
-              : atRiskCount > 0
+            backgroundColor:
+              pressed && onPressRisks
                 ? palette.dangerSoft
-                : palette.background,
+                : atRiskCount > 0
+                  ? palette.dangerSoft
+                  : palette.surface,
+            borderWidth: 1,
+            borderColor: atRiskCount > 0 ? palette.danger : palette.border,
+            borderRadius: 14,
+            padding: 14,
+            gap: 6,
           })}
         >
-          <Text
+          <View
             style={{
-              fontSize: 12,
-              fontWeight: "600",
-              color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 6,
             }}
           >
-            At Risk
-          </Text>
-          <Text
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <AlertCircle
+                size={14}
+                color={atRiskCount > 0 ? palette.danger : palette.mutedLabel}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "600",
+                  color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
+                }}
+              >
+                At Risk
+              </Text>
+            </View>
+            {onPressRisks && (
+              <ArrowUpRight
+                size={14}
+                color={atRiskCount > 0 ? palette.danger : palette.mutedLabel}
+              />
+            )}
+          </View>
+          <View
             style={{
-              fontSize: 12,
-              fontWeight: "700",
-              color: atRiskCount > 0 ? palette.danger : palette.text,
+              flexDirection: "row",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 6,
             }}
           >
-            {atRiskCount}
-          </Text>
+            <Text
+              style={{
+                fontSize: 22,
+                fontWeight: "700",
+                color: atRiskCount > 0 ? palette.danger : palette.text,
+              }}
+            >
+              {atRiskCount}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: 12,
+                color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
+                fontWeight: "500",
+              }}
+            >
+              {atRiskCount > 0 ? "Needs review" : "On schedule"}
+            </Text>
+          </View>
         </Pressable>
       </View>
     </View>
   );
 }
 
+function HeadBentoCard({
+  title,
+  badge,
+  badgeTone = "default",
+  onAction,
+  actionLabel = "See all",
+  actionAccessibilityLabel,
+  children,
+}: {
+  title: string;
+  badge?: string | number;
+  badgeTone?: "default" | "danger";
+  onAction?: () => void;
+  actionLabel?: string;
+  actionAccessibilityLabel?: string;
+  children: React.ReactNode;
+}) {
+  const palette = useTheme();
+  const badgeBg =
+    badgeTone === "danger" ? palette.dangerSoft : palette.primarySoft;
+  const badgeFg = badgeTone === "danger" ? palette.danger : palette.primary;
+  return (
+    <View
+      style={{
+        backgroundColor: palette.surface,
+        borderWidth: 1,
+        borderColor: palette.border,
+        borderRadius: 14,
+        padding: 16,
+        gap: 6,
+        marginBottom: 12,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          marginBottom: 2,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+          <Text
+            accessibilityRole="header"
+            style={{
+              fontSize: 16,
+              fontWeight: "700",
+              color: palette.text,
+            }}
+          >
+            {title}
+          </Text>
+          {badge !== undefined && (
+            <View
+              style={{
+                backgroundColor: badgeBg,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 999,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "700",
+                  color: badgeFg,
+                }}
+              >
+                {badge}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {onAction && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={actionAccessibilityLabel || `${actionLabel} ${title}`}
+            onPress={onAction}
+            hitSlop={6}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 3,
+              minHeight: 36,
+              paddingHorizontal: 6,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: "600",
+                color: palette.primary,
+              }}
+            >
+              {actionLabel}
+            </Text>
+            <ChevronRight size={15} color={palette.primary} strokeWidth={2.4} />
+          </Pressable>
+        )}
+      </View>
+
+      <View>{children}</View>
+    </View>
+  );
+}
+
 function HeadRiskCardItem({
   item,
+  isFirst = false,
   navigate,
 }: {
   item: {
@@ -1479,6 +1662,7 @@ function HeadRiskCardItem({
     reason: string;
     route: AppRoute;
   };
+  isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
@@ -1488,57 +1672,60 @@ function HeadRiskCardItem({
       accessibilityLabel={`${item.title}, ${item.reason}`}
       onPress={() => navigate(item.route)}
       style={({ pressed }) => ({
-        padding: space.md,
-        borderRadius: radius.surface,
-        borderWidth: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 11,
+        gap: 10,
+        borderTopWidth: isFirst ? 0 : 0.5,
         borderColor: palette.border,
-        backgroundColor: pressed ? palette.primarySoft : palette.surface,
-        marginBottom: space.xs,
-        gap: space.xs,
+        opacity: pressed ? 0.7 : 1,
       })}
     >
       <View
         style={{
-          flexDirection: "row",
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          backgroundColor: palette.dangerSoft,
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "center",
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <AlertCircle size={14} color={palette.danger} />
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "700",
-              color: palette.danger,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
-            {item.reason}
-          </Text>
-        </View>
-        <ChevronRight size={18} color={palette.mutedLabel} />
+        <AlertCircle size={17} color={palette.danger} />
       </View>
-      <Text
-        style={{
-          fontWeight: "700",
-          fontSize: 15,
-          color: palette.text,
-        }}
-        numberOfLines={2}
-      >
-        {item.title}
-      </Text>
-      <Text
-        style={{
-          fontSize: 13,
-          color: palette.mutedLabel,
-        }}
-        numberOfLines={1}
-      >
-        {item.projectTitle}
-      </Text>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: "700",
+            color: palette.danger,
+            textTransform: "uppercase",
+            letterSpacing: 0.4,
+          }}
+        >
+          {item.reason}
+        </Text>
+        <Text
+          style={{
+            fontWeight: "600",
+            fontSize: 15,
+            color: palette.text,
+          }}
+          numberOfLines={2}
+        >
+          {item.title}
+        </Text>
+        <Text
+          style={{
+            fontSize: 13,
+            color: palette.mutedLabel,
+          }}
+          numberOfLines={1}
+        >
+          {item.projectTitle}
+        </Text>
+      </View>
+      <ChevronRight size={16} color={palette.mutedLabel} />
     </Pressable>
   );
 }
@@ -1787,8 +1974,37 @@ function MemberWorkOverview({
   );
 }
 
+function classifyAttentionRow(row: { key: string; description: string }) {
+  const lowerDescription = row.description.toLowerCase();
+  const isReview =
+    row.key.startsWith("review:") ||
+    row.key.startsWith("finance-review:") ||
+    lowerDescription.includes("review");
+  if (isReview) {
+    return {
+      kind: "review" as const,
+      categoryLabel: "Review required",
+    };
+  }
+  const isCash =
+    row.key.startsWith("cash:") ||
+    lowerDescription.includes("voucher") ||
+    lowerDescription.includes("cash");
+  if (isCash) {
+    return {
+      kind: "cash" as const,
+      categoryLabel: "Cash approval",
+    };
+  }
+  return {
+    kind: "action" as const,
+    categoryLabel: "Action required",
+  };
+}
+
 function HeadAttentionCardItem({
   row,
+  isFirst = false,
   navigate,
 }: {
   row: {
@@ -1797,52 +2013,34 @@ function HeadAttentionCardItem({
     description: string;
     route: AppRoute;
   };
+  isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
-  const isReview =
-    row.key.startsWith("review:") ||
-    row.key.startsWith("finance-review:") ||
-    row.description.toLowerCase().includes("review");
-  const isCash =
-    row.key.startsWith("cash:") ||
-    row.description.toLowerCase().includes("voucher") ||
-    row.description.toLowerCase().includes("cash");
-  const isAlert =
-    row.description.toLowerCase().includes("overdue") ||
-    row.description.toLowerCase().includes("blocked");
+  const { kind, categoryLabel } = classifyAttentionRow(row);
 
-  const categoryLabel = isReview
-    ? "Review required"
-    : isCash
-      ? "Cash approval"
-      : isAlert
-        ? "Action required"
-        : "Action required";
+  const iconColor =
+    kind === "review"
+      ? palette.review
+      : kind === "cash"
+        ? palette.warning
+        : palette.danger;
 
-  const iconColor = isReview
-    ? palette.review
-    : isCash
-      ? palette.warning
-      : isAlert
-        ? palette.danger
-        : palette.primary;
+  const iconBg =
+    kind === "review"
+      ? palette.reviewSoft
+      : kind === "cash"
+        ? palette.warningSoft
+        : palette.dangerSoft;
 
-  const iconBg = isReview
-    ? palette.reviewSoft
-    : isCash
-      ? palette.warningSoft
-      : isAlert
-        ? palette.dangerSoft
-        : palette.primarySoft;
+  const IconComponent =
+    kind === "review"
+      ? ClipboardCheck
+      : kind === "cash"
+        ? Banknote
+        : AlertCircle;
 
-  const IconComponent = isReview
-    ? ClipboardCheck
-    : isCash
-      ? Banknote
-      : isAlert
-        ? AlertCircle
-        : ArrowRight;
+  const cleanDescription = row.description.replace(/^Action required\s*·\s*/i, "");
 
   return (
     <Pressable
@@ -1853,42 +2051,42 @@ function HeadAttentionCardItem({
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
-        padding: space.md,
-        borderRadius: radius.surface,
-        borderWidth: 1,
+        paddingVertical: 11,
+        borderTopWidth: isFirst ? 0 : 0.5,
         borderColor: palette.border,
-        backgroundColor: pressed ? palette.primarySoft : palette.surface,
-        marginBottom: space.xs,
-        gap: space.md,
+        gap: 12,
+        opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          backgroundColor: iconBg,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <IconComponent size={20} color={iconColor} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text
+      <View style={{ flex: 1, gap: 4 }}>
+        <View
           style={{
-            fontSize: 11,
-            fontWeight: "700",
-            color: iconColor,
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
+            flexDirection: "row",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            gap: 5,
+            backgroundColor: iconBg,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 999,
           }}
         >
-          {categoryLabel}
-        </Text>
+          <IconComponent size={12} color={iconColor} />
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "700",
+              color: iconColor,
+              textTransform: "uppercase",
+              letterSpacing: 0.4,
+            }}
+          >
+            {categoryLabel}
+          </Text>
+        </View>
         <Text
           style={{
-            fontWeight: "700",
+            fontWeight: "600",
             fontSize: 15,
             color: palette.text,
           }}
@@ -1904,63 +2102,108 @@ function HeadAttentionCardItem({
           }}
           numberOfLines={2}
         >
-          {row.description}
+          {cleanDescription}
         </Text>
       </View>
-      <ChevronRight size={18} color={palette.mutedLabel} />
+      <ChevronRight size={16} color={palette.mutedLabel} />
     </Pressable>
   );
 }
 
-function AnalyticsCard({ navigate }: { navigate: Navigate }) {
+function HeadSupportingGrid({
+  showAnalytics,
+  showBudget,
+  navigate,
+}: {
+  showAnalytics: boolean;
+  showBudget: boolean;
+  navigate: Navigate;
+}) {
   const palette = useTheme();
+  const { fontScale } = useWindowDimensions();
+
+  const cardStyle = {
+    flex: 1,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+  };
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Office Analytics"
-      accessibilityHint="Delivery, workload, reviews and financial reporting"
-      onPress={() => navigate({ name: "reports" })}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        padding: space.md,
-        borderRadius: radius.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        backgroundColor: pressed ? palette.primarySoft : palette.surface,
-        gap: space.md,
-        minHeight: 64,
-        marginTop: space.xs,
-      })}
+    <View
+      style={{
+        flexDirection: fontScale > 1.8 ? "column" : "row",
+        gap: 10,
+        marginBottom: 12,
+      }}
     >
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          backgroundColor: palette.primarySoft,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <ChartBar size={20} color={palette.primary} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text
-          style={{
-            fontWeight: "700",
-            fontSize: 15,
-            color: palette.text,
-          }}
+      {showAnalytics && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Office Analytics"
+          accessibilityHint="Delivery, workload, reviews and financial reporting"
+          onPress={() => navigate({ name: "reports" })}
+          style={({ pressed }) => [cardStyle, { opacity: pressed ? 0.8 : 1 }]}
         >
-          Office Analytics
-        </Text>
-        <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-          Delivery, workload, reviews and financial reporting
-        </Text>
-      </View>
-      <ArrowRight size={18} color={palette.mutedLabel} />
-    </Pressable>
+          <ChartBar size={20} color={palette.primary} />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: 6,
+            }}
+          >
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
+              >
+                Office Analytics
+              </Text>
+              <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+                Delivery & reports
+              </Text>
+            </View>
+            <ChevronRight size={16} color={palette.mutedLabel} />
+          </View>
+        </Pressable>
+      )}
+
+      {showBudget && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Office Budget"
+          accessibilityHint="Appropriations, allocations and settled expenses"
+          onPress={() => navigate({ name: "budget" })}
+          style={({ pressed }) => [cardStyle, { opacity: pressed ? 0.8 : 1 }]}
+        >
+          <Banknote size={20} color={palette.text} />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: 6,
+            }}
+          >
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
+              >
+                Office Budget
+              </Text>
+              <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+                Funding & spending
+              </Text>
+            </View>
+            <ChevronRight size={16} color={palette.mutedLabel} />
+          </View>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -1969,12 +2212,14 @@ function ProjectProgressRow({
   totals,
   risk,
   loading,
+  isFirst = false,
   onPress,
 }: {
   title: string;
   totals?: { required: number; completed: number };
   risk?: ReadonlySet<string>;
   loading: boolean;
+  isFirst?: boolean;
   onPress: () => void;
 }) {
   const palette = useTheme();
@@ -2001,180 +2246,56 @@ function ProjectProgressRow({
         .join(" · ")}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 76,
-        padding: space.md,
-        borderRadius: radius.surface,
-        borderWidth: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 11,
+        borderTopWidth: isFirst ? 0 : 0.5,
         borderColor: palette.border,
-        backgroundColor: pressed ? palette.primarySoft : palette.surface,
-        marginBottom: space.sm,
-        gap: space.sm,
+        gap: 12,
+        opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: space.sm,
-        }}
-      >
+      <View style={{ flex: 1, gap: 3 }}>
         <Text
           style={{
-            fontWeight: "700",
+            fontWeight: "600",
             fontSize: 15,
             color: palette.text,
-            flex: 1,
           }}
           numberOfLines={2}
         >
           {title}
         </Text>
-        {percent != null ? (
-          <View
-            style={{
-              paddingHorizontal: space.sm,
-              paddingVertical: 2,
-              borderRadius: radius.pill,
-              backgroundColor: palette.primarySoft,
-            }}
-          >
-            <Text
-              style={{
-                fontWeight: "700",
-                fontSize: 13,
-                color: palette.primaryDark ?? palette.primary,
-              }}
-            >
-              {percent}%
-            </Text>
-          </View>
-        ) : (
-          <ChevronRight size={18} color={palette.mutedLabel} />
-        )}
-      </View>
-
-      {percent != null && (
-        <View
-          accessible={false}
-          style={{
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: palette.border,
-            overflow: "hidden",
-          }}
-        >
-          <View
-            style={{
-              width: `${Math.min(100, Math.max(0, percent))}%`,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: palette.primary,
-            }}
-          />
-        </View>
-      )}
-
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: space.sm,
-        }}
-      >
-        <Text
-          style={{ color: palette.mutedLabel, fontSize: 13, flexShrink: 1 }}
-        >
+        <Text style={{ color: palette.mutedLabel, fontSize: 13 }}>
           {summary}
         </Text>
-        {percent != null && (
-          <ChevronRight size={16} color={palette.mutedLabel} />
+        {!!risk?.size && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              marginTop: 2,
+            }}
+          >
+            <AlertCircle size={13} color={palette.warning} />
+            <Text style={{ fontSize: 12, color: palette.warning, flex: 1 }}>
+              {[...risk].join(" · ")}
+            </Text>
+          </View>
         )}
       </View>
 
-      {!!risk?.size && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            marginTop: 2,
-            paddingTop: 6,
-            borderTopWidth: 0.5,
-            borderTopColor: palette.border,
-          }}
-        >
-          <AlertCircle size={14} color={palette.warning} />
-          <Text style={{ fontSize: 13, color: palette.warning, flex: 1 }}>
-            {[...risk].join(" · ")}
-          </Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
-function HealthIndicator({
-  value,
-  label,
-  accent,
-  onPress,
-}: {
-  value: string;
-  label: string;
-  accent?: "danger" | "primary" | "warning";
-  onPress?: () => void;
-}) {
-  const palette = useTheme();
-  const valueColor =
-    accent === "danger"
-      ? palette.danger
-      : accent === "warning"
-        ? palette.warning
-        : palette.text;
-  return (
-    <Pressable
-      accessibilityRole={onPress ? "button" : undefined}
-      accessibilityLabel={value + " " + label}
-      onPress={onPress}
-      disabled={!onPress}
-      style={({ pressed }) => ({
-        flexGrow: 1,
-        flexBasis: 140,
-        minHeight: 76,
-        padding: space.md,
-        borderRadius: radius.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        backgroundColor:
-          pressed && onPress ? palette.primarySoft : palette.surface,
-        justifyContent: "space-between",
-        gap: space.xs,
-      })}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: "600",
-            color: palette.mutedLabel,
-          }}
-        >
-          {label}
-        </Text>
-        {onPress ? <ArrowUpRight size={16} color={palette.mutedLabel} /> : null}
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-        <Text style={{ fontWeight: "800", fontSize: 24, color: valueColor }}>
-          {value}
-        </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        {percent != null && (
+          <CircularProgressRing
+            percent={percent}
+            size={46}
+            strokeWidth={4.5}
+            accessibilityLabel={`Project completion: ${percent}%`}
+          />
+        )}
+        <ChevronRight size={16} color={palette.mutedLabel} />
       </View>
     </Pressable>
   );

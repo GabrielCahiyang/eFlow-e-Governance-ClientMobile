@@ -29,7 +29,11 @@ export function statusColors(value: string, palette: ThemeColors) {
     ].includes(value)
   )
     return { background: palette.successSoft, foreground: palette.success };
-  if (["rejected", "overdue", "denied", "changes_requested"].includes(value))
+  if (
+    ["rejected", "overdue", "denied", "changes_requested", "stuck"].includes(
+      value,
+    )
+  )
     return { background: palette.dangerSoft, foreground: palette.danger };
   if (["for_review", "submitted", "pending_review"].includes(value))
     return { background: palette.reviewSoft, foreground: palette.review };

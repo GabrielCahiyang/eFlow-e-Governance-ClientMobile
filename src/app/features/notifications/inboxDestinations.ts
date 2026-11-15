@@ -25,6 +25,10 @@ export function inboxUpdateRoute(
       id: item.projectId,
       taskId: item.taskId,
       nodeId: item.workNodeId,
+      ...(item.proposalId && {
+        recordType: "work_proposal",
+        recordId: item.proposalId,
+      }),
     };
   if (item.entityType === "m7_work_proposal" && item.taskId)
     return {
@@ -33,6 +37,10 @@ export function inboxUpdateRoute(
       projectId: item.projectId,
       nodeId: item.workNodeId,
       view: item.workNodeId ? "subitems" : "details",
+      ...(item.proposalId && {
+        recordType: "work_proposal",
+        recordId: item.proposalId,
+      }),
     };
   if (
     item.financialRecordType === "settlement_staffing" ||

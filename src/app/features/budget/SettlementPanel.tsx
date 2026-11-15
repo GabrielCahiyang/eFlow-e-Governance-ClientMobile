@@ -15,6 +15,7 @@ import {
 } from "../../components/ui";
 import { useFacts } from "../../shared/useFacts";
 import { useFinancialAction } from "./useFinancialCommand";
+import { PublicMessageError } from "../../shared/userMessages";
 import { FinancialCancelled } from "./financialReceipt";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
 import { confirmAction } from "../../shared/confirm";
@@ -115,8 +116,8 @@ export function SettlementPanel({
     action.run(
       async () => {
         if (!reason.trim())
-          throw new Error("A review note or required correction is required.");
-        if (!profile) throw new Error("Sign in again.");
+          throw new PublicMessageError("A review note or required correction is required.");
+        if (!profile) throw new PublicMessageError("Sign in again.");
         if (leader) {
           await decidePettyCashLiquidationLeaderReview(
             liquidation.id,
@@ -131,7 +132,7 @@ export function SettlementPanel({
             !accounting ||
             !settlementAllowsAccountingPosting(current, profile.id)
           )
-            throw new Error(
+            throw new PublicMessageError(
               "Independent review and current Accounting settlement authority are required.",
             );
           if (
@@ -200,7 +201,7 @@ export function SettlementPanel({
           return;
         if (uncertain) throw uncertain;
         await refresh();
-        throw new Error(
+        throw new PublicMessageError(
           "The settlement result could not be verified. Check the current request status.",
         );
       },

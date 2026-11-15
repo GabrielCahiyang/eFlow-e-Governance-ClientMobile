@@ -12,17 +12,19 @@ import {
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { enablePush, disablePush, pushEnabled } from "../../../platform/push";
 export function PushSettings() {
   const { profile } = useAuth(),
+    { toast } = useToast(),
     actor = profile!.id,
     facts = useFacts("push:" + actor, () => pushEnabled(actor)),
     action = useAction();
-  const ready = !facts.loading && !facts.error && facts.data !== undefined;
+  const ready = !facts.error && facts.data !== undefined;
   return (
     <Card title="Device push notifications">
-      {facts.loading && (
+      {facts.loading && !ready && (
         <Loading label="Checking push settings" layout="summary" />
       )}
       {ready && (
@@ -40,8 +42,13 @@ export function PushSettings() {
           onPress={() =>
             void action.run(async () => {
               if (!ready) return;
-              if (facts.data) await disablePush(actor);
-              else await enablePush(actor);
+              if (facts.data) {
+                await disablePush(actor);
+                toast("Push alerts turned off.", "success");
+              } else {
+                await enablePush(actor);
+                toast("Push alerts turned on.", "success");
+              }
               await facts.refresh();
             })
           }

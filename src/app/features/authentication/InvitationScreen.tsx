@@ -13,6 +13,7 @@ import {
 import { EFlowMark } from "../../components/brand/EFlowMark";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useAuth } from "./AuthProvider";
 import { signInOnMobile } from "./mobileSignIn";
 import {
@@ -68,19 +69,26 @@ export function InvitationScreen({
   const finish = () =>
     action.run(async () => {
       if (!data || wrong)
-        throw new Error("Switch accounts to accept this invitation.");
+        throw new PublicMessageError(
+          "Switch accounts to accept this invitation.",
+        );
       if (
         ((!isExisting && !user) || data.needs_full_name) &&
         (name.trim().length < 2 || name.length > 160)
       )
-        throw new Error("Enter your full name (2–160 characters).");
+        throw new PublicMessageError(
+          "Enter your full name (2–160 characters).",
+        );
       if (!user) {
-        if (!password) throw new Error("Enter your password.");
+        if (!password)
+          throw new PublicMessageError("Enter your password.");
         if (!isExisting) {
           if (password.length < 12 || password.length > 128)
-            throw new Error("Use a password with 12 to 128 characters.");
+            throw new PublicMessageError(
+              "Use a password with 12 to 128 characters.",
+            );
           if (password !== confirmation)
-            throw new Error("Passwords must match.");
+            throw new PublicMessageError("Passwords must match.");
           try {
             await create(token, name.trim(), password, attempt.current);
           } catch (creationError) {
@@ -177,6 +185,7 @@ export function InvitationScreen({
               {!!((!isExisting && !user) || data.needs_full_name) && (
                 <Field
                   label="Full name"
+                  required
                   value={name}
                   onChangeText={setName}
                   maxLength={160}
@@ -186,6 +195,7 @@ export function InvitationScreen({
               {!user && (
                 <Field
                   label="Password"
+                  required
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -199,6 +209,7 @@ export function InvitationScreen({
               {!!(!isExisting && !user) && (
                 <Field
                   label="Confirm password"
+                  required
                   value={confirmation}
                   onChangeText={setConfirmation}
                   secureTextEntry

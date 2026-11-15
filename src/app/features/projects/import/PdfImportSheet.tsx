@@ -1,4 +1,3 @@
-import { useState } from "react";
 import * as DocumentPicker from "expo-document-picker";
 import {
   Button,
@@ -12,8 +11,12 @@ import {
   Sheet,
 } from "../../../components/ui";
 import { Text } from "../../../components/ui/Typography";
+import { useAuth } from "../../authentication";
+import { formDraftKey, useRetainedDraft } from "../../../shared/formDraftMemory";
 import { useNativePdfImport } from "./useNativePdfImport";
 import { useAction } from "../../../shared/useAction";
+import { useToast } from "../../../components/ui/Toast";
+import { PublicMessageError } from "../../../shared/userMessages";
 import { confirmAction } from "../../../shared/confirm";
 import type { ProposedOffice } from "../../../../core/web/app/features/project-import/types";
 export function PdfImportSheet({
@@ -27,12 +30,27 @@ export function PdfImportSheet({
   onClose: () => void;
   onImported: () => Promise<unknown>;
 }) {
+  const { profile } = useAuth();
+  const { toast } = useToast();
   const imp = useNativePdfImport(project, () => void onImported()),
-    action = useAction(),
-    [anchor, setAnchor] = useState(new Date().toISOString().slice(0, 10)),
-    [offices, setOffices] = useState(false),
-    [assign, setAssign] = useState(true),
-    [review, setReview] = useState<ProposedOffice[]>();
+    action = useAction();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(profile?.id, "pdf-import:" + project),
+    true,
+    () => ({
+      anchor: new Date().toISOString().slice(0, 10),
+      offices: false,
+      assign: true,
+      review: undefined as ProposedOffice[] | undefined,
+    }),
+  );
+  const { anchor, offices, assign, review } = draft;
+  const close = () => {
+    if (imp.busy || action.busy) return;
+    action.clear();
+    if (imp.result) clearDraft();
+    onClose();
+  };
   const select = () =>
     action.run(async () => {
       const picked = await DocumentPicker.getDocumentAsync({
@@ -43,7 +61,7 @@ export function PdfImportSheet({
       if (picked.canceled) return;
       const asset = picked.assets[0];
       if (!asset.size || asset.size > 20 * 1024 * 1024)
-        throw new Error("Choose a PDF up to 20 MB.");
+        throw new PublicMessageError("Choose a PDF up to 20 MB.");
       await imp.upload(
         { uri: asset.uri, name: asset.name, size: asset.size },
         anchor,
@@ -59,9 +77,7 @@ export function PdfImportSheet({
       open
       title={"Import PDF into " + title}
       busy={imp.busy || action.busy}
-      onClose={() => {
-        if (!imp.busy && !action.busy) onClose();
-      }}
+      onClose={close}
     >
       <Notice>
         Groups, tasks, schedules and budgets are saved through the same import
@@ -80,7 +96,7 @@ export function PdfImportSheet({
             label="Assigned tasks"
             value={imp.result.assignedTaskCount || 0}
           />
-          <Button onPress={onClose}>Open project table</Button>
+          <Button onPress={close}>Open project table</Button>
         </Card>
       ) : (
         <>
@@ -89,12 +105,12 @@ export function PdfImportSheet({
               <DateField
                 label="Schedule starts"
                 value={anchor}
-                onChange={setAnchor}
+                onChange={(next) => updateDraft({ anchor: next })}
               />
               <Choice
                 label="Add participating offices from the PDF"
                 value={offices ? "yes" : "no"}
-                onChange={(v) => setOffices(v === "yes")}
+                onChange={(v) => updateDraft({ offices: v === "yes" })}
                 options={[
                   { value: "no", label: "Do not add offices" },
                   { value: "yes", label: "Extract and review offices" },
@@ -103,7 +119,7 @@ export function PdfImportSheet({
               <Choice
                 label="AI assignment"
                 value={assign ? "yes" : "no"}
-                onChange={(v) => setAssign(v === "yes")}
+                onChange={(v) => updateDraft({ assign: v === "yes" })}
                 options={[
                   {
                     value: "yes",
@@ -145,11 +161,11 @@ export function PdfImportSheet({
                     label="Office name"
                     value={office.name}
                     onChangeText={(name) =>
-                      setReview(
-                        items.map((item, i) =>
+                      updateDraft({
+                        review: items.map((item, i) =>
                           i === index ? { ...item, name } : item,
                         ),
-                      )
+                      })
                     }
                   />
                   <Text>{office.evidence}</Text>
@@ -164,7 +180,9 @@ export function PdfImportSheet({
                   <Button
                     variant="danger"
                     onPress={() =>
-                      setReview(items.filter((_, i) => i !== index))
+                      updateDraft({
+                        review: items.filter((_, i) => i !== index),
+                      })
                     }
                   >
                     Exclude office
@@ -205,7 +223,8 @@ export function PdfImportSheet({
                     )
                   ) {
                     await imp.discard();
-                    setReview(undefined);
+                    clearDraft();
+                    toast("Pending import discarded.", "success");
                   }
                 })
               }

@@ -13,11 +13,17 @@ import {
   Notice,
   Row,
   Sheet,
-  Toggle,
   colors,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import { confirmAction } from "../../shared/confirm";
+import {
+  clearFormDraft,
+  formDraftKey,
+  readFormDraft,
+  writeFormDraft,
+} from "../../shared/formDraftMemory";
 import { useAuth } from "../authentication";
 import {
   isNativeWorkRecovery,
@@ -28,7 +34,6 @@ import {
   captureWorkEditorBaseline,
   freezeWorkEditorRequest,
   workEditorCapability,
-  workEditorDirty,
   workEditorDateError,
   sameWorkEditorScope,
 } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
@@ -48,15 +53,20 @@ import type {
   WorkTreeSnapshot,
   WorkRequest,
 } from "../../../core/web/app/features/nested-work/types";
-import type {
-  WorkEdit,
-  WorkEditorFields,
+import {
+  WorkRequestFailure,
+  type WorkEdit,
+  type WorkEditorFields,
 } from "../../../core/web/app/features/nested-work/types/editor";
 import { draftStore } from "../../../platform/draftStore";
 import {
   defaultSubtaskLead,
   personalReviewAllowed,
 } from "./branchInspector";
+import {
+  isProjectLeadSubtaskPlanningBlocked,
+  isSubtaskLeadOrContributor,
+} from "./workPermissions";
 import {
   nodeSchedule,
   subtaskScheduleError,
@@ -66,6 +76,70 @@ import { fetchTaskById } from "../../../core/web/app/features/tasks/services/tas
 import { PublicMessageError } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
 import { workEditorReceiptRetryAllowed } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
+import { workPriorityOptions } from "./workPriorityOptions";
+import {
+  canCreateSubtaskDependencies,
+  canEditSubtaskDependencies,
+  legacySiblingDependencyIds,
+  subtaskDependencies,
+  subtaskDependencyScheduleError,
+  subtaskDependencyWouldCycle,
+  subtaskPrerequisiteSiblings,
+  supportsSubtaskDependencies,
+  type DependencyNode,
+} from "./subtaskDependencies";
+
+type NativeEditorFields = WorkEditorFields & { priority?: string; dependencies?: string[] };
+
+/** Applies selected prerequisite subtasks right after creation because SQL forbids them on insert. */
+async function applyCreatedDependencies(
+  receipt: WorkTreeSnapshot,
+  createdId: string,
+  dependencyIds: readonly string[] | undefined,
+  actorId: string,
+): Promise<{ receipt: WorkTreeSnapshot; warning?: string }> {
+  const ids = [...new Set(dependencyIds ?? [])].sort();
+  const createdNode = receipt.nodes.find((item) => item.id === createdId) as DependencyNode | undefined;
+  if (!supportsSubtaskDependencies(receipt) || !createdNode) {
+    return ids.length
+      ? { receipt, warning: "The subtask was created, but prerequisites could not be saved. Open Edit subtask to set them." }
+      : { receipt };
+  }
+  if (!canEditSubtaskDependencies(receipt, createdNode)) {
+    return ids.length
+      ? { receipt, warning: "The subtask was created, but prerequisites could not be set with your current access. Open Edit subtask to check." }
+      : { receipt };
+  }
+  const editBaseline = captureWorkEditorBaseline(
+    receipt,
+    { command: "edit", node: createdNode },
+    actorId,
+    createdId,
+  );
+  const baseRequest = freezeWorkEditorRequest(
+    editBaseline,
+    editBaseline.fields,
+    crypto.randomUUID(),
+  );
+  const depRequest: WorkRequest = {
+    ...baseRequest,
+    payload: { ...baseRequest.payload, dependency_ids: ids },
+  };
+  try {
+    return { receipt: await saveWorkTree(receipt.root.id, depRequest) };
+  } catch (error) {
+    if (!ids.length) return { receipt };
+    const reason = error instanceof WorkRequestFailure && error.kind === "confirmed_failure"
+      ? error.message
+      : "";
+    return {
+      receipt,
+      warning: reason
+        ? `The subtask was created, but prerequisites could not be saved: ${reason} Open Edit subtask to set them.`
+        : "The subtask was created. Open Edit subtask to confirm or set its prerequisites.",
+    };
+  }
+}
 
 export function workEditorActionLabel(
   command: WorkEdit["command"],
@@ -95,14 +169,44 @@ export function workEditorActionLabel(
   }
 }
 
+export function workEditorSuccessMessage(
+  command: WorkEdit["command"],
+  progress?: number,
+): string {
+  switch (command) {
+    case "create":
+      return "Subtask added.";
+    case "edit":
+      return "Subtask saved.";
+    case "delete":
+      return "Subtask deleted.";
+    case "staff":
+    case "contributors":
+    case "root_lead":
+      return "Team updated.";
+    case "move":
+      return "Subtask moved.";
+    case "order":
+      return "Subtask order updated.";
+    case "progress":
+      return "Work update posted.";
+    case "submit":
+      return "Subtask submitted for review.";
+    case "review":
+      return progress === 100 ? "Subtask approved." : "Changes requested.";
+  }
+}
+
 export function WorkEditorSheet(
   props: Omit<Parameters<typeof WorkEditorForm>[0], "rejectedCreate">,
 ) {
   const { profile } = useAuth(),
+    { toast } = useToast(),
     { data, readOnly = false } = props,
     action = useAction();
+  const [recoveredDone, setRecoveredDone] = useState(false);
   const [rejectedCreate, setRejectedCreate] = useState<{
-    fields: WorkEditorFields;
+    fields: NativeEditorFields;
     error: unknown;
     start?: string;
   }>();
@@ -174,8 +278,12 @@ export function WorkEditorSheet(
           <>
             <Button
               busy={action.busy}
-              disabled={!canCheck || rejected}
-              onPress={() =>
+              disabled={!recoveredDone && (!canCheck || rejected)}
+              onPress={() => {
+                if (recoveredDone) {
+                  props.onClose();
+                  return;
+                }
                 void action.run(async () => {
                   let receipt: WorkTreeSnapshot;
                   try {
@@ -194,19 +302,48 @@ export function WorkEditorSheet(
                     await draftStore.remove(profile!.id, "work." + data.root.id);
                     const start = saved.request.payload.start;
                     setRejectedCreate({
-                      fields: saved.fields,
+                      fields: {
+                        ...saved.fields,
+                        priority: workPriorityOptions.find((option) =>
+                          option.value === saved.request.payload.priority)?.value,
+                      },
                       error,
                       start: typeof start === "string" ? start : undefined,
                     });
                     return;
                   }
                   await draftStore.remove(profile!.id, "work." + data.root.id);
+                  if (saved.request.command === "create") {
+                    const followUp = await applyCreatedDependencies(
+                      receipt,
+                      saved.baseline.createdId,
+                      saved.fields.dependencies,
+                      profile!.id,
+                    );
+                    receipt = followUp.receipt;
+                    if (followUp.warning) {
+                      setRecoveredDone(true);
+                      await Promise.allSettled([props.onSaved(receipt)]);
+                      throw new PublicMessageError(followUp.warning);
+                    }
+                  }
+                  toast(
+                    workEditorSuccessMessage(
+                      saved.request.command,
+                      saved.request.command === "review"
+                        ? typeof saved.request.payload.progress === "number"
+                          ? saved.request.payload.progress
+                          : Number(saved.fields.progress) || 0
+                        : undefined,
+                    ),
+                    "success",
+                  );
                   props.onClose();
                   await props.onSaved(receipt);
-                })
-              }
+                });
+              }}
             >
-              {workEditorActionLabel(saved.request.command)}
+              {recoveredDone ? "Done" : workEditorActionLabel(saved.request.command)}
             </Button>
             {rejected && (
               <Button
@@ -263,6 +400,8 @@ function WorkEditorForm({
   onClose,
   onSaved,
   readOnly = false,
+  projectStatus,
+  projectLeadId,
   rejectedCreate,
   dateBounds,
 }: {
@@ -271,7 +410,9 @@ function WorkEditorForm({
   onClose: () => void;
   onSaved: (receipt: WorkTreeSnapshot) => Promise<void>;
   readOnly?: boolean;
-  rejectedCreate?: { fields: WorkEditorFields; error: unknown; start?: string };
+  projectStatus?: string;
+  projectLeadId?: string;
+  rejectedCreate?: { fields: NativeEditorFields; error: unknown; start?: string };
   dateBounds?: WorkTreeSnapshot["root"]["scheduleBounds"];
 }) {
   const { profile } = useAuth();
@@ -299,17 +440,33 @@ function WorkEditorForm({
         readOnly,
       }),
     ).current;
-  const [fields, setFields] = useState<WorkEditorFields>(() =>
-    rejectedCreate
-      ? { ...rejectedCreate.fields, start: rejectedCreate.start ?? rejectedCreate.fields.start }
-      : {
-          ...baseline.fields,
-          lead: edit.command === "create" ? defaultSubtaskLead(data) : baseline.fields.lead,
-          start: edit.command === "create"
-            ? subtaskDateLimits(dateTree, baseline.fields.parent).earliest ?? workScheduleToday(data)
-            : baseline.fields.start,
-        },
+  const draftKey = formDraftKey(
+    profile?.id,
+    "work-editor:" +
+      data.root.id +
+      ":" +
+      edit.command +
+      ":" +
+      (edit.node?.id || edit.parent || (edit.root ? "root" : "new")),
   );
+  const [fields, setFields] = useState<NativeEditorFields>(() => {
+    if (rejectedCreate)
+      return {
+        ...rejectedCreate.fields,
+        start: rejectedCreate.start ?? rejectedCreate.fields.start,
+      };
+    const savedDraft = readFormDraft<NativeEditorFields>(draftKey);
+    if (savedDraft) return savedDraft;
+    return {
+      ...baseline.fields,
+      lead: edit.command === "create" ? defaultSubtaskLead(data) : baseline.fields.lead,
+      start:
+        edit.command === "create"
+          ? subtaskDateLimits(dateTree, baseline.fields.parent).earliest ??
+            workScheduleToday(data)
+          : baseline.fields.start,
+    };
+  });
   const originalStart =
     nodeSchedule(data.nodes.find((item) => item.id === baseline.nodeId))
       ?.start_date || "";
@@ -323,6 +480,7 @@ function WorkEditorForm({
   const changedStart =
     (sharedDates || !!today) && edit.command === "edit" && start !== originalStart;
   const request = useRef<WorkRequest | undefined>(undefined),
+    { toast } = useToast(),
     action = useAction();
   const [rejectedError, setRejectedError] = useState(rejectedCreate?.error);
   const context = {
@@ -334,11 +492,62 @@ function WorkEditorForm({
     revision: data.revision,
     readOnly,
   };
-  const node = data.nodes.find((n) => n.id === baseline.nodeId),
-    isStaff =
+  const node: DependencyNode | undefined = data.nodes.find((n) => n.id === baseline.nodeId);
+  const subtaskPlanningBlocked = isProjectLeadSubtaskPlanningBlocked(
+    data,
+    profile?.id,
+    { projectStatus, projectLeadId, actorRole: profile?.role },
+  );
+  const canAssignPeopleOnCreate =
+    edit.command === "create" && !subtaskPlanningBlocked;
+  const isStaff =
       edit.command === "staff" ||
       edit.command === "root_lead" ||
       edit.command === "contributors";
+  const supportsDependencies = supportsSubtaskDependencies(data);
+  const showPriority = supportsDependencies &&
+    (edit.command === "create" || edit.command === "edit");
+  const originalPriority = nodeSchedule(node)?.priority;
+  const priority = fields.priority ?? (edit.command === "create" ? "medium" : originalPriority ?? "");
+  const changedPriority = showPriority && fields.priority !== undefined &&
+    fields.priority !== (edit.command === "create" ? "medium" : originalPriority);
+  const dependencyParentId = edit.command === "create"
+    ? (fields.parent || null)
+    : (node?.parent_subtask_id ?? null);
+  const siblingNodes = ["create", "edit"].includes(edit.command)
+    ? subtaskPrerequisiteSiblings(
+        data,
+        dependencyParentId,
+        edit.command === "edit" ? node?.id : null,
+      )
+    : [];
+  const legacyDependencies = edit.command === "edit" && node && node.dependency_ids == null
+    ? legacySiblingDependencyIds(data, node)
+    : [];
+  const selectedDependencies = fields.dependencies ??
+    (edit.command === "create"
+      ? []
+      : Array.isArray(node?.dependency_ids)
+        ? node.dependency_ids
+        : legacyDependencies);
+  const prerequisiteOptions = [
+    ...siblingNodes.map((item) => ({ value: item.id, label: item.title })),
+    ...selectedDependencies
+      .filter((id) => !siblingNodes.some((item) => item.id === id))
+      .map((id) => ({
+        value: id,
+        label: "Unavailable prerequisite — remove to continue",
+      })),
+  ];
+  const changedDependencies = fields.dependencies !== undefined &&
+    JSON.stringify([...new Set(fields.dependencies)].sort()) !==
+      JSON.stringify(Array.isArray(node?.dependency_ids) ? [...new Set(node.dependency_ids)].sort() : null);
+  const missingDependencies = edit.command === "edit" && node
+    ? subtaskDependencies(data, node).missingCount
+    : 0;
+  const canEditDependencies = edit.command === "create"
+    ? canCreateSubtaskDependencies(data)
+    : canEditSubtaskDependencies(data, node);
   const capability = isStaff
     ? staffingCapabilities(
         data,
@@ -347,23 +556,27 @@ function WorkEditorForm({
         fields.lead,
       ).appointment
     : workEditorCapability(data, baseline, context);
-  const update = <K extends keyof WorkEditorFields>(
+  const update = <K extends keyof NativeEditorFields>(
     key: K,
-    value: WorkEditorFields[K],
+    value: NativeEditorFields[K],
   ) => {
     if (action.busy || request.current) return;
-    setFields((old) => ({ ...old, [key]: value }));
+    setFields((old) => {
+      const next = { ...old, [key]: value };
+      writeFormDraft(draftKey, next);
+      return next;
+    });
   };
   const save = () =>
     action.run(async () => {
       setRejectedError(undefined);
       if (committed) return;
-      if (!profile) throw new Error("Sign in again.");
+      if (!profile) throw new PublicMessageError("Sign in again.");
       const wasPending = !!request.current;
       if (!request.current) {
         if (edit.command === "review") {
           if (!fields.note.trim())
-            throw new Error("Enter the reason for your decision.");
+            throw new PublicMessageError("Enter the reason for your decision.");
           const approve = fields.progress === 100;
           if (
             !(await confirmAction(
@@ -375,6 +588,32 @@ function WorkEditorForm({
             return;
         }
         const latest = await fetchWorkTree(data.root.id);
+        const latestNode = baseline.nodeId
+          ? latest.nodes.find((item) => item.id === baseline.nodeId)
+          : undefined;
+        if (
+          isProjectLeadSubtaskPlanningBlocked(latest, profile.id, {
+            projectStatus,
+            projectLeadId,
+            actorRole: profile.role,
+          }) &&
+          ["create", "edit", "staff", "move", "order", "delete"].includes(
+            edit.command,
+          )
+        ) {
+          throw new PublicMessageError(
+            "Only the Task Lead can manage subtasks or assign people once the project is active.",
+          );
+        }
+        if (
+          ["progress", "submit"].includes(edit.command) &&
+          (!latestNode ||
+            !isSubtaskLeadOrContributor(latest, latestNode, profile.id))
+        ) {
+          throw new PublicMessageError(
+            "Only the Lead or contributors of this task or subtask can update or complete this work.",
+          );
+        }
         if (
           readOnly ||
           latest.root.project !== context.projectId ||
@@ -400,7 +639,7 @@ function WorkEditorForm({
               readOnly,
             ))
         )
-          throw new Error("Current independent review access is required.");
+          throw new PublicMessageError("Current independent review access is required.");
         const datedEdit = sharedDates && ["create", "edit"].includes(edit.command);
         const freshTask = datedEdit && !latest.root.scheduleBounds && latest.root.kind === "office"
           ? await fetchTaskById(latest.root.id) : undefined;
@@ -433,17 +672,63 @@ function WorkEditorForm({
             current.disabledReason || "Current work access is required.",
           );
         if (["create", "edit"].includes(edit.command) && !fields.title.trim())
-          throw new Error("Title is required.");
+          throw new PublicMessageError("Enter a subtask name.");
         if (
           ["progress", "submit", "review"].includes(edit.command) &&
           !fields.note.trim()
         )
-          throw new Error("A work note is required.");
+          throw new PublicMessageError("A work note is required.");
+        const createCanEditDeps = edit.command === "create" && canCreateSubtaskDependencies(latest);
+        const createDeps = [...new Set(selectedDependencies)].sort();
+        const requestFields = edit.command === "create" && supportsDependencies
+          ? { ...fields, standalone: createCanEditDeps ? createDeps.length === 0 : fields.standalone }
+          : fields;
         let next = isStaff
           ? createStaffingRequest(staffing, fields.lead, fields.people)
-          : freezeWorkEditorRequest(baseline, fields, crypto.randomUUID());
+          : freezeWorkEditorRequest(baseline, requestFields, crypto.randomUUID());
         if (datedEdit && start)
           next = { ...next, payload: { ...next.payload, start } };
+        if (showPriority && (edit.command === "create" || changedPriority)) {
+          if (!supportsSubtaskDependencies(latest) || !workPriorityOptions.some((option) => option.value === priority))
+            throw new PublicMessageError("Subtask priority is currently unavailable. Refresh the work and try again.");
+          next = { ...next, payload: { ...next.payload, priority } };
+        }
+        if (edit.command === "create" && supportsDependencies) {
+          if (!createCanEditDeps && createDeps.length > 0)
+            throw new PublicMessageError("Prerequisites can no longer be set with your current access. Refresh this task.");
+          if (createCanEditDeps) {
+            const latestSiblings = subtaskPrerequisiteSiblings(latest, fields.parent || null);
+            if (createDeps.length > 100)
+              throw new PublicMessageError("Choose at most 100 prerequisites.");
+            if (createDeps.some((id) => !latestSiblings.some((item) => item.id === id)))
+              throw new PublicMessageError("Choose available prerequisites under the same parent.");
+            const depScheduleIssue = subtaskDependencyScheduleError(
+              latestSiblings,
+              createDeps,
+              datedEdit ? start : undefined,
+            );
+            if (depScheduleIssue) throw new PublicMessageError(depScheduleIssue);
+          }
+        }
+        if (edit.command === "edit" && changedDependencies) {
+          const freshNode: DependencyNode | undefined = latest.nodes.find((item) => item.id === baseline.nodeId);
+          const ids = [...new Set(fields.dependencies ?? [])].sort();
+          const latestSiblings = freshNode
+            ? subtaskPrerequisiteSiblings(latest, freshNode.parent_subtask_id ?? null, freshNode.id)
+            : [];
+          if (!canEditDependencies || !freshNode || !canEditSubtaskDependencies(latest, freshNode))
+            throw new PublicMessageError("Prerequisites changed or are no longer editable. Refresh this subtask.");
+          if (ids.length > 100)
+            throw new PublicMessageError("Choose at most 100 prerequisites.");
+          if (ids.some((id) => !latestSiblings.some((item) => item.id === id)))
+            throw new PublicMessageError("Prerequisites changed or are no longer editable. Refresh this subtask.");
+          if (subtaskDependencyWouldCycle(latest.nodes, freshNode.id, ids))
+            throw new PublicMessageError("These prerequisites would create a circular dependency.");
+          const effectiveStart = datedEdit ? start : nodeSchedule(freshNode)?.start_date;
+          const depScheduleIssue = subtaskDependencyScheduleError(latestSiblings, ids, effectiveStart);
+          if (depScheduleIssue) throw new PublicMessageError(depScheduleIssue);
+          next = { ...next, payload: { ...next.payload, dependency_ids: ids } };
+        }
         const needsImpact =
           ["move", "order", "delete"].includes(edit.command) ||
           (edit.command === "edit" &&
@@ -454,13 +739,12 @@ function WorkEditorForm({
         if (needsImpact) {
           const impact = await fetchWorkImpact(data.root.id, next);
           if (impact.current_revision !== next.revision)
-            throw new Error(
+            throw new PublicMessageError(
               "Work changed. Reopen the editor and review current work.",
             );
           if (!impact.allowed)
-            throw new Error(
-              "Existing work or current permissions block this change. " +
-                impact.blocker_codes.join(", "),
+            throw new PublicMessageError(
+              "Existing work or current permissions block this change.",
             );
           if (
             !(await confirmAction(
@@ -476,7 +760,7 @@ function WorkEditorForm({
         request.current = next;
         await draftStore.set(profile.id, "work." + data.root.id, {
           request: next,
-          fields,
+          fields: requestFields,
           baseline,
         });
       }
@@ -497,8 +781,31 @@ function WorkEditorForm({
         throw error;
       }
       await draftStore.remove(profile.id, "work." + data.root.id);
+      clearFormDraft(draftKey);
       request.current = undefined;
+      if (edit.command === "create") {
+        const followUp = await applyCreatedDependencies(
+          receipt,
+          baseline.createdId,
+          selectedDependencies,
+          profile.id,
+        );
+        receipt = followUp.receipt;
+        if (followUp.warning) {
+          setCommitted(true);
+          await Promise.allSettled([onSaved(receipt)]);
+          throw new PublicMessageError(followUp.warning);
+        }
+      }
       setCommitted(true);
+      action.clear();
+      toast(
+        workEditorSuccessMessage(
+          edit.command,
+          edit.command === "review" ? Number(fields.progress) || 0 : undefined,
+        ),
+        "success",
+      );
       onClose();
       await onSaved(receipt);
     });
@@ -527,7 +834,7 @@ function WorkEditorForm({
         !sameWorkEditorScope(baseline, nextScope) ||
         !workEditorCapability(latest, nextBaseline, nextScope).allowed
       )
-        throw new Error("You no longer have access to edit this subtask.");
+        throw new PublicMessageError("You no longer have access to edit this subtask.");
       if (
         !(await confirmAction(
           "Review latest subtask details",
@@ -539,7 +846,7 @@ function WorkEditorForm({
       if (request.current)
         await draftStore.remove(profile.id, "work." + data.root.id);
       request.current = undefined;
-      setFields({
+      const merged = {
         ...nextBaseline.fields,
         title:
           fields.title === baseline.fields.title
@@ -558,26 +865,18 @@ function WorkEditorForm({
             ? nextBaseline.fields.standalone
             : fields.standalone,
         note: fields.note,
-      });
+        priority: changedPriority ? fields.priority : undefined,
+        dependencies: changedDependencies ? fields.dependencies : undefined,
+      };
+      setFields(merged);
+      writeFormDraft(draftKey, merged);
       setData(latest);
       setBaseline(nextBaseline);
       setNewer(undefined);
     });
-  const close = async () => {
+  const close = () => {
     if (action.busy) return;
-    if (
-      !committed &&
-      (request.current || changedStart || workEditorDirty(baseline, fields))
-    ) {
-      if (
-        !(await confirmAction(
-          "Leave these work changes?",
-          "You can check the result of a previous submission when you return. Unsaved field edits will be discarded.",
-          "Leave editor",
-        ))
-      )
-        return;
-    }
+    action.clear();
     onClose();
   };
   return (
@@ -594,6 +893,7 @@ function WorkEditorForm({
       busy={action.busy}
       footer={
         <Button
+          style={{ width: "100%" }}
           busy={action.busy}
           onPress={() =>
             void (committed ? onClose() : newer ? reviewLatest() : save())
@@ -610,11 +910,22 @@ function WorkEditorForm({
       {!!["create", "edit"].includes(edit.command) && (
         <>
           <Field
-            label="Title"
+            label="Subtask name"
+            required
             value={fields.title}
             onChangeText={(v) => update("title", v)}
             editable={!request.current && !action.busy}
           />
+          {data.root.kind === "office" && <Notice>Subtasks use the parent Task’s group.</Notice>}
+          {showPriority && (
+            <Choice
+              label="Priority"
+              value={priority}
+              options={workPriorityOptions}
+              onChange={(value) => update("priority", value)}
+              disabled={!!request.current || action.busy || !capability.allowed}
+            />
+          )}
           {invalidRange && (
             <ErrorState context="action" error="The parent dates leave no valid subtask date range. Update the parent schedule first." />
           )}
@@ -643,15 +954,36 @@ function WorkEditorForm({
             onChange={(v) => update("due", v)}
             disabled={!!request.current || action.busy || invalidRange || !!(dueMin && dateLimits?.latest && dueMin > dateLimits.latest)}
           />
-          <Toggle
-            label="Can start independently"
-            value={fields.standalone}
-            onChange={(v) => update("standalone", v)}
-            disabled={!!request.current || action.busy}
+          <Choice
+            label="Prerequisite subtasks"
+            multiple
+            value={selectedDependencies}
+            options={prerequisiteOptions}
+            placeholder="No prerequisites selected"
+            onChange={(value) => update("dependencies", value)}
+            disabled={!!request.current || action.busy || !capability.allowed || !canEditDependencies}
           />
+          {data.root.kind !== "office" ? (
+            <Notice>Prerequisite selection is only available on project tasks.</Notice>
+          ) : !supportsDependencies ? (
+            <Notice>Prerequisite selection is unavailable in this view.</Notice>
+          ) : edit.command === "edit" && missingDependencies > 0 ? (
+            <Notice>
+              {missingDependencies} restricted prerequisite(s). The list is read-only.
+            </Notice>
+          ) : !canEditDependencies ? (
+            <Notice>
+              {edit.command === "edit" &&
+              (node?.status !== "todo" ||
+                !!nodeSchedule(node)?.started_at ||
+                !!node?.percent_complete)
+                ? "Prerequisites cannot be changed after work starts."
+                : "Prerequisites are read-only in this view."}
+            </Notice>
+          ) : null}
         </>
       )}
-      {!!(isStaff || edit.command === "create") && (
+      {!!(isStaff || canAssignPeopleOnCreate) && (
         <>
           <Choice
             label="Appointed Lead"
@@ -728,6 +1060,7 @@ function WorkEditorForm({
       {!!(edit.command === "progress") && (
         <Field
           label="Progress (0–99%)"
+          required
           keyboardType="number-pad"
           value={String(fields.progress)}
           onChangeText={(v) => update("progress", Number(v))}
@@ -737,6 +1070,7 @@ function WorkEditorForm({
       {!!(edit.command === "review") && (
         <Choice
           label="Review decision"
+          required
           value={fields.progress === 100 ? "approve" : "changes"}
           onChange={(v) => update("progress", v === "approve" ? 100 : 0)}
           options={[
@@ -746,9 +1080,10 @@ function WorkEditorForm({
           disabled={!!request.current}
         />
       )}
-      {!!["progress", "submit", "review", "edit"].includes(edit.command) && (
+      {!!["progress", "submit", "review"].includes(edit.command) && (
         <Field
           label="Work note"
+          required
           value={fields.note}
           onChangeText={(v) => update("note", v)}
           multiline

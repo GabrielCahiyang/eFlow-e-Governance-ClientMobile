@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button, Field, Notice, Sheet } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import {
+  formDraftKey,
+  useRetainedDraft,
+} from "../../shared/formDraftMemory";
+import { PublicMessageError } from "../../shared/userMessages";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
 import { signInOnMobile } from "../authentication/mobileSignIn";
@@ -14,9 +20,14 @@ export function PasswordSheet({
   onSaved: () => void;
 }) {
   const { user } = useAuth(),
-    [current, setCurrent] = useState(""),
-    [next, setNext] = useState(""),
-    [confirmation, setConfirmation] = useState(""),
+    { toast } = useToast(),
+    draftKey = formDraftKey(user?.id, "password-change"),
+    [draft, setDraft, clearDraft] = useRetainedDraft(draftKey, true, () => ({
+      current: "",
+      next: "",
+      confirmation: "",
+    })),
+    { current, next, confirmation } = draft,
     action = useAction(),
     alive = useRef(true),
     actor = useRef(user?.id);
@@ -27,62 +38,47 @@ export function PasswordSheet({
     },
     [],
   );
-  const clear = () => {
-    setCurrent("");
-    setNext("");
-    setConfirmation("");
-  };
   const save = () =>
     action.run(async () => {
       const identity = user?.id;
-      try {
-        const issue = passwordChangeError(current, next, confirmation);
-        if (issue) throw new Error(issue);
-        if (!identity || !user?.email)
-          throw new Error("Your session has expired. Please sign in again.");
-        if (
-          !(await confirmAction(
-            "Change your password?",
-            "Your current password will be verified before saving the new one.",
-            "Update password",
-          ))
-        )
-          return;
-        await signInOnMobile(user.email, current);
-        if (!alive.current || actor.current !== identity) return;
-        const verified = await supabase.auth.getUser();
-        if (verified.error) throw verified.error;
-        if (
-          verified.data.user?.id !== identity ||
-          !alive.current ||
-          actor.current !== identity
-        )
-          throw new Error(
-            "Your account changed. Sign in again before changing its password.",
-          );
-        const result = await supabase.auth.updateUser({ password: next });
-        if (result.error) throw result.error;
-        if (alive.current) {
-          onSaved();
-          onClose();
-        }
-      } finally {
-        clear();
+      const issue = passwordChangeError(current, next, confirmation);
+      if (issue) throw new PublicMessageError(issue);
+      if (!identity || !user?.email)
+        throw new PublicMessageError(
+          "Your session has expired. Please sign in again.",
+        );
+      if (
+        !(await confirmAction(
+          "Change your password?",
+          "Your current password will be verified before saving the new one.",
+          "Update password",
+        ))
+      )
+        return;
+      await signInOnMobile(user.email, current);
+      if (!alive.current || actor.current !== identity) return;
+      const verified = await supabase.auth.getUser();
+      if (verified.error) throw verified.error;
+      if (
+        verified.data.user?.id !== identity ||
+        !alive.current ||
+        actor.current !== identity
+      )
+        throw new PublicMessageError(
+          "Your account changed. Sign in again before changing its password.",
+        );
+      const result = await supabase.auth.updateUser({ password: next });
+      if (result.error) throw result.error;
+      clearDraft();
+      toast("Password updated.", "success");
+      if (alive.current) {
+        onSaved();
+        onClose();
       }
     });
-  const close = async () => {
+  const close = () => {
     if (action.busy) return;
-    if (
-      (current || next || confirmation) &&
-      !(await confirmAction(
-        "Discard password entries?",
-        "The passwords will be cleared from this form.",
-        "Discard entries",
-        true,
-      ))
-    )
-      return;
-    clear();
+    action.clear();
     onClose();
   };
   return (
@@ -91,7 +87,7 @@ export function PasswordSheet({
       open
       title="Change your password"
       description="Confirm your current password before choosing a new one."
-      onClose={() => void close()}
+      onClose={close}
       busy={action.busy}
       footer={
         <Button busy={action.busy} onPress={() => void save()}>
@@ -101,8 +97,9 @@ export function PasswordSheet({
     >
       <Field
         label="Current password"
+        required
         value={current}
-        onChangeText={setCurrent}
+        onChangeText={(value) => setDraft({ current: value })}
         secureTextEntry
         autoComplete="current-password"
         maxLength={128}
@@ -110,8 +107,9 @@ export function PasswordSheet({
       />
       <Field
         label="New password"
+        required
         value={next}
-        onChangeText={setNext}
+        onChangeText={(value) => setDraft({ next: value })}
         secureTextEntry
         autoComplete="new-password"
         maxLength={128}
@@ -119,8 +117,9 @@ export function PasswordSheet({
       />
       <Field
         label="Confirm new password"
+        required
         value={confirmation}
-        onChangeText={setConfirmation}
+        onChangeText={(value) => setDraft({ confirmation: value })}
         secureTextEntry
         autoComplete="new-password"
         maxLength={128}

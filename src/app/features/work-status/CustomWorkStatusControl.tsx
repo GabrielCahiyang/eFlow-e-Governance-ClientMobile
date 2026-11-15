@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { ErrorState } from "../../components/ui/Screen";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import { PublicMessageError } from "../../shared/userMessages";
 import {
   useWorkStatus,
@@ -24,6 +25,7 @@ export function CustomWorkStatusControl({
   customId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const { toast } = useToast();
   const action = useAction();
   const { definitions, ready } = useWorkStatusCatalog();
   const resolve = useWorkStatus();
@@ -51,6 +53,7 @@ export function CustomWorkStatusControl({
           "Could not change the status. Check that the work and label are still available.",
         );
       nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
+      toast(id ? "Work label updated." : "Work label cleared.", "success");
     });
   };
   return (

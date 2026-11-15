@@ -6,21 +6,26 @@ import {
   Choice,
   DateField,
   Field,
+  Notice,
   Sheet,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
-import { PublicMessageError } from "../../shared/userMessages";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { fetchProjectGroups } from "../../../core/web/app/features/project-table/services/workspaceService";
 import type { ProjectGroup } from "../../../core/web/app/features/project-table/types";
-import {
-  timelineDraft,
-  timelinePatch,
-} from "../../../core/web/app/features/project-table/planningDraft";
+import { taskDatePatch, taskTimeline } from "../tasks/taskDates";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 import { rowToTask } from "../../../core/web/app/features/tasks/services/taskMapper";
-import { fetchProject } from "./services";
+import { fetchProject, fetchProjectAnalysisTasks } from "./services";
 import { projectEditorAccess, requireProjectSetup } from "./projectAccess";
+import { workPriorityOptions } from "../tasks/workPriorityOptions";
+import { dependencyWouldCycle } from "../../../core/web/app/features/project-table/selectors";
 
 type Scope = { actor: string; project: string; office: string; task?: Task; canDelegateEdit?: boolean };
 
@@ -79,21 +84,60 @@ export function ProjectTaskEditor({
   onSaved: () => Promise<unknown>;
 }) {
   const [task] = useState(scope.task);
-  const [title, setTitle] = useState(task?.title ?? "");
-  const [timeline, setTimeline] = useState(() =>
-    task ? timelineDraft(task) : { start: "", end: "", time: "" },
+  const { toast } = useToast();
+  const [createdTaskId, setCreatedTaskId] = useState<string>();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      scope.actor,
+      "project-task-editor:" + scope.project + ":" + (task?.id ?? "new"),
+    ),
+    true,
+    () => ({
+      title: task?.title ?? "",
+      priority: task?.priority ?? "medium",
+      dependencies: task?.dependencyIds ?? [],
+      timeline: task ? taskTimeline(task) : { start: "", end: "" },
+      group:
+        (groups.find((item) => item.isDefault) || groups[0])?.id ?? "",
+    }),
   );
+  const { title, priority, dependencies, timeline, group } = draft;
+  const dependencyChanged = JSON.stringify([...dependencies].sort()) !==
+    JSON.stringify([...(task?.dependencyIds ?? [])].sort());
+  const structure = useTaskStructure(scope, !!task);
+  const showPrerequisites = !task || (structure.data === "head" && !structure.error);
+  const prerequisiteFacts = useFacts(
+    `task-prerequisites:${scope.actor}:${scope.project}:${task?.id}`,
+    () => fetchProjectAnalysisTasks(scope.project),
+    showPrerequisites,
+  );
+  const prerequisiteOptions = (prerequisiteFacts.data ?? []).filter((item) =>
+    item.id !== task?.id && item.linkedProjectId === scope.project &&
+    ((!item.archivedAt && item.status !== "cancelled") || task?.dependencyIds?.includes(item.id)),
+  );
+  const restrictedPrerequisites = (task?.dependencyIds ?? []).filter((id) =>
+    !prerequisiteOptions.some((item) => item.id === id),
+  ).length;
   const projectDates = useFacts("task-project-dates:" + scope.project,
     () => fetchProject(scope.project), !task);
   const projectStart = projectDates.data?.startDate?.slice(0, 10);
   const projectDue = projectDates.data?.targetDate?.slice(0, 10);
-  const start = timeline.start || (!task ? projectStart : undefined) || "";
+  const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+  const defaultStart =
+    !task && projectStart && projectDue && projectStart < today && projectDue >= today
+      ? today
+      : !task
+        ? projectStart
+        : undefined;
+  const start = timeline.start || defaultStart || "";
   const due = timeline.end || (!task ? projectDue : undefined) || "";
-  const [group, setGroup] = useState(
-    (groups.find((item) => item.isDefault) || groups[0])?.id ?? "",
-  );
   const [unconfirmed, setUnconfirmed] = useState(false);
   const action = useAction();
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
 
   const save = () =>
     void action.run(async () => {
@@ -113,9 +157,26 @@ export function ProjectTaskEditor({
           "Current project access does not allow this change.",
         );
       await requireProjectSetup(scope.project);
+      if ((!task || priority !== task.priority) &&
+          !workPriorityOptions.some((option) => option.value === priority))
+        throw new PublicMessageError("Choose Low, Medium or High priority.");
+      if (dependencyChanged) {
+        if (access !== "head")
+          throw new PublicMessageError("Current Head access is required to change task prerequisites.");
+        const currentTasks = await fetchProjectAnalysisTasks(scope.project);
+        const visible = new Set(currentTasks.filter((item) => item.linkedProjectId === scope.project).map((item) => item.id));
+        if ((task?.dependencyIds ?? []).some((id) => !visible.has(id)) ||
+            dependencies.some((id) => id === task?.id || !visible.has(id)) ||
+            (task && dependencyWouldCycle(currentTasks, task.id, dependencies)))
+          throw new PublicMessageError("Choose available prerequisites in this project without a circular dependency.");
+      }
       if (!task && (!project.startDate || !project.targetDate || !start || !due ||
         start < project.startDate.slice(0, 10) || due > project.targetDate.slice(0, 10) || due < start))
         throw new PublicMessageError("Choose task dates within the project schedule.");
+      if (!task && start < today)
+        throw new PublicMessageError("Choose today or a future start date.");
+      if (!task && due < today)
+        throw new PublicMessageError("Choose today or a future due date.");
       if (
         !task &&
         !(await fetchProjectGroups(scope.project)).some(
@@ -148,14 +209,13 @@ export function ProjectTaskEditor({
       }
       let schedule = {};
       if (task && timeline) {
-        const original = timelineDraft(task);
+        const original = taskTimeline(task);
         if (
           timeline.start !== original.start ||
-          timeline.end !== original.end ||
-          timeline.time !== original.time
+          timeline.end !== original.end
         ) {
           try {
-            schedule = timelinePatch(task, timeline);
+            schedule = taskDatePatch(original, timeline);
           } catch (error) {
             throw new PublicMessageError(
               error instanceof Error ? error.message : "Check the task dates.",
@@ -170,7 +230,11 @@ export function ProjectTaskEditor({
       const result = task
         ? await supabase.rpc(access === "delegated" ? "edit_selected_project_task" : "phase3_patch_task", {
             p_task_id: task.id,
-            p_patch: { title: name, ...schedule },
+            p_patch: {
+              title: name, ...schedule,
+              ...(priority !== task.priority ? { priority } : {}),
+              ...(dependencyChanged ? { dependency_ids: dependencies } : {}),
+            },
           })
         : await supabase.rpc("m7_create_scheduled_task", {
             p_project: scope.project,
@@ -182,6 +246,7 @@ export function ProjectTaskEditor({
       if (result.error) {
         const code = result.error.code || "";
         if (
+          isDeterministicRejection(result.error) ||
           /^(22|23)/.test(code) ||
           ["42501", "42883", "PGRST202", "P0001"].includes(code)
         ) {
@@ -205,6 +270,36 @@ export function ProjectTaskEditor({
         throw new PublicMessageError(
           "The save could not be confirmed. Close this form and check the task list before trying again.",
         );
+      if (!task) {
+        setCreatedTaskId(result.data.id);
+        clearDraft();
+        if (priority !== "medium" || dependencyChanged) {
+          try {
+            const currentSession = await supabase.auth.getSession();
+            if (currentSession.error || currentSession.data.session?.user.id !== scope.actor)
+              throw new Error("The active account changed.");
+            const update = await supabase.rpc("phase3_patch_task", {
+              p_task_id: result.data.id,
+              p_patch: {
+                ...(priority !== "medium" ? { priority } : {}),
+                ...(dependencyChanged ? { dependency_ids: dependencies } : {}),
+              },
+            });
+            const savedDependencies = update.data?.dependency_ids;
+            if (update.error || update.data?.id !== result.data.id ||
+                (priority !== "medium" && update.data?.priority !== priority) ||
+                (dependencyChanged && (!Array.isArray(savedDependencies) ||
+                  JSON.stringify([...savedDependencies].sort()) !== JSON.stringify([...dependencies].sort()))))
+              throw new Error("Task planning fields could not be confirmed.");
+          } catch {
+            nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
+            await Promise.allSettled([onSaved()]);
+            throw new PublicMessageError("The task was created. Open Edit task to check its priority and prerequisites.");
+          }
+        }
+      }
+      clearDraft();
+      toast(task ? "Task saved." : "Task added.", "success");
       nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       onClose();
       await onSaved();
@@ -214,16 +309,25 @@ export function ProjectTaskEditor({
       actionError={action.error ?? projectDates.error}
       open
       title={task ? "Edit task" : "Add task"}
-      onClose={onClose}
+      onClose={close}
       busy={action.busy}
     >
       <Field
-        label="Task title"
+        label="Task name"
+        required
         value={title}
-        onChangeText={setTitle}
+        onChangeText={(next) => updateDraft({ title: next })}
         maxLength={300}
         editable={!action.busy && !unconfirmed}
       />
+      <Choice
+        label="Priority"
+        value={priority}
+        options={workPriorityOptions}
+        onChange={(next) => updateDraft({ priority: next })}
+        disabled={action.busy || unconfirmed}
+      />
+      {!task && <Notice>Start and due dates default to the project schedule.</Notice>}
       {timeline && (
         <>
           <DateField
@@ -231,7 +335,12 @@ export function ProjectTaskEditor({
             value={start}
             min={!task ? projectStart : undefined}
             max={!task ? due || projectDue : undefined}
-            onChange={(start) => setTimeline({ ...timeline, start })}
+            onChange={(next) =>
+              updateDraft((old) => ({
+                ...old,
+                timeline: { ...old.timeline, start: next },
+              }))
+            }
             disabled={action.busy || unconfirmed || (!task && (!projectStart || !projectDue))}
           />
           <DateField
@@ -239,37 +348,55 @@ export function ProjectTaskEditor({
             value={due}
             min={!task ? start || projectStart : undefined}
             max={!task ? projectDue : undefined}
-            onChange={(end) =>
-              setTimeline({ ...timeline, end, time: end ? timeline.time : "" })
+            onChange={(next) =>
+              updateDraft((old) => ({
+                ...old,
+                timeline: { ...old.timeline, end: next },
+              }))
             }
             disabled={action.busy || unconfirmed || (!task && (!projectStart || !projectDue))}
-          />
-          <Field
-            label="Due time (24-hour HH:mm)"
-            value={timeline.time || ""}
-            onChangeText={(time) => setTimeline({ ...timeline, time })}
-            editable={!action.busy && !unconfirmed}
           />
         </>
       )}
       {!task && (
         <Choice
           label="Group"
+          required
           options={groups.map((item) => ({
             value: item.id,
             label: item.title,
           }))}
           value={group}
-          onChange={setGroup}
+          onChange={(next) => updateDraft({ group: next })}
           disabled={action.busy || unconfirmed}
         />
       )}
+      {showPrerequisites && (
+        <>
+          <Choice
+            label="Prerequisite tasks"
+            multiple
+            value={dependencies}
+            placeholder="No prerequisites selected"
+            options={prerequisiteOptions.map((item) => ({ value: item.id, label: item.title }))}
+            onChange={(next) => updateDraft({ dependencies: next })}
+            disabled={action.busy || unconfirmed || prerequisiteFacts.loading ||
+              !!prerequisiteFacts.error || restrictedPrerequisites > 0}
+          />
+          {!!prerequisiteFacts.error && <Notice>Task prerequisites are unavailable.</Notice>}
+          {!prerequisiteFacts.loading && !prerequisiteFacts.error && restrictedPrerequisites > 0 &&
+            <Notice>{restrictedPrerequisites} restricted prerequisite(s). The list is read-only.</Notice>}
+        </>
+      )}
+      {task && structure.data === "delegated" && (task.dependencyIds?.length ?? 0) > 0 && (
+        <Notice>See the Task details for its prerequisites. An authorized Head can edit them.</Notice>
+      )}
       <Button
         busy={action.busy}
-        disabled={unconfirmed || !title.trim() || (!task && !group)}
-        onPress={save}
+        disabled={!createdTaskId && (unconfirmed || !title.trim() || (!task && !group))}
+        onPress={createdTaskId ? close : save}
       >
-        {task ? "Save task" : "Add task"}
+        {createdTaskId ? "Done" : task ? "Save task" : "Add task"}
       </Button>
     </Sheet>
   );

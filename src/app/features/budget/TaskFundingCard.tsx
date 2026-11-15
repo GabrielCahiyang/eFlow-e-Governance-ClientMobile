@@ -9,6 +9,7 @@ import {
   Notice,
 } from "../../components/ui";
 import { recordedPeso } from "../../components/ui/theme";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
 import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/constants";
 import { useAuth } from "../authentication";
@@ -23,22 +24,30 @@ import { linkedFundingSubitem, taskCashRequests } from "./mobileFinanceScope";
 import { readFocusedSubtaskFunding } from "./focusedSubtaskFunding";
 import { useCashRequestUpdates } from "./useCashRequestUpdates";
 import { SubtaskBudgetDistribution } from "./SubtaskBudgetDistribution";
+import { fetchWorkExpenseTotals } from "./workExpenseTotals";
+import { taskTimeline } from "../tasks/taskDates";
 
 export function TaskFundingCard({
   task,
   subtaskId,
   recordId,
   canManage,
+  subtaskFinished = false,
   readOnly,
-  showWebSetup,
   onOpenLinkedSubitem,
 }: {
-  task: Pick<Task, "id" | "orgId"> & Partial<Pick<Task, "status">>;
+  task: Pick<Task, "id" | "orgId"> &
+    Partial<
+      Pick<
+        Task,
+        "title" | "status" | "linkedProjectId" | "startDate" | "deadline" | "dueDate"
+      >
+    >;
   subtaskId?: string;
   recordId?: string;
   canManage: boolean;
+  subtaskFinished?: boolean;
   readOnly: boolean;
-  showWebSetup?: boolean;
   onOpenLinkedSubitem?: (id: string) => void;
 }) {
   const { profile } = useAuth();
@@ -52,12 +61,17 @@ export function TaskFundingCard({
         context.taskId !== task.id ||
         (subtaskId && context.subtaskId !== subtaskId)
       )
-        throw new Error("Could not verify the funding record for this work.");
+        throw new PublicMessageError("Could not verify the funding record for this work.");
       return context;
     },
     !!profile?.id,
   );
   const context = funding.error ? undefined : funding.data;
+  const expenses = useFacts(
+    `work-expenses:${profile?.id}:${task.id}:${subtaskId ?? ""}`,
+    async () => (await fetchWorkExpenseTotals([task.id])).get(task.id, subtaskId),
+    !!profile?.id && !recordId,
+  );
   const officeBudget = useBudget(
     !subtaskId && context
       ? context.fundingOrgId || task.orgId || profile?.org_id || ""
@@ -90,26 +104,55 @@ export function TaskFundingCard({
       ? linkedFundingSubitem(budget.data, task.id, recordId)
       : undefined;
   const refresh = useCallback(async () => {
-    await Promise.all([funding.refresh(), budget.refresh()]);
-  }, [funding.refresh, budget.refresh]);
+    await Promise.all([funding.refresh(), budget.refresh(), expenses.refresh()]);
+  }, [funding.refresh, budget.refresh, expenses.refresh]);
   useCashRequestUpdates(
     task.id,
     !!profile,
-    subtaskId ? refresh : funding.refresh,
+    refresh,
     subtaskId,
     true,
   );
+  const taskFinished =
+    task.status === "completed" || task.status === "cancelled";
+  const workFinished = taskFinished || subtaskFinished;
+  const requiresSubtaskBudget = Boolean(
+    subtaskId && context?.funded && context.distribution && !context.cap,
+  );
   const locked =
     readOnly ||
-    funding.loading ||
+    (funding.loading && !context) ||
     !!funding.error ||
-    budget.loading ||
+    (budget.loading && !budget.data) ||
     !!budget.error ||
     !budget.data;
 
   return (
     <>
       <Card title={subtaskId ? "Subtask funding" : "Task funding"}>
+        {!recordId && (
+          <>
+            {expenses.loading && !expenses.data ? (
+              <Loading label="Loading expenses" layout="summary" rows={2} />
+            ) : expenses.error || !expenses.data ? (
+              <Notice>Actual expense totals are unavailable.</Notice>
+            ) : (
+              <>
+                <Notice>
+                  {expenses.data.complete ? "Work totals across fiscal years and funding sources." :
+                    "Totals from the cash records you can access, across fiscal years and funding sources."}
+                </Notice>
+                <LabelValue label="Settled expenses" value={expenses.data.settled == null
+                  ? "Unavailable" : recordedPeso(expenses.data.settled / 100)} />
+                <LabelValue label="Pending liquidation" value={expenses.data.pending == null
+                  ? "Unavailable" : recordedPeso(expenses.data.pending / 100)} />
+              </>
+            )}
+            {!!expenses.error && (
+              <Button variant="outline" onPress={() => void expenses.refresh()}>Retry expenses</Button>
+            )}
+          </>
+        )}
         {!!funding.error && (
           <ErrorState
             error={funding.error}
@@ -156,18 +199,26 @@ export function TaskFundingCard({
                 context={context}
                 actor={profile?.id ?? ""}
                 readOnly={readOnly || !!recordId}
-                taskFinished={
-                  task.status === "completed" || task.status === "cancelled"
-                }
+                taskFinished={taskFinished}
                 onSaved={refresh}
               />
             )}
             {!context.funded && (
               <Notice>This work has no authorized funding yet.</Notice>
             )}
+            {!recordId && requiresSubtaskBudget && (
+              <Notice>
+                Ask the task lead to allocate a budget to this subtask before
+                requesting cash.
+              </Notice>
+            )}
             {!recordId &&
               !locked &&
+              !workFinished &&
+              (!officeBudget.data?.summary?.status ||
+                officeBudget.data.summary.status === "locked") &&
               context.funded &&
+              !requiresSubtaskBudget &&
               context.available > 0 &&
               (profile?.id === context.taskLeaderId || canManage) && (
                 <Button
@@ -181,12 +232,21 @@ export function TaskFundingCard({
               )}
           </>
         )}
-        {!recordId && !subtaskId && (
+        {!recordId && !subtaskId && !!context && !funding.error && (
           <WorkAllocationCard
             key={task.id}
             task={task.id}
-            readOnly={readOnly || funding.loading || !!funding.error}
-            showWebSetup={!!showWebSetup}
+            projectId={task.linkedProjectId ?? undefined}
+            taskFinished={taskFinished}
+            taskSchedule={
+              "startDate" in task ||
+              "deadline" in task ||
+              "dueDate" in task ||
+              "title" in task
+                ? taskTimeline(task)
+                : undefined
+            }
+            readOnly={readOnly}
             onSaved={refresh}
           />
         )}
@@ -245,8 +305,16 @@ export function TaskFundingCard({
           context={context}
           orgId={context.fundingOrgId || task.orgId || ""}
           correction={correction}
+          taskSchedule={
+            task.startDate || task.deadline || task.dueDate
+              ? taskTimeline(task)
+              : undefined
+          }
           readOnly={locked}
-          onClose={() => setRequest(false)}
+          onClose={() => {
+            setRequest(false);
+            setCorrection(undefined);
+          }}
           onSaved={refresh}
         />
       )}

@@ -1,4 +1,5 @@
 import { supabase } from "../../../platform/supabase";
+import { PublicMessageError } from "../../shared/userMessages";
 import { draftStore } from "../../../platform/draftStore";
 import {
   readEvidenceFile,
@@ -21,7 +22,7 @@ export const evidenceScope = (taskId: string) => "task-evidence:" + taskId;
 export async function assertEvidenceActor(actor: string) {
   const { data, error } = await supabase.auth.getSession();
   if (error || data.session?.user.id !== actor)
-    throw new Error("Sign in with the original account to continue.");
+    throw new PublicMessageError("Sign in with the original account to continue.");
 }
 
 async function hasReceipt(taskId: string, actor: string, id: string) {
@@ -31,12 +32,12 @@ async function hasReceipt(taskId: string, actor: string, id: string) {
     .eq("id", id)
     .eq("task_id", taskId)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
   if (
     data &&
     (data.id !== id || data.task_id !== taskId || data.submitter_id !== actor)
   )
-    throw new Error(
+    throw new PublicMessageError(
       "The evidence receipt did not match this task and submitter.",
     );
   return !!data;
@@ -53,7 +54,7 @@ export async function uploadEvidenceFile(
     bytes.byteLength > 25 * 1024 * 1024 ||
     (file.size > 0 && bytes.byteLength !== file.size)
   )
-    throw new Error(
+    throw new PublicMessageError(
       "The selected file is empty, too large, or changed. Verify the original file.",
     );
 
@@ -66,7 +67,7 @@ export async function uploadEvidenceFile(
     // A timeout can leave the object at this immutable per-request path.
     const stored = await bucket.info(path);
     if (stored.error || stored.data?.size !== bytes.byteLength)
-      throw new Error(`Could not verify ${file.name}. ${result.error.message}`);
+      throw new PublicMessageError(`Could not verify ${file.name}. Check the file and try uploading again.`);
   }
   return {
     fileName: file.name,
@@ -127,7 +128,8 @@ export async function sendTaskEvidence({
   )
     return;
   if (await hasReceipt(taskId, actor, request.id)) return;
-  throw new Error(
-    error?.message || "The submission outcome could not be confirmed.",
+  if (error) throw error;
+  throw new PublicMessageError(
+    "The submission outcome could not be confirmed.",
   );
 }

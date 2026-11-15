@@ -1,5 +1,6 @@
 import { supabase } from "../../../platform/supabase";
 import { validateOutgoingChatContent } from "../../../core/web/app/features/chat-calls/services/chatModerationService";
+import { PublicMessageError } from "../../shared/userMessages";
 export {
   getOrCreateDirectChannel,
   updateMessageContent,
@@ -245,7 +246,8 @@ export async function sendChat(
     valid = text.trim()
       ? validateOutgoingChatContent(text.trim())
       : { isValid: !!imagePath, reason: "" };
-  if (!valid.isValid) throw new Error(valid.reason || "Write a message first.");
+  if (!valid.isValid)
+    throw new PublicMessageError(valid.reason || "Write a message first.");
   const prior = await supabase
     .from("chat_messages")
     .select("id,channel_id,sender_id,content,image_path,deleted_at")

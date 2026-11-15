@@ -55,7 +55,7 @@ export async function recoverWorkRequest(
 }
 export interface NativeWorkRecovery {
   baseline: WorkEditorBaseline;
-  fields: WorkEditorFields;
+  fields: WorkEditorFields & { priority?: string; dependencies?: string[] };
   request: WorkRequest;
 }
 export function isNativeWorkRecovery(
@@ -82,6 +82,9 @@ export function isNativeWorkRecovery(
     typeof item.fields.lead === "string" &&
     typeof item.fields.parent === "string" &&
     typeof item.fields.standalone === "boolean" &&
+    (item.fields.dependencies === undefined ||
+      (Array.isArray(item.fields.dependencies) &&
+        item.fields.dependencies.every((id) => typeof id === "string"))) &&
     Number.isFinite(item.fields.progress) &&
     Array.isArray(item.fields.people) &&
     item.fields.people.every((id) => typeof id === "string") &&

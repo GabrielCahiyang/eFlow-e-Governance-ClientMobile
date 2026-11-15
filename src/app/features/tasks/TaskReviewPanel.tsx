@@ -18,6 +18,8 @@ import {
 import { Text } from "../../components/ui/Typography";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { PublicMessageError } from "../../shared/userMessages";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
 import {
@@ -51,6 +53,7 @@ export function TaskReviewPanel({
   const [selectedId, setSelectedId] = useState(initialSubmissionId);
   const [feedback, setFeedback] = useState("");
   const [attempted, setAttempted] = useState<string>();
+  const { toast } = useToast();
   const action = useAction();
   const scope = [profile?.id, task.id, task.updatedAt].join(":");
   const submissions = useFacts("submissions:" + scope, () =>
@@ -67,7 +70,7 @@ export function TaskReviewPanel({
   );
   const mayReview =
     !readOnly &&
-    !submissions.loading &&
+    (!submissions.loading || !!submissions.data) &&
     !submissions.error &&
     !!selected &&
     selected.id === latest?.id &&
@@ -82,9 +85,9 @@ export function TaskReviewPanel({
   const decide = (approve: boolean) =>
     action.run(async () => {
       if (!profile || !mayReview || !selected || attempted === selected.id)
-        throw new Error("Current independent review access is required.");
+        throw new PublicMessageError("Current independent review access is required.");
       const reason = feedback.trim();
-      if (!approve && !reason) throw new Error("Explain what needs to change.");
+      if (!approve && !reason) throw new PublicMessageError("Explain what needs to change.");
       if (
         !(await confirmAction(
           approve ? "Approve this submission?" : "Return this submission?",
@@ -97,14 +100,14 @@ export function TaskReviewPanel({
         return;
       await assertEvidenceActor(profile.id);
       if (approve && (await fetchTaskApprovalCashBlockers(task.id)).length)
-        throw new Error("Settle all outstanding task cash before approval.");
+        throw new PublicMessageError("Settle all outstanding task cash before approval.");
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
         .eq("id", task.id)
         .is("deleted_at", null)
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       const currentTask = rowToTask(data);
       const [current] = await fetchTaskSubmissions(task.id);
       if (
@@ -118,7 +121,7 @@ export function TaskReviewPanel({
           profile.role,
         )
       )
-        throw new Error(
+        throw new PublicMessageError(
           "This submission or your access changed. Refresh before deciding.",
         );
       await assertEvidenceActor(profile.id);
@@ -135,13 +138,14 @@ export function TaskReviewPanel({
       if (
         result?.status !== (approve ? "approved" : "changes_requested") ||
         result.decidedBy !== profile.id
-      )
-        throw new Error(
-          failure instanceof Error
-            ? failure.message
-            : "The selected decision could not be confirmed. Refresh before trying again.",
+      ) {
+        if (failure instanceof Error) throw failure;
+        throw new PublicMessageError(
+          "The selected decision could not be confirmed. Refresh before trying again.",
         );
+      }
       setFeedback("");
+      toast(approve ? "Task approved." : "Changes requested.", "success");
       nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       await onSaved();
       await submissions.refresh();
@@ -221,7 +225,7 @@ export function TaskReviewPanel({
                 error={attachments.error}
                 retry={() => void attachments.refresh()}
               />
-            ) : attachments.loading ? (
+            ) : attachments.loading && !attachments.data ? (
               <Loading label="Loading evidence files" layout="files" />
             ) : attachments.data?.length ? (
               attachments.data.map((file) => (
@@ -244,7 +248,7 @@ export function TaskReviewPanel({
               error={clearance.error}
               retry={() => void clearance.refresh()}
             />
-          ) : clearance.loading ? (
+          ) : clearance.loading && !clearance.data ? (
             <Loading label="Checking cash clearance" layout="verification" />
           ) : clearance.data?.length ? (
             <Notice>Outstanding task cash blocks approval.</Notice>
@@ -261,11 +265,11 @@ export function TaskReviewPanel({
             busy={action.busy}
             disabled={
               attempted === selected?.id ||
-              clearance.loading ||
+              (clearance.loading && !clearance.data) ||
               !!clearance.error ||
               !clearance.data ||
               clearance.data.length > 0 ||
-              attachments.loading ||
+              (attachments.loading && !attachments.data) ||
               !!attachments.error
             }
             onPress={() => void decide(true)}

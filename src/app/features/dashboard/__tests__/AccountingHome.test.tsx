@@ -1,5 +1,6 @@
 import { expect, jest, test } from "@jest/globals";
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
+import { nativeWindow } from "../../../../platform/webRuntime";
 import { AccountingHome } from "../AccountingHome";
 
 const mockQueueData = {
@@ -92,13 +93,17 @@ jest.mock("../../workspaces", () => ({
   }),
 }));
 
+const mockAccountingHomeQueue = jest.fn(async () => mockQueueData);
+const mockAssignedFinanceReviews = jest.fn(async () => mockReviewsData);
+const mockOfficeFinancialSummary = jest.fn(async () => mockSummaryData);
+
 jest.mock("../homeFinance", () => ({
-  accountingHomeQueue: async () => mockQueueData,
-  assignedFinanceReviews: async () => mockReviewsData,
+  accountingHomeQueue: () => mockAccountingHomeQueue(),
+  assignedFinanceReviews: () => mockAssignedFinanceReviews(),
 }));
 
 jest.mock("../../budget/officeFinancialSummary", () => ({
-  officeFinancialSummary: async () => mockSummaryData,
+  officeFinancialSummary: () => mockOfficeFinancialSummary(),
 }));
 
 test("AccountingHome renders officer hero, action cards, pipeline strip, outstanding items, and financial summary", async () => {
@@ -155,5 +160,49 @@ test("AccountingHome renders officer hero, action cards, pipeline strip, outstan
   // Financial Summary Tiles
   expect(view.getByText("Approved appropriation")).toBeOnTheScreen();
   expect(view.getByText("Settled expenditure")).toBeOnTheScreen();
+});
+
+test("AccountingHome keeps action cards and financial summary visible during background refresh", async () => {
+  const view = await render(<AccountingHome navigate={jest.fn()} />);
+  expect(view.getByText("Field Inspection Fuel")).toBeOnTheScreen();
+  expect(view.getByText("Approved appropriation")).toBeOnTheScreen();
+
+  let resolveQueue!: (value: typeof mockQueueData) => void;
+  let resolveSummary!: (value: typeof mockSummaryData) => void;
+  let resolveReviews!: (value: typeof mockReviewsData) => void;
+  mockAccountingHomeQueue.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveQueue = resolve;
+      }),
+  );
+  mockOfficeFinancialSummary.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveSummary = resolve;
+      }),
+  );
+  mockAssignedFinanceReviews.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveReviews = resolve;
+      }),
+  );
+
+  await act(async () => {
+    nativeWindow.dispatchEvent({ type: "eflow:finance-updated" });
+  });
+
+  expect(view.getByText("Field Inspection Fuel")).toBeOnTheScreen();
+  expect(view.getByText("Office Supplies Liquidation")).toBeOnTheScreen();
+  expect(view.getByText("Approved appropriation")).toBeOnTheScreen();
+  expect(view.queryByLabelText("Loading financial summary")).toBeNull();
+  expect(view.queryByLabelText("Loading request counts")).toBeNull();
+
+  await act(async () => {
+    resolveQueue(mockQueueData);
+    resolveSummary(mockSummaryData);
+    resolveReviews(mockReviewsData);
+  });
 });
 

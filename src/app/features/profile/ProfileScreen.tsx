@@ -13,6 +13,7 @@ import {
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { chooseFiles, asServiceFile } from "../../../platform/files";
 import {
@@ -24,6 +25,7 @@ import { ProfessionalProfile } from "./ProfessionalProfile";
 import { activationRoleLabel } from "../../../core/web/app/features/account-activation/selectors";
 export function ProfileScreen() {
   const { profile, organization, refresh } = useAuth(),
+    { toast } = useToast(),
     action = useAction(),
     [view, setView] = useState("account"),
     [name, setName] = useState(profile?.full_name || "");
@@ -75,6 +77,7 @@ export function ProfileScreen() {
                   await updateOwnProfile(profile!.id, {
                     full_name: name.trim(),
                   });
+                  toast("Account name saved.", "success");
                   await refresh();
                 }, "Account name saved.")
               }
@@ -97,6 +100,7 @@ export function ProfileScreen() {
                     await asServiceFile(file),
                     profile?.avatar_path,
                   );
+                  toast("Profile photo saved.", "success");
                   await refresh();
                   await avatar.refresh();
                 }, "Profile photo saved.")

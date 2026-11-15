@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { AppState } from "react-native";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { useAuth } from "../authentication";
 import { fetchVisibleTasks } from "../tasks";
 import { fetchProjects } from "../projects";
@@ -122,14 +122,10 @@ export function useOfficeAnalytics(
   useEffect(() => {
     if (!enabled || reportOffice || !profile || profile.role === "admin")
       return;
-    const poll = setInterval(() => void result.refresh(), 30000);
-    const app = AppState.addEventListener("change", (state) => {
-      if (state === "active") void result.refresh();
+    const live = createLiveRefreshController({
+      onRefresh: () => void result.refresh(),
     });
-    return () => {
-      clearInterval(poll);
-      app.remove();
-    };
+    return () => live.dispose();
   }, [enabled, reportOffice, profile?.id, profile?.org_id, result.refresh]);
   return result;
 }

@@ -20,6 +20,12 @@ import { useFacts } from "../../shared/useFacts";
 import { liquidationInputError } from "../../../core/web/app/features/budget/validation/financialValidation";
 import { cashReturnAmounts, cashRequestReference } from "./mobileFinanceScope";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { useAuth } from "../authentication";
 import { draftStore } from "../../../platform/draftStore";
 import {
@@ -57,6 +63,7 @@ export function LiquidationSheet({
   onSaved: () => Promise<void>;
 }) {
   const { profile } = useAuth(),
+    { toast } = useToast(),
     action = useAction();
   const assertAccess = useAccountActionAccess();
   const itemized = !!bundle.itemizedCashAvailable;
@@ -88,10 +95,22 @@ export function LiquidationSheet({
         }
       : {}),
   });
-  const [receipts, setReceipts] = useState<NativeReceipt[]>(() => [blank()]),
-    [note, setNote] = useState(""),
-    [refundNumber, setRefundNumber] = useState(""),
-    [refundDate, setRefundDate] = useState(getPhilippineCalendarDate());
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(profile?.id, "liquidation:" + request.id),
+    true,
+    () => ({
+      receipts: [blank()],
+      note: "",
+      refundNumber: "",
+      refundDate: getPhilippineCalendarDate(),
+    }),
+  );
+  const { receipts, note, refundNumber, refundDate } = draft;
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const [opened, setOpened] = useState<string | null | undefined>();
   const scope = "liquidation." + request.id;
   const recovery = useFacts(
@@ -110,7 +129,7 @@ export function LiquidationSheet({
             (receipt) => !receipt || typeof receipt.id !== "string",
           ))
       )
-        throw new Error(
+        throw new PublicMessageError(
           "The saved receipt package could not be read. Verify the original submission before continuing.",
         );
       return draft;
@@ -138,9 +157,10 @@ export function LiquidationSheet({
   const activeIndex = receipt ? receipts.indexOf(receipt) : -1;
   const change = (id: string, changes: Partial<NativeReceipt>) => {
     if (!editable) return;
-    setReceipts((old) =>
-      old.map((r) => (r.id === id ? { ...r, ...changes } : r)),
-    );
+    updateDraft((old) => ({
+      ...old,
+      receipts: old.receipts.map((r) => (r.id === id ? { ...r, ...changes } : r)),
+    }));
   };
   const itemChange = (
     receipt: NativeReceipt,
@@ -163,21 +183,21 @@ export function LiquidationSheet({
         recovery.loading ||
         recovery.error
       )
-        throw new Error("Refresh to verify your access to this cash request.");
+        throw new PublicMessageError("Refresh to verify your access to this cash request.");
       assertAccess(profile.id);
       if (!intent && returned === undefined)
-        throw new Error(
+        throw new PublicMessageError(
           "The released amount is unavailable. Refresh the cash request.",
         );
       if (!intent && exceedsRelease)
-        throw new Error("Declared spending cannot exceed released cash.");
+        throw new PublicMessageError("Declared spending cannot exceed released cash.");
       if (
         !intent &&
         returned &&
         returned > 0 &&
         (!refundNumber.trim() || !refundDate)
       )
-        throw new Error("Enter the cash-return receipt number and date.");
+        throw new PublicMessageError("Enter the cash-return receipt number and date.");
       const current = intent ?? {
         key: crypto.randomUUID(),
         note,
@@ -201,7 +221,7 @@ export function LiquidationSheet({
             };
           } catch {
             if (!intent) setOpened(receipt.id);
-            throw new Error(
+            throw new PublicMessageError(
               `Receipt ${index + 1}: Could not open the attachment. Select the file again or check the original package.`,
             );
           }
@@ -218,34 +238,45 @@ export function LiquidationSheet({
         const receiptIndex = /^Receipt (\d+):/.exec(issue);
         if (!intent && receiptIndex)
           setOpened(current.receipts[Number(receiptIndex[1]) - 1]?.id);
-        throw new Error(issue);
+        throw new PublicMessageError(issue);
       }
       if (currentReadOnly.current)
-        throw new Error("Refresh to verify cash request access.");
+        throw new PublicMessageError("Refresh to verify cash request access.");
       assertAccess(profile.id);
       if (!intent) {
         await draftStore.set(profile.id, scope, current);
         setSaved(current);
       }
-      assertAccess(profile.id);
-      if (currentReadOnly.current)
-        throw new Error("Refresh to verify cash request access.");
-      const packageId = await submitPettyCashLiquidation({
-        orgId: request.fundingOrgId || request.orgId,
-        requestId: request.id,
-        spent,
-        note: current.note,
-        receipts: drafts,
-        refundReceiptNumber: current.refundNumber,
-        refundDate: current.refundDate,
-        idempotencyKey: current.key,
-      });
+      let packageId: string;
+      try {
+        assertAccess(profile.id);
+        if (currentReadOnly.current)
+          throw new PublicMessageError("Refresh to verify cash request access.");
+        packageId = await submitPettyCashLiquidation({
+          orgId: request.fundingOrgId || request.orgId,
+          requestId: request.id,
+          spent,
+          note: current.note,
+          receipts: drafts,
+          refundReceiptNumber: current.refundNumber,
+          refundDate: current.refundDate,
+          idempotencyKey: current.key,
+        });
+      } catch (error) {
+        if (!intent && isDeterministicRejection(error)) {
+          await draftStore.remove(profile.id, scope).catch(() => {});
+          setSaved(undefined);
+        }
+        throw error;
+      }
       if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(packageId))
-        throw new Error(
+        throw new PublicMessageError(
           "The submission could not be confirmed. Check the saved receipt package before trying again.",
         );
+      clearDraft();
       setConfirmed(true);
       await draftStore.remove(profile.id, scope);
+      toast("Receipts and cash return submitted.", "success");
       await onSaved();
     });
   return (
@@ -254,7 +285,7 @@ export function LiquidationSheet({
       open
       title="Receipts and cash return"
       description={cashRequestReference(request.requestNumber)}
-      onClose={onClose}
+      onClose={close}
       busy={action.busy}
       footer={
         <>
@@ -272,7 +303,7 @@ export function LiquidationSheet({
                 !!recovery.error ||
                 (!intent && returned === undefined))
             }
-            onPress={confirmed ? onClose : () => void submit()}
+            onPress={confirmed ? close : () => void submit()}
           >
             {confirmed ? "Done" : "Submit receipts for review"}
           </Button>
@@ -314,6 +345,7 @@ export function LiquidationSheet({
             <Card key={receipt.id} title={`Edit receipt ${activeIndex + 1}`}>
               <Field
                 label="Vendor"
+                required
                 value={receipt.vendor}
                 onChangeText={(v) => change(receipt.id, { vendor: v })}
                 editable={editable}
@@ -326,6 +358,7 @@ export function LiquidationSheet({
               />
               <DateField
                 label="Receipt date"
+                required
                 value={receipt.receiptDate}
                 onChange={(v) => change(receipt.id, { receiptDate: v })}
                 disabled={!editable}
@@ -335,6 +368,7 @@ export function LiquidationSheet({
                   <Card key={item.id} title="Purchased item">
                     <Choice
                       label="Funding source"
+                      required
                       value={item.allocationLineId}
                       disabled={!editable}
                       onChange={(v) =>
@@ -347,6 +381,7 @@ export function LiquidationSheet({
                     />
                     <Field
                       label="Particular / item purchased"
+                      required
                       value={item.particular}
                       onChangeText={(v) =>
                         itemChange(receipt, item.id, { particular: v })
@@ -355,6 +390,7 @@ export function LiquidationSheet({
                     />
                     <Field
                       label="Quantity"
+                      required
                       keyboardType="decimal-pad"
                       value={String(item.quantity)}
                       onChangeText={(v) =>
@@ -364,6 +400,7 @@ export function LiquidationSheet({
                     />
                     <Field
                       label="Unit"
+                      required
                       value={item.unit}
                       onChangeText={(v) =>
                         itemChange(receipt, item.id, { unit: v })
@@ -372,6 +409,7 @@ export function LiquidationSheet({
                     />
                     <Field
                       label="Item total amount"
+                      required
                       keyboardType="decimal-pad"
                       value={String(item.amount || "")}
                       onChangeText={(v) =>
@@ -381,6 +419,7 @@ export function LiquidationSheet({
                     />
                     <Field
                       label="Purpose"
+                      required
                       value={item.purpose}
                       onChangeText={(v) =>
                         itemChange(receipt, item.id, { purpose: v })
@@ -408,6 +447,7 @@ export function LiquidationSheet({
                 <>
                   <Field
                     label="Expense description"
+                    required
                     value={receipt.description}
                     onChangeText={(v) => change(receipt.id, { description: v })}
                     multiline
@@ -415,6 +455,7 @@ export function LiquidationSheet({
                   />
                   <Field
                     label="Receipt amount"
+                    required
                     value={String(receipt.amount || "")}
                     keyboardType="decimal-pad"
                     onChangeText={(v) =>
@@ -459,6 +500,7 @@ export function LiquidationSheet({
                   </Notice>
                   <Field
                     label="Threshold override reason"
+                    required
                     value={receipt.overrideReason || ""}
                     onChangeText={(v) =>
                       change(receipt.id, { overrideReason: v })
@@ -490,7 +532,10 @@ export function LiquidationSheet({
                 variant="ghost"
                 disabled={!editable || receipts.length === 1}
                 onPress={() => {
-                  setReceipts((old) => old.filter((r) => r.id !== receipt.id));
+                  updateDraft((old) => ({
+                    ...old,
+                    receipts: old.receipts.filter((r) => r.id !== receipt.id),
+                  }));
                   setOpened(undefined);
                 }}
               >
@@ -503,7 +548,10 @@ export function LiquidationSheet({
             disabled={!editable}
             onPress={() => {
               const receipt = blank();
-              setReceipts((old) => [...old, receipt]);
+              updateDraft((old) => ({
+                ...old,
+                receipts: [...old.receipts, receipt],
+              }));
               setOpened(receipt.id);
             }}
           >
@@ -511,8 +559,9 @@ export function LiquidationSheet({
           </Button>
           <Field
             label="Liquidation note"
+            required
             value={note}
-            onChangeText={setNote}
+            onChangeText={(v) => updateDraft({ note: v })}
             multiline
             editable={editable}
           />
@@ -520,14 +569,16 @@ export function LiquidationSheet({
             <>
               <Field
                 label="Cash-return receipt number"
+                required
                 value={refundNumber}
-                onChangeText={setRefundNumber}
+                onChangeText={(v) => updateDraft({ refundNumber: v })}
                 editable={editable}
               />
               <DateField
                 label="Cash-return date"
+                required
                 value={refundDate}
-                onChange={setRefundDate}
+                onChange={(v) => updateDraft({ refundDate: v })}
                 disabled={!editable}
               />
             </>

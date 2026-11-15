@@ -15,6 +15,7 @@ import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import { supabase } from "../../../platform/supabase";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import {
@@ -28,6 +29,7 @@ export function AnnouncementsScreen() {
   const actor = profile!.id;
   const [tab, setTab] = useState("all");
   const [read, setRead] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
   const action = useAction();
   const facts = useFacts("announcements:" + actor + ":" + profile?.org_id, () =>
     loadAnnouncements(actor),
@@ -117,6 +119,7 @@ export function AnnouncementsScreen() {
                   void action.run(async () => {
                     await confirmAnnouncementRead(actor, item.id);
                     setRead((previous) => new Set(previous).add(item.id));
+                    toast("Announcement marked as read.", "success");
                     await facts.refresh();
                   })
                 }

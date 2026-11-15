@@ -1,5 +1,6 @@
 import { readAllRows } from "../../../core/web/app/shared/readAllRows";
 import { supabase } from "../../../platform/supabase";
+import { fetchWorkExpenseTotals } from "../budget/workExpenseTotals";
 
 type AmountRow = {
   task_id: string;
@@ -35,7 +36,7 @@ export async function fetchProjectTaskFinance(taskIds: string[]) {
   const totals = new Map<string, TaskFinance>();
   for (let index = 0; index < taskIds.length; index += 75) {
     const ids = taskIds.slice(index, index + 75);
-    const [allocations, settlements] = await Promise.all([
+    const [allocations, expenses] = await Promise.all([
       readAllRows<AmountRow>((from, to) =>
         supabase
           .from("work_budget_allocations")
@@ -46,16 +47,12 @@ export async function fetchProjectTaskFinance(taskIds: string[]) {
           .order("id")
           .range(from, to),
       ),
-      readAllRows<AmountRow>((from, to) =>
-        supabase
-          .from("petty_cash_requests")
-          .select("task_id,actual_spent", { count: "exact" })
-          .in("task_id", ids)
-          .eq("status", "settled")
-          .order("id")
-          .range(from, to),
-      ),
+      fetchWorkExpenseTotals(ids),
     ]);
+    const settlements = ids.flatMap((id) => {
+      const settled = expenses.get(id)?.settled;
+      return settled == null ? [] : [{ task_id: id, actual_spent: settled / 100 }];
+    });
     for (const [id, total] of taskFinanceTotals(ids, allocations, settlements))
       totals.set(id, total);
   }

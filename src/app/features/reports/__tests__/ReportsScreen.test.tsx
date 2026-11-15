@@ -53,14 +53,9 @@ test("Office Analytics uses an authorized Office and refuses mismatched workspac
   expect(
     screen.getByText(/Review waiting time runs from submission/),
   ).toBeOnTheScreen();
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Open reports in eFlow Web" }),
-  );
-  expect(navigate).toHaveBeenCalledWith({
-    name: "reports",
-    view: "web",
-    workspaceId: "office-workspace",
-  });
+  expect(
+    screen.queryByRole("button", { name: "Open reports in eFlow Web" }),
+  ).toBeNull();
   jest.mocked(useOfficeAnalytics).mockClear();
   mockOffice = "other";
   await view.rerender(<ReportsScreen navigate={navigate} />);

@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Button, Field, Notice, Sheet } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { confirmAction } from "../../shared/confirm";
 import { draftStore } from "../../../platform/draftStore";
 import type { EvidenceFile } from "../../../platform/evidenceFiles";
@@ -27,16 +33,29 @@ export function TaskEvidenceSheet({
   onSaved: () => Promise<void>;
   onClose: () => void;
 }) {
+  const { toast } = useToast();
   const action = useAction();
-  const [note, setNote] = useState("");
-  const [files, setFiles] = useState<EvidenceFile[]>([]);
   const [request, setRequest] = useState(saved);
   const [stage, report] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(actor, "task-evidence:" + taskId),
+    true,
+    () => ({
+      note: "",
+      files: [] as EvidenceFile[],
+    }),
+  );
+  const { note, files } = draft;
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const save = () =>
     action.run(async () => {
       if (confirmed) return;
-      if (!request && !note.trim()) throw new Error("Enter a completion note.");
+      if (!request && !note.trim()) throw new PublicMessageError("Enter a completion note.");
       if (
         !request &&
         !(await confirmAction(
@@ -46,6 +65,7 @@ export function TaskEvidenceSheet({
         ))
       )
         return;
+      const hadSaved = !!request;
       const attempt = request || {
         id: crypto.randomUUID(),
         note: note.trim(),
@@ -54,16 +74,27 @@ export function TaskEvidenceSheet({
       };
       await draftStore.set(actor, evidenceScope(taskId), attempt);
       setRequest(attempt);
-      await sendTaskEvidence({
-        actor,
-        taskId,
-        request: attempt,
-        verifyAccess,
-        report,
-      });
+      try {
+        await sendTaskEvidence({
+          actor,
+          taskId,
+          request: attempt,
+          verifyAccess,
+          report,
+        });
+      } catch (err) {
+        if (!hadSaved && isDeterministicRejection(err)) {
+          await draftStore.remove(actor, evidenceScope(taskId)).catch(() => {});
+          setRequest(null);
+          report("");
+        }
+        throw err;
+      }
+      clearDraft();
       setConfirmed(true);
       report("Submitted for approval");
       await draftStore.remove(actor, evidenceScope(taskId)).catch(() => {});
+      toast("Submitted for review.", "success");
       nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       await onSaved().catch(() => {});
     });
@@ -73,12 +104,12 @@ export function TaskEvidenceSheet({
       open
       title="Complete task"
       busy={action.busy}
-      onClose={onClose}
+      onClose={close}
       footer={
         <Button
           busy={action.busy}
           disabled={!confirmed && !request && !note.trim()}
-          onPress={confirmed ? onClose : () => void save()}
+          onPress={confirmed ? close : () => void save()}
         >
           {confirmed ? "Done" : "Submit for review"}
         </Button>
@@ -88,14 +119,15 @@ export function TaskEvidenceSheet({
         <>
           <Field
             label="Completion note"
+            required
             value={note}
-            onChangeText={setNote}
+            onChangeText={(next) => updateDraft({ note: next })}
             multiline
             maxLength={5000}
           />
           <EvidencePicker
             files={files}
-            onChange={setFiles}
+            onChange={(next) => updateDraft({ files: next })}
             disabled={action.busy}
             run={(pick) => void action.run(pick)}
           />

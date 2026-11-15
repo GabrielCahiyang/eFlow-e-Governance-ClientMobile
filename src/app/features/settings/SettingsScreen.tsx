@@ -11,6 +11,7 @@ import {
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import { confirmAction } from "../../shared/confirm";
 import { updateEmailPreference } from "../../../core/web/app/services/userSettingsService";
 import { PasswordSheet } from "./PasswordSheet";
@@ -25,6 +26,7 @@ export function SettingsScreen({
   navigate: Navigate;
 }) {
   const appearance = useAppearance();
+  const { toast } = useToast();
   const { profile, refresh } = useAuth(),
     [password, setPassword] = useState(false),
     [notice, setNotice] = useState(""),
@@ -45,6 +47,10 @@ export function SettingsScreen({
       )
         return;
       await updateEmailPreference(profile.id, next);
+      toast(
+        next ? "Email digests turned on." : "Email digests turned off.",
+        "success",
+      );
       setNotice(
         next
           ? "Task email notifications are on."

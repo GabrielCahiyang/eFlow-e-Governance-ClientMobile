@@ -72,12 +72,6 @@ export function OfficeAttention({
           />
         ))
       )}
-      {can("navigation.team_supervision") && (
-        <NavigationRow
-          title="Office Team on eFlow Web"
-          onPress={() => navigate({ name: "office_team" })}
-        />
-      )}
     </Card>
   );
 }

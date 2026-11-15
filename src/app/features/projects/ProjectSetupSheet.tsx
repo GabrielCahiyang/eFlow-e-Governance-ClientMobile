@@ -10,8 +10,15 @@ import {
   Sheet,
   Toggle,
 } from "../../components/ui";
+import { useAuth } from "../authentication";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { fetchAllProfiles } from "../../../core/web/lib/supabaseService";
 import { createProject } from "../../../core/web/app/features/projects/services/projectService";
 import { supabase } from "../../../platform/supabase";
@@ -70,26 +77,45 @@ export function ProjectSetupSheet({
   onClose: () => void;
   onDone: (id: string) => void;
 }) {
+  const { profile } = useAuth();
+  const { toast } = useToast();
   const action = useAction();
   const people = useFacts("setup-people:" + orgId, fetchAllProfiles, !!orgId);
-  const [draft, setDraft] = useState<Draft>(empty),
-    [step, setStep] = useState(0),
+  const [serverDraft, setServerDraft] = useState<Draft | undefined>(undefined),
     [snapshot, setSnapshot] = useState<Snapshot>();
-  const [rows, setRows] = useState([{ partitionId: "", amount: "" }]),
-    [reason, setReason] = useState("");
+  const [formDraft, updateFormDraft, clearFormDraft] = useRetainedDraft(
+    formDraftKey(
+      profile?.id,
+      "project-setup:" + (projectId ?? "new") + ":" + (orgId ?? ""),
+    ),
+    true,
+    () => ({
+      local: undefined as Draft | undefined,
+      step: 0,
+      rows: [{ partitionId: "", amount: "" }],
+      reason: "",
+    }),
+  );
+  const { step, rows, reason } = formDraft;
+  const draft = formDraft.local ?? serverDraft ?? empty;
   const [locked, setLocked] = useState(false);
   const id = useRef(projectId),
     version = useRef<string | undefined>(undefined),
     fundKey = useRef<string | undefined>(undefined);
   const savedFunding = useRef(false);
   const edit = <K extends keyof Draft>(key: K, value: Draft[K]) =>
-    setDraft((old) => ({ ...old, [key]: value }));
+    updateFormDraft({ local: { ...draft, [key]: value } });
+  const close = () => {
+    if (locked || action.busy) return;
+    action.clear();
+    onClose();
+  };
   const hydrate = () =>
     action.run(async () => {
       const data = await read(projectId!);
       const p = data.project;
       version.current = p.updated_at;
-      setDraft({
+      setServerDraft({
         title: p.title || "",
         description: p.description || "",
         scope: p.scope || "",
@@ -104,7 +130,7 @@ export function ProjectSetupSheet({
     if (projectId) void hydrate();
   }, [projectId]);
   async function persist() {
-    if (!draft.title.trim()) throw new Error("Enter a project title.");
+    if (!draft.title.trim()) throw new PublicMessageError("Enter a project title.");
     if (!id.current)
       id.current = (
         await createProject({
@@ -115,7 +141,7 @@ export function ProjectSetupSheet({
       ).id;
     const current = await read(id.current);
     if (version.current && version.current !== current.project.updated_at)
-      throw new Error(
+      throw new PublicMessageError(
         "Project changed elsewhere. Reopen setup to review the latest details.",
       );
     const p = current.project;
@@ -145,26 +171,31 @@ export function ProjectSetupSheet({
   }
   const validate = (index: number) => {
     if (index === 0 && (!draft.title.trim() || !draft.description.trim()))
-      throw new Error("Enter a project title and description.");
+      throw new PublicMessageError("Enter a project title and description.");
     if (index === 1 && !draft.scope.trim())
-      throw new Error("Enter the project scope.");
+      throw new PublicMessageError("Enter the project scope.");
     if (
       index === 2 &&
       (!draft.lead || !draft.start || !draft.end || draft.end < draft.start)
     )
-      throw new Error(
+      throw new PublicMessageError(
         "Choose a project lead and valid start and target dates.",
       );
   };
   const sources = (snapshot?.sources || []).filter((s) => s.available > 0);
   const changeRow = (index: number, part: Partial<(typeof rows)[number]>) =>
-    setRows((old) => old.map((r, i) => (i === index ? { ...r, ...part } : r)));
+    updateFormDraft((old) => ({
+      ...old,
+      rows: old.rows.map((r, i) => (i === index ? { ...r, ...part } : r)),
+    }));
   const authorize = () =>
     action.run(async () => {
       if (!id.current || !snapshot?.canAuthorize)
-        throw new Error("Only the office Head can authorize project funding.");
+        throw new PublicMessageError(
+          "Only the office Head can authorize project funding.",
+        );
       if (new Set(rows.map((r) => r.partitionId)).size !== rows.length)
-        throw new Error("Choose each account only once.");
+        throw new PublicMessageError("Choose each account only once.");
       const lines = rows.map((r) => {
         const source = sources.find((s) => s.id === r.partitionId),
           amount = Number(r.amount);
@@ -173,9 +204,11 @@ export function ProjectSetupSheet({
           !/^[0-9]+(?:\.[0-9]{1,2})?$/.test(r.amount) ||
           amount <= 0
         )
-          throw new Error("Choose an account and enter a positive amount.");
+          throw new PublicMessageError(
+            "Choose an account and enter a positive amount.",
+          );
         if (amount > source.available)
-          throw new Error(
+          throw new PublicMessageError(
             source.name +
               " has only ₱" +
               source.available.toLocaleString() +
@@ -183,7 +216,8 @@ export function ProjectSetupSheet({
           );
         return { partitionId: r.partitionId, amount };
       });
-      if (!reason.trim()) throw new Error("Enter a reason for the funding.");
+      if (!reason.trim())
+        throw new PublicMessageError("Enter a reason for the funding.");
       fundKey.current ??= crypto.randomUUID();
       setLocked(true);
       if (!savedFunding.current) {
@@ -198,10 +232,11 @@ export function ProjectSetupSheet({
         } catch (error) {
           const code = (error as { code?: string })?.code;
           if (
-            code &&
-            /^[0-9A-Z]{5}$/.test(code) &&
-            !code.startsWith("08") &&
-            code !== "57014"
+            isDeterministicRejection(error) ||
+            (code &&
+              /^[0-9A-Z]{5}$/.test(code) &&
+              !code.startsWith("08") &&
+              code !== "57014")
           ) {
             fundKey.current = undefined;
             setLocked(false);
@@ -212,8 +247,11 @@ export function ProjectSetupSheet({
       const data = await read(id.current);
       version.current = data.project.updated_at;
       setSnapshot(data);
-      setRows([{ partitionId: "", amount: "" }]);
-      setReason("");
+      toast("Project funding authorized.", "success");
+      updateFormDraft({
+        rows: [{ partitionId: "", amount: "" }],
+        reason: "",
+      });
       fundKey.current = undefined;
       savedFunding.current = false;
       setLocked(false);
@@ -224,17 +262,23 @@ export function ProjectSetupSheet({
         [0, 1, 2].forEach(validate);
         await persist();
       }
-      setStep(next);
+      updateFormDraft({ step: next });
     });
   const finish = () =>
     action.run(async () => {
       [0, 1, 2].forEach(validate);
       if (rows.some((r) => r.amount || r.partitionId) || reason.trim())
-        throw new Error("Save or remove the funding entries first.");
+        throw new PublicMessageError(
+          "Save or remove the funding entries first.",
+        );
       const data = await persist();
       if (!draft.noFunding && data.total <= 0)
-        throw new Error("Add funding or choose No funding required.");
+        throw new PublicMessageError(
+          "Add funding or choose No funding required.",
+        );
       await rpc("finish_project_setup", { p_project: id.current });
+      clearFormDraft();
+      toast("Project setup completed.", "success");
       onDone(id.current!);
     });
   const waiting = !!projectId && !snapshot;
@@ -251,6 +295,8 @@ export function ProjectSetupSheet({
         onPress={() =>
           void action.run(async () => {
             await persist();
+            clearFormDraft();
+            toast("Project draft saved.", "success");
             onDone(id.current!);
           })
         }
@@ -264,7 +310,7 @@ export function ProjectSetupSheet({
             void action.run(async () => {
               validate(step);
               if (step === 2) await persist();
-              setStep(step + 1);
+              updateFormDraft({ step: step + 1 });
             })
           }
         >
@@ -284,9 +330,7 @@ export function ProjectSetupSheet({
       footer={footer}
       title={projectId ? "Project setup" : "Create project"}
       busy={action.busy}
-      onClose={() => {
-        if (!locked && !action.busy) onClose();
-      }}
+      onClose={close}
     >
       {waiting ? (
         <Button busy={action.busy} onPress={() => void hydrate()}>
@@ -416,11 +460,13 @@ export function ProjectSetupSheet({
                           <Button
                             variant="ghost"
                             onPress={() =>
-                              setRows((old) =>
-                                old.length === 1
-                                  ? [{ partitionId: "", amount: "" }]
-                                  : old.filter((_, j) => i !== j),
-                              )
+                              updateFormDraft((old) => ({
+                                ...old,
+                                rows:
+                                  old.rows.length === 1
+                                    ? [{ partitionId: "", amount: "" }]
+                                    : old.rows.filter((_, j) => i !== j),
+                              }))
                             }
                           >
                             Clear line
@@ -432,10 +478,10 @@ export function ProjectSetupSheet({
                       <Button
                         variant="outline"
                         onPress={() =>
-                          setRows((old) => [
+                          updateFormDraft((old) => ({
                             ...old,
-                            { partitionId: "", amount: "" },
-                          ])
+                            rows: [...old.rows, { partitionId: "", amount: "" }],
+                          }))
                         }
                       >
                         Add funding account
@@ -445,7 +491,7 @@ export function ProjectSetupSheet({
                       label="Funding reason"
                       value={reason}
                       editable={!locked}
-                      onChangeText={setReason}
+                      onChangeText={(next) => updateFormDraft({ reason: next })}
                     />
                     <Button busy={action.busy} onPress={() => void authorize()}>
                       {locked ? "Retry funding" : "Authorize funding"}

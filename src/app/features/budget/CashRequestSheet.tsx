@@ -1,4 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
+import FileText from "lucide-react-native/icons/file-text";
+import Paperclip from "lucide-react-native/icons/paperclip";
 import {
   Button,
   Card,
@@ -6,11 +9,31 @@ import {
   DateField,
   Field,
   LabelValue,
+  Notice,
   Row,
   Sheet,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
+import { useToast } from "../../components/ui/Toast";
+import { Text } from "../../components/ui/Typography";
 import { useAction } from "../../shared/useAction";
+import {
+  cashNeededByBounds,
+  cashNeededByError,
+  formatTaskDateRangeHint,
+  type TaskDateRange,
+} from "./cashNeededByRange";
+import {
+  clearFormDraft,
+  formDraftKey,
+  readFormDraft,
+  writeFormDraft,
+} from "../../shared/formDraftMemory";
+import {
+  isDeterministicRejection,
+  PublicMessageError,
+} from "../../shared/userMessages";
 import { useAuth } from "../authentication";
 import { draftStore } from "../../../platform/draftStore";
 import {
@@ -37,10 +60,18 @@ type Intent = {
   existing?: string;
   requestId?: string;
 };
+type CashRequestDraft = {
+  lines: CashFundingLine[];
+  purpose: string;
+  date: string;
+  attachment?: PickedFile;
+};
+
 export function CashRequestSheet({
   context,
   orgId,
   correction,
+  taskSchedule,
   readOnly,
   onClose,
   onSaved,
@@ -48,47 +79,109 @@ export function CashRequestSheet({
   context: TaskFundingContext;
   orgId: string;
   correction?: PettyCashRequest;
+  taskSchedule?: TaskDateRange;
   readOnly?: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
   const { profile } = useAuth(),
+    palette = useTheme(),
+    { toast } = useToast(),
     action = useAction();
-  const [lines, setLines] = useState<CashFundingLine[]>(
-      correction?.fundingLines?.length
-        ? correction.fundingLines
-        : [
-            {
-              allocationLineId:
-                correction?.allocationLineId ||
-                context.cap?.allocationLineId ||
-                context.lines[0]?.id ||
-                "",
-              amount: correction?.requestedAmount || 0,
-            },
-          ],
-    ),
-    [purpose, setPurpose] = useState(correction?.purpose || ""),
-    [date, setDate] = useState(correction?.neededBy || ""),
-    [attachment, setAttachment] = useState<PickedFile>();
-  const intent = useRef<Intent | undefined>(undefined);
+  const bounds = cashNeededByBounds(taskSchedule);
+  const dateRangeHint = formatTaskDateRangeHint(taskSchedule);
   const scope =
-    "cash-request." + context.taskId + "." + (context.subtaskId || "root");
+    "cash-request." +
+    context.taskId +
+    "." +
+    (context.subtaskId || "root") +
+    "." +
+    (correction?.id || "new");
+  const draftKey = formDraftKey(profile?.id, scope);
+  const initialDraft = readFormDraft<CashRequestDraft>(draftKey);
+  const [lines, setLines] = useState<CashFundingLine[]>(() =>
+      initialDraft?.lines.length
+        ? initialDraft.lines
+        : correction?.fundingLines?.length
+          ? correction.fundingLines
+          : [
+              {
+                allocationLineId:
+                  correction?.allocationLineId ||
+                  context.cap?.allocationLineId ||
+                  context.lines[0]?.id ||
+                  "",
+                amount: correction?.requestedAmount || 0,
+              },
+            ],
+    ),
+    [purpose, setPurpose] = useState(
+      () => initialDraft?.purpose ?? (correction?.purpose || ""),
+    ),
+    [date, setDate] = useState(
+      () => initialDraft?.date ?? (correction?.neededBy || ""),
+    ),
+    [attachment, setAttachment] = useState<PickedFile | undefined>(
+      () => initialDraft?.attachment,
+    );
+  const intent = useRef<Intent | undefined>(undefined);
+  const [pendingIntent, setPendingIntent] = useState<Intent | undefined>(
+    undefined,
+  );
+  const committed = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!profile) return;
+    void draftStore.get<Intent>(profile.id, scope).then((saved) => {
+      if (!active || !saved) return;
+      intent.current = saved;
+      setPendingIntent(saved);
+      setLines(saved.lines);
+      setPurpose(saved.purpose);
+      setDate(saved.neededBy);
+    });
+    return () => {
+      active = false;
+    };
+  }, [profile, scope]);
+
+  useEffect(() => {
+    if (committed.current) return;
+    writeFormDraft<CashRequestDraft>(draftKey, {
+      lines,
+      purpose,
+      date,
+      attachment,
+    });
+  }, [draftKey, lines, purpose, date, attachment]);
+
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const total = lines.reduce(
     (s, l) => s + (Number.isFinite(l.amount) ? l.amount : 0),
     0,
   );
   const save = () =>
     action.run(async () => {
-      if (!profile) throw new Error("Sign in again.");
-      if (readOnly) throw new Error("Refresh to verify current funding access.");
-      if (!intent.current)
-        intent.current =
+      if (!profile) throw new PublicMessageError("Sign in again.");
+      if (readOnly) throw new PublicMessageError("Refresh to verify current funding access.");
+      if (!intent.current) {
+        const stored =
           (await draftStore.get<Intent>(profile.id, scope)) || undefined;
+        if (stored) {
+          intent.current = stored;
+          setPendingIntent(stored);
+        }
+      }
       if (!intent.current) {
         if (!purpose.trim())
-          throw new Error("Explain what needs to be purchased.");
-        if (!date) throw new Error("Needed-by date is required.");
+          throw new PublicMessageError("Explain what needs to be purchased.");
+        const dateIssue = cashNeededByError(date, taskSchedule);
+        if (dateIssue) throw new PublicMessageError(dateIssue);
         if (
           lines.some(
             (l) =>
@@ -97,9 +190,9 @@ export function CashRequestSheet({
               l.amount <= 0,
           )
         )
-          throw new Error("Choose funding sources and positive amounts.");
+          throw new PublicMessageError("Choose funding sources and positive amounts.");
         if (new Set(lines.map((l) => l.allocationLineId)).size !== lines.length)
-          throw new Error("Choose each funding source once.");
+          throw new PublicMessageError("Choose each funding source once.");
         if (
           lines.some(
             (l) =>
@@ -108,7 +201,7 @@ export function CashRequestSheet({
                 ?.available || 0),
           )
         )
-          throw new Error(
+          throw new PublicMessageError(
             "The request exceeds currently available task funding.",
           );
         intent.current = {
@@ -118,48 +211,66 @@ export function CashRequestSheet({
           neededBy: date,
           existing: correction?.id,
         };
+        setPendingIntent(intent.current);
         await draftStore.set(profile.id, scope, intent.current);
       }
       const current = intent.current;
-      if (!current.requestId) {
-        if (context.supportsItemizedCash)
-          current.requestId = await createVoucherCashRequest({
-            taskId: context.taskId,
-            subtaskId: context.subtaskId,
-            lines: current.lines,
-            purpose: current.purpose,
-            neededBy: current.neededBy,
-            key: current.key,
-            existingId: current.existing,
+      try {
+        if (!current.requestId) {
+          if (context.supportsItemizedCash)
+            current.requestId = await createVoucherCashRequest({
+              taskId: context.taskId,
+              subtaskId: context.subtaskId,
+              lines: current.lines,
+              purpose: current.purpose,
+              neededBy: current.neededBy,
+              key: current.key,
+              existingId: current.existing,
+            });
+          else if (current.existing) {
+            await resubmitContextualCashRequest({
+              requestId: current.existing,
+              allocationLineId: current.lines[0].allocationLineId,
+              amount: current.lines[0].amount,
+              purpose: current.purpose,
+              neededBy: current.neededBy,
+            });
+            current.requestId = current.existing;
+          } else
+            current.requestId = await createContextualCashRequest({
+              taskId: context.taskId,
+              subtaskId: context.subtaskId,
+              allocationLineId: current.lines[0].allocationLineId,
+              amount: current.lines[0].amount,
+              purpose: current.purpose,
+              neededBy: current.neededBy,
+              idempotencyKey: current.key,
+            });
+          setPendingIntent({ ...current });
+          await draftStore.set(profile.id, scope, current);
+        }
+        if (attachment)
+          await uploadCashRequestAttachment({
+            orgId,
+            requestId: current.requestId,
+            file: await asServiceFile(attachment),
           });
-        else if (current.existing) {
-          await resubmitContextualCashRequest({
-            requestId: current.existing,
-            allocationLineId: current.lines[0].allocationLineId,
-            amount: current.lines[0].amount,
-            purpose: current.purpose,
-            neededBy: current.neededBy,
-          });
-          current.requestId = current.existing;
-        } else
-          current.requestId = await createContextualCashRequest({
-            taskId: context.taskId,
-            subtaskId: context.subtaskId,
-            allocationLineId: current.lines[0].allocationLineId,
-            amount: current.lines[0].amount,
-            purpose: current.purpose,
-            neededBy: current.neededBy,
-            idempotencyKey: current.key,
-          });
-        await draftStore.set(profile.id, scope, current);
+      } catch (error) {
+        if (!current.requestId && isDeterministicRejection(error)) {
+          intent.current = undefined;
+          setPendingIntent(undefined);
+          await draftStore.remove(profile.id, scope);
+        }
+        throw error;
       }
-      if (attachment)
-        await uploadCashRequestAttachment({
-          orgId,
-          requestId: current.requestId,
-          file: await asServiceFile(attachment),
-        });
       await draftStore.remove(profile.id, scope);
+      committed.current = true;
+      clearFormDraft(draftKey);
+      action.clear();
+      toast(
+        correction ? "Cash request updated." : "Cash request submitted.",
+        "success",
+      );
       await onSaved();
       onClose();
     });
@@ -168,10 +279,14 @@ export function CashRequestSheet({
       actionError={action.error}
       open
       title={correction ? "Correct cash request" : "Request task cash"}
-      onClose={onClose}
+      onClose={close}
       busy={action.busy}
       footer={
-        <Button busy={action.busy} disabled={readOnly} onPress={() => void save()}>
+        <Button
+          busy={action.busy}
+          disabled={readOnly || (!pendingIntent && bounds.expired)}
+          onPress={() => void save()}
+        >
           Submit cash request
         </Button>
       }
@@ -180,8 +295,9 @@ export function CashRequestSheet({
         <Card key={i}>
           <Choice
             label="Funding source"
+            required
             value={line.allocationLineId}
-            disabled={!!intent.current}
+            disabled={!!pendingIntent}
             options={context.lines.map((s) => ({
               value: s.id,
               label: s.particular || s.category || "Funding source",
@@ -197,9 +313,10 @@ export function CashRequestSheet({
           />
           <Field
             label="Amount to request"
+            required
             keyboardType="decimal-pad"
             value={String(line.amount || "")}
-            editable={!intent.current}
+            editable={!pendingIntent}
             onChangeText={(v) =>
               setLines((old) =>
                 old.map((l, index) =>
@@ -211,7 +328,7 @@ export function CashRequestSheet({
           {!!(lines.length > 1) && (
             <Button
               variant="ghost"
-              disabled={!!intent.current}
+              disabled={!!pendingIntent}
               onPress={() =>
                 setLines((old) => old.filter((_, index) => index !== i))
               }
@@ -224,7 +341,7 @@ export function CashRequestSheet({
       {!!context.supportsItemizedCash && (
         <Button
           variant="outline"
-          disabled={!!intent.current}
+          disabled={!!pendingIntent}
           onPress={() =>
             setLines((old) => [...old, { allocationLineId: "", amount: 0 }])
           }
@@ -234,28 +351,107 @@ export function CashRequestSheet({
       )}
       <Field
         label="Purpose / what needs to be purchased"
+        required
         value={purpose}
         onChangeText={setPurpose}
         multiline
-        editable={!intent.current}
+        editable={!pendingIntent}
       />
       <DateField
         label="Needed by"
+        required
         value={date}
+        min={bounds.min}
+        max={bounds.max}
         onChange={setDate}
-        disabled={!!intent.current}
+        disabled={!!pendingIntent || bounds.expired}
       />
-      <Button
-        variant="outline"
-        disabled={!!intent.current}
-        onPress={() =>
-          void action.run(async () => setAttachment((await chooseFiles())[0]))
-        }
-      >
-        Attach supporting document
-      </Button>
-      {!!attachment && (
-        <LabelValue label="Attachment" value={attachment.name} />
+      {bounds.expired ? (
+        <Notice>
+          The task's scheduled dates have already passed. Update the task dates
+          before requesting cash.
+        </Notice>
+      ) : (
+        !!dateRangeHint && (
+          <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+            {dateRangeHint}
+          </Text>
+        )
+      )}
+      {attachment ? (
+        <Card style={{ gap: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                backgroundColor: palette.primarySoft,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <FileText size={20} color={palette.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                style={{ fontSize: 12, fontWeight: "600", color: palette.mutedLabel }}
+              >
+                Supporting document
+              </Text>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="middle"
+                style={{ fontSize: 14, fontWeight: "600", color: palette.text }}
+              >
+                {attachment.name}
+              </Text>
+              {attachment.size > 0 && (
+                <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+                  {attachment.size >= 1024 * 1024
+                    ? `${(attachment.size / (1024 * 1024)).toFixed(1)} MB`
+                    : `${Math.max(1, Math.ceil(attachment.size / 1024))} KB`}
+                </Text>
+              )}
+            </View>
+          </View>
+          <Row>
+            <Button
+              variant="outline"
+              style={{ flex: 1 }}
+              disabled={action.busy}
+              onPress={() =>
+                void action.run(async () => {
+                  const picked = (await chooseFiles())[0];
+                  if (picked) setAttachment(picked);
+                })
+              }
+            >
+              Change file
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={action.busy}
+              onPress={() => setAttachment(undefined)}
+            >
+              Remove
+            </Button>
+          </Row>
+        </Card>
+      ) : (
+        <Button
+          variant="outline"
+          icon={<Paperclip size={16} color={palette.text} />}
+          disabled={action.busy}
+          onPress={() =>
+            void action.run(async () => {
+              const picked = (await chooseFiles())[0];
+              if (picked) setAttachment(picked);
+            })
+          }
+        >
+          Attach supporting document
+        </Button>
       )}
       <LabelValue label="Total cash requested" value={peso(total)} />
     </Sheet>

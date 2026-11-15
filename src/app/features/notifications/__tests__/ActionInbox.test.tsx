@@ -15,6 +15,16 @@ import { fetchInboxUpdatePage } from "../inboxUpdates";
 import { getAssignedIndependentReviews } from "../../../../core/web/app/features/budget/services/independentReviewService";
 import type { Task } from "../../../../core/web/app/features/tasks/taskTypes";
 import type { SectionListProps } from "react-native";
+import { fetchAssignedSubtaskReviews } from "../../tasks/assignedSubtaskReviews";
+import { fetchWorkTree } from "../../../../core/web/app/features/nested-work/services/workTreeService";
+
+jest.mock("../../tasks/assignedSubtaskReviews", () => ({
+  ...jest.requireActual<typeof import("../../tasks/assignedSubtaskReviews")>("../../tasks/assignedSubtaskReviews"),
+  fetchAssignedSubtaskReviews: jest.fn(async () => []),
+}));
+jest.mock("../../../../core/web/app/features/nested-work/services/workTreeService", () => ({
+  fetchWorkTree: jest.fn(),
+}));
 
 const mockEnd =
   jest.fn<(callback: SectionListProps<unknown>["onEndReached"]) => void>();
@@ -74,6 +84,26 @@ jest.mock("../../../../platform/supabase", () => ({
 }));
 const mockEmpty = { data: [], loading: false, refresh: async () => {} };
 let mockTasks: Task[] = [];
+
+test("a cash-blocked assigned proposal survives an empty notification feed and opens its exact branch", async () => {
+  jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+  jest.mocked(fetchAssignedSubtaskReviews).mockResolvedValueOnce([{
+    id: "proposal", root_id: "root", node_id: "node", task_title: "Task title",
+    subtask_title: "Submit receipts", kind: "completion", submitted_at: "2026-11-14", cash_blocked: true,
+  }]);
+  jest.mocked(fetchWorkTree).mockResolvedValueOnce({
+    root: { id: "root", kind: "office", project: "project" },
+    nodes: [{ id: "node", task_id: "root" }],
+  } as Awaited<ReturnType<typeof fetchWorkTree>>);
+  const navigate = jest.fn();
+  await render(<ActionInbox navigate={navigate} initialView="decisions" />);
+  expect(await screen.findByText("Task title · Waiting for cash settlement")).toBeOnTheScreen();
+  await fireEvent.press(screen.getByText("Submit receipts"));
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith(expect.objectContaining({
+    name: "task", id: "root", projectId: "project", nodeId: "node",
+    recordType: "work_proposal", recordId: "proposal",
+  })));
+});
 
 test("notifications skip review sources and change read state only after a confirmed write", async () => {
   jest

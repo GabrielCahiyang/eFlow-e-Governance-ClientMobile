@@ -1,11 +1,6 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { AppState } from "react-native";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { TaskReviewPanel } from "../TaskReviewPanel";
 import {
   fetchTaskSubmissions,
@@ -19,11 +14,6 @@ import type { ReviewSubmission } from "../../../../core/web/app/features/reviews
 
 let mockActor = "reviewer";
 let mockCurrent: Task;
-beforeEach(() => {
-  jest
-    .spyOn(AppState, "addEventListener")
-    .mockReturnValue({ remove: jest.fn() });
-});
 jest.mock("../../authentication", () => ({
   useAuth: () => ({ profile: { id: mockActor, role: "member" } }),
 }));
@@ -94,6 +84,9 @@ const pending = {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  jest
+    .spyOn(AppState, "addEventListener")
+    .mockReturnValue({ remove: jest.fn() });
   mockActor = "reviewer";
   mockCurrent = task;
   jest.mocked(fetchTaskSubmissions).mockResolvedValue([pending]);
@@ -187,4 +180,57 @@ test("the original worker can read the returned feedback but cannot decide their
   );
   expect(screen.getByText("QA reviewer")).toBeOnTheScreen();
   expect(verifyTask).not.toHaveBeenCalled();
+});
+
+test("keeps clearance blocker notice rendered while background finance recheck runs", async () => {
+  const openBlocker = { request: { id: "req-open", status: "requested" } };
+  jest.mocked(fetchTaskCashBlockers).mockResolvedValueOnce([
+    openBlocker as never,
+  ]);
+  await render(
+    <TaskReviewPanel
+      task={task}
+      initialSubmissionId="v1"
+      onSaved={async () => {}}
+      readOnly={false}
+    />,
+  );
+  expect(
+    await screen.findByText("Outstanding task cash blocks approval."),
+  ).toBeOnTheScreen();
+
+  let resolveClearance!: (value: unknown[]) => void;
+  jest.mocked(fetchTaskCashBlockers).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveClearance = resolve;
+      }) as never,
+  );
+
+  const { nativeWindow } = require("../../../../platform/webRuntime") as {
+    nativeWindow: {
+      addEventListener: (event: string, cb: (e?: unknown) => void) => void;
+    };
+  };
+  const listeners = jest
+    .mocked(nativeWindow.addEventListener)
+    .mock.calls.filter(([event]) => event === "eflow:finance-updated")
+    .map(([, cb]) => cb);
+  expect(listeners.length).toBeGreaterThan(0);
+
+  await act(async () => {
+    listeners.forEach((cb) => cb({ detail: { taskId: "root" } }));
+  });
+  await waitFor(() =>
+    expect(fetchTaskCashBlockers).toHaveBeenCalledTimes(2),
+  );
+
+  expect(
+    screen.getByText("Outstanding task cash blocks approval."),
+  ).toBeOnTheScreen();
+  expect(screen.queryByLabelText("Checking cash clearance")).toBeNull();
+
+  await act(async () => {
+    resolveClearance([openBlocker]);
+  });
 });

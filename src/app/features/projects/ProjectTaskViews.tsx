@@ -12,7 +12,6 @@ import {
   Row,
   Status,
   colors,
-  dateLabel,
   peso,
 } from "../../components/ui";
 import type { Navigate } from "../../shared/routes";
@@ -20,6 +19,7 @@ import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 import type { Project } from "../../../core/web/app/features/projects/services/types";
 import { STATUS_COLORS } from "../../../core/web/app/features/project-table/selectors";
 import { useAuth } from "../authentication";
+import { taskDateLabel } from "../tasks/taskDates";
 export function ProjectTaskTable({
   tasks,
   navigate,
@@ -88,8 +88,8 @@ export function ProjectTaskTable({
       width: 180,
       render: (t: Task) =>
         text(
-          (t.startDate ? dateLabel(t.startDate) + " → " : "") +
-            dateLabel(t.deadline || t.dueDate),
+          (t.startDate ? taskDateLabel(t.startDate) + " → " : "") +
+            taskDateLabel(t.deadline || t.dueDate),
         ),
     },
     {
@@ -211,7 +211,7 @@ export function ProjectBoard({
                           },
                       t.deadline || t.dueDate
                         ? {
-                            value: dateLabel(t.deadline || t.dueDate),
+                            value: taskDateLabel(t.deadline || t.dueDate),
                           }
                         : null,
                     ]}

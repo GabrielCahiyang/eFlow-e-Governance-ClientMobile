@@ -3,6 +3,7 @@ import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
 import type { AppRoute } from "../../shared/routes";
 import { completionPercent } from "../../shared/completion";
+import { isSubtaskLeadOrContributor } from "./workPermissions";
 
 export function branchCompletion(
   tree: WorkTreeSnapshot,
@@ -108,7 +109,9 @@ export function completionMode(
     return;
   const scope = workScope(tree, actorId, readOnly);
   if (!selectNodeWorkCapability(tree, nodeId, "submit", scope).allowed) return;
-  if (tree.root.kind === "personal") return "review";
+  if (tree.root.kind === "personal") {
+    return isSubtaskLeadOrContributor(tree, node, actorId) ? "review" : undefined;
+  }
   if (tree.root.lead === actorId || node.lead_id === actorId) return "direct";
 }
 

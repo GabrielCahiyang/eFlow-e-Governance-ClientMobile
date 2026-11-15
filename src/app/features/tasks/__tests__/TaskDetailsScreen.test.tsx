@@ -42,23 +42,33 @@ jest.mock("../../../shared/postgresChannel", () => ({
 
 let mockTreeBlocker: string | null = null;
 jest.mock("../../../../core/web/app/features/nested-work/services/workTreeService", () => ({
-  fetchWorkTree: jest.fn(async (id: string) => ({
-    revision: 1,
-    root: {
-      id,
-      kind: "office",
-      lead: "lead-1",
-      status: "in_progress",
-      blocker: mockTreeBlocker,
-      open: true,
-      project: "proj-1",
-      office: "office-1",
-      project_status: mockProjectStatus,
-      people: [],
-    },
-    nodes: [],
-    people: [{ id: "lead-1", name: "Andres Manili" }],
-  })),
+  fetchWorkTree: jest.fn(async (id: string) => {
+    const snapshot = {
+      revision: 1,
+      root: {
+        id,
+        kind: "office",
+        lead: mockTreeLead,
+        status: "in_progress",
+        blocker: mockTreeBlocker,
+        open: true,
+        project: "proj-1",
+        office: "office-1",
+        project_status: mockProjectStatus,
+        people: [],
+        capabilities: mockTreeRootCreateAllowed
+          ? { create_child: { allowed: true, reason_code: null } }
+          : {},
+      },
+      nodes: [],
+      people: [{ id: "lead-1", name: "Andres Manili" }],
+    };
+    const {
+      rememberWorkCapabilityContext,
+    } = require("../../../../core/web/app/features/nested-work/selectors/capabilities") as typeof import("../../../../core/web/app/features/nested-work/selectors/capabilities");
+    rememberWorkCapabilityContext(snapshot as never, "lead-1");
+    return snapshot;
+  }),
   WorkTreeUnavailable: class WorkTreeUnavailable extends Error {},
 }));
 
@@ -69,6 +79,9 @@ jest.mock("../../../../platform/draftStore", () => ({
 }));
 
 let mockProjectStatus = "on_hold";
+let mockProjectLeadId: string | null = null;
+let mockTreeLead = "lead-1";
+let mockTreeRootCreateAllowed = false;
 let mockDependencyRows: Array<{
   id: string;
   title: string;
@@ -103,7 +116,14 @@ jest.mock("../../../../platform/supabase", () => ({
           }),
           maybeSingle: async () => {
             if (table === "projects") {
-              return { data: { status: mockProjectStatus, title: "Test Project" }, error: null };
+              return {
+                data: {
+                  status: mockProjectStatus,
+                  project_lead_id: mockProjectLeadId,
+                  title: "Test Project",
+                },
+                error: null,
+              };
             }
             return { data: null, error: null };
           },
@@ -230,5 +250,99 @@ describe("TaskDetailsScreen with on-hold projects", () => {
     expect(view.getByText("Secure permit")).toBeOnTheScreen();
     expect(view.getByText("WORK BLOCKED")).toBeOnTheScreen();
     expect(view.getByText("Waiting for venue clearance")).toBeOnTheScreen();
+  });
+
+  test("gates Mark as complete and shows a readiness notice when a task prerequisite is incomplete", async () => {
+    mockStructureAccess = "head";
+    mockProjectStatus = "active";
+    mockTaskRow.status = "in_progress";
+    mockTaskRow.dependency_ids = ["dep-pending"];
+    mockDependencyRows = [
+      {
+        id: "dep-pending",
+        title: "Approve site plan",
+        status: "in_progress",
+        linked_project_id: "proj-1",
+      },
+    ];
+    mockTreeBlocker = null;
+
+    const view = await render(
+      <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+    );
+
+    expect(await view.findByText("Update progress")).toBeOnTheScreen();
+    expect(view.queryByText("Mark as complete")).toBeNull();
+    expect(
+      view.getByText(
+        "Complete all task prerequisites before marking this task complete.",
+      ),
+    ).toBeOnTheScreen();
+    mockTaskRow.dependency_ids = [];
+    mockDependencyRows = [];
+  });
+
+  test("displays Stuck in the task status strip when an active task has a blocker, and In progress when cleared", async () => {
+    mockStructureAccess = "head";
+    mockProjectStatus = "active";
+    mockTaskRow.status = "in_progress";
+    mockTaskRow.dependency_ids = [];
+    mockDependencyRows = [];
+    mockTreeBlocker = "Awaiting engineering sign-off";
+
+    const view = await render(
+      <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+    );
+
+    expect(await view.findByText("Stuck")).toBeOnTheScreen();
+    expect(view.queryByText("In progress")).toBeNull();
+
+    mockTreeBlocker = null;
+    const clearedView = await render(
+      <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+    );
+    expect(await clearedView.findByText("In progress")).toBeOnTheScreen();
+    expect(clearedView.queryByText("Stuck")).toBeNull();
+  });
+
+  test("blocks non-Task-Lead Project Lead from adding subtasks or executing work in active projects while allowing planning subtask creation", async () => {
+    const prevAssignee = mockTaskRow.assigned_to;
+    try {
+      mockStructureAccess = null;
+      mockProjectStatus = "active";
+      mockProjectLeadId = "lead-1";
+      mockTreeLead = "other-task-lead";
+      mockTreeRootCreateAllowed = true;
+      mockTaskRow.status = "in_progress";
+      mockTaskRow.assigned_to = "other-task-lead";
+      mockTaskRow.team_member_ids = [];
+      mockTaskRow.dependency_ids = [];
+      mockDependencyRows = [];
+      mockTreeBlocker = null;
+
+      const activeView = await render(
+        <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+      );
+      expect(await activeView.findByText("Prepare invitations")).toBeOnTheScreen();
+      expect(activeView.queryByText("Update progress")).toBeNull();
+      expect(activeView.queryByText("Mark as complete")).toBeNull();
+      expect(activeView.queryByText("Submit for review")).toBeNull();
+      expect(activeView.queryByRole("button", { name: "Add subtask" })).toBeNull();
+      activeView.unmount();
+
+      mockProjectStatus = "planning";
+      const planningView = await render(
+        <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+      );
+      expect(await planningView.findByRole("button", { name: "Add subtask" })).toBeOnTheScreen();
+      expect(planningView.queryByText("Update progress")).toBeNull();
+      expect(planningView.queryByText("Mark as complete")).toBeNull();
+      expect(planningView.queryByText("Submit for review")).toBeNull();
+    } finally {
+      mockTaskRow.assigned_to = prevAssignee;
+      mockProjectLeadId = null;
+      mockTreeLead = "lead-1";
+      mockTreeRootCreateAllowed = false;
+    }
   });
 });

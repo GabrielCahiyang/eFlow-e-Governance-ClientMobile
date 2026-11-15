@@ -1,6 +1,7 @@
 import { inboxReadEvent } from "./useInboxIndicator";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { useEffect, useRef, useState } from "react";
 import { AppState, Pressable, View } from "react-native";
 import { Button, Empty, ErrorState, dateLabel } from "../../components/ui";
@@ -25,6 +26,10 @@ import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
 import { personalReviewActions } from "../../../core/web/app/features/action-center/selectors";
 import { personalReviewAllowed } from "../tasks/branchInspector";
+import { assignedSubtaskReviewRoute, fetchAssignedSubtaskReviews } from "../tasks/assignedSubtaskReviews";
+import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
+import { useAction } from "../../shared/useAction";
+import { PublicMessageError } from "../../shared/userMessages";
 import { nativeWindow } from "../../../platform/webRuntime";
 import { getAssignedIndependentReviews } from "../../../core/web/app/features/budget/services/independentReviewService";
 import {
@@ -43,6 +48,7 @@ type Decision = {
   title: string;
   context: string;
   route: AppRoute;
+  verifyRoute?: () => Promise<AppRoute>;
 };
 type Entry =
   { key: string; decision: Decision } | { key: string; update: Notification };
@@ -57,11 +63,17 @@ export function ActionInbox({
 }) {
   const { profile } = useAuth();
   const assertAccess = useAccountActionAccess();
+  const openDecision = useAction({ requireAccess: false });
   const actor = profile!.id;
   const palette = useTheme();
   const reviews = initialView === "decisions";
   const work = useMobileWorkFeed();
   const tasks = useTaskFacts("inbox-decisions", reviews);
+  const subtaskReviews = useFacts(
+    "inbox-subtask-reviews:" + actor,
+    fetchAssignedSubtaskReviews,
+    reviews,
+  );
   const finance = useFacts(
     "inbox-independent-reviews:" + actor,
     () => getAssignedIndependentReviews(actor),
@@ -98,6 +110,7 @@ export function ActionInbox({
   const refresh = () =>
     Promise.all([
       tasks.refresh(),
+      subtaskReviews.refresh(),
       finance.refresh(),
       escalations.refresh(),
       updates.refresh(),
@@ -115,12 +128,17 @@ export function ActionInbox({
       if (AppState.currentState === "active")
         void Promise.all([
           tasks.refresh(),
+          subtaskReviews.refresh(),
           finance.refresh(),
           escalations.refresh(),
           force ? updates.refresh() : updates.refreshIfStale(),
           force ? unreadUpdates.refresh() : unreadUpdates.refreshIfStale(),
         ]);
     };
+    const live = createLiveRefreshController({
+      onRefresh: () => refreshInbox(false),
+      hasRealtime: true,
+    });
     const channel = createPostgresChannel("native-inbox:" + actor)
       .on(
         "postgres_changes",
@@ -146,22 +164,18 @@ export function ActionInbox({
           refreshInbox();
         },
       )
-      .subscribe();
+      .subscribe(live.onChannelStatus);
     const workChanged = () => refreshInbox();
-    const poll = setInterval(() => refreshInbox(false), 30000);
     nativeWindow.addEventListener("eflow:work-updated", workChanged);
-    const foreground = AppState.addEventListener("change", (state) => {
-      if (state === "active") refreshInbox(false);
-    });
     return () => {
-      clearInterval(poll);
+      live.dispose();
       nativeWindow.removeEventListener("eflow:work-updated", workChanged);
-      foreground.remove();
       void supabase.removeChannel(channel);
     };
   }, [
     actor,
     tasks.refresh,
+    subtaskReviews.refresh,
     finance.refresh,
     escalations.refresh,
     updates.refresh,
@@ -241,6 +255,25 @@ export function ActionInbox({
       }
     }
   }
+  for (const review of subtaskReviews.error ? [] : subtaskReviews.data ?? []) {
+    decisions.push({
+      key: "subtask-proposal:" + review.id,
+      title: review.subtask_title,
+      context: review.cash_blocked
+        ? `${review.task_title} · Waiting for cash settlement`
+        : `${review.task_title} · ${review.kind === "completion" ? "Completion" : "Progress"} review`,
+      route: assignedSubtaskReviewRoute(review),
+      verifyRoute: async () => {
+        const tree = await fetchWorkTree(review.root_id);
+        if (tree.root.kind !== "office" || !tree.nodes.some((item) =>
+          item.id === review.node_id && item.task_id === review.root_id))
+          throw new PublicMessageError(
+            "This Subtask is no longer available. Refresh reviews.",
+          );
+        return assignedSubtaskReviewRoute(review, tree.root.project || undefined);
+      },
+    });
+  }
   for (const pack of finance.error ? [] : finance.data || []) {
     if (
       pack.context.current &&
@@ -292,12 +325,13 @@ export function ActionInbox({
       })),
     });
 
-  const sources = reviews ? [tasks, finance, work] : [feed];
+  const sources = reviews ? [tasks, finance, work, subtaskReviews] : [feed];
   const initial = sources.some((source) => source.loading && !source.data);
   const issues = (
     reviews
       ? [
           tasks.error && "Task reviews could not load.",
+          subtaskReviews.error && "Assigned Subtask reviews could not load.",
           finance.error &&
             "Assigned financial reviews couldn't load. Please try again.",
           (work.error ||
@@ -395,6 +429,7 @@ export function ActionInbox({
             />
           )}
           {!!markError && <ErrorState error={markError} />}
+          {!!openDecision.error && <ErrorState error={openDecision.error} />}
         </View>
       }
       renderSectionHeader={({ section }) => (
@@ -443,7 +478,11 @@ export function ActionInbox({
               <NavigationRow
                 title={item.decision.title}
                 description={item.decision.context}
-                onPress={() => navigate(item.decision.route)}
+                onPress={() => {
+                  const { verifyRoute, route } = item.decision;
+                  if (!verifyRoute) navigate(route);
+                  else void openDecision.run(async () => navigate(await verifyRoute()));
+                }}
               />
             </View>
           );

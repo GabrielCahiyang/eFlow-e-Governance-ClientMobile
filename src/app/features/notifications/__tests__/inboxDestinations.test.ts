@@ -97,6 +97,20 @@ test("an M7 Lead review notice opens its exact work details instead of the final
     nodeId: "branch",
     view: "subitems",
   });
+  expect(
+    inboxUpdateRoute(
+      { ...notice, workNodeId: "branch", proposalId: "prop-1" },
+      "member",
+    ),
+  ).toEqual({
+    name: "task",
+    id: "root",
+    projectId: "project",
+    nodeId: "branch",
+    view: "subitems",
+    recordType: "work_proposal",
+    recordId: "prop-1",
+  });
 });
 
 test("Personal Lead review notices open the exact Personal branch", () => {

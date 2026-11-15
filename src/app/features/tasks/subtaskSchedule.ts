@@ -44,12 +44,24 @@ export function subtaskScheduleError(
 }
 
 type ScheduledNode = WorkNode & {
-  start_date?: string | null;
   started_at?: string | null;
+  effective_status?: WorkNode["status"] | null;
+  priority?: "low" | "medium" | "high" | "urgent" | null;
 };
 
 export const nodeSchedule = (node?: WorkNode) =>
   node as ScheduledNode | undefined;
+
+export function subtaskDisplayStatus(
+  node: Pick<ScheduledNode, "effective_status" | "started_at"> & { status: string },
+  confirmedStart?: string,
+) {
+  if (node.effective_status && node.effective_status !== "todo")
+    return node.effective_status;
+  if (node.status === "todo" && (node.started_at || confirmedStart))
+    return "in_progress";
+  return node.status;
+}
 
 export function workScheduleToday(tree: WorkTreeSnapshot) {
   const schedule = (
@@ -60,6 +72,11 @@ export function workScheduleToday(tree: WorkTreeSnapshot) {
   return schedule?.version === 1 && isCalendarDate(schedule.today)
     ? schedule.today
     : undefined;
+}
+
+export function plannedStartReached(planned?: string | null, workDay?: string) {
+  const date = planned?.slice(0, 10);
+  return !!date && isCalendarDate(date) && !!workDay && date <= workDay;
 }
 
 export function plannedSubtaskStartIssue(

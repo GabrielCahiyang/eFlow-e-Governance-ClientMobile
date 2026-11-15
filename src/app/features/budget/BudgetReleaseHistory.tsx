@@ -18,6 +18,7 @@ import {
   peso,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
 import { PublicMessageError } from "../../shared/userMessages";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -104,7 +105,6 @@ export function BudgetReleaseHistory({
   const reload = useCallback(() => facts.refresh(), [facts.refresh]);
   useOfficeFinanceUpdates(office, year, true, reload);
   const [target, setTarget] = useState<ReleaseTarget>();
-  const [reference, setReference] = useState("");
   const palette = useTheme();
   const [history, setHistory] = useState(false);
   const [month, setMonth] = useState(
@@ -112,8 +112,27 @@ export function BudgetReleaseHistory({
   );
   const [day, setDay] = useState("");
   const action = useAction();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      actor,
+      "budget-release-confirm:" +
+        office +
+        ":" +
+        year +
+        ":" +
+        (target ? target.account + ":" + target.release : "none"),
+    ),
+    !!target,
+    () => ({ reference: "" }),
+  );
+  const reference = draft.reference;
   const data = facts.error ? undefined : facts.data;
   const today = getPhilippineCalendarDate();
+  const closeTarget = () => {
+    if (action.busy) return;
+    action.clear();
+    setTarget(undefined);
+  };
 
   const submit = () =>
     action.run(async () => {
@@ -167,8 +186,8 @@ export function BudgetReleaseHistory({
             throw error;
         }
       }
+      clearDraft();
       setTarget(undefined);
-      setReference("");
       nativeWindow.dispatchEvent({
         type: "eflow:finance-updated",
         detail: { orgId: office, fiscalYear: year },
@@ -394,7 +413,6 @@ export function BudgetReleaseHistory({
                     disabled={facts.loading}
                     onPress={() => {
                       action.clear();
-                      setReference("");
                       setTarget({
                         account,
                         release: release.id,
@@ -423,13 +441,13 @@ export function BudgetReleaseHistory({
             title="Confirm budget availability"
             description={target.title}
             busy={action.busy}
-            onClose={() => setTarget(undefined)}
+            onClose={closeTarget}
             footer={
               <Row>
                 <Button
                   variant="outline"
                   disabled={action.busy}
-                  onPress={() => setTarget(undefined)}
+                  onPress={closeTarget}
                 >
                   Cancel
                 </Button>
@@ -448,7 +466,7 @@ export function BudgetReleaseHistory({
             <Field
               label="Reference or note"
               value={reference}
-              onChangeText={setReference}
+              onChangeText={(next) => updateDraft({ reference: next })}
               maxLength={1000}
               editable={!action.busy}
               multiline

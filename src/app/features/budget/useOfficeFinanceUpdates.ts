@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { AppState } from "react-native";
 import { supabase } from "../../../platform/supabase";
 import { nativeWindow } from "../../../platform/webRuntime";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 
 export function useOfficeFinanceUpdates(
@@ -12,14 +12,12 @@ export function useOfficeFinanceUpdates(
 ) {
   useEffect(() => {
     if (!office || !enabled) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = () => {
-      if (timer || AppState.currentState !== "active") return;
-      timer = setTimeout(() => {
-        timer = undefined;
-        void reload();
-      }, 250);
-    };
+    const live = createLiveRefreshController({
+      onRefresh: () => void reload(),
+      debounceMs: 250,
+      hasRealtime: true,
+    });
+    const refresh = live.schedule;
     const filter = `org_id=eq.${office}`;
     const channel = createPostgresChannel(
       `native-office-finance:${office}:${year ?? "all"}`,
@@ -54,9 +52,7 @@ export function useOfficeFinanceUpdates(
         },
         refresh,
       )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") refresh();
-      });
+      .subscribe(live.onChannelStatus);
     const changed = (event: {
       detail?: { orgId?: string; fiscalYear?: number };
     }) => {
@@ -68,14 +64,8 @@ export function useOfficeFinanceUpdates(
         refresh();
     };
     nativeWindow.addEventListener("eflow:finance-updated", changed);
-    const foreground = AppState.addEventListener("change", (state) => {
-      if (state === "active") refresh();
-    });
-    const fallback = setInterval(refresh, 60_000);
     return () => {
-      clearTimeout(timer);
-      clearInterval(fallback);
-      foreground.remove();
+      live.dispose();
       nativeWindow.removeEventListener("eflow:finance-updated", changed);
       void supabase.removeChannel(channel);
     };

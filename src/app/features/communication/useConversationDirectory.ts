@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { AppState } from "react-native";
 import { supabase } from "../../../platform/supabase";
 import { nativeWindow } from "../../../platform/webRuntime";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { useFacts } from "../../shared/useFacts";
 import { loadChannels } from "./services";
@@ -12,14 +12,12 @@ export function useConversationDirectory(actor: string) {
   const facts = useFacts(`chat-channels:${actor}`, loadChannels, !!actor);
   useEffect(() => {
     if (!actor) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = () => {
-      if (timer || AppState.currentState !== "active") return;
-      timer = setTimeout(() => {
-        timer = undefined;
-        void facts.refresh();
-      }, 300);
-    };
+    const sync = createLiveRefreshController({
+      onRefresh: () => void facts.refresh(),
+      debounceMs: 300,
+      hasRealtime: true,
+    });
+    const refresh = sync.schedule;
     const live = createPostgresChannel(`native-chat-directory:${actor}`);
     for (const table of [
       "chat_messages",
@@ -33,18 +31,10 @@ export function useConversationDirectory(actor: string) {
         refresh,
       );
     }
-    live.subscribe((status) => {
-      if (status === "SUBSCRIBED") refresh();
-    });
-    const foreground = AppState.addEventListener("change", (state) => {
-      if (state === "active") refresh();
-    });
-    const fallback = setInterval(refresh, 30_000);
+    live.subscribe(sync.onChannelStatus);
     nativeWindow.addEventListener(conversationDirectoryChanged, refresh);
     return () => {
-      clearTimeout(timer);
-      clearInterval(fallback);
-      foreground.remove();
+      sync.dispose();
       nativeWindow.removeEventListener(conversationDirectoryChanged, refresh);
       void supabase.removeChannel(live);
     };

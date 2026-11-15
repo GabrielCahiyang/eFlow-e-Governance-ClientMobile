@@ -1,20 +1,20 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:1-147
-INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:1-147
+ADDED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:1-147
+INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:1-147
 	package
-		INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
+		INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
 	xmlns:android
-		ADDED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:11-69
+		ADDED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:11-69
 uses-permission#android.permission.RECORD_AUDIO
-ADDED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:70-136
+ADDED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:70-136
 	android:name
-		ADDED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:87-133
+		ADDED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml:1:87-133
 uses-sdk
-INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml reason: use-sdk injection requested
-INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
-INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
+INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
+INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
 	android:targetSdkVersion
-		INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
+		INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
 	android:minSdkVersion
-		INJECTED from C:\Users\gabri\OneDrive\Desktop\EflowMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml
+		INJECTED from C:\Users\james\projects\eFlow-e-Governance-ClientMobile\modules\eflow-pcm\android\src\main\AndroidManifest.xml

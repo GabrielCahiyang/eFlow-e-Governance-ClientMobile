@@ -6,7 +6,7 @@ import {
   RefreshSectionList,
 } from "../../components/ui/FolderRefresh";
 import { useState } from "react";
-import { Pressable, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -24,6 +24,7 @@ import {
   ErrorState,
   Loading,
   SearchField,
+  workStatusTone,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useFacts } from "../../shared/useFacts";
@@ -136,16 +137,6 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
           >
             Projects
           </Text>
-          {showPlanning && (
-              <Button variant="outline" onPress={() => navigate({
-                name: "projects",
-                view: "project_setup",
-                workspaceId: current?.workspace.id,
-                title: "Create or resume a project on eFlow Web",
-              })}>
-                Create or resume on eFlow Web
-              </Button>
-            )}
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
@@ -267,9 +258,10 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               flexDirection: "row",
               width: tableWidth,
               backgroundColor: palette.background,
-              borderBottomWidth: 1,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderBottomWidth: StyleSheet.hairlineWidth,
               borderColor: palette.border,
-              minHeight: 42,
+              minHeight: 40,
               alignItems: "stretch",
             }}
           >
@@ -281,6 +273,8 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                   zIndex: 2,
                   flexDirection: "row",
                   alignItems: "stretch",
+                  borderRightWidth: StyleSheet.hairlineWidth,
+                  borderColor: palette.border,
                 },
                 pinned,
               ]}
@@ -293,7 +287,16 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ color: palette.mutedLabel }}>Project</Text>
+                <Text
+                  accessibilityRole="header"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: palette.mutedLabel,
+                  }}
+                >
+                  Project
+                </Text>
               </View>
             </Animated.View>
             {[
@@ -308,13 +311,19 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                 key={label}
                 style={{
                   width: [140, 175, 150, 150, 135, 150][index],
-                  paddingHorizontal: 8,
+                  paddingHorizontal: 10,
                   justifyContent: "center",
+                  borderRightWidth: StyleSheet.hairlineWidth,
+                  borderColor: palette.border,
                 }}
               >
                 <Text
+                  accessibilityRole="header"
                   style={{
+                    fontSize: 12,
+                    fontWeight: "600",
                     color: palette.mutedLabel,
+                    textAlign: label === "Status" ? "center" : "left",
                   }}
                 >
                   {label}
@@ -328,6 +337,14 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
         const record = authoritative.get(item.id);
         const progress =
           record && portfolioSummary(record, facts.data?.tasks ?? []);
+        const statusPresentation =
+          item.status === "unavailable"
+            ? undefined
+            : resolveStatus(item.status);
+        const statusTone =
+          item.status === "unavailable"
+            ? undefined
+            : workStatusTone(item.status, palette, statusPresentation?.color);
         return (
           <View
             style={{
@@ -336,7 +353,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               minHeight: fontScale > 1.5 ? 100 : 76,
               alignItems: "stretch",
               backgroundColor: palette.surface,
-              borderBottomWidth: 1,
+              borderBottomWidth: StyleSheet.hairlineWidth,
               borderColor: palette.border,
             }}
           >
@@ -348,6 +365,8 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                   zIndex: 2,
                   flexDirection: "row",
                   alignItems: "stretch",
+                  borderRightWidth: StyleSheet.hairlineWidth,
+                  borderColor: palette.border,
                 },
                 pinned,
               ]}
@@ -411,20 +430,33 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               style={{
                 width: 140,
                 justifyContent: "center",
-                paddingHorizontal: 8,
+                alignItems: "center",
+                paddingHorizontal: 10,
+                backgroundColor: statusTone?.background,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderColor: palette.border,
               }}
             >
-              <Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "600",
+                  color: statusTone ? statusTone.foreground : palette.mutedLabel,
+                  textAlign: "center",
+                }}
+              >
                 {item.status === "unavailable"
                   ? "Status unavailable"
-                  : resolveStatus(item.status).label}
+                  : statusPresentation?.label}
               </Text>
             </View>
             <View
               style={{
                 width: 175,
                 justifyContent: "center",
-                paddingHorizontal: 8,
+                paddingHorizontal: 10,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderColor: palette.border,
               }}
             >
               {
@@ -460,7 +492,9 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               style={{
                 width: 150,
                 justifyContent: "center",
-                paddingHorizontal: 8,
+                paddingHorizontal: 10,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderColor: palette.border,
               }}
             >
               <Text>
@@ -477,7 +511,9 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               style={{
                 width: 150,
                 justifyContent: "center",
-                paddingHorizontal: 8,
+                paddingHorizontal: 10,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderColor: palette.border,
               }}
             >
               <Text>
@@ -494,7 +530,9 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               style={{
                 width: 135,
                 justifyContent: "center",
-                paddingHorizontal: 8,
+                paddingHorizontal: 10,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderColor: palette.border,
               }}
             >
               <Text>
@@ -515,7 +553,9 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               style={{
                 width: 150,
                 justifyContent: "center",
-                paddingHorizontal: 8,
+                paddingHorizontal: 10,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderColor: palette.border,
               }}
             >
               <Text>

@@ -22,10 +22,9 @@ const hours = (value: number) =>
 
 export function ProjectAnalysisSummary({
   project,
-  onOpenWeb,
 }: {
   project: Project;
-  onOpenWeb: () => void;
+  onOpenWeb?: () => void;
 }) {
   const { profile } = useAuth();
   const history = useFacts(
@@ -111,9 +110,6 @@ export function ProjectAnalysisSummary({
           />
         </Card>
       )}
-      <Button variant="outline" onPress={onOpenWeb}>
-        Open full analysis on eFlow Web
-      </Button>
     </>
   );
 }

@@ -71,7 +71,12 @@ export function Button({
       ]}
     >
       {busy ? <BusyIndicator color={foreground} /> : icon}
-      <Text style={[s.text, { color: foreground }, textStyle]}>{children}</Text>
+      <Text
+        textBreakStrategy="simple"
+        style={[s.text, { color: foreground }, textStyle]}
+      >
+        {children}
+      </Text>
     </NativePressable>
   );
 }
@@ -92,9 +97,13 @@ const s = StyleSheet.create({
     gap: 8,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 1,
   },
-  text: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  text: {
+    fontSize: 14,
+    fontWeight: "600",
+    flexShrink: 1,
+    textAlign: "center",
+  },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.8 },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },

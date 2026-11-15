@@ -2,6 +2,81 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Task due dates without due times
+
+The Mobile Task editor and scheduling sheet use date-only fields and submit changed due dates as `YYYY-MM-DD`. Existing dated records display the Philippine calendar day, including legacy timestamps with explicit offsets. The Task details, project tables and report due-date output show calendar dates. Report event timestamps retain their time.
+
+| Approved actor and fixture | Android and iOS personal QA |
+| --- | --- |
+| Responsible Head and authorized delegated Task editor | Create a Task with a due date and edit it to another valid day. Reopen the Task and check the same date in Web, details and the project table. Verify that editing only the title or priority preserves the due date. |
+| Member with read access | Compare a previously timestamped Task and a date-only Task in details and the My Work report. On a device outside Philippine time, confirm the dates match Web. |
+
+TypeScript, Metro, eight focused tests on the final source, both production JS exports and the three-bundle credential audit passed. The full run before the final report formatting adjustment reported 402 passing assertions and exited with the existing Supabase auth timer teardown error. Android build 57 installed and cold-launched on the emulator. Signed-in saves, physical Android, native iOS and personal acceptance remain pending. [Android APK](../../artifacts/M7/eFlow-Mobile-M7-Task-Dates-v57-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V57_APK_VERIFICATION.json) · [Credential audit](M7-task-dates-v57-release-audit.json)
+
+## Task and Subtask form parity
+
+Compared Web main `7574812`, project wizard `5f97408`, and Subtask reviews `739892b`, and inspected the installed work commands read-only. The Web quick-create Task needs a name and a project Group. Mobile requires those inputs and defaults its schedule from the project dates. Priority and prerequisites use the existing Task patch command. If the Task creation succeeds before its optional patch can be confirmed, the editor keeps the confirmed Task and directs the user to Edit. Estimated hours is optional on Web and remains available there.
+
+Subtasks inherit their Task's Group. The create form requires a Subtask name and retains Web's execution mode. A permitted Office editor can set explicit sibling prerequisites after creation and before start. Explicit rules replace legacy sequence for start eligibility. The legacy toggle is shown for legacy or Personal work. The server retains its dependency, schedule, cycle and access checks.
+
+| Approved actor and fixture | Android and iOS personal QA |
+| --- | --- |
+| Responsible Head in an active Office project | Open Add Task, verify the name and Group markers, create with project date defaults, and repeat with optional priority and a prerequisite. Reopen Edit and compare both fields with Web. Verify a rejected optional patch preserves the one confirmed Task. |
+| Delegated project editor | Verify authorized Task priority editing and read-only prerequisite access in the details. Confirm stale task changes are rejected without overwriting newer fields. |
+| Task Lead and delegated branch editor, under the same Office Task | Create a Subtask by name under the intended parent. Verify inherited group and legacy sequence. Reopen a pre-start Subtask, choose explicit prerequisites, and compare the dependency list with Web. Test a restricted prerequisite, a started Subtask and a Member from the second Office. |
+| Personal project Member and authorized Lead | Verify legacy execution mode and absence of Office-only dependency editing. Check required indicators with the keyboard open and large text, TalkBack or VoiceOver, both themes and reduced motion. |
+| Head, Member and Accounting Staff | Verify the documented required fields in the applicable account, work notes, allocation, cash request and liquidation forms. Verify that optional Notes and filters retain their existing behavior. |
+
+TypeScript, nine Metro checks, ten focused form tests, both production JS exports and the three-bundle credential audit passed. The full Jest run reported 400 passing tests and returned a nonzero exit due to the existing Supabase auth timer teardown error. Build 56 compiled for ARM64 and x86_64, upgraded build 55 on the Android emulator and cold-launched. Signed-in role workflows, physical Android, native iOS and personal acceptance remain pending. [Android APK](../../artifacts/M7/eFlow-Mobile-M7-Work-Forms-v56-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V56_APK_VERIFICATION.json) · [Credential audit](M7-work-forms-v56-release-audit.json)
+
+## Add and Edit Subtask priority
+
+In an Office project, the existing **Add subtask** and **Edit subtask** forms show **Priority** when the Office work tree supports it. New Subtasks default to **Medium** and existing Subtasks open with their saved value. The hosted work command accepts **Low**, **Medium** and **High** for Office Subtask creation and editing. Personal Subtasks have no priority field in the shared contract.
+
+On Android and iOS, use an approved Task Lead or delegated branch editor. Create a test Subtask with **High**, reopen it, change it to **Low**, and compare Mobile Details with the Web planning row. Reopen the editor and verify **Low** is selected. Repeat with a role that can view but cannot edit, and with a Member from the second Office. In Personal work, confirm the priority field is absent. Repeat the applicable Office scenario with large text, dark mode, a screen reader, reduced motion and the keyboard open. Use approved fixtures for any signed-in writes.
+
+TypeScript, Metro, four focused editor tests, both production JS exports, and the three-bundle credential audit passed. All 398 full-suite assertions passed, with the same Supabase auth timer teardown error causing a nonzero Jest exit. Build 55 compiled, upgraded build 54 on the Android x86_64 emulator, and cold-launched. Signed-in priority saves, physical Android, native iOS, and personal acceptance remain pending. [Android APK](../../artifacts/M7/eFlow-Mobile-M7-Subtask-Priority-v55-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V55_APK_VERIFICATION.json) · [Credential audit](M7-subtask-priority-v55-release-audit.json)
+
+## Subtask details parity follow-up
+
+Compared Web main `7574812`, project wizard `5f97408`, and Subtask reviews `739892b`. Mobile's existing status strip switches to **In progress** on a confirmed start receipt and uses the server's effective status on refresh and reopen. The schedule cards show the planned start and due date as Philippine calendar dates. Priority comes from the selected Subtask. Records without a supplied priority show a dash.
+
+| Actor and safe fixture | Personal QA on Android and iOS |
+| --- | --- |
+| Appointed Subtask Lead on an active test project | Open an eligible Office Subtask with a priority different from the parent and distinct planned start and due dates. Verify **To Do**, tap **Start work**, and check **In progress** immediately after confirmation. Pull to refresh, go back and reopen, then compare all fields with Web. Check that the planned date stays the same after a late start. |
+| Authorized viewer and Member from a second Office | The authorized viewer sees the same status, dates and priority, with start restricted to the appointed Lead. An unauthorized Member cannot inspect the branch. |
+| Appointed Personal Subtask Lead | Repeat the start and reopen checks in a Personal workspace. A record without priority shows a dash. |
+| Head, Member and Accounting Staff | Use approved accounts for the applicable role checks. Confirm the role in Profile, then check light and dark themes, larger fonts, screen readers, keyboard behavior and reduced motion on both platforms. |
+
+TypeScript, nine Metro checks, 34 focused tests, both production JS exports and the three-bundle credential audit passed. Build 54 compiled for ARM64 and x86_64, upgraded build 53 on the Android API 37 emulator, and cold-launched. The smoke check covered launch. Signed-in Subtask workflows, physical Android, and native iOS compilation and workflows remain pending. [Android APK](../../artifacts/M7/eFlow-Mobile-M7-Subtask-Details-v54-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V54_APK_VERIFICATION.json) · [Credential audit](M7-subtask-details-v54-release-audit.json)
+
+The full Jest run reported 396 passing tests in 119 suites and exited with an error after a Supabase auth timer logged during teardown. The four focused suites exited successfully.
+
+## Web parity follow-up — dependencies, reviews and expenses
+
+Source comparison used Mobile `8c30da9` plus the existing local edits, Web main `7574812`, and the audit's Web branches `5f97408` and `739892b`. The new native adapters consume existing Web contracts. The generated core snapshot remains at its current revision.
+
+Mobile uses the same Office Subtask dependency projection and start rules as Web. Explicit lists and server pending/restricted counts drive the dependency card. A server-supplied legacy configuration uses sibling order. The Start work action checks the planned date against the workday, with current permissions, parent and prerequisite checks. The hosted server makes the final decision.
+
+**More → Reviews** includes server-assigned Office Subtask proposals independently of read notifications. Selecting one verifies the branch and opens the proposal first. Work submissions show private evidence and accessible recent history. Corrected submissions link to the returned proposal, and uncertain uploads and decisions keep their request ID for recovery. Completion approvals recheck the server's cash flag and offer a link to a matching cash request when visible.
+
+Funding shows settled expenses and pending liquidation separately. The assigned Task Lead's complete totals are used once. Other roles see totals from their authorized cash records, with incomplete amounts marked unavailable. The aggregate RPC spans fiscal years and funding sources. The funding and individual cash records keep their existing scope, and the totals are labeled separately from the current-year allocation and available balance.
+
+Read-only hosted checks on `ixnfphgjyelhckjwjkdv` confirmed the late-start function and active Task guard, work-tree dependency projection, proposal and assigned-review RPCs, private 25 MiB evidence bucket and policies, cash completion trigger, authorized expense RPC, and allocation/cap RPC grants. The queue and expense RPCs returned no rows without an actor. Signed-in grants, Storage operations, and NW11 role and receipt behavior require approved accounts and fixtures.
+
+| Actor and safe fixture | Personal QA on Android and iOS |
+| --- | --- |
+| Task Lead and Subtask Lead on a dedicated project | Compare C depending only on A, explicit empty and legacy configurations. Check a restricted prerequisite as a branch-scoped reviewer. Start eligible overdue Office Tasks and Office/Personal Subtasks. Check future dates, inactive parents, dependencies and project holds. |
+| Member contributor and a separate eligible Lead reviewer | Submit progress and completion with and without evidence. Interrupt the upload and verify the same request resumes. Open the signed attachment, request changes and resubmit. Verify both versions, author, reviewer and reason in Web and Mobile. Verify no self-review and nearest eligible ancestor fallback. |
+| Assigned Office reviewer and a Member from a second Office | Read the notification and verify the proposal remains in Reviews. Open the exact proposal and use Back. Switch to an authorized Office when necessary. Check that a Member without scope cannot open the branch or proposal. |
+| Subtask Lead, eligible reviewer, Head and Accounting Staff with a preexisting cash-blocked fixture | Check that completion approval is disabled and the authorized cash link opens the correct request. A reviewer without cash access still sees the block. After separately authorized settlement, refresh and verify the queue and approval state. |
+| Appointed Task Lead, Head, Accounting Staff and an unauthorized Member | Compare two Subtasks with distinct settled expenses and pending reports, the root aggregate, confirmed zero and unavailable data. Verify revised liquidations are counted once and allocation and closeout numbers remain consistent. |
+| Head, Member and Accounting Staff | Verify fresh protected sign-in and confirm the role in Profile. Repeat the applicable flows in both themes, at large font sizes, with reduced motion, with TalkBack or VoiceOver and with the keyboard open. |
+
+TypeScript, nine Metro checks and 393 Jest tests across 118 suites passed. The Android and iOS production JS exports and the embedded Android bundle passed the credential audit.
+
+Build 53 compiled for ARM64 and x86_64, upgraded build 46 on the Android API 37 x86_64 emulator with the same QA certificate, and cold-launched to Home with the preexisting session. Ten changed feature sources matched the APK source map. The smoke check did not verify the session role in Profile or exercise account workflows. Fresh sign-in, the role and fixture scenarios above, physical Android, and native iOS compilation and workflows remain pending. Personal acceptance is pending. [Android APK](../../artifacts/M7/eFlow-Mobile-M7-Web-Parity-v53-arm64-x86_64.apk) · [APK inspection](../STANDALONE_V53_APK_VERIFICATION.json) · [Credential audit](M7-parity-v53-release-audit.json)
+
 ## Subtask visibility follow-up
 
 Use an authorized Head, the appointed Task Lead, an appointed Subtask contributor and a read-only Task viewer. Add a Subtask under a future-dated Task as Head and verify the editor closes and the row appears without a manual refresh. Check **See all** at five rows. Verify the waiting notice wraps on a narrow screen with large fonts and appears only for appointed people. Check that the start defaults to the parent date and neither picker offers dates outside the parent range. Repeat on Android and iOS after the backend follow-ups are applied.

@@ -7,6 +7,7 @@ import {
   type EvidenceFile,
 } from "../../../platform/evidenceFiles";
 import { attachmentError } from "../../../core/web/app/shared/fileValidation";
+import { PublicMessageError } from "../../shared/userMessages";
 
 export function evidenceIssue(files: EvidenceFile[], maxCount = 10) {
   if (files.some((file) => !file.name.trim() || file.name.length > 255))
@@ -36,7 +37,7 @@ export function EvidencePicker({
           all.findIndex((entry) => entry.uri === file.uri) === index,
       );
       const issue = evidenceIssue(next, maxCount);
-      if (issue) throw new Error(issue);
+      if (issue) throw new PublicMessageError(issue);
       onChange(next);
     });
   return (

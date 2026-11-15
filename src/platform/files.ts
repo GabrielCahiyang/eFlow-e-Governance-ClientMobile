@@ -9,6 +9,33 @@ export interface PickedFile {
   size: number;
   arrayBuffer: () => Promise<ArrayBuffer>;
 }
+
+const extensionMimeTypes: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+  gif: "image/gif",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv: "text/csv",
+  txt: "text/plain",
+};
+
+export function inferPickedFileMimeType(
+  name: string,
+  mimeType?: string | null,
+): string {
+  const normalized = mimeType?.trim();
+  if (normalized && normalized !== "application/octet-stream") return normalized;
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  return extensionMimeTypes[ext] || normalized || "application/octet-stream";
+}
+
 export async function chooseFiles(
   type: string | string[] = "*/*",
   multiple = false,
@@ -22,7 +49,7 @@ export async function chooseFiles(
   return result.assets.map((asset) => ({
     uri: asset.uri,
     name: asset.name,
-    type: asset.mimeType || "application/octet-stream",
+    type: inferPickedFileMimeType(asset.name, asset.mimeType),
     size: asset.size || 0,
     arrayBuffer: () =>
       Platform.OS === "web" && asset.file
@@ -36,11 +63,16 @@ export async function asServiceFile(
   file: PickedFile,
 ): Promise<globalThis.File> {
   const bytes = await file.arrayBuffer();
+  if (!bytes.byteLength)
+    throw new Error(
+      "The selected file is empty, too large, or changed. Verify the original file.",
+    );
+  const resolvedType = inferPickedFileMimeType(file.name, file.type);
   if (Platform.OS === "web")
-    return new globalThis.File([bytes], file.name, { type: file.type });
+    return new globalThis.File([bytes], file.name, { type: resolvedType });
   Object.assign(bytes, {
     name: file.name,
-    type: file.type,
+    type: resolvedType,
     size: bytes.byteLength,
     uri: file.uri,
     arrayBuffer: async () => bytes,

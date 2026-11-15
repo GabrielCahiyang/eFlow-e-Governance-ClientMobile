@@ -1,15 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { userErrorMessage } from "../../shared/userMessages";
+import { PublicMessageError, userErrorMessage } from "../../shared/userMessages";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
+import { useToast } from "../../components/ui/Toast";
 import { draftStore } from "../../../platform/draftStore";
 import { sendPersonalRequest, PersonalCommandFailure } from "./services";
 import { isPersonalRequest, type MobilePersonalCommand, type PersonalRequest } from "./requestRecovery";
+const personalActionToastLabel: Record<MobilePersonalCommand, string> = {
+  set_member: "Project team updated.",
+  create_task: "Personal task added.",
+  staff_task: "Task assignments saved.",
+  start_task: "Personal task started.",
+  progress_task: "Personal progress saved.",
+  submit_task: "Personal work submitted.",
+  review_task: "Review decision saved.",
+  complete_project: "Personal project completed.",
+  archive_project: "Personal project archived.",
+  shortcut: "Project shortcut updated.",
+};
 export function usePersonalActions(
   actor: string,
   project: string,
   onSaved: () => Promise<void>,
 ) {
   const assertAccess = useAccountActionAccess();
+  const { toast } = useToast();
   const scope = "personal-command:" + project,
     [pending, setPending] = useState<PersonalRequest | null>(null),
     [busy, setBusy] = useState(false),
@@ -37,7 +51,7 @@ export function usePersonalActions(
       .then((value) => {
         if (version !== generation.current) return;
         if (value !== null && !isPersonalRequest(value, actor, project))
-          throw new Error(
+          throw new PublicMessageError(
             "The saved personal-work request could not be verified. Check its original result before continuing.",
           );
         receipt.current = value as PersonalRequest | null;
@@ -80,7 +94,7 @@ export function usePersonalActions(
       assertAccess(actor);
       let saved = receipt.current;
       if (saved && command)
-        throw new Error(
+        throw new PublicMessageError(
           "Check your previous attempt before starting another change.",
         );
       if (!saved) {
@@ -104,6 +118,7 @@ export function usePersonalActions(
         receipt.current = null;
         setPending(null);
         setNotice("Changes saved.");
+        toast(personalActionToastLabel[saved.command] || "Changes saved.", "success");
         try {
           await onSaved();
         } catch {

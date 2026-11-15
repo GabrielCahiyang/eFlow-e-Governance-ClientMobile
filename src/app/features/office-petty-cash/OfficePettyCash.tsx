@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AppState, Linking } from "react-native";
+import { Linking } from "react-native";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import {
   Button,
   Card,
@@ -17,7 +18,13 @@ import {
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { supabase } from "../../../platform/supabase";
 import { chooseFiles } from "../../../platform/files";
 import { draftStore } from "../../../platform/draftStore";
@@ -94,7 +101,7 @@ export function OfficePettyCash({
       const { data, error } = await supabase.rpc("office_petty_cash_snapshot", {
         p_office: office,
       });
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       return data as Snapshot;
     },
     !!office && !!actor,
@@ -106,40 +113,44 @@ export function OfficePettyCash({
   );
   useEffect(() => {
     if (!office || !actor) return;
-    const refresh = () => {
-      if (AppState.currentState === "active") void facts.refresh();
-    };
-    const foreground = AppState.addEventListener("change", (state) => {
-      if (state === "active") refresh();
+    const live = createLiveRefreshController({
+      onRefresh: () => void facts.refresh(),
     });
-    const fallback = setInterval(refresh, 30_000);
-    return () => {
-      foreground.remove();
-      clearInterval(fallback);
-    };
+    return () => live.dispose();
   }, [office, actor, facts.refresh]);
+  const { toast } = useToast();
   const action = useAction();
   const [edit, setEdit] = useState<{ kind: Kind; request?: Request }>();
-  const [amount, setAmount] = useState(""),
-    [reference, setReference] = useState(""),
-    [date, setDate] = useState(getPhilippineCalendarDate),
-    [receipts, setReceipts] = useState<Receipt[]>([]);
-  const start = (kind: Kind, request?: Request) => {
-    action.clear();
-    setAmount("");
-    setReference("");
-    setDate(getPhilippineCalendarDate());
-    setReceipts([]);
-    setEdit({ kind, request });
-  };
   const data = facts.error ? undefined : facts.data;
   const ready =
     !!data && !facts.loading && !recovery.loading && !recovery.error;
   const pending = recovery.data;
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      actor,
+      "office-petty:" +
+        office +
+        ":" +
+        (edit ? edit.kind + ":" + (edit.request?.id ?? "office") : "none"),
+    ),
+    !!edit && !pending,
+    () => ({
+      amount: "",
+      reference: "",
+      date: getPhilippineCalendarDate(),
+      receipts: [] as Receipt[],
+    }),
+  );
+  const { amount, reference, date, receipts } = draft;
+  const start = (kind: Kind, request?: Request) => {
+    action.clear();
+    setEdit({ kind, request });
+  };
   const update = (i: number, fields: Partial<Receipt>) =>
-    setReceipts((old) =>
-      old.map((r, j) => (i === j ? { ...r, ...fields } : r)),
-    );
+    updateDraft((old) => ({
+      ...old,
+      receipts: old.receipts.map((r, j) => (i === j ? { ...r, ...fields } : r)),
+    }));
   async function execute(cmd: Command) {
     assertAccess(actor);
     await draftStore.set(actor, scope, cmd);
@@ -153,15 +164,30 @@ export function OfficePettyCash({
     if (error) {
       if (
         !pending &&
-        /^[0-9A-Z]{5}$/.test(error.code || "") &&
-        !error.code.startsWith("08") &&
-        error.code !== "57014"
+        (isDeterministicRejection(error) ||
+          (/^[0-9A-Z]{5}$/.test(error.code || "") &&
+            !error.code.startsWith("08") &&
+            error.code !== "57014"))
       )
         await draftStore.remove(actor, scope);
       await recovery.refresh();
-      throw new Error(error.message);
+      throw Object.assign(new Error(error.message), { code: error.code });
     }
+    clearDraft();
     await draftStore.remove(actor, scope);
+    const pettyCashSuccessMessages: Record<Kind, string> = {
+      request: "Petty cash request submitted.",
+      replenish: "Petty cash fund replenished.",
+      approve: "Petty cash request approved.",
+      reject: "Petty cash request rejected.",
+      cancel: "Petty cash request cancelled.",
+      release: "Petty cash release recorded.",
+      receipts: "Receipts submitted.",
+      endorse: "Receipts endorsed.",
+      return_receipts: "Receipts returned.",
+      settle: "Petty cash settled.",
+    };
+    toast(pettyCashSuccessMessages[cmd.action], "success");
     setEdit(undefined);
     await recovery.refresh();
     await facts.refresh();
@@ -170,10 +196,10 @@ export function OfficePettyCash({
     void action.run(async () => {
       if (pending) return execute(pending);
       if (!edit || !data || !ready)
-        throw new Error("Refresh to verify Office petty cash access.");
+        throw new PublicMessageError("Refresh to verify Office petty cash access.");
       const { kind, request } = edit;
       if (!reference.trim() || !date || date > getPhilippineCalendarDate())
-        throw new Error("Enter a purpose or reference and a valid date.");
+        throw new PublicMessageError("Enter a purpose or reference and a valid date.");
       const value = money(amount);
       if (
         (kind === "request" || kind === "replenish") &&
@@ -181,7 +207,7 @@ export function OfficePettyCash({
           value <= 0 ||
           value > (kind === "request" ? data.available : data.replenishable))
       )
-        throw new Error("Enter an amount within the available office balance.");
+        throw new PublicMessageError("Enter an amount within the available office balance.");
       const items = receipts.map((r) => ({ ...r, amount: money(r.amount) }));
       if (
         kind === "receipts" &&
@@ -198,7 +224,7 @@ export function OfficePettyCash({
           items.reduce((n, r) => n + Math.round(r.amount * 100), 0) >
             Math.round((request?.amount || 0) * 100))
       )
-        throw new Error(
+        throw new PublicMessageError(
           "Check the receipt details, attachments and the ₱5,000 per-receipt limit.",
         );
       await execute({
@@ -296,7 +322,7 @@ export function OfficePettyCash({
                         const { data, error } = await supabase.storage
                           .from("office-petty-receipts")
                           .createSignedUrl(receipt.path, 60);
-                        if (error) throw new Error(error.message);
+                        if (error) throw error;
                         await Linking.openURL(data.signedUrl);
                       })
                     }
@@ -344,7 +370,10 @@ export function OfficePettyCash({
           title={labels[pending?.action ?? edit!.kind]}
           busy={action.busy}
           onClose={() => {
-            if (!pending && !action.busy) setEdit(undefined);
+            if (!pending && !action.busy) {
+              action.clear();
+              setEdit(undefined);
+            }
           }}
           footer={
             <Button
@@ -375,8 +404,9 @@ export function OfficePettyCash({
               {(edit?.kind === "request" || edit?.kind === "replenish") && (
                 <Field
                   label="Amount"
+                  required
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeText={(next) => updateDraft({ amount: next })}
                   keyboardType="decimal-pad"
                 />
               )}
@@ -386,14 +416,16 @@ export function OfficePettyCash({
                     ? "Purpose"
                     : "Reason or transaction reference"
                 }
+                required
                 value={reference}
-                onChangeText={setReference}
+                onChangeText={(next) => updateDraft({ reference: next })}
                 multiline
               />
               <DateField
                 label="Transaction date"
+                required
                 value={date}
-                onChange={setDate}
+                onChange={(next) => updateDraft({ date: next })}
               />
               {edit?.kind === "receipts" && (
                 <>
@@ -405,21 +437,25 @@ export function OfficePettyCash({
                     <Card key={i} title={"Receipt " + (i + 1)}>
                       <Field
                         label="Vendor"
+                        required
                         value={r.vendor}
                         onChangeText={(v) => update(i, { vendor: v })}
                       />
                       <Field
                         label="Receipt number"
+                        required
                         value={r.number}
                         onChangeText={(v) => update(i, { number: v })}
                       />
                       <DateField
                         label="Receipt date"
+                        required
                         value={r.date}
                         onChange={(v) => update(i, { date: v })}
                       />
                       <Field
                         label="Actual cost"
+                        required
                         value={r.amount}
                         onChangeText={(v) => update(i, { amount: v })}
                         keyboardType="decimal-pad"
@@ -436,7 +472,7 @@ export function OfficePettyCash({
                               !formats.includes(file.type) ||
                               bytes.byteLength > 10 * 1024 * 1024
                             )
-                              throw new Error(
+                              throw new PublicMessageError(
                                 "Choose a PDF, JPG, PNG or WebP up to 10 MB.",
                               );
                             const path =
@@ -447,7 +483,7 @@ export function OfficePettyCash({
                                 contentType: file.type,
                                 upsert: false,
                               });
-                            if (error) throw new Error(error.message);
+                            if (error) throw error;
                             update(i, { path });
                           })
                         }
@@ -458,7 +494,10 @@ export function OfficePettyCash({
                         variant="ghost"
                         disabled={action.busy}
                         onPress={() =>
-                          setReceipts((old) => old.filter((_, j) => i !== j))
+                          updateDraft((old) => ({
+                            ...old,
+                            receipts: old.receipts.filter((_, j) => i !== j),
+                          }))
                         }
                       >
                         Remove receipt
@@ -470,16 +509,19 @@ export function OfficePettyCash({
                       variant="outline"
                       disabled={action.busy}
                       onPress={() =>
-                        setReceipts((old) => [
+                        updateDraft((old) => ({
                           ...old,
-                          {
-                            vendor: "",
-                            number: "",
-                            date,
-                            amount: "",
-                            path: "",
-                          },
-                        ])
+                          receipts: [
+                            ...old.receipts,
+                            {
+                              vendor: "",
+                              number: "",
+                              date,
+                              amount: "",
+                              path: "",
+                            },
+                          ],
+                        }))
                       }
                     >
                       Add receipt

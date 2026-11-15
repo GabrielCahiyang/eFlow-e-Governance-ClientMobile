@@ -1,6 +1,5 @@
 import { Text } from "../../components/ui/Typography";
 import { useEffect, useState } from "react";
-import { AppState } from "react-native";
 import { netProjectUpdates } from "./subscriptions";
 import { View } from "../../components/ui/Primitives";
 import CheckCircle2 from "lucide-react-native/icons/circle-check";
@@ -15,8 +14,12 @@ import {
   Sheet,
   colors,
 } from "../../components/ui";
+import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { PublicMessageError } from "../../shared/userMessages";
 import {
   fetchReadiness,
   reviewProject,
@@ -58,18 +61,26 @@ export function ProjectReadinessSheet({
       }, 150);
     };
     const stop = netProjectUpdates(project.id, refresh);
-    const poll = setInterval(() => {
-      if (AppState.currentState === "active") refresh();
-    }, 15000);
     return () => {
       stop();
-      clearInterval(poll);
       if (timer) clearTimeout(timer);
     };
   }, [project.id, checks.refresh, completion.refresh]);
+  const { profile } = useAuth();
+  const { toast } = useToast();
   const action = useAction(),
-    [note, setNote] = useState(""),
     [confirm, setConfirm] = useState(false);
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(profile?.id, "project-readiness:" + project.id + ":" + mode),
+    mode === "complete",
+    () => ({ note: "" }),
+  );
+  const note = draft.note;
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const data = checks.data,
     remaining = data?.checks.filter((c) => !c.ok).length || 0;
   const execute = async () => {
@@ -79,17 +90,22 @@ export function ProjectReadinessSheet({
     }
     await action.run(async () => {
       if (!canManage)
-        throw new Error("Current project management access is required.");
+        throw new PublicMessageError("Current project management access is required.");
       if (mode === "setup") {
         const latest = await fetchReadiness(project.id);
         if (!latest.canActivate || latest.governed)
-          throw new Error(
+          throw new PublicMessageError(
             "Readiness changed. Refresh the checks before activating.",
           );
         await activateReadyProject(project.id);
       } else {
         await completeProject(project.id, note);
       }
+      clearDraft();
+      toast(
+        mode === "setup" ? "Project activated." : "Project completed.",
+        "success",
+      );
       await onSaved();
       onClose();
     });
@@ -100,7 +116,7 @@ export function ProjectReadinessSheet({
       open
       title={mode === "setup" ? "Project setup" : "Completion requirements"}
       description={project.title}
-      onClose={onClose}
+      onClose={close}
       busy={action.busy}
       footer={
         <Row>
@@ -218,7 +234,7 @@ export function ProjectReadinessSheet({
           <Field
             label="Completion note (optional)"
             value={note}
-            onChangeText={setNote}
+            onChangeText={(next) => updateDraft({ note: next })}
             multiline
           />
         </>

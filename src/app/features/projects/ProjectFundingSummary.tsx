@@ -9,6 +9,7 @@ import {
   peso,
 } from "../../components/ui";
 import { useFacts } from "../../shared/useFacts";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useAuth } from "../authentication";
 import { supabase } from "../../../platform/supabase";
 import { useCallback, useEffect } from "react";
@@ -58,9 +59,9 @@ export function ProjectFundingSummary({
       const { data, error } = await supabase.rpc("project_flow_snapshot", {
         p_project: projectId,
       });
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       if (data && data.project?.id !== projectId)
-        throw new Error("Could not verify this project's funding.");
+        throw new PublicMessageError("Could not verify this project's funding.");
       return data as ProjectFundingTotals | null;
     },
     !!profile,
@@ -70,7 +71,9 @@ export function ProjectFundingSummary({
     async () => {
       const current = await fetchProjectCompletionReadiness(projectId);
       if (current.projectId !== projectId)
-        throw new Error("Could not verify this project's completion checks.");
+        throw new PublicMessageError(
+          "Could not verify this project's completion checks.",
+        );
       return current;
     },
     !!profile && !!showCloseout,
@@ -195,22 +198,6 @@ export function ProjectFundingSummary({
             />
           )}
         </Card>
-      )}
-      {showCloseout && (
-        <Button
-          variant="outline"
-          onPress={() =>
-            navigate({
-              name: "project",
-              id: projectId,
-              workspaceId,
-              view: "funding_configuration",
-              title: "Project budget",
-            })
-          }
-        >
-          Open project budget in eFlow Web
-        </Button>
       )}
     </Card>
   );

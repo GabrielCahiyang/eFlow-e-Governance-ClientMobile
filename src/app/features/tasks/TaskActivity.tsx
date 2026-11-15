@@ -13,6 +13,8 @@ import { Text } from "../../components/ui/Typography";
 import { words } from "../../components/ui/theme";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useAuth } from "../authentication";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
@@ -49,6 +51,7 @@ export function TaskActivity({
   const [editing, setEditing] = useState(false);
   const [comment, setComment] = useState("");
   const [sendPending, setSendPending] = useState(false);
+  const { toast } = useToast();
   const action = useAction();
   const facts = useFacts<TimelineEntry[]>(
     "task-activity:" + profile?.id + ":" + taskId,
@@ -229,7 +232,7 @@ export function TaskActivity({
   const send = () =>
     action.run(async () => {
       if (!profile || !canDiscuss || sendPending)
-        throw new Error("Current discussion access is required.");
+        throw new PublicMessageError("Current discussion access is required.");
       await verifyDiscussion();
       await assertEvidenceActor(profile.id);
       setSendPending(true);
@@ -240,6 +243,7 @@ export function TaskActivity({
       setSendPending(false);
       setComment("");
       setEditing(false);
+      toast("Work note posted.", "success");
       await facts.refresh();
     });
   return (

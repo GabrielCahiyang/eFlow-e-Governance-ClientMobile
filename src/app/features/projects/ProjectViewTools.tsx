@@ -11,6 +11,7 @@ import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
+import { PublicMessageError } from "../../shared/userMessages";
 import { draftStore } from "../../../platform/draftStore";
 import { exportTable } from "../../shared/exportTable";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
@@ -58,7 +59,7 @@ export function ProjectViewTools({
     [name, setName] = useState("");
   const save = () =>
     action.run(async () => {
-      if (!name.trim()) throw new Error("Name this view.");
+      if (!name.trim()) throw new PublicMessageError("Name this view.");
       await draftStore.set(actor, "views:" + project, [
         ...(facts.data || []),
         { ...current, name: name.trim(), id: crypto.randomUUID() },
@@ -104,7 +105,13 @@ export function ProjectViewTools({
   return (
     <>
       <Row>
-        <Button variant="outline" onPress={() => setOpen(true)}>
+        <Button
+          variant="outline"
+          onPress={() => {
+            action.clear();
+            setOpen(true);
+          }}
+        >
           Saved views
         </Button>
         <Button
@@ -123,9 +130,16 @@ export function ProjectViewTools({
         </Button>
       </Row>
       <Sheet
+        actionError={action.error}
+        busy={action.busy}
         open={open}
         title="My saved project views"
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setOpen(false);
+          }
+        }}
       >
         <Text>
           Views save filters, sorting and columns on this device, for this
@@ -174,7 +188,9 @@ export function ProjectViewTools({
         </Button>
         {!!facts.error && <ErrorState error={facts.error} />}
       </Sheet>
-      {!!action.error && <ErrorState context="action" error={action.error} />}
+      {!open && !!action.error && (
+        <ErrorState context="action" error={action.error} />
+      )}
     </>
   );
 }

@@ -12,6 +12,7 @@ import {
   SearchField,
 } from "../../components/ui";
 import { useFacts } from "../../shared/useFacts";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
@@ -42,6 +43,7 @@ export function OfficeAccessPanel({
   onSelected: (id: string) => void;
 }) {
   const { profile } = useAuth(),
+    { toast } = useToast(),
     [search, setSearch] = useState(""),
     [reconcile, setReconcile] = useState(false),
     action = useAction();
@@ -73,6 +75,7 @@ export function OfficeAccessPanel({
         return;
       setReconcile(true);
       await setUserOverride(person.id, permission, allowed, actor);
+      toast("Office account access updated.", "success");
       await facts.refresh();
     });
   const refresh = async () => {

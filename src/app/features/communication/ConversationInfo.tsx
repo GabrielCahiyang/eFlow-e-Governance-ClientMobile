@@ -9,6 +9,7 @@ import {
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useFacts } from "../../shared/useFacts";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { ChatAvatar } from "./ChatAvatar";
 import { EditChatGroup, EditChatNickname } from "./ConversationCustomization";
@@ -49,6 +50,7 @@ export function ConversationInfo({
     },
     open,
   );
+  const { toast } = useToast();
   const pin = useAction();
   const changed = async () => {
     await Promise.all([onChanged(), facts.refresh()]);
@@ -95,7 +97,12 @@ export function ConversationInfo({
             disabled={pin.busy}
             onPress={() =>
               void pin.run(async () => {
-                await setConversationPin(channel.id, !channel.personalPin);
+                const nextPinned = !channel.personalPin;
+                await setConversationPin(channel.id, nextPinned);
+                toast(
+                  nextPinned ? "Conversation pinned." : "Conversation unpinned.",
+                  "success",
+                );
                 await changed();
               })
             }

@@ -22,7 +22,6 @@ import {
   LabelValue,
   Loading,
   Notice,
-  Row,
   Screen,
   SearchField,
   Tabs,
@@ -43,6 +42,7 @@ import { fetchProjectGroups } from "../../../core/web/app/features/project-table
 import { useNavigationFavorites } from "../../../core/web/app/shared/navigationPreferences";
 import { nativeWindow } from "../../../platform/webRuntime";
 import { netProjectUpdates } from "./subscriptions";
+import { BentoActionButtons } from "../tasks/TaskBentoComponents";
 import { ProjectTaskEditor, useTaskStructure } from "./ProjectTaskEditor";
 import { readProjectSetup } from "./projectAccess";
 import { ProjectAnalysisSummary } from "./ProjectAnalysisSummary";
@@ -55,8 +55,10 @@ import { ProjectFundingCloseout } from "./ProjectFundingCloseout";
 import { ProjectFundingSummary } from "./ProjectFundingSummary";
 import { taskSections, type ProjectWorkView } from "./mobileProjects";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
+import { workDisplayStatus } from "../../shared/statusLabels";
 import { completionPercent } from "../../shared/completion";
 import { fetchProjectTaskFinance } from "./projectTaskFinance";
+import { fetchProjectTaskBlockers } from "./projectTaskBlockers";
 import {
   ProjectTableCells,
   ProjectTableLoading,
@@ -82,16 +84,8 @@ const tools = [
   { id: "offices", title: "Participating Offices" },
   { id: "files", title: "Project files" },
   { id: "funding", title: "Funding" },
-  { id: "gantt", title: "Planning on eFlow Web" },
-  { id: "settings", title: "Project settings on eFlow Web" },
   { id: "audit_trail", title: "Audit Trail" },
 ];
-const setupTools = [
-  { id: "project_setup", title: "Project setup on eFlow Web" },
-  { id: "task_templates", title: "Shared task templates on eFlow Web" },
-  { id: "ai_draft", title: "AI task drafting on eFlow Web" },
-];
-const importTool = { id: "import", title: "PDF import on eFlow Web" };
 
 export function ProjectScreen({
   id,
@@ -174,10 +168,10 @@ export function ProjectScreen({
   );
   const canAdd =
     createAccess.data === "head" &&
-    !createAccess.loading &&
     !createAccess.error &&
-    !facts.loading &&
-    !groupFacts.loading &&
+    !facts.error &&
+    !groupFacts.error &&
+    !!facts.data &&
     !!groups.length;
   const pages = useProjectTaskPages({
     scope,
@@ -207,6 +201,15 @@ export function ProjectScreen({
       !pages.error &&
       !!financeTaskIds.length,
   );
+  const blockers = useFacts(
+    JSON.stringify(["project-table-blockers", scope, financeTaskIds]),
+    () => fetchProjectTaskBlockers(financeTaskIds),
+    projectReady &&
+      !auxiliary &&
+      !searchPending &&
+      !pages.error &&
+      !!financeTaskIds.length,
+  );
   const refresh = useCallback(async () => {
     await Promise.all([
       facts.refresh(),
@@ -216,6 +219,7 @@ export function ProjectScreen({
       pages.refresh(),
       totals.refresh(),
       finance.refresh(),
+      blockers.refresh(),
     ]);
   }, [
     facts.refresh,
@@ -225,6 +229,7 @@ export function ProjectScreen({
     pages.refresh,
     totals.refresh,
     finance.refresh,
+    blockers.refresh,
   ]);
   const latestRefresh = useRef(refresh);
   latestRefresh.current = refresh;
@@ -296,13 +301,6 @@ export function ProjectScreen({
             Finish project details, lead, dates, and funding before adding tasks
             or people.
           </Notice>
-        )}
-        {setup.data?.canAuthorize && !setup.error && (
-          <Button
-            onPress={() => openWeb("project_setup", "Finish project setup")}
-          >
-            Finish setup on eFlow Web
-          </Button>
         )}
       </Screen>
     );
@@ -417,12 +415,23 @@ export function ProjectScreen({
           This project is read-only. Task history remains available.
         </Notice>
       )}
-      <Row>
-        <Button variant="outline" onPress={() => setMenu(true)}>
-          Project options
-        </Button>
-        {canAdd && <Button onPress={() => setAddTask(true)}>Add task</Button>}
-      </Row>
+      <BentoActionButtons
+        style={{ marginVertical: 0 }}
+        actions={[
+          {
+            label: "Project options",
+            variant: "secondary",
+            icon: "sliders",
+            onPress: () => setMenu(true),
+          },
+          canAdd && {
+            label: "Add task",
+            variant: "primary",
+            icon: "plus",
+            onPress: () => setAddTask(true),
+          },
+        ]}
+      />
       {(!auxiliary || view === "analysis" || view === "audit_trail") && (
         <Tabs
           items={views}
@@ -628,12 +637,14 @@ export function ProjectScreen({
             projectId: id,
             title: item.title,
           });
+        const blocker = blockers.error ? undefined : blockers.data?.get(item.id);
         if (main)
           return (
             <ProjectTableCells
               widths={widths}
               accent={accents.get(section.key) || palette.primary}
               task={item}
+              blocker={blocker}
               pinStyle={pinned}
               financial={finance.error ? undefined : finance.data?.get(item.id)}
               onOpen={open}
@@ -643,8 +654,9 @@ export function ProjectScreen({
         return (
           <MondayTableRow
             title={item.title}
-            status={item.status}
+            status={workDisplayStatus(item.status, blocker)}
             customStatusId={item.customStatusId}
+            blocker={blocker}
             due={due ? taskDateLabel(due) : null}
             assignee={item.assigneeName || null}
             isLast={index === section.data.length - 1}
@@ -766,11 +778,6 @@ export function ProjectScreen({
                 },
               ]
             : []),
-          ...(setup.data?.canAuthorize &&
-          !closed &&
-          !project.sourceCollaborationDraftId
-            ? [...setupTools, importTool]
-            : []),
         ]}
         onClose={() => setMenu(false)}
         onSelect={(option) => {
@@ -793,9 +800,7 @@ export function ProjectScreen({
           else
             openWeb(
               option,
-              [...tools, ...setupTools, importTool].find(
-                (tool) => tool.id === option,
-              )?.title ?? project.title,
+              tools.find((tool) => tool.id === option)?.title ?? project.title,
             );
         }}
       />

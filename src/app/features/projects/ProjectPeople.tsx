@@ -59,11 +59,6 @@ export function ProjectPeople({
       ) : (
         <Empty kind="workspace" compact title="No project people to show" />
       )}
-      {profile?.role === "head" && (
-        <Button variant="outline" onPress={onManage}>
-          Manage people on eFlow Web
-        </Button>
-      )}
     </Sheet>
   );
 }

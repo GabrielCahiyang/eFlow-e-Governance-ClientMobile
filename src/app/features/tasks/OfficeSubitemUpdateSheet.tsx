@@ -8,13 +8,20 @@ import {
   Notice,
   Sheet,
 } from "../../components/ui";
+import { useToast } from "../../components/ui/Toast";
 import { asServiceFile, chooseFiles, type PickedFile } from "../../../platform/files";
 import { useAction } from "../../shared/useAction";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { saveSubtaskWorkUpdate } from "../../../core/web/app/features/subtasks/services/subtaskWorkflowService";
 import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
 import { workScope } from "./branchInspector";
+import { isSubtaskLeadOrContributor } from "./workPermissions";
 
 export function OfficeSubitemUpdateSheet({
   tree,
@@ -32,25 +39,41 @@ export function OfficeSubitemUpdateSheet({
   onSaved: (data: WorkTreeSnapshot) => Promise<void>;
 }) {
   const baseline = useRef(tree).current;
-  const [state, setState] = useState("in_progress");
-  const [note, setNote] = useState("");
-  const [blocker, setBlocker] = useState("");
-  const [nextStep, setNextStep] = useState("");
-  const [attachment, setAttachment] = useState<PickedFile>();
+  const { toast } = useToast();
   const [attempted, setAttempted] = useState(false);
   const action = useAction();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(actorId, "subitem-update:" + nodeId),
+    true,
+    () => ({
+      state: "in_progress" as "in_progress" | "stuck",
+      note: "",
+      blocker: "",
+      nextStep: "",
+      attachment: undefined as PickedFile | undefined,
+    }),
+  );
+  const { state, note, blocker, nextStep, attachment } = draft;
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const save = () =>
     action.run(async () => {
       if (attempted) return;
       if (state === "stuck" && !blocker.trim())
-        throw new Error("Describe what is blocking the work.");
+        throw new PublicMessageError("Describe what is blocking the work.");
       const latest = await fetchWorkTree(baseline.root.id);
+      const latestNode = latest.nodes.find((item) => item.id === nodeId);
       if (
         readOnly ||
         latest.root.kind !== "office" ||
         latest.root.project !== baseline.root.project ||
         latest.root.office !== baseline.root.office ||
         latest.revision !== baseline.revision ||
+        !latestNode ||
+        !isSubtaskLeadOrContributor(latest, latestNode, actorId) ||
         !selectNodeWorkCapability(
           latest,
           nodeId,
@@ -64,14 +87,21 @@ export function OfficeSubitemUpdateSheet({
       }
       const file = attachment ? await asServiceFile(attachment) : null;
       setAttempted(true);
-      await saveSubtaskWorkUpdate({
-        subtaskId: nodeId,
-        state: state === "stuck" ? "stuck" : "in_progress",
-        blocker: state === "stuck" ? blocker : undefined,
-        note,
-        nextStep,
-        attachment: file,
-      });
+      try {
+        await saveSubtaskWorkUpdate({
+          subtaskId: nodeId,
+          state: state === "stuck" ? "stuck" : "in_progress",
+          blocker: state === "stuck" ? blocker : undefined,
+          note,
+          nextStep,
+          attachment: file,
+        });
+      } catch (error) {
+        if (isDeterministicRejection(error)) setAttempted(false);
+        throw error;
+      }
+      clearDraft();
+      toast("Work update posted.", "success");
       await onSaved(latest).catch(() => {});
       onClose();
     });
@@ -81,7 +111,7 @@ export function OfficeSubitemUpdateSheet({
       open
       title="Update subtask work"
       busy={action.busy}
-      onClose={onClose}
+      onClose={close}
       footer={
         <Button
           busy={action.busy}
@@ -95,7 +125,7 @@ export function OfficeSubitemUpdateSheet({
       <Choice
         label="Work state"
         value={state}
-        onChange={setState}
+        onChange={(next) => updateDraft({ state: next })}
         options={[
           { value: "in_progress", label: "In progress" },
           { value: "stuck", label: "Blocked" },
@@ -104,8 +134,9 @@ export function OfficeSubitemUpdateSheet({
       {state === "stuck" && (
         <Field
           label="Blocker"
+          required
           value={blocker}
-          onChangeText={setBlocker}
+          onChangeText={(next) => updateDraft({ blocker: next })}
           maxLength={3000}
           multiline
         />
@@ -113,27 +144,38 @@ export function OfficeSubitemUpdateSheet({
       <Field
         label="Work note"
         value={note}
-        onChangeText={setNote}
+        onChangeText={(next) => updateDraft({ note: next })}
         maxLength={3000}
         multiline
       />
       <Field
         label="Next step"
         value={nextStep}
-        onChangeText={setNextStep}
+        onChangeText={(next) => updateDraft({ nextStep: next })}
         maxLength={300}
       />
       {attachment ? (
         <Row>
           <LabelValue label="Attachment" value={attachment.name} />
-          <Button variant="outline" disabled={attempted || readOnly || action.busy} onPress={() => setAttachment(undefined)}>
+          <Button
+            variant="outline"
+            disabled={attempted || readOnly || action.busy}
+            onPress={() => updateDraft({ attachment: undefined })}
+          >
             Remove attachment
           </Button>
         </Row>
       ) : (
-        <Button variant="outline" disabled={attempted || readOnly || action.busy} onPress={() =>
-          void action.run(async () => setAttachment((await chooseFiles("*/*", false))[0]))
-        }>
+        <Button
+          variant="outline"
+          disabled={attempted || readOnly || action.busy}
+          onPress={() =>
+            void action.run(async () => {
+              const picked = (await chooseFiles("*/*", false))[0];
+              if (picked) updateDraft({ attachment: picked });
+            })
+          }
+        >
           Attach evidence (optional)
         </Button>
       )}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import {
   Button,
   Card,
@@ -12,6 +12,8 @@ import {
   peso,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
 import { PublicMessageError } from "../../shared/userMessages";
 import type { Navigate } from "../../shared/routes";
@@ -55,8 +57,19 @@ export function ProjectCloseoutSheet({
 }) {
   const archive = mode === "archive";
   const label = archive ? "Archive project" : "Complete project";
-  const [note, setNote] = useState("");
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(actor, "project-closeout:" + project.id + ":" + mode),
+    true,
+    () => ({ note: "" }),
+  );
+  const note = draft.note;
+  const { toast } = useToast();
   const action = useAction();
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const facts = useFacts(
     JSON.stringify([
       "project-closeout",
@@ -97,6 +110,8 @@ export function ProjectCloseoutSheet({
         await reload();
         throw error;
       }
+      clearDraft();
+      toast(archive ? "Project archived." : "Project completed.", "success");
       await onSaved().catch(() => {});
       onClose();
     });
@@ -107,10 +122,10 @@ export function ProjectCloseoutSheet({
       title={label}
       description={project.title}
       busy={action.busy}
-      onClose={onClose}
+      onClose={close}
       footer={
         <Row>
-          <Button variant="outline" disabled={action.busy} onPress={onClose}>
+          <Button variant="outline" disabled={action.busy} onPress={close}>
             Cancel
           </Button>
           <Button
@@ -175,24 +190,6 @@ export function ProjectCloseoutSheet({
                 Open task
               </Button>
             )}
-            {blocker.kind === "governance" && !blocker.taskId && (
-              <Button
-                variant="outline"
-                disabled={action.busy}
-                onPress={() => {
-                  onClose();
-                  navigate({
-                    name: "project",
-                    id: project.id,
-                    workspaceId,
-                    view: "settings",
-                    title: "Review project settings",
-                  });
-                }}
-              >
-                Review project settings on eFlow Web
-              </Button>
-            )}
           </Card>
         ))
       )}
@@ -204,7 +201,7 @@ export function ProjectCloseoutSheet({
           archive ? "Archive note (optional)" : "Completion note (optional)"
         }
         value={note}
-        onChangeText={setNote}
+        onChangeText={(next) => updateDraft({ note: next })}
         maxLength={2000}
         editable={!action.busy}
         multiline

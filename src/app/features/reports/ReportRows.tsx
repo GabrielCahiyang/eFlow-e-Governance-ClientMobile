@@ -7,13 +7,13 @@ import {
   LabelValue,
   Sheet,
   colors,
-  dateLabel,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import type { AppRoute, Navigate } from "../../shared/routes";
 import type { DepartmentReportRow } from "../../../core/web/app/features/reports/types";
 import { activityTime } from "../tasks/activityPresentation";
 import { reportRecordRoute } from "./reportRecordRoute";
+import { reportValue } from "./exportData";
 export function ReportRows({
   rows,
   navigate,
@@ -108,7 +108,7 @@ export function ReportRows({
               <>
                 <Text>{row.eventAt ? activityTime(row.eventAt) : "—"}</Text>
                 <Text style={{ color: colors.muted }}>
-                  Due {dateLabel(row.dueAt)}
+                  Due {reportValue(row, "dueAt")}
                 </Text>
               </>
             ),

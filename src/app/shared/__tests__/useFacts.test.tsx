@@ -7,7 +7,7 @@ import {
   readDisplayCache,
   setDisplayCacheActor,
 } from "../displayCache";
-import { readWithTimeout } from "../readTimeout";
+import { DEFAULT_READ_TIMEOUT_MS, readWithTimeout } from "../readTimeout";
 const deferred = <T,>() => {
   let resolve!: (value: T) => void, reject!: (error: Error) => void;
   const promise = new Promise<T>((yes, no) => {
@@ -129,12 +129,18 @@ test("authoritative reads do not enter the display cache and read timeout never 
     readDisplayCache("authority", { actor: "qa-a", select: (data) => data }),
   ).toBeUndefined();
   jest.useFakeTimers();
+  expect(DEFAULT_READ_TIMEOUT_MS).toBe(60_000);
   const load = jest.fn(() => new Promise<never>(() => {}));
-  const assertion = expect(readWithTimeout(load, 25_000)).rejects.toMatchObject(
-    { name: "TimeoutError" },
-  );
+  let settled = false;
+  const assertion = readWithTimeout(load).catch((error) => {
+    settled = true;
+    return error;
+  });
   await jest.advanceTimersByTimeAsync(25_000);
-  await assertion;
+  expect(settled).toBe(false);
+  await jest.advanceTimersByTimeAsync(35_000);
+  await expect(assertion).resolves.toMatchObject({ name: "TimeoutError" });
+  expect(settled).toBe(true);
   expect(load).toHaveBeenCalledTimes(1);
   expect(jest.getTimerCount()).toBe(0);
 });

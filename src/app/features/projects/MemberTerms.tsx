@@ -9,8 +9,15 @@ import {
   Notice,
   Sheet,
 } from "../../components/ui";
+import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import {
   fetchMembers,
   saveMemberTerms,
@@ -37,25 +44,42 @@ function Editor({
   onSaved: () => Promise<unknown>;
   onClose: () => void;
 }) {
-  const [engagement, setEngagement] = useState<Engagement>(member.engagement),
-    [end, setEnd] = useState(accessEndDate(member.access_end, timezone)),
-    [until, setUntil] = useState(member.until_close),
-    [locked, setLocked] = useState(false),
+  const { profile } = useAuth();
+  const { toast } = useToast();
+  const [locked, setLocked] = useState(false),
     request = useRef(crypto.randomUUID()),
     action = useAction();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      profile?.id,
+      "member-terms:" + project + ":" + member.user_id + ":" + member.office,
+    ),
+    true,
+    () => ({
+      engagement: member.engagement,
+      end: accessEndDate(member.access_end, timezone),
+      until: member.until_close,
+    }),
+  );
+  const { engagement, end, until } = draft;
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   return (
     <Sheet
       actionError={action.error}
       open
       title={"Access terms · " + member.name}
       busy={action.busy}
-      onClose={onClose}
+      onClose={close}
     >
       <Choice
         label="Engagement"
         value={engagement}
         disabled={locked}
-        onChange={(value) => setEngagement(value as Engagement)}
+        onChange={(value) => updateDraft({ engagement: value as Engagement })}
         options={ENGAGEMENT_TYPES.map((value) => ({ value, label: value }))}
       />
       <Choice
@@ -66,14 +90,14 @@ function Editor({
           { value: "close", label: "Until project closes" },
           { value: "date", label: "Choose end date" },
         ]}
-        onChange={(value) => setUntil(value === "close")}
+        onChange={(value) => updateDraft({ until: value === "close" })}
       />
       {!until && (
         <DateField
           label="Last access date"
           value={end}
           disabled={locked}
-          onChange={setEnd}
+          onChange={(next) => updateDraft({ end: next })}
         />
       )}
       <Notice>
@@ -84,17 +108,25 @@ function Editor({
         busy={action.busy}
         onPress={() =>
           void action.run(async () => {
-            if (!until && !end) throw new Error("Choose an access end date.");
+            if (!until && !end)
+              throw new PublicMessageError("Choose an access end date.");
             const timestamp = until ? null : accessEnd(end, timezone);
             setLocked(true);
-            await saveMemberTerms(
-              project,
-              member,
-              engagement,
-              timestamp,
-              until,
-              request.current,
-            );
+            try {
+              await saveMemberTerms(
+                project,
+                member,
+                engagement,
+                timestamp,
+                until,
+                request.current,
+              );
+            } catch (error) {
+              if (isDeterministicRejection(error)) setLocked(false);
+              throw error;
+            }
+            clearDraft();
+            toast("Member access terms saved.", "success");
             await onSaved();
             onClose();
           })

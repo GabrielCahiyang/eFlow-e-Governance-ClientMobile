@@ -13,19 +13,22 @@ import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Search from "lucide-react-native/icons/search";
 import { Sheet } from "./Sheet";
 import { useTheme } from "./Appearance";
+import { isRawEntityId } from "../../shared/entityId";
 import { colors, dateLabel } from "./theme";
 import { userErrorMessage } from "../../shared/userMessages";
 export function Field({
   label,
   error,
+  required,
   ...props
-}: TextInputProps & { label: string; error?: string }) {
+}: TextInputProps & { label: string; error?: string; required?: boolean }) {
   const palette = useTheme();
   return (
     <View style={s.field}>
-      <Text style={s.label}>{label}</Text>
+      <Text style={s.label}>{label}{required ? " *" : ""}</Text>
       <TextInput
         accessibilityLabel={label}
+        accessibilityHint={required ? "Required" : undefined}
         placeholderTextColor={palette.mutedLabel}
         selectionColor={palette.blue}
         {...props}
@@ -53,6 +56,8 @@ export function Choice({
   placeholder = "Choose…",
   disabled,
   multiple = false,
+  required,
+  searchable,
 }: {
   label: string;
   value: string | string[];
@@ -61,17 +66,23 @@ export function Choice({
   placeholder?: string;
   disabled?: boolean;
   multiple?: boolean;
+  required?: boolean;
+  searchable?: boolean;
 }) {
   const palette = useTheme();
   const [open, setOpen] = useState(false),
     [search, setSearch] = useState("");
   const selected = Array.isArray(value) ? value : [value];
+  const showSearch = searchable ?? options.length >= 6;
+  const visibleDescription = (description?: string) =>
+    description && !isRawEntityId(description) ? description : undefined;
   return (
     <View style={s.field}>
-      <Text style={s.label}>{label}</Text>
+      <Text style={s.label}>{label}{required ? " *" : ""}</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityHint={required ? "Required" : undefined}
         accessibilityState={{ disabled: !!disabled, expanded: open }}
         disabled={disabled}
         style={[s.choice, disabled && { opacity: 0.45 }]}
@@ -93,50 +104,57 @@ export function Choice({
           setSearch("");
         }}
       >
-        <Field label="Search options" value={search} onChangeText={setSearch} />
+        {showSearch && (
+          <Field label="Search options" value={search} onChangeText={setSearch} />
+        )}
         {options
-          .filter((o) =>
-            (o.label + " " + o.description)
+          .filter((o) => {
+            if (!showSearch || !search.trim()) return true;
+            const desc = visibleDescription(o.description) ?? "";
+            return (o.label + " " + desc)
               .toLowerCase()
-              .includes(search.toLowerCase()),
-          )
-          .map((option) => (
-            <Pressable
-              key={option.value}
-              accessibilityRole={multiple ? "checkbox" : "radio"}
-              aria-checked={selected.includes(option.value)}
-              accessibilityState={{
-                checked: selected.includes(option.value),
-                disabled: !!option.disabled,
-              }}
-              accessibilityLabel={option.label}
-              disabled={option.disabled}
-              style={[s.option, selected.includes(option.value) && s.selected]}
-              onPress={() => {
-                onChange(
-                  multiple
-                    ? selected.includes(option.value)
-                      ? selected.filter((v) => v !== option.value)
-                      : [...selected, option.value]
-                    : option.value,
-                );
-                if (!multiple) {
-                  setOpen(false);
-                  setSearch("");
-                }
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={s.label}>{option.label}</Text>
-                {!!option.description && (
-                  <Text style={s.help}>{option.description}</Text>
+              .includes(search.toLowerCase());
+          })
+          .map((option) => {
+            const description = visibleDescription(option.description);
+            return (
+              <Pressable
+                key={option.value}
+                accessibilityRole={multiple ? "checkbox" : "radio"}
+                aria-checked={selected.includes(option.value)}
+                accessibilityState={{
+                  checked: selected.includes(option.value),
+                  disabled: !!option.disabled,
+                }}
+                accessibilityLabel={option.label}
+                disabled={option.disabled}
+                style={[s.option, selected.includes(option.value) && s.selected]}
+                onPress={() => {
+                  onChange(
+                    multiple
+                      ? selected.includes(option.value)
+                        ? selected.filter((v) => v !== option.value)
+                        : [...selected, option.value]
+                      : option.value,
+                  );
+                  if (!multiple) {
+                    setOpen(false);
+                    setSearch("");
+                  }
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={s.label}>{option.label}</Text>
+                  {!!description && (
+                    <Text style={s.help}>{description}</Text>
+                  )}
+                </View>
+                {!!selected.includes(option.value) && (
+                  <Check size={19} color={palette.primary} />
                 )}
-              </View>
-              {!!selected.includes(option.value) && (
-                <Check size={19} color={palette.primary} />
-              )}
-            </Pressable>
-          ))}
+              </Pressable>
+            );
+          })}
       </Sheet>
     </View>
   );
@@ -148,6 +166,7 @@ export function DateField({
   disabled,
   min,
   max,
+  required,
 }: {
   label: string;
   value: string;
@@ -155,6 +174,7 @@ export function DateField({
   disabled?: boolean;
   min?: string;
   max?: string;
+  required?: boolean;
 }) {
   const palette = useTheme();
   const [open, setOpen] = useState(false);
@@ -167,10 +187,11 @@ export function DateField({
   if (maximumDate && pickerDate > maximumDate) pickerDate = maximumDate;
   return (
     <View style={s.field}>
-      <Text style={s.label}>{label}</Text>
+      <Text style={s.label}>{label}{required ? " *" : ""}</Text>
       {Platform.OS === "web" ? (
         <TextInput
           accessibilityLabel={label}
+          accessibilityHint={required ? "Required" : undefined}
           value={value}
           onChangeText={onChange}
           editable={!disabled}
@@ -182,6 +203,7 @@ export function DateField({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={label}
+            accessibilityHint={required ? "Required" : undefined}
             disabled={disabled}
             style={s.choice}
             onPress={() => setOpen(true)}

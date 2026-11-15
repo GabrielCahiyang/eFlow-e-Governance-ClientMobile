@@ -13,8 +13,11 @@ import {
   Status,
 } from "../../components/ui";
 import { OrderList } from "../../components/ui/OrderList";
+import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import { confirmAction } from "../../shared/confirm";
 import { supabase } from "../../../platform/supabase";
 import {
@@ -43,6 +46,8 @@ export function Milestones({
   editable: boolean;
   onTasksChanged: () => Promise<unknown>;
 }) {
+  const { profile } = useAuth();
+  const { toast } = useToast();
   const facts = useFacts("milestones:" + project, async () => {
       const { data, error } = await supabase
         .from("milestones")
@@ -54,19 +59,28 @@ export function Milestones({
     }),
     action = useAction(),
     [editing, setEditing] = useState<Milestone | null>(),
-    [title, setTitle] = useState(""),
-    [description, setDescription] = useState(""),
-    [date, setDate] = useState(""),
-    [status, setStatus] = useState("auto"),
-    [note, setNote] = useState(""),
     [ordering, setOrdering] = useState(false);
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(
+      profile?.id,
+      "milestone:" +
+        project +
+        ":" +
+        (editing ? editing.id : editing === null ? "new" : "none"),
+    ),
+    editing !== undefined,
+    () => ({
+      title: editing?.title || "",
+      description: editing?.description || "",
+      date: editing?.dueDate?.slice(0, 10) || "",
+      status: editing?.manualStatus || "auto",
+      note: editing?.manualNote || "",
+    }),
+  );
+  const { title, description, date, status, note } = draft;
   const edit = (item: Milestone | null) => {
+    action.clear();
     setEditing(item);
-    setTitle(item?.title || "");
-    setDescription(item?.description || "");
-    setDate(item?.dueDate?.slice(0, 10) || "");
-    setStatus(item?.manualStatus || "auto");
-    setNote(item?.manualNote || "");
   };
   return (
     <>
@@ -74,7 +88,13 @@ export function Milestones({
         {editable && (
           <>
             <Button onPress={() => edit(null)}>Add milestone</Button>
-            <Button variant="outline" onPress={() => setOrdering(true)}>
+            <Button
+              variant="outline"
+              onPress={() => {
+                action.clear();
+                setOrdering(true);
+              }}
+            >
               Reorder milestones
             </Button>
           </>
@@ -135,18 +155,29 @@ export function Milestones({
         open={editing !== undefined}
         title={editing ? "Edit milestone" : "Add milestone"}
         onClose={() => {
-          if (!action.busy) setEditing(undefined);
+          if (!action.busy) {
+            action.clear();
+            setEditing(undefined);
+          }
         }}
       >
-        <Field label="Title" value={title} onChangeText={setTitle} />
-        <DateField label="Due date" value={date} onChange={setDate} />
+        <Field
+          label="Title"
+          value={title}
+          onChangeText={(next) => updateDraft({ title: next })}
+        />
+        <DateField
+          label="Due date"
+          value={date}
+          onChange={(next) => updateDraft({ date: next })}
+        />
         {editing && (
           <>
             <Field
               label="Description"
               multiline
               value={description}
-              onChangeText={setDescription}
+              onChangeText={(next) => updateDraft({ description: next })}
             />
             <Choice
               label="Status"
@@ -158,12 +189,12 @@ export function Milestones({
                 "at_risk",
                 "completed",
               ].map((value) => ({ value, label: value.replaceAll("_", " ") }))}
-              onChange={setStatus}
+              onChange={(next) => updateDraft({ status: next })}
             />
             <Field
               label="Override reason"
               value={note}
-              onChangeText={setNote}
+              onChangeText={(next) => updateDraft({ note: next })}
             />
           </>
         )}
@@ -183,6 +214,8 @@ export function Milestones({
                   note,
                 );
               } else await createMilestone(project, title, date || null);
+              clearDraft();
+              toast(editing ? "Milestone saved." : "Milestone added.", "success");
               setEditing(undefined);
               await facts.refresh();
             })
@@ -195,7 +228,12 @@ export function Milestones({
         actionError={action.error}
         open={ordering}
         title="Milestone order"
-        onClose={() => setOrdering(false)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setOrdering(false);
+          }
+        }}
       >
         <OrderList
           items={(facts.data || []).map((i) => ({ id: i.id, label: i.title }))}
@@ -203,6 +241,7 @@ export function Milestones({
           onSave={async (ids) => {
             await action.run(async () => {
               await reorderMilestones(project, ids);
+              toast("Milestone order saved.", "success");
               setOrdering(false);
               await facts.refresh();
             });

@@ -14,6 +14,7 @@ import {
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
 import { chooseFiles, asServiceFile } from "../../../platform/files";
@@ -38,7 +39,7 @@ async function readProfessionalRecord<T>(path: string): Promise<T> {
   const response = await controlPanelFetch(
     path,
     { cache: "no-store" },
-    { retryOnEndpointChange: false, timeoutMs: 30000 },
+    { retryOnEndpointChange: false, timeoutMs: 60_000 },
   );
   if (!response.ok)
     throw Object.assign(new Error("Professional record request failed."), {
@@ -57,6 +58,7 @@ const empty: ProfessionalValues = {
 };
 export function ProfessionalProfile({ userId }: { userId: string }) {
   const { profile } = useAuth(),
+    { toast } = useToast(),
     own = profile?.id === userId,
     facts = useFacts(`professional:${profile?.id}:${userId}`, () =>
       readProfessionalRecord<{ profile: ProfessionalProfileRecord | null }>(
@@ -75,6 +77,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
       action.run(async () => {
         await updateProfessionalProfile(values);
         setDraft(undefined);
+        toast("Professional profile saved.", "success");
         await facts.refresh();
       }, "Professional profile saved. Confirm it before AI staffing uses it.");
   return (
@@ -157,6 +160,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                       )
                         return;
                       await confirmProfessionalProfile();
+                      toast("Professional profile confirmed.", "success");
                       await facts.refresh();
                     }, "Professional profile confirmed.")
                   }
@@ -191,6 +195,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                   )
                     throw new Error("Choose a PDF smaller than 10 MB.");
                   await uploadPds(await asServiceFile(file));
+                  toast("PDS uploaded.", "success");
                   await documents.refresh();
                 })
               }

@@ -1,4 +1,4 @@
-import { AppState, Linking } from "react-native";
+import { Linking } from "react-native";
 import { useEffect } from "react";
 import {
   Card,
@@ -21,6 +21,7 @@ import { getAssignedIndependentReviews } from "../../../core/web/app/features/bu
 import { createReceiptSignedUrl } from "../../../core/web/app/features/budget/services/budgetService";
 import { SettlementPanel } from "./SettlementPanel";
 import { getStaffingReviewPackage } from "./staffingEscalation";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { cashRequestReference } from "./mobileFinanceScope";
 import { supabase } from "../../../platform/supabase";
@@ -48,14 +49,12 @@ export function FinancialReviewsScreen({
     action = useAction();
   useEffect(() => {
     if (!actor || (staffing && profile?.role !== "head")) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = () => {
-      if (timer || AppState.currentState !== "active") return;
-      timer = setTimeout(() => {
-        timer = undefined;
-        void facts.refresh();
-      }, 250);
-    };
+    const live = createLiveRefreshController({
+      onRefresh: () => void facts.refresh(),
+      debounceMs: 250,
+      hasRealtime: true,
+    });
+    const refresh = live.schedule;
     const channel = createPostgresChannel(`native-financial-reviews:${actor}`)
       .on(
         "postgres_changes",
@@ -77,19 +76,11 @@ export function FinancialReviewsScreen({
         },
         refresh,
       )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") refresh();
-      });
+      .subscribe(live.onChannelStatus);
     nativeWindow.addEventListener("eflow:finance-updated", refresh);
-    const app = AppState.addEventListener("change", (state) => {
-      if (state === "active") refresh();
-    });
-    const fallback = setInterval(refresh, 30_000);
     return () => {
-      clearTimeout(timer);
-      clearInterval(fallback);
+      live.dispose();
       nativeWindow.removeEventListener("eflow:finance-updated", refresh);
-      app.remove();
       void supabase.removeChannel(channel);
     };
   }, [actor, facts.refresh, profile?.role, recordId, staffing]);

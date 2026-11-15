@@ -1,7 +1,11 @@
-import { useState } from "react";
 import { Button, Field, Notice, Sheet } from "../../components/ui";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { confirmAction } from "../../shared/confirm";
+import {
+  formDraftKey,
+  useRetainedDraft,
+} from "../../shared/formDraftMemory";
 import type { Employee } from "../../../core/web/app/services/employeeService";
 import {
   updateEmployeeNotes,
@@ -20,12 +24,15 @@ export function CoachingSheet({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const [strengths, setStrengths] = useState(
-      note?.strengths || employee.jobDescription,
-    ),
-    [weaknesses, setWeaknesses] = useState(note?.weaknesses || ""),
-    [notes, setNotes] = useState(note?.notes || ""),
-    [tags, setTags] = useState(note?.tags.join(", ") || ""),
+  const draftKey = formDraftKey(actor, "coaching:" + employee.id),
+    [draft, setDraft, clearDraft] = useRetainedDraft(draftKey, true, () => ({
+      strengths: note?.strengths || employee.jobDescription,
+      weaknesses: note?.weaknesses || "",
+      notes: note?.notes || "",
+      tags: note?.tags.join(", ") || "",
+    })),
+    { strengths, weaknesses, notes, tags } = draft,
+    { toast } = useToast(),
     action = useAction();
   const save = () =>
     action.run(async () => {
@@ -50,24 +57,15 @@ export function CoachingSheet({
         },
         actor,
       );
+      clearDraft();
+      action.clear();
+      toast("Member coaching context saved.", "success");
       await onSaved();
       onClose();
     });
-  const close = async () => {
+  const close = () => {
     if (action.busy) return;
-    if (
-      (strengths !== (note?.strengths || employee.jobDescription) ||
-        weaknesses !== (note?.weaknesses || "") ||
-        notes !== (note?.notes || "") ||
-        tags !== (note?.tags.join(", ") || "")) &&
-      !(await confirmAction(
-        "Discard unsaved context?",
-        employee.name,
-        "Discard changes",
-        true,
-      ))
-    )
-      return;
+    action.clear();
     onClose();
   };
   return (
@@ -76,7 +74,7 @@ export function CoachingSheet({
       open
       title="Member coaching context"
       description={employee.name}
-      onClose={() => void close()}
+      onClose={close}
       busy={action.busy}
       footer={
         <Button busy={action.busy} onPress={() => void save()}>
@@ -87,25 +85,25 @@ export function CoachingSheet({
       <Field
         label="Strengths"
         value={strengths}
-        onChangeText={setStrengths}
+        onChangeText={(value) => setDraft({ strengths: value })}
         multiline
       />
       <Field
         label="Development areas"
         value={weaknesses}
-        onChangeText={setWeaknesses}
+        onChangeText={(value) => setDraft({ weaknesses: value })}
         multiline
       />
       <Field
         label="Manager notes"
         value={notes}
-        onChangeText={setNotes}
+        onChangeText={(value) => setDraft({ notes: value })}
         multiline
       />
       <Field
         label="Skill tags (comma separated)"
         value={tags}
-        onChangeText={setTags}
+        onChangeText={(value) => setDraft({ tags: value })}
       />
       <Notice>
         These are manager observations, separate from verified task activity. Do

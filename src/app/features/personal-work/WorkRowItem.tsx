@@ -1,6 +1,7 @@
 import type { MobileWorkRow } from "./displayWorkSnapshot";
 import { workDateLabel } from "../../../core/web/app/shared/workCalendar";
 import { MondayTableRow } from "../../components/ui/MondayTable";
+import { workDisplayStatus } from "../../shared/statusLabels";
 
 export function WorkRowItem({
   row,
@@ -39,7 +40,7 @@ export function WorkRowItem({
   return (
     <MondayTableRow
       title={row.title}
-      status={row.status}
+      status={workDisplayStatus(row.status, row.blocker)}
       customStatusId={row.customStatusId}
       context={context}
       due={schedule}

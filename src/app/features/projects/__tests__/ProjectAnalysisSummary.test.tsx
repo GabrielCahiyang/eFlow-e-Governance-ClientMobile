@@ -46,6 +46,6 @@ test("project completion, late submission and review time use separate dates", a
   expect(await view.findByText("Completed 2 days early")).toBeOnTheScreen();
   expect(view.getByText("1 of 1 with comparable dates")).toBeOnTheScreen();
   expect(view.getByText("3.0 hr")).toBeOnTheScreen();
-  await fireEvent.press(view.getByRole("button", { name: "Open full analysis on eFlow Web" }));
-  expect(onOpenWeb).toHaveBeenCalledTimes(1);
+  expect(view.queryByRole("button", { name: "Open full analysis on eFlow Web" })).toBeNull();
+  expect(onOpenWeb).not.toHaveBeenCalled();
 });

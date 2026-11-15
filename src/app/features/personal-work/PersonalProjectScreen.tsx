@@ -1,6 +1,6 @@
 import { useWorkStatus } from "../../shared/workStatusPresentation";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { useEffect, useState } from "react";
-import { AppState } from "react-native";
 import {
   Button,
   Card,
@@ -21,6 +21,7 @@ import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
 import { ProjectFiles, ProjectActivity } from "../projects";
 import { useFacts } from "../../shared/useFacts";
+import { PublicMessageError } from "../../shared/userMessages";
 import { useSnapshotPage } from "../../shared/useSnapshotPage";
 import type { Navigate } from "../../shared/routes";
 import { fetchPersonalProject } from "../../../core/web/app/features/workspaces/services/workspaceService";
@@ -52,14 +53,10 @@ export function PersonalProjectScreen({
     await Promise.all([facts.refresh(), workspace.refresh(), tree.refresh()]);
   });
   useEffect(() => {
-    const poll = setInterval(() => void facts.refresh(), 15000),
-      app = AppState.addEventListener("change", (state) => {
-        if (state === "active") void facts.refresh();
-      });
-    return () => {
-      clearInterval(poll);
-      app.remove();
-    };
+    const live = createLiveRefreshController({
+      onRefresh: () => void facts.refresh(),
+    });
+    return () => live.dispose();
   }, [facts.refresh]);
   const [view, setView] = useState("tasks"),
     [search, setSearch] = useState(""),
@@ -107,7 +104,7 @@ export function PersonalProjectScreen({
     async () => {
       const snapshot = await fetchWorkTree(task!.id);
       if (snapshot.root.kind !== "personal" || snapshot.root.project !== id)
-        throw new Error("The task hierarchy could not be verified.");
+        throw new PublicMessageError("The task hierarchy could not be verified.");
       return snapshot;
     },
     !!task && !facts.error,
@@ -158,19 +155,6 @@ export function PersonalProjectScreen({
                   }
                 />
               ),
-              ListFooterComponent: owner ? (
-                <NavigationRow
-                  title="Project closeout on eFlow Web"
-                  onPress={() =>
-                    navigate({
-                      name: "personal_project",
-                      id,
-                      view: "closeout",
-                      title: "Project closeout",
-                    })
-                  }
-                />
-              ) : undefined,
             }
           : undefined
       }
@@ -416,19 +400,6 @@ export function PersonalProjectScreen({
                   </Text>
                 </Row>
               ))}
-              {owner && (
-                <NavigationRow
-                  title="Manage access on eFlow Web"
-                  onPress={() =>
-                    navigate({
-                      name: "personal_project",
-                      id,
-                      view: "access_management",
-                      title: "Project access",
-                    })
-                  }
-                />
-              )}
             </>
           )}
           {!!(view === "files") && (

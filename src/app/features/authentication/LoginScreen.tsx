@@ -121,6 +121,7 @@ export function LoginScreen() {
                 <ErrorShake trigger={errors.email ? shake : 0}>
                   <Field
                     label="Email address"
+                    required
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -144,6 +145,7 @@ export function LoginScreen() {
                     <View>
                       <Field
                         label="Password"
+                        required
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry={!show}

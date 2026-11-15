@@ -64,10 +64,8 @@ export function ProjectAuditTrail({
       if (!page.snapshot) void facts.refresh();
     });
     nativeWindow.addEventListener(ACCESS_CHANGED_EVENT, update);
-    const timer = setInterval(update, 60_000);
     return () => {
       stop();
-      clearInterval(timer);
       nativeWindow.removeEventListener(ACCESS_CHANGED_EVENT, update);
     };
   }, [project, page.snapshot, facts.refresh]);

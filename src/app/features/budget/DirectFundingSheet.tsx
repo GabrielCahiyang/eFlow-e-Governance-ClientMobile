@@ -1,5 +1,5 @@
 import { Text } from "../../components/ui/Typography";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import {
   Button,
   Card,
@@ -10,6 +10,12 @@ import {
   peso,
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { confirmAction } from "../../shared/confirm";
 import { useAuth } from "../authentication";
 import { draftStore } from "../../../platform/draftStore";
@@ -35,27 +41,44 @@ export function DirectFundingSheet({
   onSaved: () => Promise<void>;
 }) {
   const { profile } = useAuth(),
+    { toast } = useToast(),
     action = useAction();
-  const [lines, setLines] = useState<DirectFundingLine[]>([
-      { partitionId: "", amount: 0, particular: "" },
-    ]),
-    [reason, setReason] = useState("");
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(profile?.id, "direct-funding:" + task.id),
+    true,
+    () => ({
+      lines: [
+        { partitionId: "", amount: 0, particular: "" },
+      ] as DirectFundingLine[],
+      reason: "",
+    }),
+  );
+  const { lines, reason } = draft;
   const key = useRef(crypto.randomUUID());
   const frozen = useRef<
     { lines: DirectFundingLine[]; reason: string; key: string } | undefined
   >(undefined);
   const leaves = sectionLeaves(budget.sections || []),
     total = lines.reduce((s, l) => s + moneyCents(l.amount || 0), 0) / 100;
+  const close = () => {
+    if (action.busy) return;
+    action.clear();
+    onClose();
+  };
   const save = () =>
     action.run(async () => {
       if (!profile || !budget.summary)
-        throw new Error("Current Office Budget is required.");
+        throw new PublicMessageError("Current Office Budget is required.");
+      let wasRecovered = false;
       if (!frozen.current) {
         const recovered = await draftStore.get<typeof frozen.current>(
           profile.id,
           "fund." + task.id,
         );
-        if (recovered) frozen.current = recovered;
+        if (recovered) {
+          frozen.current = recovered;
+          wasRecovered = true;
+        }
       }
       if (!frozen.current) {
         if (
@@ -66,11 +89,11 @@ export function DirectFundingSheet({
               !l.partitionId || !Number.isFinite(l.amount) || l.amount <= 0,
           )
         )
-          throw new Error(
+          throw new PublicMessageError(
             "Choose annual accounts, positive amounts and an approved authority reference.",
           );
         if (new Set(lines.map((l) => l.partitionId)).size !== lines.length)
-          throw new Error("Choose each annual account once.");
+          throw new PublicMessageError("Choose each annual account once.");
         if (
           !(await confirmAction(
             "Authorize funding?",
@@ -86,14 +109,24 @@ export function DirectFundingSheet({
         };
         await draftStore.set(profile.id, "fund." + task.id, frozen.current);
       }
-      await fundOfficeWork({
-        taskId: task.id,
-        fiscalYear: budget.summary.fiscalYear,
-        lines: frozen.current.lines,
-        reason: frozen.current.reason,
-        authorizationKey: frozen.current.key,
-      });
+      try {
+        await fundOfficeWork({
+          taskId: task.id,
+          fiscalYear: budget.summary.fiscalYear,
+          lines: frozen.current.lines,
+          reason: frozen.current.reason,
+          authorizationKey: frozen.current.key,
+        });
+      } catch (error) {
+        if (!wasRecovered && isDeterministicRejection(error)) {
+          frozen.current = undefined;
+          await draftStore.remove(profile.id, "fund." + task.id);
+        }
+        throw error;
+      }
+      clearDraft();
       await draftStore.remove(profile.id, "fund." + task.id);
+      toast("Task funding authorized.", "success");
       await onSaved();
       onClose();
     });
@@ -103,7 +136,7 @@ export function DirectFundingSheet({
       open
       title="Authorize task Budget"
       description={task.title}
-      onClose={onClose}
+      onClose={close}
       busy={action.busy}
       footer={
         <Button busy={action.busy} onPress={() => void save()}>
@@ -123,11 +156,12 @@ export function DirectFundingSheet({
               description: `${peso(s.amount - s.heldAmount - (s.committedAmount || 0))} available`,
             }))}
             onChange={(v) =>
-              setLines((old) =>
-                old.map((l, index) =>
+              updateDraft((old) => ({
+                ...old,
+                lines: old.lines.map((l, index) =>
                   index === i ? { ...l, partitionId: v } : l,
                 ),
-              )
+              }))
             }
           />
           <Field
@@ -136,11 +170,12 @@ export function DirectFundingSheet({
             value={String(line.amount || "")}
             editable={!frozen.current && !action.busy}
             onChangeText={(v) =>
-              setLines((old) =>
-                old.map((l, index) =>
+              updateDraft((old) => ({
+                ...old,
+                lines: old.lines.map((l, index) =>
                   index === i ? { ...l, amount: Number(v) } : l,
                 ),
-              )
+              }))
             }
           />
           <Field
@@ -148,18 +183,22 @@ export function DirectFundingSheet({
             value={line.particular}
             editable={!frozen.current && !action.busy}
             onChangeText={(v) =>
-              setLines((old) =>
-                old.map((l, index) =>
+              updateDraft((old) => ({
+                ...old,
+                lines: old.lines.map((l, index) =>
                   index === i ? { ...l, particular: v } : l,
                 ),
-              )
+              }))
             }
           />
           <Button
             variant="ghost"
             disabled={!!frozen.current || action.busy}
             onPress={() =>
-              setLines((old) => old.filter((_, index) => index !== i))
+              updateDraft((old) => ({
+                ...old,
+                lines: old.lines.filter((_, index) => index !== i),
+              }))
             }
           >
             Remove funding account
@@ -170,10 +209,13 @@ export function DirectFundingSheet({
         variant="outline"
         disabled={!!frozen.current || action.busy}
         onPress={() =>
-          setLines((old) => [
+          updateDraft((old) => ({
             ...old,
-            { partitionId: "", amount: 0, particular: "" },
-          ])
+            lines: [
+              ...old.lines,
+              { partitionId: "", amount: 0, particular: "" },
+            ],
+          }))
         }
       >
         Add funding account
@@ -181,7 +223,7 @@ export function DirectFundingSheet({
       <Field
         label="Reason / approved authority reference"
         value={reason}
-        onChangeText={setReason}
+        onChangeText={(next) => updateDraft({ reason: next })}
         multiline
         editable={!frozen.current && !action.busy}
       />

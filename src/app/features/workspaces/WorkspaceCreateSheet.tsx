@@ -1,4 +1,14 @@
-import { userErrorMessage } from "../../shared/userMessages";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+  userErrorMessage,
+} from "../../shared/userMessages";
+import {
+  clearFormDraft,
+  formDraftKey,
+  readFormDraft,
+  writeFormDraft,
+} from "../../shared/formDraftMemory";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -61,12 +71,15 @@ export function WorkspaceCreateSheet({
             !saved.title.trim() ||
             (saved.created !== undefined && typeof saved.created !== "string"))
         )
-          throw new Error(
+          throw new PublicMessageError(
             "The saved creation request could not be verified. Check its original result before continuing.",
           );
         receipt.current = saved;
         setPending(saved);
-        setTitle(saved?.title || "");
+        const remembered = readFormDraft<{ title: string }>(
+          formDraftKey(actor, scope),
+        );
+        setTitle(saved?.title || remembered?.title || "");
         ready.current = true;
       })
       .catch((reason) => {
@@ -106,20 +119,32 @@ export function WorkspaceCreateSheet({
       }
       let id = request.created;
       if (!id) {
-        const result =
-          kind === "workspace"
-            ? await createWorkspace(
-                request.request,
-                request.title,
-                "Asia/Manila",
-              )
-            : await createPersonalProject(
-                context,
-                request.request,
-                request.title,
-              );
+        let result: { id: string };
+        try {
+          result =
+            kind === "workspace"
+              ? await createWorkspace(
+                  request.request,
+                  request.title,
+                  "Asia/Manila",
+                )
+              : await createPersonalProject(
+                  context,
+                  request.request,
+                  request.title,
+                );
+        } catch (err) {
+          if (!pending && isDeterministicRejection(err)) {
+            await draftStore.remove(actor, scope).catch(() => {});
+            if (revision === generation.current) {
+              receipt.current = null;
+              setPending(null);
+            }
+          }
+          throw err;
+        }
         if (!result || typeof result.id !== "string" || !result.id)
-          throw new Error(
+          throw new PublicMessageError(
             "No creation receipt was returned. Retry this same request.",
           );
         id = result.id;
@@ -130,6 +155,7 @@ export function WorkspaceCreateSheet({
         setPending(request);
       }
       await onCreated(id);
+      clearFormDraft(formDraftKey(actor, scope));
       await draftStore.remove(actor, scope);
       if (revision === generation.current) onClose();
     } catch (reason) {
@@ -142,12 +168,17 @@ export function WorkspaceCreateSheet({
       if (revision === generation.current) setBusy(false);
     }
   };
+  const close = () => {
+    if (busy) return;
+    setError("");
+    onClose();
+  };
   return (
     <Sheet
       actionError={error}
       open
       title={`Create personal ${kind}`}
-      onClose={onClose}
+      onClose={close}
       busy={busy}
       footer={
         <Button
@@ -167,8 +198,13 @@ export function WorkspaceCreateSheet({
         <>
           <Field
             label={kind === "workspace" ? "Workspace name" : "Project name"}
+            required
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(next) => {
+              setTitle(next);
+              if (!pending)
+                writeFormDraft(formDraftKey(actor, scope), { title: next });
+            }}
             maxLength={kind === "workspace" ? 120 : 200}
             editable={!pending && !busy}
           />

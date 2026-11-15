@@ -13,8 +13,11 @@ import {
   Sheet,
   Toggle,
 } from "../../components/ui";
+import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useAction } from "../../shared/useAction";
+import { PublicMessageError } from "../../shared/userMessages";
 import { supabase } from "../../../platform/supabase";
 import { resolveNativeControlBase } from "../../../platform/gateway";
 import { backendConfig } from "../../../platform/config";
@@ -29,12 +32,13 @@ import type {
 
 async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(name, args);
-  if (error) throw new Error(error.message);
+  if (error) throw error;
   return data as T;
 }
 async function gateway(path: string, body?: unknown) {
   const { data } = await supabase.auth.getSession();
-  if (!data.session) throw new Error("Sign in again to review this project.");
+  if (!data.session)
+    throw new PublicMessageError("Sign in again to review this project.");
   const base = await resolveNativeControlBase();
   const response = await fetch(base + "/project-seals/" + path, {
     method: body ? "POST" : "GET",
@@ -87,17 +91,19 @@ export function ProjectPublication({
       .order("version", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throw error;
     return data;
   });
   async function publicRecord(id: string) {
     if (!backendConfig.webOrigin)
-      throw new Error(
+      throw new PublicMessageError(
         "The public eFlow website address is not configured on this build.",
       );
     const url = new URL(backendConfig.webOrigin);
     if (url.protocol !== "https:" || url.username || url.password)
-      throw new Error("Configure the public eFlow HTTPS address.");
+      throw new PublicMessageError(
+        "Configure the public eFlow HTTPS address.",
+      );
     await Linking.openURL(
       new URL("/project-record/" + encodeURIComponent(id), url).toString(),
     );
@@ -163,12 +169,20 @@ function SealSheet({
   const manifest: ArchiveManifest | undefined = preview.data?.manifest
     ? JSON.parse(preview.data.manifest)
     : undefined;
-  const [consent, setConsent] = useState("");
+  const { profile } = useAuth();
   const [section, setSection] = useState("");
-  const [correction, setCorrection] = useState("");
   const [copy, setCopy] = useState<ArchiveFile>();
-  const [copyReason, setCopyReason] = useState("");
   const action = useAction();
+  const [draft, updateDraft] = useRetainedDraft(
+    formDraftKey(profile?.id, "project-publication:" + projectId),
+    true,
+    () => ({
+      consent: "",
+      correction: "",
+      copyReason: "",
+    }),
+  );
+  const { consent, correction, copyReason } = draft;
   useEffect(() => {
     if (!seal || !running.includes(seal.state)) return;
     const timer = setInterval(() => {
@@ -179,7 +193,7 @@ function SealSheet({
   const run = (fn: () => Promise<unknown>) =>
     void action.run(async () => {
       await fn();
-      setConsent("");
+      updateDraft({ consent: "" });
       await state.refresh();
     });
   const hash = preview.data?.manifest_hash || "";
@@ -192,7 +206,10 @@ function SealSheet({
       open
       title="Project publication"
       onClose={() => {
-        if (!action.busy) onClose();
+        if (!action.busy) {
+          action.clear();
+          onClose();
+        }
       }}
       busy={action.busy}
     >
@@ -291,8 +308,7 @@ function SealSheet({
                           variant="ghost"
                           onPress={() => {
                             setCopy(f);
-                            setCopyReason("");
-                            setConsent("");
+                            updateDraft({ consent: "" });
                           }}
                         >
                           Use publication copy
@@ -305,7 +321,7 @@ function SealSheet({
                       <Field
                         label="Reason for the publication copy"
                         value={copyReason}
-                        onChangeText={setCopyReason}
+                        onChangeText={(next) => updateDraft({ copyReason: next })}
                       />
                       <Button
                         variant="ghost"
@@ -318,7 +334,7 @@ function SealSheet({
                         onPress={() =>
                           run(async () => {
                             if (copyReason.trim().length < 5)
-                              throw new Error(
+                              throw new PublicMessageError(
                                 "Explain why the public copy is different.",
                               );
                             const [file] = await chooseFiles();
@@ -328,12 +344,12 @@ function SealSheet({
                               !bytes.byteLength ||
                               bytes.byteLength > 25 * 1024 * 1024
                             )
-                              throw new Error(
+                              throw new PublicMessageError(
                                 "Choose a nonempty file up to 25 MB.",
                               );
                             const { data } = await supabase.auth.getSession();
                             if (!data.session)
-                              throw new Error("Sign in again.");
+                              throw new PublicMessageError("Sign in again.");
                             const path =
                               seal.id +
                               "/" +
@@ -346,7 +362,7 @@ function SealSheet({
                                 upsert: false,
                                 contentType: file.type,
                               });
-                            if (error) throw new Error(error.message);
+                            if (error) throw error;
                             await gateway(
                               "snapshots/" + seal.id + "/publication-copy",
                               {
@@ -358,6 +374,7 @@ function SealSheet({
                                 reason: copyReason.trim(),
                               },
                             );
+                            updateDraft({ copyReason: "" });
                             setCopy(undefined);
                           })
                         }
@@ -377,7 +394,7 @@ function SealSheet({
                         : "I reviewed this record for simulation"
                     }
                     value={consent === hash}
-                    onChange={(v) => setConsent(v ? hash : "")}
+                    onChange={(v) => updateDraft({ consent: v ? hash : "" })}
                   />
                   {ready && (
                     <Button
@@ -457,18 +474,19 @@ function SealSheet({
                   <Field
                     label="Correction note"
                     value={correction}
-                    onChangeText={setCorrection}
+                    onChangeText={(next) => updateDraft({ correction: next })}
                     multiline
                   />
                   <Button
                     disabled={!correction.trim()}
                     busy={action.busy}
                     onPress={() =>
-                      run(() =>
-                        gateway(projectId + "/prepare", {
+                      run(async () => {
+                        await gateway(projectId + "/prepare", {
                           correction: correction.trim(),
-                        }),
-                      )
+                        });
+                        updateDraft({ correction: "" });
+                      })
                     }
                   >
                     Prepare linked correction

@@ -1,4 +1,4 @@
-import { colors } from "../../components/ui/theme";
+import { colors, dateLabel } from "../../components/ui/theme";
 import type { DepartmentReportRow } from "../../../core/web/app/features/reports/types";
 export const reportColumns = [
   ["Work item", "title"],
@@ -21,7 +21,8 @@ export function reportValue(
   const value = row[key];
   if (value === undefined || value === null) return "—";
   if (key === "progress") return `${value}%`;
-  if (key === "eventAt" || key === "dueAt")
+  if (key === "dueAt") return dateLabel(Number(value));
+  if (key === "eventAt")
     return new Date(Number(value)).toLocaleString();
   return String(value);
 }

@@ -18,6 +18,7 @@ import { retryTransientRead } from "../../shared/retryTransientRead";
 import { readWithTimeout } from "../../shared/readTimeout";
 import { authoritativeReadEpoch } from "../../shared/displayCache";
 import { useAction } from "../../shared/useAction";
+import { PublicMessageError } from "../../shared/userMessages";
 import { supabase } from "../../../platform/supabase";
 import { draftStore } from "../../../platform/draftStore";
 import { chooseFiles } from "../../../platform/files";
@@ -266,7 +267,7 @@ export function ChatScreen({
     async () => {
       const saved = await draftStore.get<unknown>(actor, "chat:" + channel!.id);
       if (saved !== null && !isMessageDraft(saved))
-        throw new Error(
+        throw new PublicMessageError(
           "This saved message is unreadable. Verify its original send before continuing.",
         );
       return saved as MessageDraft | null;
@@ -302,17 +303,17 @@ export function ChatScreen({
         return;
       const session = await supabase.auth.getSession();
       if (session.error || session.data.session?.user.id !== actor)
-        throw new Error("Sign in again.");
+        throw new PublicMessageError("Sign in again.");
       const current = (await loadChannels()).find(
         (item) => item.id === channel.id,
       );
       if (!current)
-        throw new Error(
+        throw new PublicMessageError(
           "This conversation is no longer available to your account.",
         );
       if (current.archived) {
         void channels.refresh();
-        throw new Error("This project chat is archived.");
+        throw new PublicMessageError("This project chat is archived.");
       }
       assertAccess(actor);
       const item = original || {
@@ -384,7 +385,7 @@ export function ChatScreen({
     action.run(async () => {
       const session = await supabase.auth.getSession();
       if (session.error || session.data.session?.user.id !== actor)
-        throw new Error("Sign in again.");
+        throw new PublicMessageError("Sign in again.");
       assertAccess(actor);
       const id = await openDirectConversation(personId);
       await channels.refresh();
@@ -617,7 +618,7 @@ export function ChatScreen({
           action.run(async () => {
             assertAccess(actor);
             if (channel.archived || message.sender_id !== actor)
-              throw new Error("This message cannot be deleted.");
+              throw new PublicMessageError("This message cannot be deleted.");
             const path = await removeConversationMessage(message.id);
             if (path) void cleanupChatImage(path).catch(() => {});
             const deleted = await readChatMessage(channel.id, message.id);

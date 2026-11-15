@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Button, Choice, ErrorState, Notice, Sheet } from "../../components/ui";
+import { useAuth } from "../authentication";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useAction } from "../../shared/useAction";
+import { useToast } from "../../components/ui/Toast";
 import { updateTask } from "../../../core/web/app/features/tasks/services/taskMutationService";
 import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 export function MilestoneTasks({
@@ -12,17 +15,24 @@ export function MilestoneTasks({
   tasks: Task[];
   onSaved: () => Promise<unknown>;
 }) {
+  const { profile } = useAuth();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false),
-    [selected, setSelected] = useState<string[]>([]),
     action = useAction();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(profile?.id, "milestone-tasks:" + id),
+    open,
+    () => ({
+      selected: tasks.filter((t) => t.milestoneId === id).map((t) => t.id),
+    }),
+  );
+  const selected = draft.selected;
   return (
     <>
       <Button
         variant="outline"
         onPress={() => {
-          setSelected(
-            tasks.filter((t) => t.milestoneId === id).map((t) => t.id),
-          );
+          action.clear();
           setOpen(true);
         }}
       >
@@ -33,7 +43,12 @@ export function MilestoneTasks({
         open={open}
         title="Milestone tasks"
         busy={action.busy}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setOpen(false);
+          }
+        }}
       >
         <Notice>
           Link work to this milestone. Completed and cancelled work stays
@@ -43,7 +58,7 @@ export function MilestoneTasks({
           label="Linked tasks"
           multiple
           value={selected}
-          onChange={setSelected}
+          onChange={(next) => updateDraft({ selected: next })}
           options={tasks
             .filter((t) => !["completed", "cancelled"].includes(t.status))
             .map((t) => ({ value: t.id, label: t.title }))}
@@ -64,6 +79,8 @@ export function MilestoneTasks({
                   if (next !== task.milestoneId)
                     await updateTask(task.id, { milestoneId: next });
                 }
+                clearDraft();
+                toast("Milestone tasks updated.", "success");
                 setOpen(false);
               } finally {
                 await onSaved();

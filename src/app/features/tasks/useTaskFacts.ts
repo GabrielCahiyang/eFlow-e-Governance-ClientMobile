@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { AppState } from "react-native";
 import { useAuth } from "../authentication";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { useFacts } from "../../shared/useFacts";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
@@ -14,20 +14,21 @@ export function useTaskFacts(scope: string, enabled = true) {
   );
   useEffect(() => {
     if (!profile || !enabled) return;
+    const live = createLiveRefreshController({
+      onRefresh: () => void facts.refresh(),
+      hasRealtime: true,
+    });
     const channel = createPostgresChannel(
       "native-task-facts:" + scope + ":" + profile.id,
     )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tasks" },
-        () => void facts.refresh(),
+        live.schedule,
       )
-      .subscribe();
-    const app = AppState.addEventListener("change", (state) => {
-      if (state === "active") void facts.refresh();
-    });
+      .subscribe(live.onChannelStatus);
     return () => {
-      app.remove();
+      live.dispose();
       void supabase.removeChannel(channel);
     };
   }, [scope, profile?.id, enabled]);

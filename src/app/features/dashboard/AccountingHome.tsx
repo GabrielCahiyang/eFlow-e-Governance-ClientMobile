@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Pressable, View } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
 import Banknote from "lucide-react-native/icons/banknote";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import CircleCheck from "lucide-react-native/icons/circle-check-big";
@@ -25,7 +24,6 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
   const { profile, organization, can } = useAuth();
   const workspace = useWorkspace();
   const palette = useTheme();
-  const focused = useIsFocused();
   const actor = profile?.id || "";
   const office = profile?.org_id;
   const year = getCurrentFiscalYear();
@@ -38,23 +36,22 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
   const queue = useFacts(
     "accounting-home-queue:" + JSON.stringify([scope, canRelease, canSettle]),
     () => accountingHomeQueue(office!, year, actor, canRelease, canSettle),
-    focused && !!office && canOpenQueue,
+    !!office && canOpenQueue,
   );
   const summary = useFacts(
     "accounting-home-summary:" + scope,
     () => officeFinancialSummary(office!, year),
-    focused && !!office && canOpenAccounting,
+    !!office && canOpenAccounting,
   );
   const reviews = useFacts(
     "accounting-home-reviews:" + scope,
     () => assignedFinanceReviews(actor, office!),
-    focused && !!office && !!actor,
+    !!office && !!actor,
   );
   const refresh = async () => {
     await Promise.all([queue.refresh(), summary.refresh(), reviews.refresh()]);
   };
   useEffect(() => {
-    if (!focused) return;
     const reload = () => void refresh();
     nativeWindow.addEventListener("eflow:work-updated", reload);
     nativeWindow.addEventListener("eflow:finance-updated", reload);
@@ -62,12 +59,12 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
       nativeWindow.removeEventListener("eflow:work-updated", reload);
       nativeWindow.removeEventListener("eflow:finance-updated", reload);
     };
-  }, [focused, queue.refresh, summary.refresh, reviews.refresh]);
-  const transactions = queue.error || queue.loading ? undefined : queue.data;
+  }, [queue.refresh, summary.refresh, reviews.refresh]);
+  const transactions = queue.error ? undefined : queue.data;
   const totals = summary.error ? undefined : summary.data;
   const actionRows = [
     ...(transactions?.actions ?? []),
-    ...(!reviews.error && !reviews.loading ? (reviews.data ?? []) : []),
+    ...(!reviews.error ? (reviews.data ?? []) : []),
   ]
     .sort(
       (a, b) =>
@@ -76,7 +73,8 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
         a.key.localeCompare(b.key),
     )
     .slice(0, 3);
-  const loading = queue.loading || reviews.loading;
+  const loading =
+    (queue.loading && !queue.data) || (reviews.loading && !reviews.data);
   const error = queue.error || reviews.error;
   return (
     <Screen compact onRefresh={refresh}>

@@ -18,6 +18,7 @@ import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
 import { useOfficeAnalytics } from "../analytics";
 import { useTaskFacts, myNativeTasks } from "../tasks";
+import { taskCalendarDate } from "../tasks/taskDates";
 import { useAction } from "../../shared/useAction";
 import type { Navigate } from "../../shared/routes";
 import { DEPARTMENT_REPORTS } from "../../../core/web/app/features/reports/constants";
@@ -178,16 +179,6 @@ function OfficeReports({
           View Office budget and settled expenditure
         </Button>
       )}
-      {webHandoffUrl({ name: "reports" }, backendConfig.webOrigin) && (
-        <Button
-          variant="outline"
-          onPress={() =>
-            navigate({ name: "reports", view: "web", workspaceId })
-          }
-        >
-          Open reports in eFlow Web
-        </Button>
-      )}
       <SearchField
         value={query}
         onChange={setQuery}
@@ -296,7 +287,12 @@ function OfficeReports({
       <Sheet
         open={briefOpen}
         title="Management brief"
-        onClose={() => setBriefOpen(false)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setBriefOpen(false);
+          }
+        }}
         busy={action.busy}
       >
         <Notice>
@@ -328,28 +324,28 @@ function PersonalReports({ navigate }: { navigate: Navigate }) {
       (status === "all" || task.status === status) &&
       (!since || task.createdAt >= since || task.updatedAt >= since),
   );
-  const rows: DepartmentReportRow[] = mine.map((task) => ({
-    id: task.id,
-    kind: "operations",
-    title: task.title,
-    parent: task.description || "—",
-    project: task.projectTitle || "Unlinked work",
-    projectId: task.linkedProjectId,
-    person: profile?.full_name || "Me",
-    personId: profile?.id,
-    role: "My task contribution",
-    status: task.status,
-    priority: task.priority || "medium",
-    progress: task.percentComplete ?? 0,
-    eventAt: task.updatedAt,
-    dueAt:
-      task.deadline || task.dueDate
-        ? new Date(task.deadline || task.dueDate!).getTime()
-        : undefined,
-    metric: `${task.percentComplete ?? 0}% complete`,
-    detail: task.description || "",
-    taskId: task.id,
-  }));
+  const rows: DepartmentReportRow[] = mine.map((task) => {
+    const due = taskCalendarDate(task.deadline || task.dueDate);
+    return {
+      id: task.id,
+      kind: "operations",
+      title: task.title,
+      parent: task.description || "—",
+      project: task.projectTitle || "Unlinked work",
+      projectId: task.linkedProjectId,
+      person: profile?.full_name || "Me",
+      personId: profile?.id,
+      role: "My task contribution",
+      status: task.status,
+      priority: task.priority || "medium",
+      progress: task.percentComplete ?? 0,
+      eventAt: task.updatedAt,
+      dueAt: due ? new Date(due + "T00:00:00").getTime() : undefined,
+      metric: `${task.percentComplete ?? 0}% complete`,
+      detail: task.description || "",
+      taskId: task.id,
+    };
+  });
   const title = `My work report — ${profile?.full_name || "Me"}`,
     scope = `Personal report · Status: ${status} · ${period === "0" ? "All time" : `Last ${period} days`}`;
   return (

@@ -32,7 +32,7 @@ export async function loadOfficeTeam(): Promise<OfficeTeam> {
         cache: "no-store",
         referrerPolicy: "no-referrer",
       },
-      { timeoutMs: 30000, retryOnEndpointChange: false },
+      { timeoutMs: 60_000, retryOnEndpointChange: false },
     );
   } catch (error) {
     if (error instanceof Error && error.message === SESSION_REFRESH_MESSAGE)

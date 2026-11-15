@@ -14,7 +14,13 @@ import {
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
+import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
+import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import {
+  PublicMessageError,
+  isDeterministicRejection,
+} from "../../shared/userMessages";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
 import { confirmAction } from "../../shared/confirm";
 import { draftStore } from "../../../platform/draftStore";
@@ -46,6 +52,7 @@ type Saved = {
 };
 export function ProjectInvitations({ project }: { project: string }) {
   const { profile, organization } = useAuth(),
+    { toast } = useToast(),
     actor = profile!.id,
     facts = useFacts("project-invitations:" + actor + ":" + project, () =>
       listProjectInvitations(project),
@@ -60,12 +67,19 @@ export function ProjectInvitations({ project }: { project: string }) {
     ),
     action = useAction(),
     [open, setOpen] = useState(false),
-    [email, setEmail] = useState(""),
-    [engagement, setEngagement] = useState<Engagement>("Other"),
-    [end, setEnd] = useState(""),
-    [until, setUntil] = useState(true),
     [sponsor, setSponsor] = useState(""),
     [pending, setPending] = useState<Saved>();
+  const [draft, updateDraft, clearDraft] = useRetainedDraft(
+    formDraftKey(actor, "project-invitation:" + project),
+    open && !pending,
+    () => ({
+      email: "",
+      engagement: "Other" as Engagement,
+      end: "",
+      until: true,
+    }),
+  );
+  const { email, engagement, end, until } = draft;
   const recovery = useFacts(
     "invitation-draft:" + actor + ":" + project,
     async () => {
@@ -79,7 +93,9 @@ export function ProjectInvitations({ project }: { project: string }) {
           typeof saved.draft?.id !== "string" ||
           typeof saved.draft?.email !== "string")
       )
-        throw new Error("The saved invitation could not be verified.");
+        throw new PublicMessageError(
+          "The saved invitation could not be verified.",
+        );
       setPending(saved || undefined);
       return true;
     },
@@ -90,13 +106,15 @@ export function ProjectInvitations({ project }: { project: string }) {
       isAppointedOfficeHead(profile, organization ? [organization] : []));
   const submit = () =>
     action.run(async () => {
+      const hadPending = !!pending;
       let saved = pending;
       if (!saved) {
         if (!/^\S+@\S+\.\S+$/.test(email.trim()))
-          throw new Error("Enter a valid email.");
-        if (!until && !end) throw new Error("Choose an access end date.");
+          throw new PublicMessageError("Enter a valid email.");
+        if (!until && !end)
+          throw new PublicMessageError("Choose an access end date.");
         if (!facts.data?.office_id)
-          throw new Error("Designate a sponsoring Office first.");
+          throw new PublicMessageError("Designate a sponsoring Office first.");
         saved = {
           project,
           direct,
@@ -115,26 +133,42 @@ export function ProjectInvitations({ project }: { project: string }) {
         await draftStore.set(actor, "project-invitation:" + project, saved);
         setPending(saved);
       }
-      const receipt = saved.direct
-        ? (
-            await sendProjectInvitation(
+      let receipt: ProjectInvitation;
+      try {
+        receipt = saved.direct
+          ? (
+              await sendProjectInvitation(
+                project,
+                saved.office,
+                saved.draft,
+                saved.timezone,
+              )
+            ).item
+          : await submitProjectInvitation(
               project,
               saved.office,
               saved.draft,
               saved.timezone,
-            )
-          ).item
-        : await submitProjectInvitation(
-            project,
-            saved.office,
-            saved.draft,
-            saved.timezone,
-          );
+            );
+      } catch (err) {
+        if (!hadPending && isDeterministicRejection(err)) {
+          await draftStore
+            .remove(actor, "project-invitation:" + project)
+            .catch(() => {});
+          setPending(undefined);
+        }
+        throw err;
+      }
       if (receipt.id !== saved.draft.id)
-        throw new Error(
+        throw new PublicMessageError(
           "No matching invitation receipt. Retry the original request.",
         );
+      clearDraft();
       await draftStore.remove(actor, "project-invitation:" + project);
+      toast(
+        saved.direct ? "Invitation sent." : "Invitation request submitted.",
+        "success",
+      );
       setPending(undefined);
       setOpen(false);
       await facts.refresh();
@@ -158,6 +192,14 @@ export function ProjectInvitations({ project }: { project: string }) {
       )
         return;
       await decideProjectInvitation(item, state);
+      toast(
+        state === "approved"
+          ? "Invitation approved."
+          : state === "rejected"
+            ? "Invitation rejected."
+            : "Invitation revoked.",
+        "success",
+      );
       await facts.refresh();
     });
   return (
@@ -175,7 +217,10 @@ export function ProjectInvitations({ project }: { project: string }) {
               disabled={
                 recovery.loading || !!recovery.error || !facts.data?.office_id
               }
-              onPress={() => setOpen(true)}
+              onPress={() => {
+                action.clear();
+                setOpen(true);
+              }}
             >
               {direct ? "Invite project member" : "Request project invitation"}
             </Button>
@@ -299,7 +344,9 @@ export function ProjectInvitations({ project }: { project: string }) {
                         const file = (await chooseFiles("application/pdf"))[0];
                         if (!file) return;
                         if (file.size > 10 * 1024 * 1024)
-                          throw new Error("Choose a PDF up to 10 MB.");
+                          throw new PublicMessageError(
+                            "Choose a PDF up to 10 MB.",
+                          );
                         await uploadRequestPds(
                           await asServiceFile(file),
                           item.id,
@@ -329,7 +376,12 @@ export function ProjectInvitations({ project }: { project: string }) {
         open={open}
         title={direct ? "Invite project member" : "Request project invitation"}
         busy={action.busy}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (!action.busy) {
+            action.clear();
+            setOpen(false);
+          }
+        }}
       >
         <Field
           label="Email"
@@ -337,7 +389,7 @@ export function ProjectInvitations({ project }: { project: string }) {
           editable={!pending}
           autoCapitalize="none"
           keyboardType="email-address"
-          onChangeText={setEmail}
+          onChangeText={(next) => updateDraft({ email: next })}
         />
         <Choice
           label="Engagement"
@@ -346,7 +398,7 @@ export function ProjectInvitations({ project }: { project: string }) {
           options={["Permanent", "Job Order", "OJT", "Consultant", "Other"].map(
             (value) => ({ value, label: value }),
           )}
-          onChange={(value) => setEngagement(value as Engagement)}
+          onChange={(value) => updateDraft({ engagement: value as Engagement })}
         />
         <Choice
           label="Access duration"
@@ -356,14 +408,14 @@ export function ProjectInvitations({ project }: { project: string }) {
             { value: "close", label: "Until project closes" },
             { value: "date", label: "Choose end date" },
           ]}
-          onChange={(value) => setUntil(value === "close")}
+          onChange={(value) => updateDraft({ until: value === "close" })}
         />
         {!until && (
           <DateField
             label="Access end date"
             value={end}
             disabled={!!pending}
-            onChange={setEnd}
+            onChange={(next) => updateDraft({ end: next })}
           />
         )}
         <Notice>
