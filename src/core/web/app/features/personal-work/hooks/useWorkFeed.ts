@@ -41,15 +41,15 @@ export function useWorkFeed(userId: string, scope?: WorkScope) {
     useEffect(() => {
         void refresh();
         const timer = __nativeWindow.setInterval(() => {
-            if (!inFlight.current)
+            if (!inFlight.current && !__nativeWindow.document?.hidden)
                 void refresh();
-        }, 15000);
+        }, 30000);
         __nativeWindow.addEventListener("focus", refresh);
         __nativeWindow.addEventListener("eflow:work-updated", refresh);
         __nativeWindow.addEventListener(ACCESS_CHANGED_EVENT, refresh);
         return () => {
             ++generation.current;
-            clearInterval(timer);
+            __nativeWindow.clearInterval(timer);
             __nativeWindow.removeEventListener("focus", refresh);
             __nativeWindow.removeEventListener("eflow:work-updated", refresh);
             __nativeWindow.removeEventListener(ACCESS_CHANGED_EVENT, refresh);

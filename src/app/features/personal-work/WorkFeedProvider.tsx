@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { AppState } from "react-native";
 import { supabase } from "../../../platform/supabase";
 import { nativeWindow } from "../../../platform/webRuntime";
 import { loadWorkFeed } from "../../../core/web/app/features/personal-work/services/workFeedService";
@@ -29,9 +30,20 @@ export function WorkFeedProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!actor) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const isForeground = () => {
+      const state: unknown = AppState.currentState;
+      return (
+        typeof state !== "string" || state === "active" || state === "unknown"
+      );
+    };
     const schedule = () => {
+      if (!isForeground()) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void facts.refresh(), 150);
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (!isForeground()) return;
+        void facts.refresh();
+      }, 900);
     };
     const live = createLiveRefreshController({
       onRefresh: () => void facts.refreshIfStale(),

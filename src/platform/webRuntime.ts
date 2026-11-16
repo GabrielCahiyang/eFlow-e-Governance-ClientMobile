@@ -47,8 +47,18 @@ export async function hydrateWebPreferences() {
   });
 }
 export const nativeDocument: any = {
-  visibilityState: AppState.currentState === "active" ? "visible" : "hidden",
-  hidden: AppState.currentState !== "active",
+  get visibilityState() {
+    const state: unknown = AppState.currentState;
+    return typeof state !== "string" || state === "active" || state === "unknown"
+      ? "visible"
+      : "hidden";
+  },
+  get hidden() {
+    const state: unknown = AppState.currentState;
+    return (
+      typeof state === "string" && state !== "active" && state !== "unknown"
+    );
+  },
   addEventListener: appEvents.addEventListener.bind(appEvents),
   removeEventListener: appEvents.removeEventListener.bind(appEvents),
 };

@@ -75,7 +75,10 @@ export function useWorkTree(rootId: string): WorkTreeController & {
         void reload(false);
         const refresh = () => { if (pending.current === undefined && reading.current === undefined)
             void reload(true); };
-        const timer = __nativeWindow.setInterval(refresh, 15000);
+        const timer = __nativeWindow.setInterval(() => {
+            if (!__nativeWindow.document?.hidden)
+                refresh();
+        }, 30000);
         __nativeWindow.addEventListener('focus', refresh);
         __nativeWindow.addEventListener('eflow:work-updated', refresh);
         return () => { active.current = false; ++generation.current; __nativeWindow.clearInterval(timer); __nativeWindow.removeEventListener('focus', refresh); __nativeWindow.removeEventListener('eflow:work-updated', refresh); };

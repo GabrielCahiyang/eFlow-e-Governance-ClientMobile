@@ -19,13 +19,24 @@ async function rememberResponse(data:WorkTreeSnapshot,before:Awaited<ReturnType<
  const after=await clientSession();
  if(before&&after&&before.actorId===after.actorId&&before.token===after.token)rememberWorkCapabilityContext(data,before.actorId);
 }
+const inFlightTrees=new Map<string,Promise<WorkTreeSnapshot>>();
 export async function fetchWorkTree(root:string):Promise<WorkTreeSnapshot>{
- const before=await clientSession();
- const {data,error}=await supabase.rpc('r7_work_tree',{p_root:root});
- if(error){if(error.code==='PGRST202')throw new WorkTreeUnavailable('Nested work is not installed on this server yet.');throw Object.assign(new Error(error.message),{code:error.code});}
- if(!data?.root?.id||data.root.id!==root||!Array.isArray(data.nodes)||!Array.isArray(data.people))throw new Error('Could not verify the current work tree.');
- await rememberResponse(data,before);
- return data as WorkTreeSnapshot;
+ const existing=inFlightTrees.get(root);
+ if(existing)return existing;
+ const request=(async()=>{
+  const before=await clientSession();
+  const {data,error}=await supabase.rpc('r7_work_tree',{p_root:root});
+  if(error){if(error.code==='PGRST202')throw new WorkTreeUnavailable('Nested work is not installed on this server yet.');throw Object.assign(new Error(error.message),{code:error.code});}
+  if(!data?.root?.id||data.root.id!==root||!Array.isArray(data.nodes)||!Array.isArray(data.people))throw new Error('Could not verify the current work tree.');
+  await rememberResponse(data,before);
+  return data as WorkTreeSnapshot;
+ })();
+ inFlightTrees.set(root,request);
+ try{
+  return await request;
+ }finally{
+  if(inFlightTrees.get(root)===request)inFlightTrees.delete(root);
+ }
 }
 export async function saveWorkTree(root:string,request:WorkRequest):Promise<WorkTreeSnapshot>{
  if(request.command==='progress'){const issue=integerError(request.payload.progress,'Progress',0,99);if(issue)throw new WorkRequestFailure('confirmed_failure',issue);}
