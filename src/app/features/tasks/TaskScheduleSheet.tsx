@@ -191,6 +191,9 @@ export function TaskScheduleSheet({
     >
       {(!editState.data || editState.error) && <Notice>{detailEditingUnavailable}</Notice>}
       {editState.data?.started && <Notice>Work has started. Start date and prerequisites are locked. An authorized reschedule needs a reason.</Notice>}
+      <Notice>
+        Prerequisites must be completed before dependent work can proceed.
+      </Notice>
       <DateField
         label="Start date"
         value={draft.start}
@@ -221,9 +224,6 @@ export function TaskScheduleSheet({
         <Field label="Reason for changing the due date" required multiline maxLength={1000}
           value={formDraft.changeReason || ""} onChangeText={(changeReason) => updateFormDraft({ changeReason })}
           editable={!action.busy && !unconfirmed && allowed && editState.data.due} />}
-      <Notice>
-        Prerequisites must be completed before dependent work can proceed.
-      </Notice>
       {tasks.loading ? (
         <Loading layout="verification" label="Loading current prerequisites…" />
       ) : tasks.error ? (

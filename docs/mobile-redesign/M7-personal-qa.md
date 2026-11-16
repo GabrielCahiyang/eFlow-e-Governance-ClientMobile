@@ -2,6 +2,10 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## All Task edit-modal notices at the top — 16 November 2026 follow-up
+
+The placement request covers the entire informational/warning block, not only “Work has started…”. Task editor guidance and restriction banners now precede every input; field labels/errors remain with their inputs. No new SQL or authority change is involved. [Delta and verification limits](M7-modal-notices.md). PASS: 636 tests / 146 suites, TypeScript/Metro, Android+iOS JS exports, Android release/signature/30-source checks and three-executable credential audit. [Modal-Notices REVIEW APK](../../artifacts/M7/eFlow-Mobile-M7-Modal-Notices-REVIEW-v57-arm64-x86_64.apk) · [v2 Web handoff](../../artifacts/M7/eFlow-Web-Workflow-UX-Dependency-Linking-Handoff-2026-11-16-v2.zip). Previous packages do not include this clarification. Native visual/role acceptance remains pending.
+
 ## Workflow feedback and date-neutral prerequisites — latest 16 November 2026
 
 Task/Subtask Delete now sits beside Edit; background action checks retain disabled controls with small feedback. Start work confirms first. Ordinary edit forms reopen from saved values, while open-form failure input and uncertain-request recovery remain. The started-work notice is above Task fields, and child schedule errors ask the appointed Task Lead to reschedule the named Subtask. Mobile prerequisite selection/save validation now permits overlap and missing prerequisite due dates while preserving own bounds and all execution/permission/history gates.

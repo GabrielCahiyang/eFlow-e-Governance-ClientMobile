@@ -368,6 +368,14 @@ export function ProjectTaskEditor({
       busy={action.busy}
     >
       {task && editState.data?.started && <Notice>Work has started. You can correct its name and priority. Start date, prerequisites and structure are locked. Rescheduling requires supervising authority and a reason.</Notice>}
+      {!task && <Notice>Start and due dates default to the project schedule.</Notice>}
+      {task && (!editState.data || editState.error) && <Notice>{detailEditingUnavailable}</Notice>}
+      {showPrerequisites && prerequisiteFacts.error && <Notice>Task prerequisites are unavailable.</Notice>}
+      {showPrerequisites && !prerequisiteFacts.loading && !prerequisiteFacts.error && restrictedPrerequisites > 0 &&
+        <Notice>{restrictedPrerequisites} restricted prerequisite(s). The list is read-only.</Notice>}
+      {task && structure.data === "delegated" && (task.dependencyIds?.length ?? 0) > 0 && (
+        <Notice>See the Task details for its prerequisites. An authorized Head can edit them.</Notice>
+      )}
       <Field
         label="Task name"
         required
@@ -384,8 +392,6 @@ export function ProjectTaskEditor({
         onChange={(next) => updateDraft({ priority: next })}
         disabled={action.busy || unconfirmed || !detailsAllowed}
       />
-      {!task && <Notice>Start and due dates default to the project schedule.</Notice>}
-      {task && (!editState.data || editState.error) && <Notice>{detailEditingUnavailable}</Notice>}
       {timeline && (
         <>
           <DateField
@@ -452,13 +458,7 @@ export function ProjectTaskEditor({
             disabled={action.busy || unconfirmed || (!!task && (!detailsAllowed || !editState.data?.planning)) || prerequisiteFacts.loading ||
               !!prerequisiteFacts.error || restrictedPrerequisites > 0}
           />
-          {!!prerequisiteFacts.error && <Notice>Task prerequisites are unavailable.</Notice>}
-          {!prerequisiteFacts.loading && !prerequisiteFacts.error && restrictedPrerequisites > 0 &&
-            <Notice>{restrictedPrerequisites} restricted prerequisite(s). The list is read-only.</Notice>}
         </>
-      )}
-      {task && structure.data === "delegated" && (task.dependencyIds?.length ?? 0) > 0 && (
-        <Notice>See the Task details for its prerequisites. An authorized Head can edit them.</Notice>
       )}
       <Button
         busy={action.busy}

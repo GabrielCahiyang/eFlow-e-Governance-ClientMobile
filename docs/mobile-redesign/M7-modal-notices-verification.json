@@ -1,0 +1,30 @@
+{
+  "atLocalDate": "2026-11-16",
+  "scope": "All Task edit-modal informational/warning banners precede fields",
+  "checks": {
+    "typeScriptMetro": "PASS; 9 Metro checks",
+    "tests": "PASS; 636 tests / 146 suites",
+    "androidJsExport": "PASS",
+    "iosJsExport": "PASS",
+    "androidRelease": "PASS arm64-v8a + x86_64",
+    "apkSignature": "PASS",
+    "currentActiveSourceMatches": 30,
+    "credentialAudit": "PASS; 3 executable bundles",
+    "gitDiffWhitespace": "PASS"
+  },
+  "apk": "artifacts/M7/eFlow-Mobile-M7-Modal-Notices-REVIEW-v57-arm64-x86_64.apk",
+  "apkSha256": "8598595d8e4b4c1713265fe75cdb27ef8f4c682b372f5558c977932dea9e48a8",
+  "webHandoff": "artifacts/M7/eFlow-Web-Workflow-UX-Dependency-Linking-Handoff-2026-11-16-v2.zip",
+  "sourceFiles": [
+    "src/app/features/projects/ProjectTaskEditor.tsx",
+    "src/app/features/tasks/TaskScheduleSheet.tsx"
+  ],
+  "unbundledChangedComponent": "src/app/features/tasks/TaskScheduleSheet.tsx",
+  "backendChanges": "NONE; no SQL required for placement",
+  "priorDependencyCandidate": "PENDING; not applied by agent",
+  "productionAccessThisFollowup": false,
+  "androidInstallWorkflow": "NOT RUN",
+  "iosNativeWorkflow": "NOT RUN",
+  "visualAccessibilityAcceptance": "NOT RUN; both platforms require device verification",
+  "personalAcceptance": "PENDING"
+}
