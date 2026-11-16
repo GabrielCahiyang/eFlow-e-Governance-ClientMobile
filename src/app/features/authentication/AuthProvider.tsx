@@ -46,6 +46,10 @@ type AuthValue = {
   signOut: () => Promise<void>;
 };
 const AuthContext = createContext<AuthValue | null>(null);
+/** Realtime filter for the role-default rows that can change this actor's access. */
+export function roleDefaultsFilter(role: string) {
+  return "role=eq." + role;
+}
 function temporaryFailure(error: unknown) {
   const failure = error as { status?: number; name?: string } | null;
   if (failure?.status === 401 || failure?.status === 403) return false;
@@ -298,11 +302,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "role_permissions" },
-        accessChanged,
-      )
-      .on(
-        "postgres_changes",
         {
           event: "*",
           schema: "public",
@@ -342,6 +341,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void supabase.removeChannel(channel);
     };
   }, [user?.id, refresh, requestRefresh]);
+  // Only the actor's own role defaults affect resolved permissions. A role
+  // change arrives through the `profiles` listener and resubscribes here.
+  const role = profile?.role;
+  useEffect(() => {
+    if (!user || !role) return;
+    let subscribed = false;
+    const accessChanged = () => {
+      actionAccess.current.ready = false;
+      clearDisplayCache("access");
+      void requestRefresh(true);
+    };
+    const channel = createPostgresChannel(
+      "native-role-access-" + user.id,
+    )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "role_permissions",
+          filter: roleDefaultsFilter(role),
+        },
+        accessChanged,
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          if (subscribed) void requestRefresh(true);
+          subscribed = true;
+        }
+      });
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, role, requestRefresh]);
   const signOut = async () => {
     current.current = null;
     actionAccess.current.ready = false;

@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { useAuth } from "../authentication";
-import { createLiveRefreshController } from "../../shared/liveUpdates";
+import {
+  BULK_REFRESH_DEBOUNCE_MS,
+  BULK_REFRESH_MAX_WAIT_MS,
+  createLiveRefreshController,
+} from "../../shared/liveUpdates";
 import { useFacts } from "../../shared/useFacts";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { supabase } from "../../../platform/supabase";
@@ -16,6 +20,9 @@ export function useTaskFacts(scope: string, enabled = true) {
     if (!profile || !enabled) return;
     const live = createLiveRefreshController({
       onRefresh: () => void facts.refresh(),
+      // Unfiltered `tasks` listener: coalesce system-wide bursts.
+      debounceMs: BULK_REFRESH_DEBOUNCE_MS,
+      maxWaitMs: BULK_REFRESH_MAX_WAIT_MS,
       hasRealtime: true,
     });
     const channel = createPostgresChannel(

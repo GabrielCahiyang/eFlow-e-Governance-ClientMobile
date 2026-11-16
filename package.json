@@ -49,6 +49,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@lottiefiles/dotlottie-react": "^0.13.5",
     "@react-native/jest-preset": "0.88.0",
     "@resvg/resvg-js": "2.6.2",
     "@testing-library/react-native": "^14.1.0",

@@ -19,6 +19,7 @@ let mockProfile = {
 let mockReceive: (event: string, session: unknown) => void;
 let mockAccessChanged: () => void;
 let mockSubscribeStatus: ((status: string) => void) | undefined;
+let mockListeners: { table?: string; filter?: string }[] = [];
 jest.mock("../../../../platform/supabase", () => ({
   supabase: {
     auth: {
@@ -53,7 +54,8 @@ jest.mock("../../../../platform/supabase", () => ({
 }));
 jest.mock("../../../shared/postgresChannel", () => ({
   createPostgresChannel: () => ({
-    on(_event: string, _filter: unknown, callback: () => void) {
+    on(_event: string, filter: { table?: string; filter?: string }, callback: () => void) {
+      mockListeners.push(filter);
       mockAccessChanged = callback;
       return this;
     },
@@ -72,6 +74,7 @@ jest.mock("../../../../platform/push", () => ({
 
 let foreground: (state: AppStateStatus) => void;
 beforeEach(() => {
+  mockListeners = [];
   mockProfile = {
     id: "member-a",
     role: "member",
@@ -238,4 +241,29 @@ test("realtime reconnect refreshes access without clearing display cache when ac
   } finally {
     unsubscribe();
   }
+});
+test("role defaults are watched only for the actor's own role, never the whole table", async () => {
+  const view = await setup();
+  await waitFor(() =>
+    expect(view.result.current.auth.profile?.id).toBe(actor.id),
+  );
+  const roleListeners = mockListeners.filter(
+    (listener) => listener.table === "role_permissions",
+  );
+  expect(roleListeners).toEqual([
+    expect.objectContaining({ filter: "role=eq.member" }),
+  ]);
+  // Personal access sources stay scoped to the actor.
+  expect(mockListeners).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ table: "profiles", filter: "id=eq.member-a" }),
+      expect.objectContaining({
+        table: "user_permission_overrides",
+        filter: "user_id=eq.member-a",
+      }),
+    ]),
+  );
+  // A role-default change for the actor's role re-verifies access.
+  await act(async () => mockAccessChanged());
+  await waitFor(() => expect(supabase.auth.getUser).toHaveBeenCalledTimes(2));
 });

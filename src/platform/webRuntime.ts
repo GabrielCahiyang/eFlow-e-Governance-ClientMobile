@@ -46,18 +46,19 @@ export async function hydrateWebPreferences() {
     if (value !== null) local.set(key.slice(9), value);
   });
 }
+// Last app state seen; updated by the AppState listener below before
+// visibilitychange is dispatched, so readers never see a stale snapshot.
+let appVisibilityState: unknown = AppState.currentState;
+const appIsVisible = () =>
+  typeof appVisibilityState !== "string" ||
+  appVisibilityState === "active" ||
+  appVisibilityState === "unknown";
 export const nativeDocument: any = {
   get visibilityState() {
-    const state: unknown = AppState.currentState;
-    return typeof state !== "string" || state === "active" || state === "unknown"
-      ? "visible"
-      : "hidden";
+    return appIsVisible() ? "visible" : "hidden";
   },
   get hidden() {
-    const state: unknown = AppState.currentState;
-    return (
-      typeof state === "string" && state !== "active" && state !== "unknown"
-    );
+    return !appIsVisible();
   },
   addEventListener: appEvents.addEventListener.bind(appEvents),
   removeEventListener: appEvents.removeEventListener.bind(appEvents),
@@ -89,8 +90,9 @@ export const nativeWindow: any = {
   },
 };
 AppState.addEventListener("change", (state) => {
-  nativeDocument.visibilityState = state === "active" ? "visible" : "hidden";
-  nativeDocument.hidden = state !== "active";
+  // visibilityState/hidden are getters; assigning them throws and would stop
+  // visibilitychange/focus from being dispatched.
+  appVisibilityState = state;
   appEvents.dispatchEvent({ type: "visibilitychange" });
   if (state === "active") appEvents.dispatchEvent({ type: "focus" });
 });

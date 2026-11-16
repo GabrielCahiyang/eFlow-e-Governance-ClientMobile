@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, jest, test } from "@jest/globals";
 import { AppState, type AppStateStatus } from "react-native";
 import {
+  BULK_REFRESH_DEBOUNCE_MS,
+  BULK_REFRESH_MAX_WAIT_MS,
   createLiveRefreshController,
   DEGRADED_REALTIME_POLL_MS,
   FALLBACK_POLL_MS,
@@ -133,4 +135,77 @@ test("partial publications keep foreground catch-up polling while subscribed and
   controller.dispose();
   jest.advanceTimersByTime(60_000);
   expect(onRefresh).toHaveBeenCalledTimes(2);
+});
+
+test("bulk change bursts coalesce into one refresh and never wait past the max wait", () => {
+  const onRefresh = jest.fn();
+  const controller = createLiveRefreshController({
+    onRefresh,
+    debounceMs: BULK_REFRESH_DEBOUNCE_MS,
+    maxWaitMs: BULK_REFRESH_MAX_WAIT_MS,
+    hasRealtime: true,
+    pollIntervalMs: 0,
+  });
+  controller.onChannelStatus("SUBSCRIBED");
+
+  // 20 system-wide changes within the debounce window cost one reload.
+  for (let i = 0; i < 20; i++) {
+    controller.schedule();
+    jest.advanceTimersByTime(50);
+  }
+  expect(onRefresh).not.toHaveBeenCalled();
+  jest.advanceTimersByTime(BULK_REFRESH_DEBOUNCE_MS);
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+
+  // A continuous stream cannot starve the refresh beyond the max wait.
+  for (let elapsed = 0; elapsed < BULK_REFRESH_MAX_WAIT_MS; elapsed += 500) {
+    controller.schedule();
+    jest.advanceTimersByTime(500);
+  }
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+
+  controller.dispose();
+  jest.advanceTimersByTime(BULK_REFRESH_MAX_WAIT_MS);
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+});
+
+test("changes received while backgrounded refresh once on return, and quiet trips stay silent", () => {
+  const onRefresh = jest.fn();
+  const controller = createLiveRefreshController({
+    onRefresh,
+    debounceMs: BULK_REFRESH_DEBOUNCE_MS,
+    hasRealtime: true,
+    pollIntervalMs: 0,
+  });
+  controller.onChannelStatus("SUBSCRIBED");
+
+  // No reload work while the app is not visible.
+  setAppState("background");
+  controller.schedule();
+  controller.schedule();
+  jest.advanceTimersByTime(BULK_REFRESH_DEBOUNCE_MS * 3);
+  expect(onRefresh).not.toHaveBeenCalled();
+
+  // A brief trip still catches up on the missed change exactly once.
+  setAppState("active");
+  jest.advanceTimersByTime(BULK_REFRESH_DEBOUNCE_MS);
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+
+  // A pending trailing refresh that fires in the background is deferred.
+  controller.schedule();
+  setAppState("background");
+  jest.advanceTimersByTime(BULK_REFRESH_DEBOUNCE_MS);
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+  setAppState("active");
+  jest.advanceTimersByTime(BULK_REFRESH_DEBOUNCE_MS);
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+
+  // A brief trip with no changes does not reload.
+  setAppState("background");
+  jest.advanceTimersByTime(10_000);
+  setAppState("active");
+  jest.advanceTimersByTime(BULK_REFRESH_DEBOUNCE_MS);
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+
+  controller.dispose();
 });
