@@ -75,7 +75,7 @@ export function ConversationInfo({
       title="Conversation info"
       onClose={onClose}
       busy={pin.busy}
-      footer={<Button onPress={onClose}>Done</Button>}
+      footer={<Button onPress={onClose}>Close conversation info</Button>}
     >
       <Card>
         <Row>

@@ -70,6 +70,10 @@ test("login uses plain offline/timeout/account guidance, never the supplied acco
 });
 
 test.each([
+  [{ code: "22023", message: "Complete earlier subtasks before starting this subtask" }, /Cancelled work does not count as completed/],
+  [{ code: "23514", message: "Complete every selected prerequisite before starting this subtask." }, /Complete every selected prerequisite/],
+  [{ code: "22023", message: "Complete earlier ordered steps first" }, /earlier ordered subtasks before completing/],
+  [{ code: "22023", message: "Add subtasks directly to their task." }, /Open the parent task/],
   [{ code: "42501", message: "Only the appointed Task Lead can start this task" }, /appointed Task Lead/],
   [{ code: "22023", message: "Choose a start date within the parent schedule, or reschedule the parent first" }, /parent schedule/],
   [{ code: "P0001", message: "Project is on hold" }, /project is on hold/],
@@ -236,4 +240,18 @@ test.each([
   new PublicMessageError(feedback.saved),
 ])("keeps recovery locked on ambiguous, transient, or unknown errors: %j", (error) => {
   expect(isDeterministicRejection(error)).toBe(false);
+});
+
+
+test("timeline validation directs the user to the appointed Task Lead",()=>{
+ expect(userErrorMessage({code:"22023",message:'Reschedule subtask "Create the meeting sign-in sheet" before changing this timeline.'},"action"))
+ .toMatch(/Ask the appointed Task Lead to reschedule .*Create the meeting sign-in sheet.* first\./);
+});
+
+test.each([
+  "Task start date is earlier than a prerequisite due date. Adjust the schedule first",
+  "The subtask starts before a prerequisite is due. Adjust the schedule first.",
+])("an older server's date-only linking rejection clearly identifies the backend dependency: %s", message => {
+  expect(userErrorMessage({ code: "23514", message }, "action"))
+    .toBe("Prerequisite linking needs a backend update. Contact your Office Head.");
 });

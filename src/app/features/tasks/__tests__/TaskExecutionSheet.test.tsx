@@ -124,11 +124,11 @@ test("TaskExecutionSheet requires Blocker when Blocked and maps payload plus opt
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 
-test("TaskExecutionSheet defaults to In progress even with an active blocker, while retaining draft values across close/reopen", async () => {
-  jest.mocked(submitProgressUpdate).mockResolvedValueOnce(undefined as never);
+test("TaskExecutionSheet reopens with saved blocker state, discards abandoned edits and still clears blockers explicitly", async () => {
+  jest.mocked(submitProgressUpdate).mockResolvedValue(undefined as never);
 
   const onClose = jest.fn();
-  await render(
+  const view = await render(
     <TaskExecutionSheet
       taskId="task-3"
       initialBlocker="Missing vendor quote"
@@ -139,8 +139,13 @@ test("TaskExecutionSheet defaults to In progress even with an active blocker, wh
   );
 
   expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent(
-    "In progress",
+    "Blocked",
   );
+  expect(screen.getByDisplayValue("Missing vendor quote")).toBeOnTheScreen();
+
+  // Switching back to In progress clears the blocker on submit
+  await fireEvent.press(screen.getByRole("button", { name: "Work state" }));
+  await fireEvent.press(await screen.findByRole("radio", { name: "In progress" }));
   expect(screen.queryByLabelText("Blocker")).toBeNull();
 
   await fireEvent.changeText(screen.getByLabelText("Work note"), "Quote received");
@@ -149,8 +154,9 @@ test("TaskExecutionSheet defaults to In progress even with an active blocker, wh
   // Close without submitting preserves draft values
   await fireEvent.press(screen.getByRole("button", { name: "Close dialog" }));
   expect(onClose).toHaveBeenCalledTimes(1);
+  await view.unmount();
 
-  await render(
+  const reopened = await render(
     <TaskExecutionSheet
       taskId="task-3"
       initialBlocker="Missing vendor quote"
@@ -159,8 +165,15 @@ test("TaskExecutionSheet defaults to In progress even with an active blocker, wh
       onSaved={jest.fn(async () => {})}
     />,
   );
-  expect(screen.getByDisplayValue("Quote received")).toBeOnTheScreen();
-  expect(screen.getByDisplayValue("Proceed with PO")).toBeOnTheScreen();
+  expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent(
+    "Blocked",
+  );
+  expect(screen.getByDisplayValue("Missing vendor quote")).toBeOnTheScreen();
+  expect(screen.queryByDisplayValue("Quote received")).toBeNull();
+  await fireEvent.press(screen.getByRole("button", { name: "Work state" }));
+  await fireEvent.press(await screen.findByRole("radio", { name: "In progress" }));
+  await fireEvent.changeText(screen.getByLabelText("Work note"), "Quote received");
+  await fireEvent.changeText(screen.getByLabelText("Next step"), "Proceed with PO");
 
   await fireEvent.press(screen.getByRole("button", { name: "Post update" }));
   await waitFor(() => {
@@ -174,4 +187,31 @@ test("TaskExecutionSheet defaults to In progress even with an active blocker, wh
       attachment: null,
     });
   });
+  await reopened.unmount();
+
+  // untouched blocker state clears automatically when active blocker is cleared remotely
+  clearAllFormDrafts();
+  const blockedUntouched = await render(
+    <TaskExecutionSheet
+      taskId="task-4"
+      initialBlocker="Remote blocker"
+      onClose={jest.fn()}
+      verifyAccess={jest.fn(async () => {})}
+      onSaved={jest.fn(async () => {})}
+    />,
+  );
+  expect(screen.getByDisplayValue("Remote blocker")).toBeOnTheScreen();
+  await blockedUntouched.rerender(
+    <TaskExecutionSheet
+      taskId="task-4"
+      initialBlocker={null}
+      onClose={jest.fn()}
+      verifyAccess={jest.fn(async () => {})}
+      onSaved={jest.fn(async () => {})}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent(
+    "In progress",
+  );
+  expect(screen.queryByLabelText("Blocker")).toBeNull();
 });

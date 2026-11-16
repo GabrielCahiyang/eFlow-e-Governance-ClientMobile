@@ -72,7 +72,7 @@ export function ProjectOffices({
       email: "",
       officeId: "",
       access: "collaborating" as "collaborating" | "observer",
-    }),
+    }), { restoreOnOpen: false },
   );
   const { name, email, officeId, access } = draft;
   const closed = ["completed", "archived"].includes(project.status);
@@ -261,6 +261,7 @@ export function ProjectOffices({
             <Choice
               label="Project access"
               value={access}
+              searchable={false}
               onChange={(next) =>
                 updateDraft({ access: next as "collaborating" | "observer" })
               }

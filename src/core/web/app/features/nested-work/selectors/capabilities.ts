@@ -8,6 +8,7 @@ const reasons:Record<WorkCapabilityReasonCode|'capability_unavailable',string>={
  lifecycle_blocked:'This task is not ready for this change yet.',
  history_blocked:'Existing work history or commitments block this change.',
  project_on_hold:'Work updates are paused while the project is under review.',
+ active_staffing_locked:'Task Lead and Subtask Lead cannot be changed after the project is active.',
  capability_unavailable:'Action availability could not be verified. Reload the work.',
 };
 const rootActions:readonly RootWorkAction[]=['manage_contributors','appoint_lead','create_child','order_children'];

@@ -30,7 +30,7 @@ export function CoachingSheet({
       weaknesses: note?.weaknesses || "",
       notes: note?.notes || "",
       tags: note?.tags.join(", ") || "",
-    })),
+    }), { restoreOnOpen: false }),
     { strengths, weaknesses, notes, tags } = draft,
     { toast } = useToast(),
     action = useAction();

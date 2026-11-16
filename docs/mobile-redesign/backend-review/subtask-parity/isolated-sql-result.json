@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-15T12:52:59.613Z",
+  "checks": 47,
+  "migrationSha256": "e75657f3fa13dd8411ce0d1681d383475b1437727006298ea143babe3f266d85",
+  "scope": "Isolated PGlite PostgreSQL with captured actual RPC/guard bodies and explicitly synthetic identity/scope helpers",
+  "beforePatch": "Reproduced earlier-sibling rejection for explicit []",
+  "afterPatch": "Explicit [] and satisfied selected prerequisites allow Start and Complete; NULL retains legacy sequence",
+  "functionMetadataPreserved": true,
+  "hostedWrites": 0,
+  "staging": "BLOCKED: no authorized staging target/actors",
+  "webMobileAuthenticatedParity": "BLOCKED: no approved actors/fixtures"
+}

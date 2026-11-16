@@ -262,6 +262,7 @@ export function DeliveryAnalytics({
       <Choice
         label="Status filter"
         value={status}
+        searchable={false}
         onChange={(v) => {
           setStatus(v);
           setLimit(25);

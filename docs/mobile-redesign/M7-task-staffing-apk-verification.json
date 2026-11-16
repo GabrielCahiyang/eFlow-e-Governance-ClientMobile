@@ -1,0 +1,30 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Task-People-Permissions-v57-arm64-x86_64.apk",
+  "versionCode": 57,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5710716,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "415031ccb16e06adbdc0e771f320a2e3611c69897b894a293dc2869bf6dab1c3",
+  "bytes": 99552741,
+  "featureSourcesMatched": [
+    "src/app/features/tasks/TaskDetailsScreen.tsx",
+    "src/app/features/tasks/WorkEditorSheet.tsx",
+    "src/app/features/tasks/workPermissions.ts",
+    "src/app/features/tasks/workRecovery.ts",
+    "src/app/features/tasks/postCreateStaffingPrompt.tsx",
+    "src/app/features/tasks/WorkProposalSheet.tsx"
+  ],
+  "nativeInstallation": "NOT RUN",
+  "authenticatedWorkflow": "BLOCKED: approved dedicated actors and fixture not designated",
+  "nativeIosCompilation": "NOT RUN: Mac/Xcode unavailable",
+  "signatureVerified": true
+}

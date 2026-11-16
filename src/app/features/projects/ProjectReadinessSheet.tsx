@@ -121,7 +121,7 @@ export function ProjectReadinessSheet({
       footer={
         <Row>
           <Button variant="outline" disabled={action.busy} onPress={onClose}>
-            Done for now
+            Close readiness checklist
           </Button>
           {!!canManage && (
             <Button

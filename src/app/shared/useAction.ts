@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useAccountActionAccess } from "./AccountActionAccess";
+import { beginOperation } from "./operationActivity";
 export function useAction({ requireAccess = true } = {}) {
   const assertAccess = useAccountActionAccess();
   const pending = useRef(false);
@@ -16,8 +17,10 @@ export function useAction({ requireAccess = true } = {}) {
     setBusy(true);
     setError(undefined);
     setNotice("");
+    let finish: (() => void) | undefined;
     try {
       if (requireAccess) assertAccess();
+      finish = beginOperation("update");
       await action();
       setNotice(message);
       onDone?.();
@@ -36,6 +39,7 @@ export function useAction({ requireAccess = true } = {}) {
       }
       return false;
     } finally {
+      finish?.();
       pending.current = false;
       setBusy(false);
     }

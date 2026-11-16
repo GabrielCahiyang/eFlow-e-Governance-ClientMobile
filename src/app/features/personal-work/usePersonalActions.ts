@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PublicMessageError, userErrorMessage } from "../../shared/userMessages";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
+import { beginOperation } from "../../shared/operationActivity";
 import { useToast } from "../../components/ui/Toast";
 import { draftStore } from "../../../platform/draftStore";
 import { sendPersonalRequest, PersonalCommandFailure } from "./services";
@@ -90,6 +91,7 @@ export function usePersonalActions(
     setNotice("");
     setCanDiscard(false);
     const version = generation.current;
+    const finish = beginOperation("update");
     try {
       assertAccess(actor);
       let saved = receipt.current;
@@ -137,6 +139,7 @@ export function usePersonalActions(
       }
       return false;
     } finally {
+      finish();
       active.current = false;
       if (version === generation.current) setBusy(false);
     }

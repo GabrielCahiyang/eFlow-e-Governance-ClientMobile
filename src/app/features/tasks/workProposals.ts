@@ -27,6 +27,7 @@ export type WorkProposal = {
   terms: {
     note: string;
     blocker?: string;
+    next_step?: string;
     progress?: number;
     attachments?: TaskSubmissionAttachment[];
   };

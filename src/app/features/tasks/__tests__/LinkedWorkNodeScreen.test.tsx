@@ -35,15 +35,19 @@ jest.mock(
 );
 jest.mock("../WorkTreePanel", () => ({
   WorkTreePanel: ({
+    data,
     focusNodeId,
     funding,
   }: {
+    data: WorkTreeSnapshot;
     focusNodeId: string;
     funding?: React.ReactNode;
   }) => {
     const { Text, View } = require("react-native");
+    const nodeTitle = data.nodes.find((node) => node.id === focusNodeId)?.title;
     return (
       <View>
+        {!!nodeTitle && <Text>{nodeTitle}</Text>}
         <Text>{"Focused branch " + focusNodeId}</Text>
         {funding}
       </View>
@@ -105,13 +109,14 @@ test("personal links pass the exact branch from its verified root to the focused
   await waitFor(() =>
     expect(screen.getByText("Focused branch depth-eight")).toBeOnTheScreen(),
   );
-  expect(screen.getByText("Exact branch")).toBeOnTheScreen();
+  // Overview renders the branch title once inside WorkTreePanel without duplicating it in Screen
+  expect(screen.getAllByText("Exact branch")).toHaveLength(1);
   expect(screen.queryByText(/Funding/)).toBeNull();
   expect(screen.queryByText("Sibling")).toBeNull();
   expect(fetchWorkTree).toHaveBeenLastCalledWith("root");
 });
 
-test("an assigned Office subtask can be opened before its parent starts", async () => {
+test("an assigned Office subtask is hidden until its parent Task starts, then a refresh reveals it", async () => {
   const office = {
     ...tree,
     root: {
@@ -138,11 +143,13 @@ test("an assigned Office subtask can be opened before its parent starts", async 
       }}
     />,
   );
-  expect(await screen.findByText("Exact branch")).toBeOnTheScreen();
+  expect(await screen.findByText("Subtasks will be available when the Task Lead starts the parent task.")).toBeOnTheScreen();
+  expect(screen.queryByText("Exact branch")).toBeNull();
   expect(screen.queryByText(/Funding/)).toBeNull();
   expect(screen.queryByText("Open subtask funding")).toBeNull();
   jest.mocked(fetchWorkTree).mockResolvedValue({
     ...office,
+    root: { ...office.root, status: "in_progress" },
     nodes: office.nodes.map((node) => node.id === "depth-eight"
       ? { ...node, title: "Updated on another device" }
       : node),

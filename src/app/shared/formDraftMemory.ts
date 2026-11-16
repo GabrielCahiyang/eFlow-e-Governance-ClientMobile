@@ -51,6 +51,7 @@ export function useRetainedDraft<T extends Record<string, unknown>>(
   key: string,
   active: boolean,
   getInitial: () => T,
+  { restoreOnOpen = true }: { restoreOnOpen?: boolean } = {},
 ): readonly [
   T,
   (updater: Partial<T> | ((current: T) => T)) => void,
@@ -62,9 +63,11 @@ export function useRetainedDraft<T extends Record<string, unknown>>(
   keyRef.current = key;
   const activeRef = useRef(active);
   activeRef.current = active;
+  const restoreRef = useRef(restoreOnOpen);
+  restoreRef.current = restoreOnOpen;
 
   const [state, setState] = useState<T>(
-    () => readFormDraft<T>(key) ?? getInitialRef.current(),
+    () => (restoreOnOpen ? readFormDraft<T>(key) : undefined) ?? getInitialRef.current(),
   );
 
   const prevActive = useRef(active);
@@ -75,7 +78,7 @@ export function useRetainedDraft<T extends Record<string, unknown>>(
     prevKey.current = key;
     prevActive.current = active;
     if (keyChanged || justOpened) {
-      setState(readFormDraft<T>(key) ?? getInitialRef.current());
+      setState((restoreRef.current ? readFormDraft<T>(key) : undefined) ?? getInitialRef.current());
     }
   }, [key, active]);
 
@@ -96,5 +99,9 @@ export function useRetainedDraft<T extends Record<string, unknown>>(
     setState(getInitialRef.current());
   }, []);
 
-  return [state, updateDraft, clearDraft] as const;
+  const opening = prevKey.current !== key || (!prevActive.current && active);
+  const visibleState = opening
+    ? (restoreRef.current ? readFormDraft<T>(key) : undefined) ?? getInitialRef.current()
+    : state;
+  return [visibleState, updateDraft, clearDraft] as const;
 }

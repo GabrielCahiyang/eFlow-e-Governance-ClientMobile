@@ -85,6 +85,7 @@ export function ProjectAuditTrail({
       <Choice
         label="Activity type"
         value={filters.kind}
+        searchable={false}
         options={categories}
         onChange={(kind) => {
           setPage(firstPage);
@@ -142,7 +143,7 @@ export function ProjectAuditTrail({
                 setPage({ index: page.index - 1, snapshot: history.snapshot })
               }
             >
-              Previous
+              Previous page
             </Button>
             <Button
               variant="outline"
@@ -151,7 +152,7 @@ export function ProjectAuditTrail({
                 setPage({ index: page.index + 1, snapshot: history.snapshot })
               }
             >
-              Next
+              Next page
             </Button>
           </Row>
         </>

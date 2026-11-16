@@ -1,26 +1,28 @@
-import { expect, jest, test, describe } from "@jest/globals";
+import { expect, jest, test, describe, afterEach } from "@jest/globals";
 import { fireEvent, render } from "@testing-library/react-native";
 import { TaskDetailsScreen } from "../TaskDetailsScreen";
 import { getPhilippineCalendarDate } from "../../../../core/web/app/shared/calendarDates";
 jest.mock("../WorkProposalSheet", () => ({ WorkProposalReview: () => null, WorkProposalSheet: () => null }));
 
 let mockStructureAccess: "head" | "delegated" | null = "head";
+let mockStructureLoading = false;
 jest.mock("../../projects/ProjectTaskEditor", () => {
   const actual = jest.requireActual("../../projects/ProjectTaskEditor") as Record<string, unknown>;
   return {
     ...actual,
     useTaskStructure: () => ({
       data: mockStructureAccess,
-      loading: false,
+      loading: mockStructureLoading,
       error: null,
       refresh: jest.fn(async () => {}),
     }),
   };
 });
 
+let mockProfile = { id: "lead-1", role: "head", name: "Andres Manili", org_id: "office-1" };
 jest.mock("../../authentication", () => ({
   useAuth: () => ({
-    profile: { id: "lead-1", role: "head", name: "Andres Manili", org_id: "office-1" },
+    profile: mockProfile,
     organization: { id: "office-1", name: "LEDIPO" },
   }),
 }));
@@ -30,17 +32,22 @@ jest.mock("../../../shared/useAction", () => ({
   useAction: () => ({ run: mockRun, loading: false }),
 }));
 
+const mockSubscribedTables: string[] = [];
 jest.mock("../../../shared/postgresChannel", () => ({
-  createPostgresChannel: () => ({
-    on: () => ({
-      on: () => ({
-        subscribe: () => ({ unsubscribe: jest.fn() }),
-      }),
-    }),
-  }),
+  createPostgresChannel: () => {
+    const channel = {
+      on: (_event: string, filter: { table?: string }) => {
+        if (filter?.table) mockSubscribedTables.push(filter.table);
+        return channel;
+      },
+      subscribe: () => ({ unsubscribe: jest.fn() }),
+    };
+    return channel;
+  },
 }));
 
 let mockTreeBlocker: string | null = null;
+let mockStaffCapabilities = {};
 jest.mock("../../../../core/web/app/features/nested-work/services/workTreeService", () => ({
   fetchWorkTree: jest.fn(async (id: string) => {
     const snapshot = {
@@ -56,9 +63,10 @@ jest.mock("../../../../core/web/app/features/nested-work/services/workTreeServic
         office: "office-1",
         project_status: mockProjectStatus,
         people: [],
-        capabilities: mockTreeRootCreateAllowed
-          ? { create_child: { allowed: true, reason_code: null } }
-          : {},
+        capabilities: {
+          ...(mockTreeRootCreateAllowed ? { create_child: { allowed: true, reason_code: null } } : {}),
+          ...mockStaffCapabilities,
+        },
       },
       nodes: [],
       people: [{ id: "lead-1", name: "Andres Manili" }],
@@ -135,6 +143,59 @@ jest.mock("../../../../platform/supabase", () => ({
     }),
   },
 }));
+
+describe("Task staffing permissions", () => {
+  afterEach(() => {
+    mockStructureLoading = false;
+    mockProfile = { id: "lead-1", role: "head", name: "Andres Manili", org_id: "office-1" };
+    mockStaffCapabilities = {};
+    mockProjectLeadId = null;
+    mockTaskRow.status = "in_progress";
+  });
+  test.each(["todo", "in_progress"])("Task visibility remains available and Delete follows its %s state", async (status) => {
+    mockProjectStatus = "active";
+    mockProjectLeadId = "lead-1";
+    mockTaskRow.status = status;
+    const view = await render(<TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />);
+    expect(await view.findByText("Prepare invitations")).toBeOnTheScreen();
+    if (status === "todo") expect(view.getByRole("button", { name: "Delete task" })).toBeOnTheScreen();
+    else expect(view.queryByRole("button", { name: "Delete task" })).toBeNull();
+  });
+  test("Edit and Delete stay together and become disabled during permission revalidation", async () => {
+    mockProjectStatus="active";mockProjectLeadId="lead-1";mockTaskRow.status="todo";
+    const props={id:"task-1",projectId:"proj-1",navigate:jest.fn()};
+    const view=await render(<TaskDetailsScreen {...props} />);
+    await view.findByText("Prepare invitations");
+    const {within}=require("@testing-library/react-native");
+    const actions=within(view.getByTestId("task-detail-actions"));
+    expect(actions.getByRole("button",{name:"Edit task"})).toBeOnTheScreen();
+    expect(actions.getByRole("button",{name:"Delete task"})).toBeOnTheScreen();
+    mockStructureLoading=true;await view.rerender(<TaskDetailsScreen {...props} />);
+    expect(actions.getByRole("button",{name:"Edit task"})).toBeDisabled();
+    expect(actions.getByRole("button",{name:"Delete task"})).toBeDisabled();
+    mockStructureLoading=false;await view.rerender(<TaskDetailsScreen {...props} />);
+    expect(actions.getByRole("button",{name:"Edit task"})).toBeEnabled();
+  });
+  test.each([
+    ["member", false, true, true],
+    ["member", false, false, false],
+    ["member", true, true, true],
+    ["head", false, true, true],
+    ["head", true, true, true],
+  ] as const)("%s sees Task people controls with either scoped staffing capability (%s, %s)", async (role, appoint, contributors, visible) => {
+    mockProfile = { ...mockProfile, role };
+    mockProjectStatus = "active";
+    mockStaffCapabilities = {
+      appoint_lead: appoint ? { allowed: true, reason_code: null } : { allowed: false, reason_code: "appointment_denied" },
+      manage_contributors: contributors ? { allowed: true, reason_code: null } : { allowed: false, reason_code: "branch_denied" },
+    };
+    const view = await render(<TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />);
+    await view.findByText("Prepare invitations");
+    const button = view.queryByRole("button", { name: "Choose people for this task" });
+    if (visible) expect(button).toBeOnTheScreen();
+    else expect(button).toBeNull();
+  });
+});
 
 describe("TaskDetailsScreen with on-hold projects", () => {
   test("renders BentoProjectOnHoldCard and hides work action buttons when project is on hold", async () => {
@@ -296,6 +357,7 @@ describe("TaskDetailsScreen with on-hold projects", () => {
 
     expect(await view.findByText("Stuck")).toBeOnTheScreen();
     expect(view.queryByText("In progress")).toBeNull();
+    await view.unmount();
 
     mockTreeBlocker = null;
     const clearedView = await render(
@@ -303,6 +365,7 @@ describe("TaskDetailsScreen with on-hold projects", () => {
     );
     expect(await clearedView.findByText("In progress")).toBeOnTheScreen();
     expect(clearedView.queryByText("Stuck")).toBeNull();
+    await clearedView.unmount();
   });
 
   test("blocks non-Task-Lead Project Lead from adding subtasks or executing work in active projects while allowing planning subtask creation", async () => {
@@ -328,7 +391,7 @@ describe("TaskDetailsScreen with on-hold projects", () => {
       expect(activeView.queryByText("Mark as complete")).toBeNull();
       expect(activeView.queryByText("Submit for review")).toBeNull();
       expect(activeView.queryByRole("button", { name: "Add subtask" })).toBeNull();
-      activeView.unmount();
+      await activeView.unmount();
 
       mockProjectStatus = "planning";
       const planningView = await render(
@@ -338,11 +401,84 @@ describe("TaskDetailsScreen with on-hold projects", () => {
       expect(planningView.queryByText("Update progress")).toBeNull();
       expect(planningView.queryByText("Mark as complete")).toBeNull();
       expect(planningView.queryByText("Submit for review")).toBeNull();
+      await planningView.unmount();
     } finally {
       mockTaskRow.assigned_to = prevAssignee;
       mockProjectLeadId = null;
       mockTreeLead = "lead-1";
       mockTreeRootCreateAllowed = false;
+    }
+  });
+
+  test("explains why Start work is restricted for future start dates, incomplete prerequisites, and non-lead contributors, and subscribes to progress update tables", async () => {
+    const prevStartDate = mockTaskRow.start_date;
+    const prevAssignedTo = mockTaskRow.assigned_to;
+    try {
+      mockSubscribedTables.length = 0;
+      mockStructureAccess = "head";
+      mockProjectStatus = "active";
+      mockTaskRow.status = "todo";
+      mockTaskRow.assigned_to = "lead-1";
+      mockTaskRow.dependency_ids = ["dep-pending"];
+      mockDependencyRows = [
+        {
+          id: "dep-pending",
+          title: "Complete preliminary review",
+          status: "in_progress",
+          linked_project_id: "proj-1",
+        },
+      ];
+      mockTaskRow.start_date = getPhilippineCalendarDate();
+      mockTreeBlocker = null;
+
+      const prereqView = await render(
+        <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+      );
+      expect(
+        await prereqView.findByText("This task cannot start because its prerequisites are incomplete."),
+      ).toBeOnTheScreen();
+      expect(prereqView.queryByText("Start work")).toBeNull();
+      expect(mockSubscribedTables).toEqual(
+        expect.arrayContaining([
+          "tasks",
+          "subtasks",
+          "task_progress_updates",
+          "subtask_progress_updates",
+        ]),
+      );
+      await prereqView.unmount();
+
+      // Future start date notice
+      mockTaskRow.dependency_ids = [];
+      mockDependencyRows = [];
+      mockTaskRow.start_date = "2099-01-01";
+      const futureView = await render(
+        <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+      );
+      expect(
+        await futureView.findByText("Start work is available on or after the planned start date."),
+      ).toBeOnTheScreen();
+      await futureView.unmount();
+
+      // Contributor on todo task sees lead start notice
+      mockTaskRow.assigned_to = "other-lead";
+      mockTaskRow.team_member_ids = ["lead-1"];
+      mockTaskRow.start_date = getPhilippineCalendarDate();
+      const contributorView = await render(
+        <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
+      );
+      expect(
+        await contributorView.findByText(
+          "The Task Lead must start work before you can post progress or submit completion.",
+        ),
+      ).toBeOnTheScreen();
+      await contributorView.unmount();
+    } finally {
+      mockTaskRow.start_date = prevStartDate;
+      mockTaskRow.assigned_to = prevAssignedTo;
+      mockTaskRow.team_member_ids = [];
+      mockTaskRow.dependency_ids = [];
+      mockDependencyRows = [];
     }
   });
 });

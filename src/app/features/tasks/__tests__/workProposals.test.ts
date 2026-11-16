@@ -34,7 +34,7 @@ test("a corrected submission links its original and resumes saved evidence befor
     args: {
       p_request: "replacement",
       p_supersedes: "original",
-      p_terms: { note: "Corrected" },
+      p_terms: { note: "Corrected", next_step: "Get signed approval" },
     },
     files: [first, second].map((file) => ({
       name: file.fileName,
@@ -72,7 +72,11 @@ test("a corrected submission links its original and resumes saved evidence befor
       id: "replacement",
       args: {
         ...request.args,
-        p_terms: { note: "Corrected", attachments: [first, second] },
+        p_terms: {
+          note: "Corrected",
+          next_step: "Get signed approval",
+          attachments: [first, second],
+        },
       },
     },
     expect.any(Function),
@@ -80,27 +84,33 @@ test("a corrected submission links its original and resumes saved evidence befor
   );
 });
 
-test("a saved submission with an uncertain RPC result reuses the original arguments", async () => {
-  jest.mocked(uploadEvidenceFile).mockClear();
-  const request = {
-    id: "original",
-    args: {
-      p_request: "original",
-      p_supersedes: null,
-      p_terms: { note: "Original" },
-    },
-  };
-  await sendWorkProposal("author", "root", "node", "scope", request, true);
-  expect(uploadEvidenceFile).not.toHaveBeenCalled();
-  expect(saveSharedWork).toHaveBeenLastCalledWith(
-    "author",
-    "scope",
-    "m7_propose_work",
-    request,
-    expect.any(Function),
-    true,
-  );
-});
+test.each([
+  { note: "Original\n\nNext step: Original plan" },
+  { note: "Original", next_step: "Original plan" },
+])(
+  "a saved submission with an uncertain RPC result reuses the original terms: %j",
+  async (terms) => {
+    jest.mocked(uploadEvidenceFile).mockClear();
+    const request = {
+      id: "original",
+      args: {
+        p_request: "original",
+        p_supersedes: null,
+        p_terms: terms,
+      },
+    };
+    await sendWorkProposal("author", "root", "node", "scope", request, true);
+    expect(uploadEvidenceFile).not.toHaveBeenCalled();
+    expect(saveSharedWork).toHaveBeenLastCalledWith(
+      "author",
+      "scope",
+      "m7_propose_work",
+      request,
+      expect.any(Function),
+      true,
+    );
+  },
+);
 
 test("only the original author can correct a returned submission that has no replacement", () => {
   const original = {

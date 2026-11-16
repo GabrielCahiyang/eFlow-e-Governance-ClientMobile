@@ -10,6 +10,10 @@ import {
 import Svg, { Circle } from "react-native-svg";
 import Calendar from "lucide-react-native/icons/calendar";
 import UserPlus from "lucide-react-native/icons/user-plus";
+import Trash2 from "lucide-react-native/icons/trash";
+import { Button } from "../../components/ui/Button";
+import { BusyIndicator } from "../../components/ui/BusyIndicator";
+import { SmallProgress } from "../../components/ui/OperationStatus";
 import Activity from "lucide-react-native/icons/activity";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Wallet from "lucide-react-native/icons/wallet";
@@ -287,26 +291,28 @@ export function BentoEditButton({
   onPress,
   accessibilityLabel = "Edit",
   disabled = false,
+  busy = false,
 }: {
   onPress: () => void;
   accessibilityLabel?: string;
   disabled?: boolean;
+  busy?: boolean;
 }) {
   const palette = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || busy}
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: disabled || busy, busy }}
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
         gap: 6,
-        minHeight: 36,
+        minHeight: 48,
         paddingHorizontal: 11,
         paddingVertical: 6,
         borderRadius: 10,
@@ -316,7 +322,7 @@ export function BentoEditButton({
         opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
       })}
     >
-      <Pencil size={14} color={palette.text} strokeWidth={2.2} />
+      {busy ? <BusyIndicator size={14} color={palette.text} /> : <Pencil size={14} color={palette.text} strokeWidth={2.2} />}
       <Text
         numberOfLines={1}
         style={{
@@ -329,6 +335,16 @@ export function BentoEditButton({
       </Text>
     </Pressable>
   );
+}
+
+export function BentoDeleteButton({ onPress, accessibilityLabel, disabled, busy }: {
+  onPress: () => void; accessibilityLabel: string; disabled?: boolean; busy?: boolean;
+}) {
+  const palette = useTheme();
+  return <Button variant="outline" accessibilityLabel={accessibilityLabel} onPress={onPress}
+    disabled={disabled} busy={busy} icon={<Trash2 size={14} color={palette.danger} />}
+    style={{ minHeight: 48, paddingHorizontal: 11, borderRadius: 10 }}
+    textStyle={{ fontSize: 13, color: palette.danger }}>Delete</Button>;
 }
 
 export interface DependencyItemData {
@@ -483,9 +499,28 @@ export function BentoDependenciesCard({
   );
 }
 
-export function BentoBlockerCard({ blocker }: { blocker?: string | null }) {
+export function BentoBlockerCard({
+  blocker,
+  reporter,
+  reportedAt,
+  note,
+  nextStep,
+  onPressActivity,
+}: {
+  blocker?: string | null;
+  reporter?: string | null;
+  reportedAt?: string | number | null;
+  note?: string | null;
+  nextStep?: string | null;
+  onPressActivity?: () => void;
+}) {
   const palette = useTheme();
   if (!blocker) return null;
+
+  const metaParts = [
+    reporter?.trim(),
+    reportedAt ? dateLabel(reportedAt) || String(reportedAt) : null,
+  ].filter(Boolean);
 
   return (
     <View
@@ -523,6 +558,47 @@ export function BentoBlockerCard({ blocker }: { blocker?: string | null }) {
       >
         {blocker}
       </Text>
+      {metaParts.length > 0 && (
+        <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+          {metaParts.join(" · ")}
+        </Text>
+      )}
+      {!!note?.trim() && (
+        <Text selectable style={{ fontSize: 13, color: palette.muted }}>
+          Note: {note.trim()}
+        </Text>
+      )}
+      {!!nextStep?.trim() && (
+        <Text selectable style={{ fontSize: 13, color: palette.muted }}>
+          Next step: {nextStep.trim()}
+        </Text>
+      )}
+      {onPressActivity && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View blocker activity"
+          onPress={onPressActivity}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            gap: 4,
+            paddingTop: 2,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "600",
+              color: palette.danger,
+            }}
+          >
+            Activity & evidence
+          </Text>
+          <ChevronRight size={14} color={palette.danger} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -836,11 +912,13 @@ export function BentoAssignedTeamCard({
   leadRoleLabel = "Task Lead",
   contributors,
   onChoosePeople,
+  peoplePending = false,
 }: {
   leadName?: string | null;
   leadRoleLabel?: string;
   contributors: readonly { id?: string; name: string; office?: string }[];
   onChoosePeople?: () => void;
+  peoplePending?: boolean;
 }) {
   const palette = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -889,6 +967,8 @@ export function BentoAssignedTeamCard({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Choose people for this task"
+              disabled={peoplePending}
+              accessibilityState={{ disabled: peoplePending, busy: peoplePending }}
               onPress={onChoosePeople}
               style={{
                 flexDirection: "row",
@@ -898,7 +978,7 @@ export function BentoAssignedTeamCard({
                 paddingHorizontal: 8,
               }}
             >
-              <UserPlus size={14} color={palette.primary} />
+              {peoplePending ? <BusyIndicator size={14} color={palette.primary} /> : <UserPlus size={14} color={palette.primary} />}
               <Text
                 style={{
                   fontSize: 13,
@@ -910,6 +990,7 @@ export function BentoAssignedTeamCard({
               </Text>
             </Pressable>
           )}
+          {!onChoosePeople && peoplePending && <SmallProgress label="Checking actions…" />}
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -1054,12 +1135,14 @@ export function BentoSubtasksCard({
   canAdd,
   onAddSubtask,
   onPressSubtask,
+  actionsPending = false,
 }: {
   title?: string;
   subtasks: readonly SubtaskItemData[];
   canAdd?: boolean;
   onAddSubtask?: () => void;
   onPressSubtask: (subtask: SubtaskItemData) => void;
+  actionsPending?: boolean;
 }) {
   const palette = useTheme();
   const resolveStatus = useWorkStatus();
@@ -1153,6 +1236,8 @@ export function BentoSubtasksCard({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Add ${title === "Child subtasks" ? "child subtask" : "subtask"}`}
+            disabled={actionsPending}
+            accessibilityState={{ disabled: actionsPending, busy: actionsPending }}
             onPress={onAddSubtask}
             style={{
               flexDirection: "row",
@@ -1162,7 +1247,7 @@ export function BentoSubtasksCard({
               paddingHorizontal: 8,
             }}
           >
-            <Plus size={15} color={palette.primary} />
+            {actionsPending ? <BusyIndicator size={14} color={palette.primary} /> : <Plus size={15} color={palette.primary} />}
             <Text
               style={{
                 fontSize: 14,

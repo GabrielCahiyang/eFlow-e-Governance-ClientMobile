@@ -516,6 +516,7 @@ export function CashRequestCard({
             <Choice
               label="Release method"
               value={method}
+              searchable={false}
               onChange={(next) => updateDraft({ method: next })}
               options={[
                 { value: "cash", label: "Cash" },

@@ -1,0 +1,47 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Subtask-Parity-REVIEW-v57-arm64-x86_64.apk",
+  "versionCode": 57,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5696356,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "e5d0fade7e099e30c8e02e0eca9fa48271464b2900678a5aa120f6263e69585f",
+  "bytes": 99538381,
+  "workflowSourcesMatched": [
+    "src/app/features/tasks/subtaskDependencies.ts",
+    "src/app/features/tasks/WorkTreePanel.tsx",
+    "src/app/features/tasks/SubtaskCompletionSheet.tsx",
+    "src/app/features/tasks/OfficeSubitemUpdateSheet.tsx",
+    "src/app/features/tasks/TaskActivity.tsx",
+    "src/app/features/tasks/useWorkRecordUpdates.ts",
+    "src/app/shared/liveUpdates.ts",
+    "src/app/shared/userMessages.ts",
+    "src/app/shared/domainErrorMessages.ts"
+  ],
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "purpose": "REVIEW candidate; backend correction must precede release",
+  "nativeAndroidCompilation": "PASS",
+  "installation": "NOT TESTED",
+  "iosNativeCompilation": "NOT TESTED: Windows host",
+  "authenticatedWebAndroidIosParity": "BLOCKED: approved staging target/actors/fixtures unavailable",
+  "mobileTests": 530,
+  "mobileTestSuites": 132,
+  "typecheck": "PASS",
+  "metroChecks": 9,
+  "jsExports": [
+    "android",
+    "ios"
+  ],
+  "migrationApplied": false
+}

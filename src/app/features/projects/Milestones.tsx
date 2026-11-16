@@ -75,7 +75,7 @@ export function Milestones({
       date: editing?.dueDate?.slice(0, 10) || "",
       status: editing?.manualStatus || "auto",
       note: editing?.manualNote || "",
-    }),
+    }), { restoreOnOpen: editing === null },
   );
   const { title, description, date, status, note } = draft;
   const edit = (item: Milestone | null) => {
@@ -133,7 +133,7 @@ export function Milestones({
                           await confirmAction(
                             "Delete milestone?",
                             item.title,
-                            "Delete",
+                            "Delete milestone",
                           )
                         ) {
                           await deleteMilestone(item.id);
@@ -142,7 +142,7 @@ export function Milestones({
                       })
                     }
                   >
-                    Delete
+                    Delete milestone
                   </Button>
                 </Row>
               )}
@@ -182,6 +182,7 @@ export function Milestones({
             <Choice
               label="Status"
               value={status}
+              searchable={false}
               options={[
                 "auto",
                 "not_started",

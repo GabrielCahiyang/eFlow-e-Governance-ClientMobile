@@ -126,7 +126,7 @@ export function ProjectCloseoutSheet({
       footer={
         <Row>
           <Button variant="outline" disabled={action.busy} onPress={close}>
-            Cancel
+            Cancel closeout
           </Button>
           <Button
             busy={action.busy}

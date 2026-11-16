@@ -2,6 +2,72 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Workflow feedback and date-neutral prerequisites — latest 16 November 2026
+
+Task/Subtask Delete now sits beside Edit; background action checks retain disabled controls with small feedback. Start work confirms first. Ordinary edit forms reopen from saved values, while open-form failure input and uncertain-request recovery remain. The started-work notice is above Task fields, and child schedule errors ask the appointed Task Lead to reschedule the named Subtask. Mobile prerequisite selection/save validation now permits overlap and missing prerequisite due dates while preserving own bounds and all execution/permission/history gates.
+
+**PASS:** 636 tests / 146 suites, TypeScript + 9 Metro checks, Android/iOS JS exports, Android release/signature/source checks (30 active sources), three-executable credential audit and 44 disposable SQL assertions per LF/CRLF input mode. [Latest unique REVIEW v57 APK](../../artifacts/M7/eFlow-Mobile-M7-Action-Feedback-Dependency-Linking-REVIEW-v57-arm64-x86_64.apk) · [Full delta and limits](M7-action-feedback-dependency-linking.md) · [Portable Web handoff ZIP](../../artifacts/M7/eFlow-Web-Workflow-UX-Dependency-Linking-Handoff-2026-11-16.zip).
+
+**BACKEND REQUIRED / NOT APPLIED:** three installed guards still reject date-overlapping links. [New candidate, exact functions and staging matrix](backend-review/dependency-linking/README.md). Until reviewed installation, affected saves display a backend-update error and remain unsaved. The earlier contributor correction and part of the later started-editing installation are now observed in read-only evidence; older sections below retain their historical preparation status and must not be treated as the latest deployment assessment. Do not rerun historical SQL blindly.
+
+**BLOCKED/NOT RUN:** approved staging/actors/fixtures, real authenticated/RLS/concurrency and Web-to-Mobile writes, Android install/workflow and iOS native/workflow acceptance. No production/Web changes or hosted fixture mutations were made. Verify both themes, reduced motion, font scaling, accessibility and keyboard on each platform. M7 remains unaccepted; use the linked latest report and candidate checklist before personal acceptance.
+
+## Limited editing after Start and complete edit details — 16 November 2026
+
+Latest approved policy applies to **both Tasks and Subtasks**: existing authorized editors may correct names/priorities after Start; supervising authority and a reason are required to reschedule due dates. Planned starts, prerequisites and structure stay locked after started history. General details are read-only during review/after completion. Existing contributor, Lead-transfer, execution, blocker, evidence and approval permissions remain separate. Task visibility is unchanged. [Implementation and deployment report](M7-started-editing.md).
+
+**PASS:** 620 tests / 143 suites, TypeScript, nine Metro checks, both native JS exports, Android release/signature/packaged-source checks, three-executable credential audit, and 50 local PostgreSQL assertions per LF/CRLF script. [Started Editing Audit REVIEW v57 APK](../../artifacts/M7/eFlow-Mobile-M7-Started-Editing-Audit-REVIEW-v57-arm64-x86_64.apk).
+
+**BACKEND REQUIRED, NOT APPLIED:** the [review candidate](backend-review/started-editing/README.md) supplies atomic field guards and Task Activity deltas. Until installed, Task detail editing displays an unavailable state and started Subtasks retain the installed server denial. Live authenticated/staging/concurrency/device verification remains BLOCKED or NOT RUN. No production or Web changes were made. M7 remains unaccepted.
+
+Use approved dedicated fixtures only after authorization. On each platform, verify Cheryl's authorized Task corrections/rescheduling and Andres's authorized Subtask corrections/rescheduling; Crisostomo may correct his Subtask only with its actual detail-edit capability and cannot reschedule merely from contributor/worker permission. Check blocked fields, review locks, revoked authority, old/new Activity values and reasons, cancelled drafts, no-op saves and uncertain receipts. Recheck dependency Start/Complete and blocker/proposal/approval workflows independently. Names describe proposed appointments, not server-verified accounts or permission to mutate records.
+
+Earlier sections below are historical checkpoints. Current read-only evidence confirms restrictive operational policies and a parent-Start predicate in the captured `node_visible`; it does not certify deployment of the entire earlier visibility/deletion set or cross-device privacy.
+
+## Pre-start Delete, Subtask visibility and picker confirmation — 16 November 2026
+
+Latest scope: Delete applies to **both Tasks and Subtasks**. The visibility change applies **only to Subtasks**; Task behavior otherwise remains unchanged. Before parent Task Start, only its Task Lead gets the native Subtask planning view. Nested Lead/contributor pickers now stage selections and expose explicit Confirm/Cancel actions; Save team remains the server write. [Delta ledger and actor-specific checklist](M7-planning-delete-confirm.md).
+
+**PASS:** 603 tests / 140 suites, TypeScript, nine Metro checks, both native JS exports, Android release compilation, packaged-source/signature checks, three-executable credential audit and 18 isolated PostgreSQL proposal checks. [Planning Delete Confirm REVIEW v57 APK](../../artifacts/M7/eFlow-Mobile-M7-Planning-Delete-Confirm-REVIEW-v57-arm64-x86_64.apk) · [APK verification](M7-planning-delete-confirm-apk-verification.json) · [Credential audit](M7-planning-delete-confirm-release-audit.json).
+
+**INTEGRATION BLOCKED:** full Subtask privacy needs shared RLS/RPC/feed/history enforcement; the current broad permissive policies remain. Atomic pre-start Task deletion needs the [reviewed backend guard](backend-review/subtask-planning/README.md). Neither backend change was applied. Native presentation is not a security guarantee. Approved fixture/role writes, concurrent sessions, staging, native installation and device UX/iOS acceptance remain unexecuted. No production/Web changes were made by the agent. M7 remains unaccepted.
+
+## Clarified Lead contributor permissions — 16 November 2026
+
+**Supersedes the earlier Task people restriction below.** A Task/Subtask Lead may manage contributors for their own work through its server capability; that permission does not authorize Lead transfer. Both contributor pickers omit the current Lead while preserving the canonical Lead ID in saved worker lists. [Implementation and personal checklist](M7-lead-contributors.md).
+
+**PASS:** 62 focused tests; 577 tests / 137 suites; TypeScript, nine Metro checks, both native JS exports, Android release build, packaged source/signature checks, credential audit across three executables and 31 isolated PostgreSQL proposal checks. [Lead Contributors REVIEW v57 APK](../../artifacts/M7/eFlow-Mobile-M7-Lead-Contributors-REVIEW-v57-arm64-x86_64.apk) · [APK verification](M7-lead-contributors-apk-verification.json) · [Credential audit](M7-lead-contributors-release-audit.json).
+
+**Backend installation verified:** the user applied the [backend correction](backend-review/lead-contributors/README.md), and a subsequent read-only comparison confirms all five installed function bodies match. [Installation evidence](backend-review/lead-contributors/installed-readonly-verification.json). The earlier installation blocker is cleared; authenticated role checks still require approved actors/fixtures. Staging checks, Android installation, native iOS compilation/workflows and device UX acceptance remain unexecuted. The agent made no hosted/Web changes. M7 remains unaccepted.
+
+## Task people permissions — 16 November 2026
+
+The [scoped permission report and role-specific checklist](M7-task-staffing-permissions.md) separates the observed production appointments/receipts from unverified unauthorized-write claims. Andres is a Member and also Project Lead of Barangay Digital Records Management Initiative; the two inspected Task staffing receipts are in that authorized project. Mobile now requires the scoped Project Lead/Office Head appointment capability for Office Task staffing, applies individual picker permissions, and checks current authority before a new save or uncommitted retry. No hosted/Web/migration changes were made. Backend Task Lead contributor rights outside active projects still need separate review against the clarified rule.
+
+**PASS:** 45 focused tests; 572 tests / 137 suites in the final full run; TypeScript, nine Metro checks, both native JS exports, Android ARM64/x86_64 release build, packaged-source/signature checks and three-executable credential audit. [Task People Permissions v57 APK](../../artifacts/M7/eFlow-Mobile-M7-Task-People-Permissions-v57-arm64-x86_64.apk) · [APK verification](M7-task-staffing-apk-verification.json) · [Credential audit](M7-task-staffing-release-audit.json).
+
+Dedicated authenticated positive/negative permission tests remain **BLOCKED** pending approved actors and disposable fixtures. Native installation, device UX and native iOS compilation/workflows were not executed. M7 remains unaccepted. Use the exact APK filename; previous candidates also use version 57.
+
+## Contributor → Lead structured Next step — 16 November 2026
+
+New Task/Subtask progress proposals preserve Next step as `p_terms.next_step`. Review cards, returned corrections and saved-upload recovery retain the field; uncertain submissions replay their original arguments, including legacy notes. The [scoped report and actor-specific personal checklist](M7-contributor-next-step.md) records production read-only SQL evidence. No migration or production write was performed. The installed production functions already support this field.
+
+**PASS:** 14 focused proposal tests; 561 tests / 136 suites across the current worktree; TypeScript, nine Metro checks, Android/iOS JS exports, Android ARM64/x86_64 release compilation, signature/source checks and credential audit across all three executables. [Contributor Next Step v57 APK](../../artifacts/M7/eFlow-Mobile-M7-Contributor-Next-Step-v57-arm64-x86_64.apk) · [APK verification](M7-contributor-next-step-apk-verification.json) · [Credential audit](M7-contributor-next-step-release-audit.json).
+
+Authenticated contributor → Lead approval and blocker refresh remain **BLOCKED** until approved actors and disposable fixtures are designated. Android installation/workflows, native iOS compilation/workflows and device UX/accessibility checks were not executed for this candidate. M7 remains unaccepted. Use this exact APK filename because older candidates also use version 57.
+
+## Final approved Task/Subtask rules — 15 November 2026
+
+Direct Office Subtasks are the capstone scope. Explicit selections (including `[]`) control both Start and Complete; NULL alone retains legacy sequencing. Cancelled selections remain unresolved until authorized removal/replacement. The [final Task audit](M7-final-task-audit.md) separates Task-level findings from the Subtask SQL defect. The [single-function migration review, compatibility table and staging matrix](backend-review/subtask-parity/README.md) is **NOT APPLIED**. Local SQL checks do not constitute signed-in Web/Android/iOS acceptance. The revised Mobile candidate must follow the approved backend correction; do not treat the older candidate's sibling workaround or nesting failure classification as the final contract. M7 remains unaccepted and authenticated verification remains BLOCKED.
+
+For the final-rule review candidate: **PASS** for 47 isolated PostgreSQL checks, 530 Mobile tests / 132 suites, TypeScript, nine Metro checks, both JS exports, Android ARM64/x86_64 release compilation, APK source verification and three-executable credential audit. [M7 Subtask Parity REVIEW APK](../../artifacts/M7/eFlow-Mobile-M7-Subtask-Parity-REVIEW-v57-arm64-x86_64.apk) · [Candidate verification](backend-review/subtask-parity/mobile-build-verification.json). No new authenticated/device acceptance or native iOS compilation is implied.
+
+## Defense workflow stability — 15 November 2026
+
+The [defense workflow report and minimum fixture proposal](M7-defense-workflow-report.md) records the current production read-only findings, exact failures, scoped Mobile corrections, and role-specific personal checklist. No production records, Web code, migrations or hosted configuration were changed. Authenticated Project → Task → Subtask → dependency → blocker → completion → approval tests remain **BLOCKED** until the user designates the Head, Member Subtask Lead, separate Member Task Lead/reviewer and approves a disposable zero-funding project. The archived QA project with financial history must not be reused.
+
+**PASS:** 528 tests / 132 suites, TypeScript, nine Metro checks, both production JS exports, Android ARM64/x86_64 release compilation, packaged-source verification and credential audit across all three executables. [M7 Defense Stability v57 APK](../../artifacts/M7/eFlow-Mobile-M7-Defense-Stability-v57-arm64-x86_64.apk) · [APK verification](M7-defense-apk-verification.json) · [Credential audit](M7-defense-release-audit.json) · [Read-only backend evidence](M7-defense-readonly-evidence.json). Android installation and authenticated workflows were not executed for this candidate. Native iOS compilation/workflows, device accessibility, keyboard, themes and motion acceptance remain **NOT TESTED** for this repair. M7 is not accepted.
+
 ## Task due dates without due times
 
 The Mobile Task editor and scheduling sheet use date-only fields and submit changed due dates as `YYYY-MM-DD`. Existing dated records display the Philippine calendar day, including legacy timestamps with explicit offsets. The Task details, project tables and report due-date output show calendar dates. Report event timestamps retain their time.

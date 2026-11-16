@@ -170,6 +170,7 @@ export function LivingBoard() {
         <Choice
           label="Column"
           value={cards.find((c) => c.id === selected)?.columnId || "todo"}
+          searchable={false}
           options={previewColumns.map((c) => ({ value: c.id, label: c.label }))}
           onChange={(col: Column) => {
             if (selected) move(selected, col);

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { nativeWindow } from "../../../platform/webRuntime";
 import {
   Button,
@@ -34,6 +35,7 @@ export function TaskExecutionSheet({
   const { profile } = useAuth(),
     { toast } = useToast(),
     action = useAction();
+  const activeBlocker = initialBlocker?.trim() || "";
   const [draft, updateDraft, clearDraft] = useRetainedDraft<{
     state?: "in_progress" | "stuck";
     category?: string;
@@ -41,17 +43,43 @@ export function TaskExecutionSheet({
     next: string;
     blocker: string;
     files: PickedFile[];
+    seededBlocker?: string;
+    dirty?: boolean;
+    stateTouched?: boolean;
   }>(
     formDraftKey(profile?.id, "task-execution:" + taskId),
     true,
     () => ({
-      state: "in_progress",
+      state: activeBlocker ? "stuck" : "in_progress",
       note: "",
       next: "",
-      blocker: "",
+      blocker: activeBlocker,
       files: [] as PickedFile[],
-    }),
+      seededBlocker: activeBlocker,
+      dirty: false,
+      stateTouched: false,
+    }), { restoreOnOpen: false },
   );
+  useEffect(() => {
+    if (action.busy) return;
+    const seeded = draft.seededBlocker ?? "";
+    if (seeded === activeBlocker) return;
+    if (!draft.dirty || (!draft.stateTouched && draft.blocker === seeded)) {
+      updateDraft({
+        state: activeBlocker ? "stuck" : "in_progress",
+        blocker: activeBlocker,
+        seededBlocker: activeBlocker,
+      });
+    }
+  }, [
+    action.busy,
+    activeBlocker,
+    draft.blocker,
+    draft.dirty,
+    draft.seededBlocker,
+    draft.stateTouched,
+    updateDraft,
+  ]);
   const { note, next, blocker, files } = draft;
   const workState =
     draft.state ??
@@ -98,10 +126,13 @@ export function TaskExecutionSheet({
       <Choice
         label="Work state"
         value={workState}
+        searchable={false}
         onChange={(value) =>
           updateDraft({
             state: value === "stuck" ? "stuck" : "in_progress",
             category: undefined,
+            dirty: true,
+            stateTouched: true,
           })
         }
         options={[
@@ -114,7 +145,7 @@ export function TaskExecutionSheet({
           label="Blocker"
           required
           value={blocker}
-          onChangeText={(value) => updateDraft({ blocker: value })}
+          onChangeText={(value) => updateDraft({ blocker: value, dirty: true })}
           maxLength={3000}
           multiline
         />
@@ -122,14 +153,14 @@ export function TaskExecutionSheet({
       <Field
         label="Work note"
         value={note}
-        onChangeText={(value) => updateDraft({ note: value })}
+        onChangeText={(value) => updateDraft({ note: value, dirty: true })}
         maxLength={3000}
         multiline
       />
       <Field
         label="Next step"
         value={next}
-        onChangeText={(value) => updateDraft({ next: value })}
+        onChangeText={(value) => updateDraft({ next: value, dirty: true })}
         maxLength={300}
       />
       {files.length ? (

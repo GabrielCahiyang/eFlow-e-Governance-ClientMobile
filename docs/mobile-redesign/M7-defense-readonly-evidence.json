@@ -1,0 +1,44 @@
+{
+  "at": "2026-11-15T12:02:25.59255+00:00",
+  "projectRef": "ixnfphgjyelhckjwjkdv",
+  "environment": "production",
+  "databaseRole": "supabase_read_only_user",
+  "transactionReadOnly": "on",
+  "verification": "Administrative read-only stored-row predicate comparison; no actor impersonation, authentication or mutating RPC execution",
+  "observedSubtasks": 12,
+  "legacyNull": 11,
+  "explicitArrays": 1,
+  "cancelled": 0,
+  "predicateComparison": "PASS",
+  "failures": [],
+  "publication": [
+    "subtask_progress_updates",
+    "subtasks",
+    "tasks"
+  ],
+  "snapshotContract": {
+    "dependency_projection": true,
+    "support_flag": true
+  },
+  "rpcHashes": [
+    {
+      "function": "eflow_r7.operation_capabilities",
+      "md5": "dfa6e9d95e8303e1a737deaca383902e"
+    },
+    {
+      "function": "public.r7_work_tree",
+      "md5": "04d1a5ee79cb040e85ac0911024374b5"
+    },
+    {
+      "function": "eflow_r7.complete_subitem",
+      "md5": "93234d1109e736688029de6eeb5e18a9"
+    },
+    {
+      "function": "public.m7_start_subtask",
+      "md5": "f1048dc09d64f2b25033bdd64ca3e9e7"
+    }
+  ],
+  "mobileSelectorSha256": "6e0712f545185d440e593a19d0e8f6c97c080fe0c7e73337bb08edf18b99104c",
+  "authenticatedWorkflow": "BLOCKED: no approved test actors or disposable writable fixture",
+  "databaseWrites": 0
+}

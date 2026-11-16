@@ -116,11 +116,23 @@ describe("TaskBentoComponents", () => {
   });
 
   test("BentoBlockerCard renders blocker text with warning header", async () => {
+    const onPressActivity = jest.fn();
     const view = await render(
-      <BentoBlockerCard blocker="Awaiting budget clearance from LGU" />,
+      <BentoBlockerCard
+        blocker="Awaiting budget clearance from LGU"
+        reporter="Andres Manili"
+        note="Submitted endorsement"
+        nextStep="Follow up Monday"
+        onPressActivity={onPressActivity}
+      />,
     );
     expect(view.getByText("WORK BLOCKED")).toBeOnTheScreen();
     expect(view.getByText("Awaiting budget clearance from LGU")).toBeOnTheScreen();
+    expect(view.getByText("Andres Manili")).toBeOnTheScreen();
+    expect(view.getByText("Note: Submitted endorsement")).toBeOnTheScreen();
+    expect(view.getByText("Next step: Follow up Monday")).toBeOnTheScreen();
+    await fireEvent.press(view.getByRole("button", { name: "View blocker activity" }));
+    expect(onPressActivity).toHaveBeenCalledTimes(1);
   });
 
   test("BentoAssignedTeamCard supports Task Lead and Subtask Lead roles with empty contributors", async () => {

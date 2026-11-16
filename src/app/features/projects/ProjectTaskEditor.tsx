@@ -11,7 +11,11 @@ import {
 } from "../../components/ui";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
-import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
+import {
+  clearFormDraft,
+  formDraftKey,
+  useRetainedDraft,
+} from "../../shared/formDraftMemory";
 import { useFacts } from "../../shared/useFacts";
 import {
   PublicMessageError,
@@ -25,7 +29,11 @@ import { rowToTask } from "../../../core/web/app/features/tasks/services/taskMap
 import { fetchProject, fetchProjectAnalysisTasks } from "./services";
 import { projectEditorAccess, requireProjectSetup } from "./projectAccess";
 import { workPriorityOptions } from "../tasks/workPriorityOptions";
-import { dependencyWouldCycle } from "../../../core/web/app/features/project-table/selectors";
+import { detailEditError, detailEditingUnavailable, fetchDetailEditState } from "../tasks/workDetailEditing";
+import {
+  buildTaskPrerequisiteOptions,
+  taskPrerequisiteSelectionError,
+} from "../tasks/taskPrerequisites";
 
 type Scope = { actor: string; project: string; office: string; task?: Task; canDelegateEdit?: boolean };
 
@@ -76,32 +84,43 @@ export function ProjectTaskEditor({
   scope,
   groups,
   onClose,
+  onCreated,
   onSaved,
 }: {
   scope: Scope;
   groups: ProjectGroup[];
   onClose: () => void;
+  onCreated?: (task: { id: string; title: string }) => void;
   onSaved: () => Promise<unknown>;
 }) {
   const [task] = useState(scope.task);
   const { toast } = useToast();
   const [createdTaskId, setCreatedTaskId] = useState<string>();
+  const draftKey = formDraftKey(
+    scope.actor,
+    "project-task-editor:" + scope.project + ":" + (task?.id ?? "new"),
+  );
   const [draft, updateDraft, clearDraft] = useRetainedDraft(
-    formDraftKey(
-      scope.actor,
-      "project-task-editor:" + scope.project + ":" + (task?.id ?? "new"),
-    ),
+    draftKey,
     true,
     () => ({
       title: task?.title ?? "",
       priority: task?.priority ?? "medium",
+      changeReason: "",
       dependencies: task?.dependencyIds ?? [],
       timeline: task ? taskTimeline(task) : { start: "", end: "" },
       group:
         (groups.find((item) => item.isDefault) || groups[0])?.id ?? "",
-    }),
+    }), { restoreOnOpen: !task },
   );
   const { title, priority, dependencies, timeline, group } = draft;
+  const editState = useFacts(
+    `task-detail-edit:${scope.actor}:${task?.id}:${task?.updatedAt}`,
+    () => fetchDetailEditState(task!.id),
+    !!task,
+  );
+  const editReady = !editState.loading && !editState.error && !editState.stale;
+  const detailsAllowed = !task || (editReady && editState.data?.details === true);
   const dependencyChanged = JSON.stringify([...dependencies].sort()) !==
     JSON.stringify([...(task?.dependencyIds ?? [])].sort());
   const structure = useTaskStructure(scope, !!task);
@@ -119,7 +138,7 @@ export function ProjectTaskEditor({
     !prerequisiteOptions.some((item) => item.id === id),
   ).length;
   const projectDates = useFacts("task-project-dates:" + scope.project,
-    () => fetchProject(scope.project), !task);
+    () => fetchProject(scope.project), true);
   const projectStart = projectDates.data?.startDate?.slice(0, 10);
   const projectDue = projectDates.data?.targetDate?.slice(0, 10);
   const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
@@ -131,10 +150,26 @@ export function ProjectTaskEditor({
         : undefined;
   const start = timeline.start || defaultStart || "";
   const due = timeline.end || (!task ? projectDue : undefined) || "";
+  const originalDates = task ? taskTimeline(task) : { start: "", end: "" };
+  const livePrerequisiteError = prerequisiteFacts.data
+    ? taskPrerequisiteSelectionError({
+        allTasks: prerequisiteFacts.data,
+        visibleProjectIds: new Set(
+          prerequisiteFacts.data
+            .filter((item) => item.linkedProjectId === scope.project)
+            .map((item) => item.id),
+        ),
+        taskId: task?.id,
+        candidateIds: dependencies,
+
+        originalIds: task?.dependencyIds ?? [],
+      })
+    : "";
   const [unconfirmed, setUnconfirmed] = useState(false);
   const action = useAction();
   const close = () => {
     if (action.busy) return;
+    if (createdTaskId) clearDraft();
     action.clear();
     onClose();
   };
@@ -160,17 +195,25 @@ export function ProjectTaskEditor({
       if ((!task || priority !== task.priority) &&
           !workPriorityOptions.some((option) => option.value === priority))
         throw new PublicMessageError("Choose Low, Medium or High priority.");
-      if (dependencyChanged) {
-        if (access !== "head")
+      if (dependencyChanged || (dependencies.length > 0 && start !== originalDates.start)) {
+        if (dependencyChanged && access !== "head")
           throw new PublicMessageError("Current Head access is required to change task prerequisites.");
         const currentTasks = await fetchProjectAnalysisTasks(scope.project);
         const visible = new Set(currentTasks.filter((item) => item.linkedProjectId === scope.project).map((item) => item.id));
-        if ((task?.dependencyIds ?? []).some((id) => !visible.has(id)) ||
-            dependencies.some((id) => id === task?.id || !visible.has(id)) ||
-            (task && dependencyWouldCycle(currentTasks, task.id, dependencies)))
+        if (dependencyChanged && (task?.dependencyIds ?? []).some((id) => !visible.has(id)))
           throw new PublicMessageError("Choose available prerequisites in this project without a circular dependency.");
+        const prerequisiteIssue = taskPrerequisiteSelectionError({
+          allTasks: currentTasks,
+          visibleProjectIds: visible,
+          taskId: task?.id,
+          candidateIds: dependencies,
+
+          originalIds: task?.dependencyIds ?? [],
+        });
+        if (prerequisiteIssue) throw new PublicMessageError(prerequisiteIssue);
       }
-      if (!task && (!project.startDate || !project.targetDate || !start || !due ||
+      const datesChanged = !task || start !== originalDates.start || due !== originalDates.end;
+      if (datesChanged && (!project.startDate || !project.targetDate || !start || !due ||
         start < project.startDate.slice(0, 10) || due > project.targetDate.slice(0, 10) || due < start))
         throw new PublicMessageError("Choose task dates within the project schedule.");
       if (!task && start < today)
@@ -201,11 +244,18 @@ export function ProjectTaskEditor({
           latest.updatedAt !== task.updatedAt ||
           latest.archivedAt ||
           (access === "delegated" && (latest.proposedOfficeIdentityId || latest.status === "for_review")) ||
-          ["completed", "cancelled"].includes(latest.status)
+          ["for_review", "completed", "cancelled"].includes(latest.status)
         )
           throw new PublicMessageError(
             "This task changed. Close the form and refresh before editing it again.",
           );
+        const policy = await fetchDetailEditState(task.id);
+        const policyError = detailEditError(policy, {
+          planning: start !== originalDates.start || dependencyChanged,
+          due: due !== originalDates.end,
+          reason: draft.changeReason,
+        });
+        if (policyError) throw new PublicMessageError(policyError);
       }
       let schedule = {};
       if (task && timeline) {
@@ -234,6 +284,7 @@ export function ProjectTaskEditor({
               title: name, ...schedule,
               ...(priority !== task.priority ? { priority } : {}),
               ...(dependencyChanged ? { dependency_ids: dependencies } : {}),
+              ...(due !== originalDates.end ? { change_reason: draft.changeReason?.trim() || "" } : {}),
             },
           })
         : await supabase.rpc("m7_create_scheduled_task", {
@@ -272,7 +323,7 @@ export function ProjectTaskEditor({
         );
       if (!task) {
         setCreatedTaskId(result.data.id);
-        clearDraft();
+        clearFormDraft(draftKey);
         if (priority !== "medium" || dependencyChanged) {
           try {
             const currentSession = await supabase.auth.getSession();
@@ -297,11 +348,15 @@ export function ProjectTaskEditor({
             throw new PublicMessageError("The task was created. Open Edit task to check its priority and prerequisites.");
           }
         }
+        clearDraft();
       }
       clearDraft();
       toast(task ? "Task saved." : "Task added.", "success");
       nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       onClose();
+      if (!task && typeof result.data.id === "string") {
+        onCreated?.({ id: result.data.id, title: title.trim() });
+      }
       await onSaved();
     });
   return (
@@ -312,51 +367,59 @@ export function ProjectTaskEditor({
       onClose={close}
       busy={action.busy}
     >
+      {task && editState.data?.started && <Notice>Work has started. You can correct its name and priority. Start date, prerequisites and structure are locked. Rescheduling requires supervising authority and a reason.</Notice>}
       <Field
         label="Task name"
         required
         value={title}
         onChangeText={(next) => updateDraft({ title: next })}
         maxLength={300}
-        editable={!action.busy && !unconfirmed}
+        editable={!action.busy && !unconfirmed && detailsAllowed}
       />
       <Choice
         label="Priority"
         value={priority}
+        searchable={false}
         options={workPriorityOptions}
         onChange={(next) => updateDraft({ priority: next })}
-        disabled={action.busy || unconfirmed}
+        disabled={action.busy || unconfirmed || !detailsAllowed}
       />
       {!task && <Notice>Start and due dates default to the project schedule.</Notice>}
+      {task && (!editState.data || editState.error) && <Notice>{detailEditingUnavailable}</Notice>}
       {timeline && (
         <>
           <DateField
             label="Start date"
             value={start}
-            min={!task ? projectStart : undefined}
-            max={!task ? due || projectDue : undefined}
+            min={projectStart}
+            max={due || projectDue}
             onChange={(next) =>
               updateDraft((old) => ({
                 ...old,
                 timeline: { ...old.timeline, start: next },
               }))
             }
-            disabled={action.busy || unconfirmed || (!task && (!projectStart || !projectDue))}
+            disabled={action.busy || unconfirmed || (task ? !detailsAllowed || !editState.data?.planning : !projectStart || !projectDue)}
           />
           <DateField
             label="Due date"
             value={due}
-            min={!task ? start || projectStart : undefined}
-            max={!task ? projectDue : undefined}
+            min={start || projectStart}
+            max={projectDue}
             onChange={(next) =>
               updateDraft((old) => ({
                 ...old,
                 timeline: { ...old.timeline, end: next },
               }))
             }
-            disabled={action.busy || unconfirmed || (!task && (!projectStart || !projectDue))}
+            disabled={action.busy || unconfirmed || (task ? !detailsAllowed || !editState.data?.due : !projectStart || !projectDue)}
           />
         </>
+      )}
+      {task && due !== originalDates.end && editState.data?.started && (
+        <Field label="Reason for changing the due date" required multiline maxLength={1000}
+          value={draft.changeReason || ""} onChangeText={(changeReason) => updateDraft({ changeReason })}
+          editable={!action.busy && !unconfirmed && !!editState.data?.due} />
       )}
       {!task && (
         <Choice
@@ -378,9 +441,15 @@ export function ProjectTaskEditor({
             multiple
             value={dependencies}
             placeholder="No prerequisites selected"
-            options={prerequisiteOptions.map((item) => ({ value: item.id, label: item.title }))}
+            options={buildTaskPrerequisiteOptions({
+              choices: prerequisiteOptions,
+              allTasks: prerequisiteFacts.data ?? [],
+              selectedIds: dependencies,
+
+            })}
+            error={livePrerequisiteError}
             onChange={(next) => updateDraft({ dependencies: next })}
-            disabled={action.busy || unconfirmed || prerequisiteFacts.loading ||
+            disabled={action.busy || unconfirmed || (!!task && (!detailsAllowed || !editState.data?.planning)) || prerequisiteFacts.loading ||
               !!prerequisiteFacts.error || restrictedPrerequisites > 0}
           />
           {!!prerequisiteFacts.error && <Notice>Task prerequisites are unavailable.</Notice>}
@@ -393,10 +462,10 @@ export function ProjectTaskEditor({
       )}
       <Button
         busy={action.busy}
-        disabled={!createdTaskId && (unconfirmed || !title.trim() || (!task && !group))}
+        disabled={!createdTaskId && (unconfirmed || !detailsAllowed || !title.trim() || (!task && !group))}
         onPress={createdTaskId ? close : save}
       >
-        {createdTaskId ? "Done" : task ? "Save task" : "Add task"}
+        {createdTaskId ? "Close task form" : task ? "Save task" : "Add task"}
       </Button>
     </Sheet>
   );

@@ -1,0 +1,32 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Lead-Contributors-REVIEW-v57-arm64-x86_64.apk",
+  "versionCode": 57,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5711724,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "d486f0dfff191b5c5f741659c52afaf649c8f4360c05bc01ceffad11351fbd01",
+  "bytes": 99553749,
+  "featureSourcesMatched": [
+    "src/app/features/tasks/TaskDetailsScreen.tsx",
+    "src/app/features/tasks/WorkEditorSheet.tsx",
+    "src/app/features/tasks/WorkTreePanel.tsx",
+    "src/app/features/tasks/workPermissions.ts",
+    "src/app/features/tasks/workRecovery.ts",
+    "src/app/features/tasks/postCreateStaffingPrompt.tsx",
+    "src/app/features/tasks/WorkProposalSheet.tsx"
+  ],
+  "nativeInstallation": "NOT RUN",
+  "authenticatedWorkflow": "BLOCKED: approved actors and fixtures unavailable",
+  "backendPatch": "REVIEW ONLY; NOT APPLIED",
+  "nativeIosCompilation": "NOT RUN: Mac/Xcode unavailable",
+  "signatureVerified": true
+}

@@ -1,0 +1,31 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Started-Editing-Audit-REVIEW-v57-arm64-x86_64.apk",
+  "versionCode": 57,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5730360,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "2d45d498d9bea1ccadc797293b471578f40a0f8bef499c963c3720e935e17a92",
+  "bytes": 99572385,
+  "featureSourcesMatched": [
+    "src/app/features/projects/ProjectTaskEditor.tsx",
+    "src/app/features/tasks/WorkEditorSheet.tsx",
+    "src/app/features/tasks/workDetailEditing.ts",
+    "src/app/features/tasks/taskDetailActivity.ts",
+    "src/app/features/tasks/activityPresentation.ts",
+    "src/app/features/tasks/TaskActivity.tsx",
+    "src/app/features/tasks/workRecovery.ts",
+    "src/app/shared/domainErrorMessages.ts"
+  ],
+  "maintainedButNotBundled": [
+    "src/app/features/tasks/TaskScheduleSheet.tsx (no current route imports this component)"
+  ]
+}

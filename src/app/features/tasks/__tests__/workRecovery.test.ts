@@ -1,10 +1,14 @@
-import { test, expect } from "@jest/globals";
+import { test, expect, jest } from "@jest/globals";
 import {
   isNativeWorkRecovery,
   workRecoveryCanDiscard,
   type NativeWorkRecovery,
 } from "../workRecovery";
 import { WorkRequestFailure } from "../../../../core/web/app/features/nested-work/types/editor";
+jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
+jest.mock("../../../../core/web/app/features/nested-work/services/workTreeService", () => ({
+  fetchWorkTree: jest.fn(), saveWorkTree: jest.fn(),
+}));
 const fields = {
   title: "Work",
   note: "",

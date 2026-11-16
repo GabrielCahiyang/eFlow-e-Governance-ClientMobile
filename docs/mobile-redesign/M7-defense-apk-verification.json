@@ -1,0 +1,37 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Defense-Stability-v57-arm64-x86_64.apk",
+  "versionCode": 57,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5696948,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "613e11705a11bc55fd2ffd4cbb761d4fb07f398abab54f218bbc59f932cd1c15",
+  "bytes": 99538973,
+  "workflowSourcesMatched": [
+    "src/app/features/tasks/subtaskDependencies.ts",
+    "src/app/features/tasks/WorkTreePanel.tsx",
+    "src/app/features/tasks/SubtaskCompletionSheet.tsx",
+    "src/app/features/tasks/OfficeSubitemUpdateSheet.tsx",
+    "src/app/features/tasks/TaskActivity.tsx",
+    "src/app/features/tasks/useWorkRecordUpdates.ts",
+    "src/app/shared/liveUpdates.ts",
+    "src/app/shared/userMessages.ts",
+    "src/app/shared/domainErrorMessages.ts"
+  ],
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "nativeCompilation": "PASS",
+  "installation": "NOT TESTED for this repair",
+  "authenticatedWorkflow": "BLOCKED: no approved actors or fixture",
+  "iosNativeCompilation": "NOT TESTED: Xcode unavailable on Windows"
+}

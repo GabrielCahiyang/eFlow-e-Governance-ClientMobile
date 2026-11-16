@@ -84,7 +84,7 @@ export function AnnualBudgetSheet({
     override: summary?.allowReceiptLimitOverride ?? false,
     notes: summary?.notes || "",
     reason: "",
-  }));
+  }), { restoreOnOpen: false });
   const { sections, daily, receipt, days, threshold, override, notes, reason } =
     draft;
   const setSections = (

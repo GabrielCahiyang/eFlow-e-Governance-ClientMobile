@@ -150,7 +150,7 @@ export function LiveSheet({
               </Button>
             )}
             <Button variant="outline" onPress={onClose}>
-              End
+              End conversation
             </Button>
             {!!(stage !== "idle") && (
               <Button variant="outline" onPress={voice.interrupt}>

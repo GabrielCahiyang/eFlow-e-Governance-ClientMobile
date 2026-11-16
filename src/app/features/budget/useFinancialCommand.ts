@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
+import { beginOperation } from "../../shared/operationActivity";
 import { useToast } from "../../components/ui/Toast";
 import { draftStore } from "../../../platform/draftStore";
 import { feedback, PublicMessageError } from "../../shared/userMessages";
@@ -31,10 +32,12 @@ export function useFinancialCommand(actorId: string, scope: string) {
     setError(undefined);
     setNotice("");
     let saved = false;
+    let finish: (() => void) | undefined;
     try {
       assertAccess(actorId);
       if (!actorId)
         throw new PublicMessageError("Current work access is required.");
+      finish = beginOperation("update");
       const scopeHash = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
         scope,
@@ -79,6 +82,7 @@ export function useFinancialCommand(actorId: string, scope: string) {
       );
       return false;
     } finally {
+      finish?.();
       activeScopes.delete(activeScope);
       pending.current = false;
       setBusy(false);

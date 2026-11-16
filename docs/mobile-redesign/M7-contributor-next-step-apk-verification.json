@@ -1,0 +1,26 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Contributor-Next-Step-v57-arm64-x86_64.apk",
+  "versionCode": 57,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5710148,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "591962e78455c14dab1cd7db20d648db49ca945017e1ad36dbf8aee696d2d902",
+  "bytes": 99552173,
+  "featureSourcesMatched": [
+    "src/app/features/tasks/WorkProposalSheet.tsx",
+    "src/app/features/tasks/workProposals.ts"
+  ],
+  "nativeInstallation": "NOT RUN",
+  "authenticatedWorkflow": "BLOCKED: approved actors and disposable fixture unavailable",
+  "nativeIosCompilation": "NOT RUN: Mac/Xcode unavailable",
+  "signatureVerified": true
+}

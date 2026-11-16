@@ -68,6 +68,8 @@ export interface LiveRefreshOptions {
    * paused while the channel is healthy and runs only while degraded.
    */
   hasRealtime?: boolean;
+  /** Use when some of this screen's source tables are not published. */
+  pollWhileSubscribed?: boolean;
   /**
    * Override poll cadence (ms) when Realtime is absent or degraded.
    * Pass 0 to disable fallback polling completely.
@@ -96,6 +98,7 @@ export function createLiveRefreshController(
     debounceMs = 0,
     staleAfterMs = FOREGROUND_STALE_AFTER_MS,
     hasRealtime = false,
+    pollWhileSubscribed = false,
     pollIntervalMs,
   } = options;
 
@@ -114,7 +117,7 @@ export function createLiveRefreshController(
     !stopped &&
     effectivePollMs > 0 &&
     isAppForeground() &&
-    (!hasRealtime || degraded);
+    (!hasRealtime || degraded || pollWhileSubscribed);
 
   const clearPoll = () => {
     if (!pollTimer) return;
@@ -157,6 +160,7 @@ export function createLiveRefreshController(
     if (status === "SUBSCRIBED") {
       degraded = false;
       clearPoll();
+      if (pollWhileSubscribed) armPoll();
       if (needsCatchup) {
         needsCatchup = false;
         schedule();

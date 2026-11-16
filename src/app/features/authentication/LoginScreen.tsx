@@ -327,6 +327,7 @@ export function LoginScreen() {
         <Choice
           label="Development account"
           value={selected}
+          searchable={false}
           onChange={setSelected}
           options={(scenarios || []).map((a) => ({
             value: a.email,

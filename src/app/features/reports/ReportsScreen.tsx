@@ -153,6 +153,7 @@ function OfficeReports({
       <Choice
         label="Report"
         value={kind}
+        searchable={false}
         onChange={(value) => {
           setKind(value);
           if (!["operations", "projects"].includes(value))
@@ -217,6 +218,7 @@ function OfficeReports({
           <Choice
             label="Status"
             value={status}
+            searchable={false}
             onChange={setStatus}
             options={[
               { value: "all", label: "All statuses" },
@@ -368,6 +370,7 @@ function PersonalReports({ navigate }: { navigate: Navigate }) {
       <Choice
         label="Work report status"
         value={status}
+        searchable={false}
         onChange={setStatus}
         options={[
           { value: "all", label: "All statuses" },
@@ -414,6 +417,7 @@ function Period({
     <Choice
       label="Period"
       value={value}
+      searchable={false}
       onChange={onChange}
       options={[
         { value: "7", label: "Last 7 days" },

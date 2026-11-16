@@ -137,7 +137,7 @@ export function ProjectSettings({
         />
         {!!(canManage && !closed) && (
           <Button busy={action.busy} onPress={() => void save()}>
-            Save changes
+            Save project details
           </Button>
         )}
         {!!action.notice && (
@@ -211,7 +211,7 @@ export function ProjectSettings({
                 }
               }}
             >
-              Cancel
+              Cancel lifecycle action
             </Button>
             <Button
               variant={operation === "delete" ? "danger" : "primary"}

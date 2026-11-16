@@ -15,6 +15,10 @@ export function useWorkRecordUpdates(
       onRefresh: refresh,
       debounceMs: 120,
       hasRealtime: !personal,
+      // Task progress is not published on the approved hosted backend.
+      // Keep inspector blockers current even when the socket reports healthy.
+      pollWhileSubscribed: !personal,
+      pollIntervalMs: personal ? undefined : 30_000,
     });
     const schedule = live.schedule;
     nativeWindow.addEventListener("eflow:work-updated", refresh);
@@ -37,6 +41,26 @@ export function useWorkRecordUpdates(
               event: "*",
               schema: "public",
               table: "subtasks",
+              filter: "task_id=eq." + rootId,
+            },
+            schedule,
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "task_progress_updates",
+              filter: "task_id=eq." + rootId,
+            },
+            schedule,
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "subtask_progress_updates",
               filter: "task_id=eq." + rootId,
             },
             schedule,

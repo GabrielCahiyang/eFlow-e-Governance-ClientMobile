@@ -70,3 +70,23 @@ test("edits retain recorded values and omit unchanged fields", () => {
     /25/,
   );
 });
+
+test("priority, planned start, explicit prerequisites and reschedule reason use recorded snapshots", () => {
+  const a = { ...node, priority: "medium" as const, start_date: "2026-11-24", dependency_ids: null };
+  const b = { ...a, priority: "high" as const, start_date: "2026-11-25", dependency_ids: [],
+    due_date: "2026-11-28", due_date_change_reason: "Approved extension" };
+  const result = describeWorkEvent(event("edit", [a], [b]));
+  expect(result.fields).toEqual(expect.arrayContaining([
+    { label: "Priority", value: "Medium → High" },
+    { label: "Start date", value: "24 Nov 2026 → 25 Nov 2026" },
+    { label: "Prerequisites", value: "Legacy sequential prerequisites → None" },
+    { label: "Schedule change reason", value: "Approved extension" },
+  ]));
+});
+
+test("prerequisite labels retain historical titles and never substitute current names", () => {
+  const prerequisite = { ...node, id: "prior", title: "Recorded prerequisite" };
+  const result = describeWorkEvent(event("edit", [{ ...node, dependency_ids: [] } as WorkNode],
+    [{ ...node, dependency_ids: ["prior", "unavailable"] } as WorkNode, prerequisite]));
+  expect(result.fields).toContainEqual({ label: "Prerequisites", value: "None → Recorded prerequisite, Historical prerequisite unavailable" });
+});

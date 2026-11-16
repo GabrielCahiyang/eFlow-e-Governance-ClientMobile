@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-15T18:13:48.157Z",
+  "method": "Exact Hermes string-table entries; quoted literals for JavaScript. Numeric substrings are not credential matches.",
+  "platforms": [
+    "android",
+    "ios"
+  ],
+  "bundles": [
+    "dist/android/_expo/static/js/android/index-8d0f1d9e59c8ad0f706fda1bf455afd5.hbc",
+    "dist/ios/_expo/static/js/ios/index-b86ed3d2f2a4c8f05bce6dac0b26f98e.hbc",
+    "C:/Users/james/projects/eFlow-e-Governance-ClientMobile/artifacts/M7/task-staffing-embedded.hbc"
+  ],
+  "developmentAccountLiteralCount": 6,
+  "developmentAccountLiteralsFound": 0
+}

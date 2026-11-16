@@ -327,7 +327,7 @@ function SealSheet({
                         variant="ghost"
                         onPress={() => setCopy(undefined)}
                       >
-                        Cancel
+                        Cancel replacement
                       </Button>
                       <Button
                         busy={action.busy}

@@ -16,6 +16,7 @@ import WifiOff from "lucide-react-native/icons/wifi-off";
 import { EmptyIllustration, type EmptyKind } from "./EmptyIllustration";
 import { colors, withOpacity } from "./theme";
 import { Button } from "./Button";
+import { OperationStatus } from "./OperationStatus";
 import {
   ViewLoadingState,
   type LoadingLayout,
@@ -75,6 +76,7 @@ export function Screen<T = never>({
   };
   const header = (
     <>
+      <OperationStatus />
       {!!title && (
         <View style={s.header}>
           <View style={s.heading}>
@@ -150,6 +152,8 @@ export function Loading({
   return <ViewLoadingState label={label} layout={layout} rows={rows} />;
 }
 function errorMeta(message: string, context: FeedbackContext) {
+  if (/^Ask the appointed Task Lead\b/.test(message))
+    return { title: "Schedule update needed", Icon: AlertCircle };
   if (message === feedback.invalidCredentials)
     return { title: "Couldn't sign in", Icon: ShieldAlert };
   if (/Connection unavailable/i.test(message))
@@ -173,7 +177,7 @@ function errorMeta(message: string, context: FeedbackContext) {
   if (/the upload stopped before/i.test(message))
     return { title: "Upload interrupted", Icon: AlertCircle };
   if (
-    /^(?:Enter|Choose|Record|Explain|Describe|Use|Passwords|Progress|Actual spending|Attach|Title|Task name|A work note|A review note|Needed-by|Allow camera)\b/i.test(
+    /^(?:Ask the appointed Task Lead|Enter|Choose|Record|Explain|Describe|Use|Passwords|Progress|Actual spending|Attach|Title|Task name|A work note|A review note|Needed-by|Allow camera)\b/i.test(
       message,
     )
   )

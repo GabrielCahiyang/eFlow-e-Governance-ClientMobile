@@ -1,23 +1,19 @@
+import type { Option } from "../../components/ui";
 import type {
   WorkNode,
   WorkTreeSnapshot,
 } from "../../../core/web/app/features/nested-work/types";
 import { nodeSchedule } from "./subtaskSchedule";
+import { buildPrerequisiteChoiceOptions } from "./prerequisiteChoices";
 
 // The hosted snapshot projects these fields for Office subtasks.
-export type DependencyNode = WorkNode & {
-  can_edit_dependencies?: boolean;
-  dependency_ids?: string[] | null;
-  pending_dependency_count?: number | null;
-  restricted_dependency_count?: number | null;
-};
+export type DependencyNode = WorkNode;
 
 /** Returns true when the server snapshot includes Office subtask planning support. */
 export function supportsSubtaskDependencies(tree: WorkTreeSnapshot) {
   return (
     tree.root.kind === "office" &&
-    (tree as WorkTreeSnapshot & { supportsSubtaskDependencies?: boolean })
-      .supportsSubtaskDependencies === true
+    tree.supportsSubtaskDependencies === true
   );
 }
 
@@ -36,15 +32,13 @@ export function subtaskPrerequisiteSiblings(
   );
 }
 
-/** Maps legacy sequential subtasks to their implicit non-cancelled earlier siblings. */
+/** Preserve every legacy prerequisite: cancellation does not satisfy completion. */
 export function legacySiblingDependencyIds(
   tree: WorkTreeSnapshot,
   node: DependencyNode,
 ): string[] {
   if (node.dependency_ids != null) return [];
-  return subtaskDependencies(tree, node)
-    .items.filter((item) => String(item.status) !== "cancelled")
-    .map((item) => item.id);
+  return subtaskDependencies(tree, node).items.map((item) => item.id);
 }
 
 /** Checks whether the actor has Office dependency planning access when adding a subtask. */
@@ -107,7 +101,6 @@ export function subtaskDependencyWouldCycle(
             prerequisite.parent_subtask_id === item.parent_subtask_id &&
             !prerequisite.is_standalone &&
             prerequisite.status !== "completed" &&
-            String(prerequisite.status) !== "cancelled" &&
             prerequisite.sibling_order < item.sibling_order,
         )
         .map((prerequisite) => prerequisite.id),
@@ -125,23 +118,63 @@ export function subtaskDependencyWouldCycle(
   return false;
 }
 
-/** Rejects schedules where the subtask starts before an incomplete prerequisite is due. */
-export function subtaskDependencyScheduleError(
-  siblings: readonly DependencyNode[],
-  candidateIds: readonly string[],
-  startDate?: string | null,
-): string {
-  if (!startDate) return "";
-  const conflict = siblings.some(
-    (item) =>
-      candidateIds.includes(item.id) &&
-      item.status !== "completed" &&
-      !!item.due_date &&
-      item.due_date > startDate,
-  );
-  return conflict
-    ? "The subtask starts before a selected prerequisite is due. Adjust the schedule first."
-    : "";
+/** Builds Picker options for subtask prerequisites and keeps dates informational. */
+export function buildSubtaskPrerequisiteOptions({
+  siblings,
+  nodes,
+  selectedIds,
+  dependentStart,
+  requireScheduledIncomplete = false,
+}: {
+  siblings: readonly DependencyNode[];
+  nodes: readonly DependencyNode[];
+  selectedIds: readonly string[];
+  dependentStart?: string | null;
+  requireScheduledIncomplete?: boolean;
+}): Option[] {
+  return buildPrerequisiteChoiceOptions({
+    choices: siblings,
+    allItems: nodes,
+    selectedIds,
+    getStart: (item) => item.start_date,
+    getDue: (item) => item.due_date,
+    dependentStart,
+    requireScheduledIncomplete,
+    kindLabel: "subtask",
+  });
+}
+
+/** Validates selected subtask prerequisites immediately for scope, uniqueness, self-links and cycles. */
+export function subtaskDependencySelectionError({
+  nodes,
+  siblings,
+  nodeId,
+  candidateIds,
+  startDate,
+  requireDueDates = !!startDate,
+  requireNewDueDates = requireDueDates,
+  originalIds = [],
+}: {
+  nodes: readonly DependencyNode[];
+  siblings: readonly DependencyNode[];
+  nodeId: string;
+  candidateIds: readonly string[];
+  startDate?: string | null;
+  requireDueDates?: boolean;
+  requireNewDueDates?: boolean;
+  originalIds?: readonly string[];
+}): string {
+  if (!candidateIds.length) return "";
+  if (new Set(candidateIds).size !== candidateIds.length || candidateIds.includes(nodeId))
+    return "Choose each prerequisite once, without selecting this subtask itself.";
+  const siblingIds = new Set(siblings.map((item) => item.id));
+  if (candidateIds.some((id) => !siblingIds.has(id))) {
+    return "One prerequisite is no longer available. Remove it to continue.";
+  }
+  if (subtaskDependencyWouldCycle(nodes, nodeId, candidateIds)) {
+    return "These prerequisites would create a circular dependency.";
+  }
+  return "";
 }
 
 export function subtaskDependencies(
@@ -154,34 +187,54 @@ export function subtaskDependencies(
       item.task_id === tree.root.id &&
       item.parent_subtask_id === node.parent_subtask_id,
   );
+  const restrictedCount = Math.max(0, node.restricted_dependency_count ?? 0);
   if (Array.isArray(node.dependency_ids)) {
     const ids = new Set(node.dependency_ids);
+    // A visible cancelled selection is unresolved, not a restricted record.
+    // Keeping it visible also lets the authorized pre-start editor remove it.
     const items = siblings.filter((item) => ids.has(item.id));
-    const missingCount =
-      ids.size -
-      items.length +
-      Math.max(0, node.restricted_dependency_count ?? 0);
+    const missingCount = Math.max(0, ids.size - items.length) + restrictedCount;
     const pendingCount = Math.max(
-      items.filter((item) => item.status !== "completed").length,
-      node.pending_dependency_count ?? missingCount,
+      items.filter((item) => item.status !== "completed").length + missingCount,
+      node.pending_dependency_count ?? 0,
     );
     return { items, missingCount, pendingCount, known: true };
   }
   if (node.dependency_ids === null || tree.root.kind === "personal") {
+    const nodeOrder = node.sibling_order ?? node.position ?? 0;
     const items = node.is_standalone
       ? []
       : siblings
           .filter(
             (item) =>
-              !item.is_standalone && item.sibling_order < node.sibling_order,
+              !item.is_standalone &&
+              (item.sibling_order ?? item.position ?? 0) < nodeOrder,
           )
-          .sort((left, right) => left.sibling_order - right.sibling_order);
+          .sort(
+            (left, right) =>
+              (left.sibling_order ?? left.position ?? 0) -
+              (right.sibling_order ?? right.position ?? 0),
+          );
+    const missingCount = restrictedCount;
+    const pendingCount = Math.max(
+      items.filter((item) => item.status !== "completed").length + missingCount,
+      node.pending_dependency_count ?? 0,
+    );
     return {
       items,
-      missingCount: 0,
-      pendingCount: items.filter((item) => item.status !== "completed").length,
+      missingCount,
+      pendingCount,
       known: true,
     };
   }
-  return { items: [], missingCount: 0, pendingCount: 0, known: false };
+  return {
+    items: [],
+    missingCount: restrictedCount,
+    pendingCount: Math.max(
+      1,
+      node.pending_dependency_count ?? 0,
+      restrictedCount,
+    ),
+    known: false,
+  };
 }

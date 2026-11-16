@@ -1,8 +1,22 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
+import { clearFormDraft, formDraftKey } from "../../../shared/formDraftMemory";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
+
+jest.mock("@react-native-community/datetimepicker", () => {
+  const { View } = require("react-native");
+  return function MockDateTimePicker(props: Record<string, unknown>) {
+    return <View testID="date-time-picker" {...props} />;
+  };
+});
 import { rowToTask } from "../../../../core/web/app/features/tasks/services/taskMapper";
 import { ProjectTaskEditor } from "../ProjectTaskEditor";
 import type { ProjectGroup } from "../../../../core/web/app/features/project-table/types";
+import { fetchDetailEditState } from "../../tasks/workDetailEditing";
+
+jest.mock("../../tasks/workDetailEditing", () => ({
+  ...jest.requireActual<typeof import("../../tasks/workDetailEditing")>("../../tasks/workDetailEditing"),
+  fetchDetailEditState: jest.fn(),
+}));
 
 const mockProjectOfficeMembers = jest.fn<
   () => Promise<{
@@ -36,12 +50,28 @@ let mockProject = {
   startDate: pastProjectStart(),
   targetDate: futureProjectDue(),
 };
+let mockAnalysisTasks: Record<string, unknown>[] = [];
 beforeEach(() => {
+  jest.mocked(fetchDetailEditState).mockImplementation(async taskId => ({
+    version: 1, task_id: taskId, node_id: null, updated_at: null,
+    started: false, details: true, due: true, planning: true,
+  }));
+  clearFormDraft(formDraftKey("head", "project-task-editor:project:new"));
   mockProject = {
     status: "active",
     startDate: pastProjectStart(),
     targetDate: futureProjectDue(),
   };
+  mockAnalysisTasks = [
+    {
+      id: "prerequisite",
+      linkedProjectId: "project",
+      title: "Prepare permit",
+      status: "todo",
+      startDate: offsetPhilippineDate(-5),
+      dueDate: todayDate(),
+    },
+  ];
 });
 jest.mock(
   "../../../../core/web/app/features/project-offices/services/projectOfficeService",
@@ -72,9 +102,7 @@ jest.mock("../../../../platform/supabase", () => ({
 }));
 jest.mock("../services", () => ({
   fetchProject: async () => mockProject,
-  fetchProjectAnalysisTasks: async () => [{
-    id: "prerequisite", linkedProjectId: "project", title: "Prepare permit", status: "todo",
-  }],
+  fetchProjectAnalysisTasks: async () => mockAnalysisTasks,
 }));
 jest.mock(
   "../../../../core/web/app/features/project-table/services/workspaceService",
@@ -92,6 +120,28 @@ const mockGroups: ProjectGroup[] = [
     isDefault: true,
   },
 ];
+
+test("started Task editing permits title corrections while planning and unsupervised due dates stay locked", async () => {
+  const row = { id: "started-task", title: "Original agenda", priority: "medium", status: "in_progress",
+    org_id: "office", linked_project_id: "project", start_date: todayDate(), deadline: offsetPhilippineDate(5),
+    updated_at: "2026-11-15T00:00:00Z", dependency_ids: [] };
+  mockTaskRead.mockResolvedValue({ data: row, error: null });
+  jest.mocked(fetchDetailEditState).mockResolvedValue({ version: 1, task_id: row.id, node_id: null,
+    updated_at: row.updated_at, started: true, details: true, due: false, planning: false });
+  mockRpc.mockReset().mockImplementation(async (name, args) => ({ error: null,
+    data: name === "phase3_patch_task" ? { ...row, ...(args.p_patch as object) } :
+      name === "project_flow_snapshot" ? { project: { id: "project" }, ready: true } : true }));
+  const saved = jest.fn(async () => {});
+  const view = await render(<ProjectTaskEditor scope={{ actor: "head", project: "project", office: "office", task: rowToTask(row) }}
+    groups={mockGroups} onClose={jest.fn()} onSaved={saved} />);
+  await waitFor(() => expect(view.getByRole("button", { name: "Save task" })).toBeEnabled());
+  expect(view.getByRole("button", { name: "Start date" })).toBeDisabled();
+  expect(view.getByRole("button", { name: "Due date" })).toBeDisabled();
+  await fireEvent.changeText(view.getByLabelText("Task name"), "Corrected agenda");
+  await fireEvent.press(view.getByRole("button", { name: "Save task" }));
+  await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+  expect(mockRpc).toHaveBeenLastCalledWith("phase3_patch_task", { p_task_id: row.id, p_patch: { title: "Corrected agenda" } });
+});
 
 test("task creation rechecks both Web permissions and never writes when one is denied", async () => {
   mockRpc.mockReset().mockImplementation(async (name) => ({
@@ -361,4 +411,260 @@ test("blocks past project schedules with exact start date reason instead of fall
   expect(
     mockRpc.mock.calls.some(([name]) => name === "m7_create_scheduled_task"),
   ).toBe(false);
+});
+
+test("permits undated and overlapping prerequisites without changing task schedule bounds", async () => {
+  mockAnalysisTasks = [
+    {
+      id: "no-dates",
+      linkedProjectId: "project",
+      title: "Undated draft",
+      status: "todo",
+    },
+    {
+      id: "start-only",
+      linkedProjectId: "project",
+      title: "Missing due date",
+      status: "todo",
+      startDate: todayDate(),
+    },
+    {
+      id: "late-prereq",
+      linkedProjectId: "project",
+      title: "Later clearance",
+      status: "todo",
+      startDate: todayDate(),
+      dueDate: offsetPhilippineDate(5),
+    },
+  ];
+  mockRpc.mockReset().mockImplementation(async (name) => ({
+    error: null,
+    data:
+      name === "project_flow_snapshot"
+        ? { project: { id: "project" }, ready: true }
+        : true,
+  }));
+
+  const view = await render(
+    <ProjectTaskEditor
+      scope={{ actor: "head", project: "project", office: "office" }}
+      groups={mockGroups}
+      onClose={jest.fn()}
+      onSaved={async () => {}}
+    />,
+  );
+
+  await fireEvent.changeText(view.getByLabelText("Task name"), "Dependent build");
+  await fireEvent.press(view.getByRole("button", { name: "Prerequisite tasks" }));
+
+  expect(await view.findByRole("checkbox", {name:"Undated draft"})).toBeEnabled();
+  expect(view.getByRole("checkbox", {name:"Missing due date"})).toBeEnabled();
+  expect(view.getByText("No dates set")).toBeOnTheScreen();
+  await fireEvent.press(view.getByRole("checkbox", {name:"Undated draft"}));
+  await fireEvent.press(view.getByRole("checkbox", {name:"Later clearance"}));
+  expect(view.queryByText(/is earlier than prerequisite/)).toBeNull();
+  const close=view.getAllByLabelText("Close dialog").at(-1);if(close)await fireEvent.press(close);
+  await fireEvent.press(view.getByRole("button",{name:"Add task"}));
+  await waitFor(()=>expect(mockRpc.mock.calls.some(([name])=>name==="m7_create_scheduled_task")).toBe(true));
+});
+
+test("keeps entered task fields and shows Close task form instead of Done if step 2 patch fails", async () => {
+  mockRpc.mockReset().mockImplementation((async (name: string) => {
+    if (name === "phase3_patch_task") {
+      return { data: null, error: { code: "22023", message: "Patch rejected" } };
+    }
+    return {
+      error: null,
+      data:
+        name === "project_flow_snapshot"
+          ? { project: { id: "project" }, ready: true }
+          : name === "m7_create_scheduled_task"
+            ? { id: "new-task", linked_project_id: "project" }
+            : true,
+    };
+  }) as never);
+
+  const view = await render(
+    <ProjectTaskEditor
+      scope={{ actor: "head", project: "project", office: "office" }}
+      groups={mockGroups}
+      onClose={jest.fn()}
+      onSaved={async () => {}}
+    />,
+  );
+
+  await fireEvent.changeText(view.getByLabelText("Task name"), "Keep this title");
+  await fireEvent.press(view.getByRole("button", { name: "Priority" }));
+  await fireEvent.press(await view.findByRole("radio", { name: "High" }));
+  await fireEvent.press(view.getByRole("button", { name: "Add task" }));
+
+  expect(
+    await view.findByText("The task was created. Open Edit task to check its priority and prerequisites."),
+  ).toBeOnTheScreen();
+  expect(view.queryByRole("button", { name: "Done" })).toBeNull();
+  expect(view.getByRole("button", { name: "Close task form" })).toBeOnTheScreen();
+  expect(view.getByDisplayValue("Keep this title")).toBeOnTheScreen();
+});
+
+test("Edit task uses project timeline bounds identically to Add task and blocks out-of-range dates while allowing undated prerequisites", async () => {
+  const row = {
+    id: "task-edit-1",
+    title: "Existing road task",
+    priority: "medium",
+    status: "todo",
+    org_id: "office",
+    linked_project_id: "project",
+    start_date: todayDate(),
+    due_date: offsetPhilippineDate(5),
+    updated_at: "2026-11-15T00:00:00Z",
+  };
+  mockAnalysisTasks = [
+    {
+      id: "no-dates",
+      linkedProjectId: "project",
+      title: "Unscheduled blocker",
+      status: "todo",
+    },
+    {
+      id: "scheduled-ok",
+      linkedProjectId: "project",
+      title: "Early check",
+      status: "todo",
+      startDate: offsetPhilippineDate(-2),
+      dueDate: todayDate(),
+    },
+  ];
+  mockTaskRead.mockResolvedValue({ data: row, error: null });
+  mockRpc.mockReset().mockImplementation(async (name) => ({
+    error: null,
+    data:
+      name === "project_flow_snapshot"
+        ? { project: { id: "project" }, ready: true }
+        : true,
+  }));
+
+  const view = await render(
+    <ProjectTaskEditor
+      scope={{
+        actor: "head",
+        project: "project",
+        office: "office",
+        task: rowToTask(row),
+      }}
+      groups={mockGroups}
+      onClose={jest.fn()}
+      onSaved={async () => {}}
+    />,
+  );
+
+  await waitFor(() => expect(view.getByRole("button", { name: "Start date" })).toBeOnTheScreen());
+  await fireEvent.press(view.getByRole("button", { name: "Due date" }));
+  const picker = await view.findByTestId("date-time-picker");
+  await waitFor(() => {
+    expect(picker.props.minimumDate?.toISOString().slice(0, 10)).toBe(todayDate());
+    expect(picker.props.maximumDate?.toISOString().slice(0, 10)).toBe(futureProjectDue());
+  });
+
+  // Attempt to set Due date past project targetDate via DateTimePicker change
+  await fireEvent(
+    picker,
+    "change",
+    { type: "set" },
+    new Date(Date.parse(offsetPhilippineDate(25) + "T12:00:00Z")),
+  );
+  await fireEvent.press(view.getByRole("button", { name: "Confirm date" }));
+  await waitFor(() =>
+    expect(view.queryByRole("button", { name: "Confirm date" })).toBeNull(),
+  );
+
+  // Verify unscheduled prerequisite is disabled inside Edit task too
+  await fireEvent.press(view.getByRole("button", { name: "Prerequisite tasks" }));
+  expect(await view.findByRole("checkbox", { name: "Unscheduled blocker" })).toBeEnabled();
+  const closePrereqs = view.getAllByLabelText("Close dialog").at(-1);
+  if (closePrereqs) await fireEvent.press(closePrereqs);
+
+  await fireEvent.press(view.getByRole("button", { name: "Save task" }));
+  expect(
+    await view.findByText("Choose Task dates within the project schedule."),
+  ).toBeOnTheScreen();
+  expect(mockRpc.mock.calls.some(([name]) => name === "phase3_patch_task")).toBe(false);
+});
+
+test("ProjectTaskEditor triggers onCreated only after clean task creation", async () => {
+  clearFormDraft(formDraftKey("head", "project-task-editor:project:new"));
+  mockRpc.mockReset().mockImplementation(async (name) => ({
+    data:
+      name === "m7_create_scheduled_task"
+        ? { id: "created-task-id", linked_project_id: "project" }
+        : name === "project_flow_snapshot"
+          ? { project: { id: "project" }, ready: true }
+          : true,
+    error: null,
+  }));
+  const onCreated = jest.fn();
+  const onClose = jest.fn();
+  const onSaved = jest.fn(async () => {});
+
+  const view = await render(
+    <ProjectTaskEditor
+      scope={{ actor: "head", project: "project", office: "office" }}
+      groups={mockGroups}
+      onClose={onClose}
+      onCreated={onCreated}
+      onSaved={onSaved}
+    />,
+  );
+  await waitFor(() => expect(view.getByLabelText("Task name")).toBeOnTheScreen());
+  expect(view.queryByRole("button", { name: "Appointed Lead" })).toBeNull();
+  expect(view.queryByRole("button", { name: "Contributors" })).toBeNull();
+
+  await fireEvent.changeText(view.getByLabelText("Task name"), "Site inspection");
+  await fireEvent.press(view.getByRole("button", { name: "Add task" }));
+
+  await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  expect(onCreated).toHaveBeenCalledWith({
+    id: "created-task-id",
+    title: "Site inspection",
+  });
+  expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+test("ProjectTaskEditor does not fire onCreated when step-2 planning fields fail after create", async () => {
+  clearFormDraft(formDraftKey("head", "project-task-editor:project:new"));
+  mockRpc.mockReset().mockImplementation(async (name) => {
+    if (name === "phase3_patch_task") throw new Error("patch rejected");
+    return {
+      data:
+        name === "m7_create_scheduled_task"
+          ? { id: "created-partial-id", linked_project_id: "project" }
+          : name === "project_flow_snapshot"
+            ? { project: { id: "project" }, ready: true }
+            : true,
+      error: null,
+    };
+  });
+  const onCreated = jest.fn();
+  const onSaved = jest.fn(async () => {});
+
+  const view = await render(
+    <ProjectTaskEditor
+      scope={{ actor: "head", project: "project", office: "office" }}
+      groups={mockGroups}
+      onClose={jest.fn()}
+      onCreated={onCreated}
+      onSaved={onSaved}
+    />,
+  );
+  await fireEvent.press(await view.findByRole("button", { name: "Priority" }));
+  await fireEvent.press(await view.findByRole("radio", { name: "High" }));
+  await fireEvent.changeText(view.getByLabelText("Task name"), "Site inspection");
+  await fireEvent.press(view.getByRole("button", { name: "Add task" }));
+
+  expect(
+    await view.findByText(
+      "The task was created. Open Edit task to check its priority and prerequisites.",
+    ),
+  ).toBeOnTheScreen();
+  expect(onCreated).not.toHaveBeenCalled();
+  expect(onSaved).toHaveBeenCalledTimes(1);
 });

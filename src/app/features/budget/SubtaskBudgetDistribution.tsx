@@ -177,7 +177,7 @@ function DistributionSheet({
         "",
       amount: row.amount > 0 ? String(row.amount) : "",
       reason: "",
-    }),
+    }), { restoreOnOpen: false },
   );
   const { preferredMode, source, amount, reason } = draft;
   const close = () => {
@@ -308,6 +308,7 @@ function DistributionSheet({
             <Choice
               label="Budget action"
               value={mode}
+              searchable={false}
               disabled={action.busy}
               onChange={(value) => {
                 action.clear();
@@ -390,7 +391,7 @@ function DistributionSheet({
         )
       )}
       <Button variant="outline" disabled={action.busy} onPress={close}>
-        Cancel
+        Cancel budget edit
       </Button>
     </Sheet>
   );

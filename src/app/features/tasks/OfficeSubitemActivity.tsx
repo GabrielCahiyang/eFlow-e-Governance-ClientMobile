@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import Clock from "lucide-react-native/icons/clock";
 import { Button, ErrorState, Loading } from "../../components/ui";
@@ -51,6 +51,22 @@ function SubtaskTimeline({
     () => fetchSubitemInspectorRecord(rootId, nodeId),
     !!actorId && tree?.root.kind !== "personal",
   );
+  const currentNode = tree?.nodes?.find(
+    (item) => item.id === nodeId && item.task_id === rootId,
+  );
+  const nodeSignature = JSON.stringify([
+    tree?.revision ?? null,
+    currentNode?.status ?? null,
+    currentNode?.blocker ?? null,
+  ]);
+  const prevNodeSignature = useRef(nodeSignature);
+  useEffect(() => {
+    if (prevNodeSignature.current !== nodeSignature) {
+      prevNodeSignature.current = nodeSignature;
+      void history.refresh();
+      void events.refresh();
+    }
+  }, [nodeSignature, history.refresh, events.refresh]);
   useEffect(() => {
     const refresh = () => {
       void history.refresh();

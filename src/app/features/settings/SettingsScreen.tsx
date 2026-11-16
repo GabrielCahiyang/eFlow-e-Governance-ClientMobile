@@ -88,6 +88,7 @@ export function SettingsScreen({
               <Choice
                 label="Color theme"
                 value={appearance.preference}
+                searchable={false}
                 options={[
                   { value: "system", label: "Use device setting" },
                   { value: "light", label: "Light" },

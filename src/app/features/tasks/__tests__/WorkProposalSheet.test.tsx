@@ -1,13 +1,21 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react-native";
 import { WorkProposalReview, WorkProposalSheet } from "../WorkProposalSheet";
 import { clearAllFormDrafts } from "../../../shared/formDraftMemory";
 import { saveSharedWork } from "../../../shared/sharedWorkRequest";
+import { draftStore } from "../../../../platform/draftStore";
+import { confirmAction } from "../../../shared/confirm";
 import {
   canResubmit,
   fetchWorkProposals,
   sendWorkProposal,
   type WorkProposal,
+  type ProposalRequest,
 } from "../workProposals";
 
 jest.mock("../workProposals", () => ({
@@ -18,6 +26,10 @@ jest.mock("../workProposals", () => ({
 
 jest.mock("../../../shared/sharedWorkRequest", () => ({
   saveSharedWork: jest.fn(),
+}));
+
+jest.mock("../../../shared/confirm", () => ({
+  confirmAction: jest.fn(async () => true),
 }));
 
 jest.mock("../../../../platform/draftStore", () => ({
@@ -73,6 +85,217 @@ const baseProposal = (overrides: Partial<WorkProposal> = {}): WorkProposal => ({
 beforeEach(() => {
   clearAllFormDrafts();
   jest.clearAllMocks();
+  jest.mocked(draftStore.get).mockResolvedValue(undefined);
+});
+
+test.each([
+  { note: "Work recorded", next_step: "Request sign-off" },
+  { note: "Work recorded\n\nNext step: Legacy plan" },
+])(
+  "recovered progress shows saved terms and verifies the unchanged request: %j",
+  async (terms) => {
+    const request: ProposalRequest = {
+      id: "saved-progress",
+      args: {
+        p_root: "task-1",
+        p_node: "sub-1",
+        p_request: "saved-progress",
+        p_kind: "progress",
+        p_terms: terms,
+        p_supersedes: null,
+      },
+    };
+    jest.mocked(draftStore.get).mockResolvedValue(request);
+    jest.mocked(sendWorkProposal).mockResolvedValue(undefined);
+    await render(
+      <WorkProposalSheet
+        actor="member-1"
+        root="task-1"
+        node="sub-1"
+        kind="progress"
+        onClose={jest.fn()}
+        onSaved={jest.fn(async () => {})}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByDisplayValue(terms.note)).toHaveProp(
+        "editable",
+        false,
+      ),
+    );
+    if (terms.next_step) {
+      expect(screen.getByLabelText("Next step")).toHaveDisplayValue(
+        terms.next_step,
+      );
+      expect(screen.getByLabelText("Next step")).toHaveProp("editable", false);
+    } else {
+      expect(screen.queryByLabelText("Next step")).toBeNull();
+    }
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Verify submission" }),
+    );
+    await waitFor(() =>
+      expect(sendWorkProposal).toHaveBeenCalledWith(
+        "member-1",
+        "task-1",
+        "sub-1",
+        "work-proposal:task-1:sub-1:progress",
+        request,
+        true,
+      ),
+    );
+  },
+);
+
+test("discarding an unsubmitted saved upload restores its structured next step for editing", async () => {
+  const request: ProposalRequest = {
+    id: "saved-upload",
+    args: {
+      p_terms: { note: "Awaiting review", next_step: "Ask for a signature" },
+    },
+    files: [
+      {
+        uri: "file:///evidence.pdf",
+        name: "evidence.pdf",
+        size: 10,
+        type: "application/pdf",
+      },
+    ],
+  };
+  jest.mocked(draftStore.get).mockResolvedValue(request);
+  await render(
+    <WorkProposalSheet
+      actor="member-1"
+      root="task-1"
+      kind="progress"
+      onClose={jest.fn()}
+      onSaved={jest.fn(async () => {})}
+    />,
+  );
+  await screen.findByRole("button", { name: "Discard saved upload" });
+  jest
+    .mocked(draftStore.get)
+    .mockResolvedValueOnce(request)
+    .mockResolvedValue(undefined);
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Discard saved upload" }),
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText("Next step")).toHaveProp("editable", true),
+  );
+  expect(confirmAction).toHaveBeenCalledTimes(1);
+  expect(screen.getByLabelText("Next step")).toHaveDisplayValue(
+    "Ask for a signature",
+  );
+  expect(screen.getByLabelText("Work note")).toHaveDisplayValue(
+    "Awaiting review",
+  );
+});
+
+test.each([undefined, "sub-1"])(
+  "returned progress retains an editable next step for Task/Subtask %s",
+  async (node) => {
+    const returned = baseProposal({
+      node_id: node ?? null,
+      state: "changes_requested",
+      canDecide: false,
+      terms: { note: "Original note", next_step: "Get a signature" },
+    });
+    jest.mocked(fetchWorkProposals).mockResolvedValue({
+      items: [returned],
+      canProposeProgress: true,
+      canProposeCompletion: false,
+    });
+    jest.mocked(canResubmit).mockReturnValue(true);
+    jest.mocked(sendWorkProposal).mockResolvedValue(undefined);
+    await render(
+      <WorkProposalReview
+        actor="member-1"
+        root="task-1"
+        node={node}
+        onSaved={jest.fn(async () => {})}
+      />,
+    );
+    await fireEvent.press(
+      await screen.findByRole("button", { name: "Resubmit work" }),
+    );
+    expect(screen.getByLabelText("Next step")).toHaveDisplayValue(
+      "Get a signature",
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText("Work note"),
+      "Revised evidence ready",
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText("Next step"),
+      "Obtain final approval",
+    );
+    const buttons = screen.getAllByRole("button", { name: "Resubmit work" });
+    await fireEvent.press(buttons[buttons.length - 1]);
+    await waitFor(() => expect(sendWorkProposal).toHaveBeenCalledTimes(1));
+    expect(jest.mocked(sendWorkProposal).mock.calls[0]?.[4].args).toMatchObject(
+      {
+        p_node: node ?? null,
+        p_supersedes: returned.id,
+        p_terms: {
+          note: "Revised evidence ready",
+          next_step: "Obtain final approval",
+        },
+      },
+    );
+  },
+);
+
+test("work note and next step have separate limits and overlong next step prevents submission", async () => {
+  jest.mocked(fetchWorkProposals).mockResolvedValue({
+    items: [],
+    canProposeProgress: true,
+    canProposeCompletion: false,
+  });
+  jest.mocked(sendWorkProposal).mockResolvedValue(undefined);
+  await render(
+    <WorkProposalSheet
+      actor="member-1"
+      root="task-1"
+      kind="progress"
+      onClose={jest.fn()}
+      onSaved={jest.fn(async () => {})}
+    />,
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Submit progress for review" }),
+    ).toBeEnabled(),
+  );
+  await fireEvent.changeText(
+    screen.getByLabelText("Work note"),
+    "n".repeat(3000),
+  );
+  await fireEvent.changeText(
+    screen.getByLabelText("Next step"),
+    "s".repeat(301),
+  );
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Submit progress for review" }),
+  );
+  expect(
+    await screen.findByText("Next step must be 300 characters or fewer."),
+  ).toBeOnTheScreen();
+  expect(sendWorkProposal).not.toHaveBeenCalled();
+  await fireEvent.changeText(
+    screen.getByLabelText("Next step"),
+    "s".repeat(300),
+  );
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Submit progress for review" }),
+  );
+  await waitFor(() => expect(sendWorkProposal).toHaveBeenCalledTimes(1));
+  expect(
+    jest.mocked(sendWorkProposal).mock.calls[0]?.[4].args.p_terms,
+  ).toMatchObject({
+    note: "n".repeat(3000),
+    next_step: "s".repeat(300),
+  });
 });
 
 test("Task contributor progress proposal uses Work state, Blocker, Work note, Next step, and Evidence without Progress (%)", async () => {
@@ -98,7 +321,9 @@ test("Task contributor progress proposal uses Work state, Blocker, Work note, Ne
   );
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Work state" })).toBeOnTheScreen();
+    expect(
+      screen.getByRole("button", { name: "Work state" }),
+    ).toBeOnTheScreen();
   });
   expect(screen.queryByText(/Progress \(%\)/)).toBeNull();
   expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent(
@@ -118,7 +343,9 @@ test("Task contributor progress proposal uses Work state, Blocker, Work note, Ne
     screen.getByRole("button", { name: "Submit progress for review" }),
   );
   await waitFor(() => {
-    expect(screen.getByText("Describe what is blocking the work.")).toBeOnTheScreen();
+    expect(
+      screen.getByText("Describe what is blocking the work."),
+    ).toBeOnTheScreen();
   });
 
   await fireEvent.changeText(
@@ -147,7 +374,8 @@ test("Task contributor progress proposal uses Work state, Blocker, Work note, Ne
     p_node: null,
     p_kind: "progress",
     p_terms: {
-      note: "Completed site staking\n\nNext step: Request lab follow-up",
+      note: "Completed site staking",
+      next_step: "Request lab follow-up",
       blocker: "Awaiting soil report",
       progress: 45,
     },
@@ -157,7 +385,7 @@ test("Task contributor progress proposal uses Work state, Blocker, Work note, Ne
   expect(onSaved).toHaveBeenCalledTimes(1);
 });
 
-test("Subtask contributor progress proposal omits Progress (%) and defaults to In progress even with an active blocker", async () => {
+test("Subtask contributor progress proposal omits Progress (%), prefills active blocker, and allows switching to In progress to clear", async () => {
   jest.mocked(fetchWorkProposals).mockResolvedValue({
     items: [],
     canProposeProgress: true,
@@ -165,7 +393,7 @@ test("Subtask contributor progress proposal omits Progress (%) and defaults to I
   });
   jest.mocked(sendWorkProposal).mockResolvedValue(undefined);
 
-  await render(
+  const view = await render(
     <WorkProposalSheet
       actor="member-2"
       root="task-1"
@@ -178,14 +406,42 @@ test("Subtask contributor progress proposal omits Progress (%) and defaults to I
   );
 
   await waitFor(() => {
-    expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent(
-      "In progress",
-    );
+    expect(
+      screen.getByRole("button", { name: "Work state" }),
+    ).toHaveTextContent("Blocked");
   });
-  expect(screen.queryByLabelText("Blocker")).toBeNull();
+  expect(
+    screen.getByDisplayValue("Permit signature pending"),
+  ).toBeOnTheScreen();
   expect(screen.queryByText(/Progress \(%\)/)).toBeNull();
 
-  await fireEvent.changeText(screen.getByLabelText("Work note"), "Signature secured");
+  // Untouched blocker clears automatically if cleared before editing
+  await view.rerender(
+    <WorkProposalSheet
+      actor="member-2"
+      root="task-1"
+      node="sub-1"
+      kind="progress"
+      initialBlocker={null}
+      onClose={jest.fn()}
+      onSaved={jest.fn(async () => {})}
+    />,
+  );
+  await waitFor(() => {
+    expect(
+      screen.getByRole("button", { name: "Work state" }),
+    ).toHaveTextContent("In progress");
+  });
+  expect(screen.queryByLabelText("Blocker")).toBeNull();
+
+  await fireEvent.changeText(
+    screen.getByLabelText("Work note"),
+    "Signature secured",
+  );
+  await fireEvent.changeText(
+    screen.getByLabelText("Next step"),
+    "  File signed permit  ",
+  );
 
   await fireEvent.press(
     screen.getByRole("button", { name: "Submit progress for review" }),
@@ -198,6 +454,7 @@ test("Subtask contributor progress proposal omits Progress (%) and defaults to I
   expect(payload?.args.p_node).toBe("sub-1");
   expect(payload?.args.p_terms).toEqual({
     note: "Signature secured",
+    next_step: "File signed permit",
   });
 });
 
@@ -230,7 +487,11 @@ test("Contributor completion proposal uses Completion note and EvidencePicker wi
 
 test("WorkProposalReview displays blocker on proposal and opens Review note for both Approve (optional) and Request changes (required)", async () => {
   const proposal = baseProposal({
-    terms: { note: "Work paused", blocker: "Waiting on structural sign-off" },
+    terms: {
+      note: "Work paused",
+      blocker: "Waiting on structural sign-off",
+      next_step: "Ask the engineer to review",
+    },
   });
   jest.mocked(fetchWorkProposals).mockResolvedValue({
     items: [proposal],
@@ -257,11 +518,16 @@ test("WorkProposalReview displays blocker on proposal and opens Review note for 
   });
 
   // Approve opens Review note optionally and accepts empty note
-  await fireEvent.press(screen.getByRole("button", { name: "Approve" }));
-  expect(await screen.findByText("Approve work")).toBeOnTheScreen();
+  expect(
+    screen.getByText("Next step · Ask the engineer to review"),
+  ).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("button", { name: "Approve work" }));
+  expect(screen.getAllByText("Approve work").length).toBeGreaterThan(0);
   expect(screen.getByLabelText("Review note")).toBeOnTheScreen();
 
-  const approveButtons = screen.getAllByRole("button", { name: "Approve" });
+  const approveButtons = screen.getAllByRole("button", {
+    name: "Approve work",
+  });
   await fireEvent.press(approveButtons[approveButtons.length - 1]);
   await waitFor(() => {
     expect(saveSharedWork).toHaveBeenCalledTimes(1);
@@ -273,7 +539,9 @@ test("WorkProposalReview displays blocker on proposal and opens Review note for 
   });
 
   // Wait for card Request changes button to become enabled again after refresh
-  const cardReject = await screen.findByRole("button", { name: "Request changes" });
+  const cardReject = await screen.findByRole("button", {
+    name: "Request changes",
+  });
   await waitFor(() => {
     expect(cardReject).toBeEnabled();
   });

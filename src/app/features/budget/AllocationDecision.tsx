@@ -97,7 +97,7 @@ export function AllocationDecision({
             }, decision === "approve" ? "Allocation approved." : "Allocation rejected.")
           }
         >
-          Confirm {decision}
+          {decision === "approve" ? "Confirm approval" : "Confirm rejection"}
         </Button>
       </Sheet>
       {!decision && !!action.error && <ErrorState context="action" error={action.error} />}

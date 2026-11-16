@@ -143,6 +143,7 @@ export function TeamScreen({
               <Choice
                 label="Attention type"
                 value={attentionKind}
+                searchable={false}
                 onChange={setAttentionKind}
                 options={[
                   "all",

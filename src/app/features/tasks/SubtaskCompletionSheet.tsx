@@ -16,6 +16,7 @@ import { fetchWorkTree } from "../../../core/web/app/features/nested-work/servic
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
 
 import { completionMode } from "./branchInspector";
+import { subtaskDependencies } from "./subtaskDependencies";
 import { uploadEvidenceFile } from "./taskEvidence";
 
 type Attachment = {
@@ -82,6 +83,14 @@ export function SubtaskCompletionSheet({
         attempt?.files && attempt.attachments.length < attempt.files.length;
       {
         const tree = await fetchWorkTree(rootId);
+        const current = tree.nodes.find((item) => item.id === node.id);
+        if (current && current.status !== "completed") {
+          const dependencies = subtaskDependencies(tree, current);
+          if (!dependencies.known)
+            throw new PublicMessageError("Subtask dependencies could not be verified. Refresh before completing this subtask.");
+          if (dependencies.pendingCount > 0 || dependencies.missingCount > 0)
+            throw new PublicMessageError("Complete all prerequisite subtasks before completing this subtask.");
+        }
         if (
           tree.root.project !== projectId ||
           tree.root.office !== officeId ||

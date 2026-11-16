@@ -1,0 +1,21 @@
+{
+  "at": "2026-11-15T12:50:32.553596+00:00",
+  "projectRef": "ixnfphgjyelhckjwjkdv",
+  "environment": "production",
+  "databaseRole": "supabase_read_only_user",
+  "transactionReadOnly": "on",
+  "reviewedOriginalCompletionStillInstalled": true,
+  "allFiveReviewedFunctionFingerprintsMatch": true,
+  "dependencyUpdateTriggerEnabled": true,
+  "officeSubtasks": 12,
+  "legacyNull": 11,
+  "explicitEmpty": 1,
+  "explicitNonempty": 0,
+  "cancelled": 0,
+  "tasks": 9,
+  "tasksWithSelectedDependencies": 0,
+  "published": ["subtask_progress_updates", "subtasks", "tasks"],
+  "hostedWrites": 0,
+  "migrationApplied": false,
+  "authenticatedWebMobileAcceptance": "BLOCKED: no approved actors/fixtures or authorized staging target"
+}

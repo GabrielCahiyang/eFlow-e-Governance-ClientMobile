@@ -59,7 +59,7 @@ function Editor({
       engagement: member.engagement,
       end: accessEndDate(member.access_end, timezone),
       until: member.until_close,
-    }),
+    }), { restoreOnOpen: false },
   );
   const { engagement, end, until } = draft;
   const close = () => {
@@ -78,6 +78,7 @@ function Editor({
       <Choice
         label="Engagement"
         value={engagement}
+        searchable={false}
         disabled={locked}
         onChange={(value) => updateDraft({ engagement: value as Engagement })}
         options={ENGAGEMENT_TYPES.map((value) => ({ value, label: value }))}
@@ -85,6 +86,7 @@ function Editor({
       <Choice
         label="Access duration"
         value={until ? "close" : "date"}
+        searchable={false}
         disabled={locked}
         options={[
           { value: "close", label: "Until project closes" },

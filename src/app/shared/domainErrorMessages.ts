@@ -1,4 +1,26 @@
 const exactMessages: Record<string, string> = {
+  "the subtask starts before a prerequisite is due. adjust the schedule first":
+    "Prerequisite linking needs a backend update. Contact your Office Head.",
+  "start date, prerequisites and structure cannot change after work has started":
+    "Start date, prerequisites and structure cannot change after work has started.",
+  "only the supervising lead or authorized office head can reschedule this work":
+    "Only the supervising Lead or authorized Office Head can reschedule this work.",
+  "enter a reason for changing the due date":
+    "Enter a reason for changing the due date.",
+  "keep the schedule change reason within 1,000 characters":
+    "Keep the schedule change reason within 1,000 characters.",
+  "work details are read-only. refresh the work or use its existing review or reopen action":
+    "Work details are read-only. Refresh the work or use its existing review or reopen action.",
+  "work details are read-only during review or after completion":
+    "Work details are read-only during review or after completion.",
+  "started work and its history cannot be deleted":
+    "Started work and its history cannot be deleted.",
+  "complete every selected prerequisite before starting this subtask":
+    "Complete every selected prerequisite before starting this subtask.",
+  "this subtask is blocked until every selected prerequisite is completed":
+    "Complete every selected prerequisite before updating or completing this subtask.",
+  "add subtasks directly to their task":
+    "This server currently supports creating subtasks directly under a task. Open the parent task to add one.",
   // Cash requests, releases, liquidation, budgets & accounting
   "a pcv cannot change fiscal budget":
     "A petty cash voucher cannot change the fiscal budget.",
@@ -1547,7 +1569,7 @@ const exactMessages: Record<string, string> = {
   "task responsibility changed; refresh before authorizing funding":
     "Task responsibility changed. Refresh before authorizing funding.",
   "task start date is earlier than a prerequisite due date. adjust the schedule first":
-    "Task start date is earlier than a prerequisite's due date. Adjust the schedule first.",
+    "Prerequisite linking needs a backend update. Contact your Office Head.",
   "task title is required": "Enter a task title.",
   "task unavailable": "This task is no longer available.",
   "task/subtask is not open for progress":

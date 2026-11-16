@@ -12,6 +12,7 @@ import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Search from "lucide-react-native/icons/search";
 import { Sheet } from "./Sheet";
+import { Button } from "./Button";
 import { useTheme } from "./Appearance";
 import { isRawEntityId } from "../../shared/entityId";
 import { colors, dateLabel } from "./theme";
@@ -25,7 +26,10 @@ export function Field({
   const palette = useTheme();
   return (
     <View style={s.field}>
-      <Text style={s.label}>{label}{required ? " *" : ""}</Text>
+      <Text style={s.label}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
       <TextInput
         accessibilityLabel={label}
         accessibilityHint={required ? "Required" : undefined}
@@ -57,7 +61,10 @@ export function Choice({
   disabled,
   multiple = false,
   required,
-  searchable,
+  searchable = true,
+  error,
+  confirmSelection = false,
+  confirmationLabel = "Confirm selection",
 }: {
   label: string;
   value: string | string[];
@@ -68,17 +75,33 @@ export function Choice({
   multiple?: boolean;
   required?: boolean;
   searchable?: boolean;
+  error?: string;
+  confirmSelection?: boolean;
+  confirmationLabel?: string;
 }) {
   const palette = useTheme();
   const [open, setOpen] = useState(false),
     [search, setSearch] = useState("");
-  const selected = Array.isArray(value) ? value : [value];
-  const showSearch = searchable ?? options.length >= 6;
+  const [selectionDraft, setSelectionDraft] = useState<string[]>();
+  const currentSelection = Array.isArray(value) ? value : value ? [value] : [];
+  const selected =
+    confirmSelection && open
+      ? (selectionDraft ?? currentSelection)
+      : currentSelection;
+  const close = () => {
+    setOpen(false);
+    setSearch("");
+    setSelectionDraft(undefined);
+  };
+  const showSearch = searchable;
   const visibleDescription = (description?: string) =>
     description && !isRawEntityId(description) ? description : undefined;
   return (
     <View style={s.field}>
-      <Text style={s.label}>{label}{required ? " *" : ""}</Text>
+      <Text style={s.label}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -86,7 +109,10 @@ export function Choice({
         accessibilityState={{ disabled: !!disabled, expanded: open }}
         disabled={disabled}
         style={[s.choice, disabled && { opacity: 0.45 }]}
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          setSelectionDraft([...currentSelection]);
+          setOpen(true);
+        }}
       >
         <Text style={s.choiceText}>
           {options
@@ -96,24 +122,57 @@ export function Choice({
         </Text>
         <ChevronDown size={18} color={palette.muted} />
       </Pressable>
+      {!!error && !open && (
+        <Text accessibilityRole="alert" style={s.error}>
+          {userErrorMessage(error, "action")}
+        </Text>
+      )}
       <Sheet
         open={open}
         title={label}
-        onClose={() => {
-          setOpen(false);
-          setSearch("");
-        }}
+        onClose={close}
+        description={
+          confirmSelection
+            ? "Confirm to apply your selection to the form. Save the form to save your changes."
+            : undefined
+        }
+        footer={
+          confirmSelection ? (
+            <>
+              <Button
+                disabled={disabled || (required && !selected.length)}
+                onPress={() => {
+                  onChange(multiple ? selected : (selected[0] ?? ""));
+                  close();
+                }}
+              >
+                {confirmationLabel}
+              </Button>
+              <Button variant="ghost" onPress={close}>
+                Cancel selection
+              </Button>
+            </>
+          ) : undefined
+        }
       >
         {showSearch && (
-          <Field label="Search options" value={search} onChangeText={setSearch} />
+          <Field
+            label="Search options"
+            value={search}
+            onChangeText={setSearch}
+          />
+        )}
+        {!!error && (
+          <Text accessibilityRole="alert" style={s.error}>
+            {userErrorMessage(error, "action")}
+          </Text>
         )}
         {options
           .filter((o) => {
-            if (!showSearch || !search.trim()) return true;
+            const query = search.trim().toLowerCase();
+            if (!showSearch || !query) return true;
             const desc = visibleDescription(o.description) ?? "";
-            return (o.label + " " + desc)
-              .toLowerCase()
-              .includes(search.toLowerCase());
+            return (o.label + " " + desc).toLowerCase().includes(query);
           })
           .map((option) => {
             const description = visibleDescription(option.description);
@@ -124,30 +183,31 @@ export function Choice({
                 aria-checked={selected.includes(option.value)}
                 accessibilityState={{
                   checked: selected.includes(option.value),
-                  disabled: !!option.disabled,
+                  disabled: !!option.disabled || !!disabled,
                 }}
                 accessibilityLabel={option.label}
-                disabled={option.disabled}
-                style={[s.option, selected.includes(option.value) && s.selected]}
+                disabled={option.disabled || disabled}
+                style={[
+                  s.option,
+                  selected.includes(option.value) && s.selected,
+                  option.disabled && s.optionDisabled,
+                ]}
                 onPress={() => {
-                  onChange(
-                    multiple
-                      ? selected.includes(option.value)
-                        ? selected.filter((v) => v !== option.value)
-                        : [...selected, option.value]
-                      : option.value,
-                  );
-                  if (!multiple) {
-                    setOpen(false);
-                    setSearch("");
+                  const next = multiple
+                    ? selected.includes(option.value)
+                      ? selected.filter((v) => v !== option.value)
+                      : [...selected, option.value]
+                    : [option.value];
+                  if (confirmSelection) setSelectionDraft(next);
+                  else {
+                    onChange(multiple ? next : option.value);
+                    if (!multiple) close();
                   }
                 }}
               >
                 <View style={{ flex: 1 }}>
                   <Text style={s.label}>{option.label}</Text>
-                  {!!description && (
-                    <Text style={s.help}>{description}</Text>
-                  )}
+                  {!!description && <Text style={s.help}>{description}</Text>}
                 </View>
                 {!!selected.includes(option.value) && (
                   <Check size={19} color={palette.primary} />
@@ -180,14 +240,17 @@ export function DateField({
   const [open, setOpen] = useState(false);
   const parsed = value ? new Date(value + "T12:00:00") : new Date();
   const minimumDate = min ? new Date(min + "T12:00:00") : undefined;
-  const maximumDate = max && (!min || max >= min)
-    ? new Date(max + "T12:00:00") : undefined;
+  const maximumDate =
+    max && (!min || max >= min) ? new Date(max + "T12:00:00") : undefined;
   let pickerDate = Number.isFinite(parsed.getTime()) ? parsed : new Date();
   if (minimumDate && pickerDate < minimumDate) pickerDate = minimumDate;
   if (maximumDate && pickerDate > maximumDate) pickerDate = maximumDate;
   return (
     <View style={s.field}>
-      <Text style={s.label}>{label}{required ? " *" : ""}</Text>
+      <Text style={s.label}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
       {Platform.OS === "web" ? (
         <TextInput
           accessibilityLabel={label}
@@ -233,7 +296,7 @@ export function DateField({
               accessibilityRole="button"
               onPress={() => setOpen(false)}
             >
-              <Text style={s.label}>Done</Text>
+              <Text style={s.label}>Confirm date</Text>
             </Pressable>
           )}
         </>
@@ -328,6 +391,7 @@ const s = StyleSheet.create({
     gap: 12,
   },
   selected: { backgroundColor: colors.primarySoft, borderRadius: 8 },
+  optionDisabled: { opacity: 0.45 },
   help: { fontSize: 12, color: colors.muted, marginTop: 4 },
   toggle: { flexDirection: "row", alignItems: "center", gap: 12 },
   search: {

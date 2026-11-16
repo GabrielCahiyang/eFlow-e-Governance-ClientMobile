@@ -1,5 +1,7 @@
 import { brandColors, withOpacity } from "./theme";
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -34,6 +36,57 @@ import { colors } from "./theme";
 import { Text } from "./Typography";
 import { useAppearance, useTheme, themedStyle } from "./Appearance";
 import { ErrorState } from "./Screen";
+import { OperationStatus } from "./OperationStatus";
+
+const SheetHostContext = createContext(false);
+
+/**
+ * Keeps a single native <Modal> mounted across multi-step sheet transitions
+ * so UIKit / Android never drops an incoming sheet while tearing down the old one.
+ */
+export function SheetModalHost({
+  open,
+  onClose,
+  busy,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  busy?: boolean;
+  children?: ReactNode;
+}) {
+  const alreadyHosted = useContext(SheetHostContext);
+  const { reduced } = useMotionPreferences();
+  const [present, setPresent] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setPresent(true);
+      return;
+    }
+    const duration = reduced ? 0 : motionDuration.productiveLong;
+    const timer = setTimeout(() => setPresent(false), duration);
+    return () => clearTimeout(timer);
+  }, [open, reduced]);
+
+  if (alreadyHosted) return <>{children}</>;
+
+  return (
+    <Modal
+      visible={present}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={() => {
+        if (!busy) onClose();
+      }}
+    >
+      <SheetHostContext.Provider value={true}>
+        {children}
+      </SheetHostContext.Provider>
+    </Modal>
+  );
+}
 
 export function Sheet({
   title,
@@ -58,6 +111,7 @@ export function Sheet({
   presentation?: "dialog" | "inspector";
   maxWidth?: number;
 }) {
+  const hosted = useContext(SheetHostContext);
   const { isDark } = useAppearance();
   const palette = useTheme();
   const inset = useSafeAreaInsets(),
@@ -65,6 +119,10 @@ export function Sheet({
     { reduced } = useMotionPreferences();
   const [present, setPresent] = useState(open);
   const body = useRef<ComponentRef<typeof ScrollView>>(null);
+  useEffect(() => {
+    if (!hosted || !open) return;
+    AccessibilityInfo.announceForAccessibility(title);
+  }, [hosted, open, title]);
   useEffect(() => {
     if (!open || !actionError) return;
     const frame = requestAnimationFrame(() =>
@@ -103,6 +161,98 @@ export function Sheet({
   const close = () => {
     if (!busy) onClose();
   };
+  const content = (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={[
+        s.container,
+        {
+          paddingTop: Math.max(inset.top, 16),
+          paddingBottom: Math.max(inset.bottom, 16),
+        },
+        presentation === "inspector" && {
+          alignItems: "flex-end",
+          padding: 0,
+        },
+      ]}
+    >
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          s.shade,
+          hosted ? { opacity: 1 } : backdrop,
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss dialog"
+          disabled={busy}
+          onPress={close}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+      <Animated.View
+        accessibilityViewIsModal
+        accessibilityState={{ busy: !!busy }}
+        style={[
+          themedStyle(s.panel, isDark),
+          {
+            width: Math.min(width - 32, maxWidth),
+            maxHeight: height - inset.top - inset.bottom - 32,
+          },
+          presentation === "inspector" && {
+            width: Math.min(width, maxWidth),
+            borderRadius: 0,
+            height: "100%",
+            maxHeight: "100%",
+          },
+          panel,
+        ]}
+      >
+        <View style={s.header}>
+          <View style={{ flex: 1, gap: 5 }}>
+            <Text accessibilityRole="header" style={s.title}>
+              {title}
+            </Text>
+            {!!description && (
+              <Text style={s.description}>{description}</Text>
+            )}
+            <OperationStatus />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close dialog"
+            accessibilityState={{ disabled: !!busy }}
+            disabled={busy}
+            onPress={close}
+            style={s.close}
+          >
+            <X color={palette.text} size={22} />
+          </Pressable>
+        </View>
+        <ScrollView
+          ref={body}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={s.content}
+        >
+          {!!actionError && <ErrorState context="action" error={actionError} />}
+          <SheetHostContext.Provider value={false}>
+            {children}
+          </SheetHostContext.Provider>
+        </ScrollView>
+        {!!footer && (
+          <View style={s.footer}>
+            <SheetHostContext.Provider value={false}>
+              {footer}
+            </SheetHostContext.Provider>
+          </View>
+        )}
+      </Animated.View>
+    </KeyboardAvoidingView>
+  );
+
+  if (hosted) return present ? content : null;
+
   return (
     <Modal
       visible={present}
@@ -113,78 +263,7 @@ export function Sheet({
       onRequestClose={close}
       onShow={() => AccessibilityInfo.announceForAccessibility(title)}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={[
-          s.container,
-          {
-            paddingTop: Math.max(inset.top, 16),
-            paddingBottom: Math.max(inset.bottom, 16),
-          },
-          presentation === "inspector" && {
-            alignItems: "flex-end",
-            padding: 0,
-          },
-        ]}
-      >
-        <Animated.View style={[StyleSheet.absoluteFill, s.shade, backdrop]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss dialog"
-            disabled={busy}
-            onPress={close}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-        <Animated.View
-          accessibilityViewIsModal
-          accessibilityState={{ busy: !!busy }}
-          style={[
-            themedStyle(s.panel, isDark),
-            {
-              width: Math.min(width - 32, maxWidth),
-              maxHeight: height - inset.top - inset.bottom - 32,
-            },
-            presentation === "inspector" && {
-              width: Math.min(width, maxWidth),
-              borderRadius: 0,
-              height: "100%",
-              maxHeight: "100%",
-            },
-            panel,
-          ]}
-        >
-          <View style={s.header}>
-            <View style={{ flex: 1, gap: 5 }}>
-              <Text accessibilityRole="header" style={s.title}>
-                {title}
-              </Text>
-              {!!description && (
-                <Text style={s.description}>{description}</Text>
-              )}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close dialog"
-              accessibilityState={{ disabled: !!busy }}
-              disabled={busy}
-              onPress={close}
-              style={s.close}
-            >
-              <X color={palette.text} size={22} />
-            </Pressable>
-          </View>
-          <ScrollView
-            ref={body}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={s.content}
-          >
-            {!!actionError && <ErrorState context="action" error={actionError} />}
-            {children}
-          </ScrollView>
-          {!!footer && <View style={s.footer}>{footer}</View>}
-        </Animated.View>
-      </KeyboardAvoidingView>
+      {content}
     </Modal>
   );
 }

@@ -32,6 +32,7 @@ import {
   priorityLabel,
 } from "./TaskBentoComponents";
 import { subtaskDisplayStatus } from "./subtaskSchedule";
+import { hiddenSubtasksMessage, subtasksVisibleForActor } from "./subtaskVisibility";
 import { useWorkRecordUpdates } from "./useWorkRecordUpdates";
 import { personalReviewAllowed, workNodeRoute } from "./branchInspector";
 import {
@@ -46,6 +47,8 @@ type TaskPlanningInfo = {
   startDate?: string | null;
   deadline?: string | null;
   dueDate?: string | null;
+  parentStatus?: string;
+  parentLead?: string | null;
 };
 
 const SUBPAGE_TITLES: Record<string, string> = {
@@ -62,13 +65,15 @@ async function readTaskPlanning(taskId: string): Promise<TaskPlanningInfo | unde
     const res = await supabase
       .from("tasks")
       .select(
-        "description, definition_of_done, acceptance_criteria, start_date, deadline, due_date",
+        "description, definition_of_done, acceptance_criteria, start_date, deadline, due_date, status, assigned_to, recommendation_lead_id",
       )
       .eq("id", taskId)
       .maybeSingle();
     if (res.error || !res.data) return undefined;
     const row = res.data as Record<string, unknown>;
     return {
+      parentStatus: typeof row.status === "string" ? row.status : undefined,
+      parentLead: typeof row.assigned_to === "string" ? row.assigned_to : typeof row.recommendation_lead_id === "string" ? row.recommendation_lead_id : null,
       description: typeof row.description === "string" ? row.description : null,
       definitionOfDone:
         typeof row.definition_of_done === "string"
@@ -119,6 +124,7 @@ export function LinkedWorkNodeScreen({
           throw new PublicMessageError(
             "This subtask is outside the linked project context.",
           );
+        if (!subtasksVisibleForActor(tree.root, actor)) throw new PublicMessageError(hiddenSubtasksMessage);
         let projectStatus: string | undefined;
         let projectLeadId: string | undefined;
         if (!personal && tree.root.project) {
@@ -164,6 +170,8 @@ export function LinkedWorkNodeScreen({
           .maybeSingle();
         if (result.error) throw result.error;
         const taskPlanning = await readTaskPlanning(rootId);
+        if (!subtasksVisibleForActor({ kind: "office", lead: taskPlanning?.parentLead ?? null, status: taskPlanning?.parentStatus }, actor))
+          throw new PublicMessageError(hiddenSubtasksMessage);
         return {
           legacy: result.data ? rowToSubtask(result.data) : undefined,
           legacyProjectId,
@@ -268,7 +276,11 @@ export function LinkedWorkNodeScreen({
   return (
     <Screen
       compact
-      title={subpageTitle || itemTitle || "Linked subtask"}
+      title={
+        isOverview && branch
+          ? undefined
+          : subpageTitle || itemTitle || "Linked subtask"
+      }
       description={subpageTitle ? itemTitle || route.title : undefined}
       onRefresh={() => facts.refresh()}
     >
@@ -289,6 +301,7 @@ export function LinkedWorkNodeScreen({
                 : undefined
             }
             readOnly={!branch.tree.root.open}
+            refreshing={facts.loading}
             projectStatus={branch.projectStatus}
             projectLeadId={branch.projectLeadId}
             projectOnHold={executionBlocked}
@@ -419,6 +432,7 @@ export function LinkedWorkNodeScreen({
                 : undefined
             }
             readOnly={!branch.tree.root.open}
+            refreshing={facts.loading}
             projectStatus={branch.projectStatus}
             projectLeadId={branch.projectLeadId}
             projectOnHold={executionBlocked}

@@ -22,6 +22,7 @@ import { useWorkspace } from "../workspaces";
 import { ProjectFiles, ProjectActivity } from "../projects";
 import { useFacts } from "../../shared/useFacts";
 import { PublicMessageError } from "../../shared/userMessages";
+import { confirmAction } from "../../shared/confirm";
 import { useSnapshotPage } from "../../shared/useSnapshotPage";
 import type { Navigate } from "../../shared/routes";
 import { fetchPersonalProject } from "../../../core/web/app/features/workspaces/services/workspaceService";
@@ -292,10 +293,11 @@ export function PersonalProjectScreen({
                         <Button
                           variant="outline"
                           disabled={blocked}
-                          onPress={() => void action.run("start_task", {
-                            task_id: task.id,
-                            revision: task.revision,
-                          })}
+                          busy={action.busy}
+                          onPress={() => void (async () => {
+                            if (!(await confirmAction("Start this task?", "Ready to begin this work?", "Start work"))) return;
+                            await action.run("start_task", { task_id: task.id, revision: task.revision });
+                          })()}
                         >
                           Start work
                         </Button>
@@ -320,7 +322,7 @@ export function PersonalProjectScreen({
                           >
                             {task.reviewer_id
                               ? "Submit for review"
-                              : "Mark done"}
+                              : "Complete personal task"}
                           </Button>
                         </>
                       )}

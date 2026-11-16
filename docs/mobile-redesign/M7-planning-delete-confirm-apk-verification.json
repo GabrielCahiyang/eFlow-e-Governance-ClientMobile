@@ -1,0 +1,35 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Planning-Delete-Confirm-REVIEW-v57-arm64-x86_64.apk",
+  "versionCode": 57,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 5720172,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "3400aa0ff72fc503f5be79cc753574673b6750eae150165bf477716f446db666",
+  "bytes": 99562197,
+  "featureSourcesMatched": [
+    "src/app/components/ui/Fields.tsx",
+    "src/app/features/tasks/TaskDetailsScreen.tsx",
+    "src/app/features/tasks/WorkEditorSheet.tsx",
+    "src/app/features/tasks/WorkTreePanel.tsx",
+    "src/app/features/tasks/LinkedWorkNodeScreen.tsx",
+    "src/app/features/tasks/workRecovery.ts",
+    "src/app/features/tasks/subtaskVisibility.ts",
+    "src/app/features/tasks/taskDeletion.ts",
+    "src/app/features/tasks/WorkProposalSheet.tsx"
+  ],
+  "nativeInstallation": "NOT RUN",
+  "authenticatedWorkflow": "BLOCKED: approved actors/fixtures unavailable",
+  "backendPrivacy": "NOT ENFORCED: shared Subtask RLS/RPC correction requires review",
+  "taskDeleteAtomicGuard": "REVIEW ONLY; NOT APPLIED",
+  "nativeIosCompilation": "NOT RUN: Mac/Xcode unavailable",
+  "signatureVerified": true
+}

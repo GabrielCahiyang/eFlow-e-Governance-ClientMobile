@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Choice,
@@ -14,6 +14,7 @@ import { useAction } from "../../shared/useAction";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import {
   PublicMessageError,
+  feedback,
   isDeterministicRejection,
 } from "../../shared/userMessages";
 import { saveSubtaskWorkUpdate } from "../../../core/web/app/features/subtasks/services/subtaskWorkflowService";
@@ -39,6 +40,8 @@ export function OfficeSubitemUpdateSheet({
   onSaved: (data: WorkTreeSnapshot) => Promise<void>;
 }) {
   const baseline = useRef(tree).current;
+  const activeBlocker =
+    tree.nodes.find((item) => item.id === nodeId)?.blocker?.trim() || "";
   const { toast } = useToast();
   const [attempted, setAttempted] = useState(false);
   const action = useAction();
@@ -46,13 +49,36 @@ export function OfficeSubitemUpdateSheet({
     formDraftKey(actorId, "subitem-update:" + nodeId),
     true,
     () => ({
-      state: "in_progress" as "in_progress" | "stuck",
+      state: (activeBlocker ? "stuck" : "in_progress") as "in_progress" | "stuck",
       note: "",
-      blocker: "",
+      blocker: activeBlocker,
       nextStep: "",
       attachment: undefined as PickedFile | undefined,
-    }),
+      seededBlocker: activeBlocker,
+      dirty: false,
+      stateTouched: false,
+    }), { restoreOnOpen: false },
   );
+  useEffect(() => {
+    if (action.busy) return;
+    const seeded = draft.seededBlocker ?? "";
+    if (seeded === activeBlocker) return;
+    if (!draft.dirty || (!draft.stateTouched && draft.blocker === seeded)) {
+      updateDraft({
+        state: activeBlocker ? "stuck" : "in_progress",
+        blocker: activeBlocker,
+        seededBlocker: activeBlocker,
+      });
+    }
+  }, [
+    action.busy,
+    activeBlocker,
+    draft.blocker,
+    draft.dirty,
+    draft.seededBlocker,
+    draft.stateTouched,
+    updateDraft,
+  ]);
   const { state, note, blocker, nextStep, attachment } = draft;
   const close = () => {
     if (action.busy) return;
@@ -102,7 +128,11 @@ export function OfficeSubitemUpdateSheet({
       }
       clearDraft();
       toast("Work update posted.", "success");
-      await onSaved(latest).catch(() => {});
+      try {
+        await onSaved(await fetchWorkTree(baseline.root.id));
+      } catch {
+        toast(feedback.saved, "info");
+      }
       onClose();
     });
   return (
@@ -125,7 +155,10 @@ export function OfficeSubitemUpdateSheet({
       <Choice
         label="Work state"
         value={state}
-        onChange={(next) => updateDraft({ state: next })}
+        searchable={false}
+        onChange={(next) =>
+          updateDraft({ state: next, dirty: true, stateTouched: true })
+        }
         options={[
           { value: "in_progress", label: "In progress" },
           { value: "stuck", label: "Blocked" },
@@ -136,7 +169,7 @@ export function OfficeSubitemUpdateSheet({
           label="Blocker"
           required
           value={blocker}
-          onChangeText={(next) => updateDraft({ blocker: next })}
+          onChangeText={(next) => updateDraft({ blocker: next, dirty: true })}
           maxLength={3000}
           multiline
         />
@@ -144,14 +177,14 @@ export function OfficeSubitemUpdateSheet({
       <Field
         label="Work note"
         value={note}
-        onChangeText={(next) => updateDraft({ note: next })}
+        onChangeText={(next) => updateDraft({ note: next, dirty: true })}
         maxLength={3000}
         multiline
       />
       <Field
         label="Next step"
         value={nextStep}
-        onChangeText={(next) => updateDraft({ nextStep: next })}
+        onChangeText={(next) => updateDraft({ nextStep: next, dirty: true })}
         maxLength={300}
       />
       {attachment ? (

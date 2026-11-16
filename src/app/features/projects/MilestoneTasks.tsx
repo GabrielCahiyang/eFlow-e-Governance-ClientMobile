@@ -24,7 +24,7 @@ export function MilestoneTasks({
     open,
     () => ({
       selected: tasks.filter((t) => t.milestoneId === id).map((t) => t.id),
-    }),
+    }), { restoreOnOpen: false },
   );
   const selected = draft.selected;
   return (

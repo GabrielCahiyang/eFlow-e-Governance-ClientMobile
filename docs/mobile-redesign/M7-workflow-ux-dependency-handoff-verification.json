@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "archive": "artifacts/M7/eFlow-Web-Workflow-UX-Dependency-Linking-Handoff-2026-11-16.zip",
+  "files": 112,
+  "bytes": 393139,
+  "sha256": "7911936cdc1a01e00c9f2a5b7b83999603b1d0c46de9a74304f6b8c647708aac",
+  "allManifestBytesVerified": true,
+  "currentRootDocumentReferencesIncluded": true,
+  "noEnvironmentPrivateKeyOrExecutableFiles": true,
+  "allHostedOperationsReadOnly": true,
+  "liveWorkflowAcceptance": "BLOCKED"
+}

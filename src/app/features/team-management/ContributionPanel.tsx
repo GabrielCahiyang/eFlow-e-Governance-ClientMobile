@@ -51,6 +51,7 @@ export function ContributionPanel({
       <Choice
         label="Manila month"
         value={month}
+        searchable={false}
         onChange={setMonth}
         options={periods.map((p) => ({ value: p.key, label: p.label }))}
       />

@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-16T06:08:53.130Z",
+  "method": "Exact Hermes string-table entries; quoted literals for JavaScript. Numeric substrings are not credential matches.",
+  "platforms": [
+    "android",
+    "ios"
+  ],
+  "bundles": [
+    "dist/android/_expo/static/js/android/index-8d4d33a3e724475a3cc4471a75c78984.hbc",
+    "dist/ios/_expo/static/js/ios/index-024ded7c1a5ea983c56d57c76d7e3cdd.hbc",
+    "C:/Users/james/projects/eFlow-e-Governance-ClientMobile/artifacts/M7/planning-delete-confirm-embedded.hbc"
+  ],
+  "developmentAccountLiteralCount": 6,
+  "developmentAccountLiteralsFound": 0
+}

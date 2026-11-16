@@ -136,7 +136,7 @@ const workReasons: Record<string, string> = {
   "start work is available on the planned start date": "Start work is available on the planned start date.",
   "only the appointed subtask lead can start this subtask": "Only the appointed Subtask Lead can start this subtask.",
   "the parent task must be in progress before starting this subtask": "The Task Lead must start the parent Task first.",
-  "complete earlier subtasks before starting this subtask": "Complete the earlier dependent Subtasks before starting this Subtask.",
+  "complete earlier subtasks before starting this subtask": "Complete earlier ordered subtasks before starting this subtask. Cancelled work does not count as completed.",
   "choose task dates within the project schedule": "Choose Task dates within the project schedule.",
   "start the parent subtask first": "The parent Subtask must start before this Subtask can start.",
   "choose a due date between the subtask start and the parent deadline": "Choose a due date between the subtask start and the parent deadline.",
@@ -237,7 +237,7 @@ const workReasons: Record<string, string> = {
   "subitems complete directly; review the parent task instead": "Use Mark complete to finish a subtask.",
   "subitems complete directly. use mark complete in the subitem; final approval belongs to the task": "Use Mark complete to finish a subtask.",
   "complete every child step first": "Complete every child subtask first.",
-  "complete earlier ordered steps first": "Complete earlier ordered subtasks first.",
+  "complete earlier ordered steps first": "Complete earlier ordered subtasks before completing this subtask.",
   "complete earlier ordered siblings first": "Complete earlier ordered subtasks first.",
   "this work is closed or already completed": "This work is closed or already completed.",
   "root task contributors are read-only for the task lead after the project becomes active": "Root task contributors cannot be changed by the Task Lead once the project is active.",
@@ -351,7 +351,7 @@ export function userErrorMessage(
     /^Reschedule subtask "([^"]+)" before changing this timeline\.?$/i,
   );
   if (rescheduleChild)
-    return `Reschedule subtask "${rescheduleChild[1]}" before changing this timeline.`;
+    return `Ask the appointed Task Lead to reschedule “${rescheduleChild[1]}” first.`;
   const stepOrder = text.match(
     /^Complete Step \d+: "([^"]+)" before starting this subtask\.?$/i,
   );

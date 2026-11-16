@@ -24,6 +24,7 @@ import { useToast } from "../../components/ui/Toast";
 import { workDisplayStatus } from "../../shared/statusLabels";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
+import { SmallProgress } from "../../components/ui/OperationStatus";
 import { useAuth } from "../authentication";
 import {
   TaskFundingCard,
@@ -52,6 +53,7 @@ import { TaskReviewPanel } from "./TaskReviewPanel";
 import { TaskActivity } from "./TaskActivity";
 import { WorkTreePanel } from "./WorkTreePanel";
 import { WorkEditorSheet } from "./WorkEditorSheet";
+import { hiddenSubtasksMessage, subtasksVisibleForActor } from "./subtaskVisibility";
 import { WorkProposalReview, WorkProposalSheet } from "./WorkProposalSheet";
 import {
   plannedStartReached,
@@ -60,9 +62,13 @@ import {
 } from "./subtaskSchedule";
 import { getPhilippineCalendarDate } from "../../../core/web/app/shared/calendarDates";
 import { PublicMessageError } from "../../shared/userMessages";
+import { confirmAction } from "../../shared/confirm";
+import { deleteUnstartedTask, taskCanBeDeletedBeforeStart } from "./taskDeletion";
+import { notifyTaskListeners } from "../../../core/web/app/features/tasks/services/taskRealtimeService";
 import {
   isProjectLeadSubtaskPlanningBlocked,
   isTaskLeadOrContributor,
+  taskStaffingCapability,
 } from "./workPermissions";
 function canPostTaskUpdate(
   task: ReturnType<typeof rowToTask>,
@@ -80,6 +86,7 @@ import {
   BentoBlockerCard,
   BentoDependenciesCard,
   BentoEditButton,
+  BentoDeleteButton,
   BentoProjectOnHoldCard,
   BentoScheduleCards,
   priorityLabel,
@@ -268,16 +275,16 @@ export function TaskDetailsScreen({
       </Screen>
     );
   const { task, projectStatus } = facts.data;
+  const mayViewSubtasks = subtasksVisibleForActor({ kind: "office", lead: task.assigneeId || task.recommendationLeadId || null, status: task.status }, profile?.id);
   const today = (tree.data && workScheduleToday(tree.data)) ?? getPhilippineCalendarDate();
   const canStartToday = plannedStartReached(task.startDate, today);
   const taskDependenciesReady = facts.data.missingDependencyCount === 0 &&
     facts.data.dependencyItems.every((dependency) => dependency.completed);
   const isProjectOnHold = projectStatus === "on_hold";
   const canEditTask =
-    !facts.loading &&
-    !editAccess.loading &&
     !editAccess.error &&
     !!editAccess.data;
+  const actionsChecking = facts.loading || editAccess.loading;
   const readOnly =
       ["completed", "archived", "unavailable"].includes(projectStatus) ||
       !!task.archivedAt,
@@ -289,7 +296,7 @@ export function TaskDetailsScreen({
     participant = isTaskLeadOrContributor(task, profile?.id),
     lead = !!profile?.id && task.assigneeId === profile.id;
   const completion =
-    tree.data && !tree.error
+    mayViewSubtasks && tree.data && !tree.error
       ? branchCompletion(tree.data, task.status)
       : undefined;
   const context = tree.data
@@ -307,9 +314,16 @@ export function TaskDetailsScreen({
     !tree.error &&
     !!tree.data &&
     !!context &&
-    (selectRootWorkCapability(tree.data, "appoint_lead", context).allowed ||
-      selectRootWorkCapability(tree.data, "manage_contributors", context)
-        .allowed);
+    taskStaffingCapability(tree.data, context).allowed;
+  const canDeleteTask = !readOnly && !isProjectOnHold && !!profile?.id &&
+    (head || facts.data.projectLeadId === profile.id) && taskCanBeDeletedBeforeStart(task);
+  const deleteTask = () => void action.run(async () => {
+    if (!profile?.id || !(await confirmAction("Delete this task?", `Remove “${task.title}” from active work? Its project will remain.`, "Delete task", true))) return;
+    await deleteUnstartedTask(task, profile.id);
+    toast("Task deleted.", "success");
+    await Promise.allSettled([notifyTaskListeners()]);
+    navigate(task.linkedProjectId ? { name: "project", id: task.linkedProjectId, title: "Project" } : { name: "tasks", title: "My Work" });
+  });
   const verifyCurrentTask = async () => {
     const session = await supabase.auth.getSession();
     if (
@@ -437,6 +451,7 @@ export function TaskDetailsScreen({
       }
     />
   );
+  if (nodeId && !mayViewSubtasks) return <Screen><Notice>{hiddenSubtasksMessage}</Notice></Screen>;
   if (initialView === "budget" && (nodeId || financialRecordId))
     return (
       <Screen
@@ -513,9 +528,8 @@ export function TaskDetailsScreen({
   });
 
   const canCreateSubtask =
+    mayViewSubtasks &&
     !readOnly &&
-    !tree.loading &&
-    !facts.loading &&
     !!tree.data &&
     !!context &&
     !isProjectLeadSubtaskPlanningBlocked(tree.data, profile?.id, {
@@ -586,12 +600,19 @@ export function TaskDetailsScreen({
               >
                 {task.title}
               </Text>
+              <View testID="task-detail-actions" style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
               {canEditTask && (
                 <BentoEditButton
                   accessibilityLabel="Edit task"
+                  busy={actionsChecking}
+                  disabled={action.busy}
                   onPress={() => setEditingTask(true)}
                 />
               )}
+              {canDeleteTask && <BentoDeleteButton accessibilityLabel="Delete task" onPress={deleteTask}
+                busy={action.busy || actionsChecking} />}
+              {actionsChecking && !canEditTask && !canDeleteTask && <SmallProgress label="Checking actions…" />}
+              </View>
             </View>
             {!!(task.projectTitle || task.department) && (
               <Text
@@ -627,6 +648,9 @@ export function TaskDetailsScreen({
                         onPress: () =>
                           void action.run(async () => {
                             const resuming = task.status === "changes_requested";
+                            if (!(await confirmAction(resuming ? "Resume this task?" : "Start this task?",
+                              resuming ? "Ready to continue this work?" : "Starting this task will make its subtasks visible to authorized project members.",
+                              resuming ? "Resume work" : "Start work"))) return;
                             await verifyExecution("start");
                             await updateTaskStatus(id, "in_progress");
                             toast(
@@ -664,6 +688,24 @@ export function TaskDetailsScreen({
                 style={{ marginTop: 8, marginBottom: 8 }}
               />
             )}
+            {!executionBlocked &&
+              participant &&
+              ["todo", "changes_requested"].includes(task.status) &&
+              (!lead ||
+                (task.status === "todo" &&
+                  (!canStartToday || !taskDependenciesReady))) && (
+                <Notice>
+                  {!lead
+                    ? task.status === "changes_requested"
+                      ? "The Task Lead must resume work before you can post progress or submit completion."
+                      : "The Task Lead must start work before you can post progress or submit completion."
+                    : !taskDependenciesReady
+                      ? "This task cannot start because its prerequisites are incomplete."
+                      : !task.startDate
+                        ? "Set a planned start date before starting this task."
+                        : "Start work is available on or after the planned start date."}
+                </Notice>
+              )}
             {!executionBlocked &&
               participant &&
               task.status === "in_progress" &&
@@ -757,6 +799,15 @@ export function TaskDetailsScreen({
                 task.feedback ||
                 task.rejectionNote
               }
+              onPressActivity={() =>
+                navigate({
+                  name: "task",
+                  id,
+                  projectId: task.linkedProjectId,
+                  view: "activity",
+                  title: "Activity",
+                })
+              }
             />
           )}
 
@@ -766,17 +817,19 @@ export function TaskDetailsScreen({
             leadRoleLabel="Task Lead"
             contributors={contributorList}
             onChoosePeople={mayStaff ? () => setStaff(true) : undefined}
+            peoplePending={tree.loading}
           />
 
           {/* 5. Subtasks bento card */}
-          <BentoSubtasksCard
+          {mayViewSubtasks ? <BentoSubtasksCard
             subtasks={subtaskItems}
+            actionsPending={tree.loading || facts.loading}
             canAdd={canCreateSubtask}
             onAddSubtask={() => setCreatingSubtask(true)}
             onPressSubtask={(item) =>
               navigate(workNodeRoute(tree.data!, item.id, item.title))
             }
-          />
+          /> : <Notice>{hiddenSubtasksMessage}</Notice>}
 
           {/* 6. Supporting features 2x2 bento grid */}
           <BentoSupportingGrid
@@ -824,7 +877,7 @@ export function TaskDetailsScreen({
             task.linkedProjectId &&
             projectStatus === "active" &&
             task.status === "in_progress" &&
-            !tree.data?.root.blocker && (
+            !taskBlocker && (
               <CustomWorkStatusControl
                 actor={profile.id}
                 taskId={id}
@@ -900,6 +953,7 @@ export function TaskDetailsScreen({
                 navigate={navigate}
                 onSaved={savedTree}
                 readOnly={readOnly}
+                refreshing={tree.loading || facts.loading}
                 projectStatus={projectStatus}
                 projectLeadId={facts.data.projectLeadId}
                 projectOnHold={isProjectOnHold}
@@ -1045,6 +1099,7 @@ export function TaskDetailsScreen({
           projectStatus={projectStatus}
           projectLeadId={facts.data.projectLeadId}
           readOnly={readOnly || !!tree.error}
+          promptPostCreateStaffing
           onClose={() => setCreatingSubtask(false)}
           onSaved={savedTree}
         />

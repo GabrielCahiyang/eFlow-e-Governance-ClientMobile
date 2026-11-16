@@ -114,3 +114,23 @@ test("non-realtime controller uses calm polling only while active", () => {
 
   controller.dispose();
 });
+
+test("partial publications keep foreground catch-up polling while subscribed and stop in background", () => {
+  const onRefresh = jest.fn();
+  const controller = createLiveRefreshController({
+    onRefresh, hasRealtime: true, pollWhileSubscribed: true, pollIntervalMs: 30_000,
+  });
+  controller.onChannelStatus("SUBSCRIBED");
+  jest.advanceTimersByTime(30_000);
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+  setAppState("background");
+  jest.advanceTimersByTime(60_000);
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+  setAppState("active");
+  controller.onChannelStatus("SUBSCRIBED");
+  jest.advanceTimersByTime(30_000);
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+  controller.dispose();
+  jest.advanceTimersByTime(60_000);
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+});

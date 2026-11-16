@@ -44,7 +44,7 @@ export function PersonalTaskSheet({
         progress: String(task?.progress || 0),
         note: mode === "review" ? "" : task?.note || "",
         decision: "approve",
-      }),
+      }), { restoreOnOpen: mode !== "staff" },
     ),
     { title, lead, reviewer, progress, note, decision } = draft,
     [error, setError] = useState("");
@@ -149,7 +149,19 @@ export function PersonalTaskSheet({
       busy={busy}
       footer={
         <Button busy={busy} onPress={() => void save()}>
-          Save
+          {mode === "create"
+            ? "Add personal task"
+            : mode === "staff"
+              ? "Save task people"
+              : mode === "progress"
+                ? "Save progress update"
+                : mode === "submit"
+                  ? task?.reviewer_id
+                    ? "Submit for review"
+                    : "Complete personal task"
+                  : decision === "approve"
+                    ? "Approve personal work"
+                    : "Request changes"}
         </Button>
       }
     >
@@ -209,6 +221,7 @@ export function PersonalTaskSheet({
         <Choice
           label="Decision"
           required
+          searchable={false}
           value={decision}
           onChange={(next) => updateDraft({ decision: next })}
           options={[

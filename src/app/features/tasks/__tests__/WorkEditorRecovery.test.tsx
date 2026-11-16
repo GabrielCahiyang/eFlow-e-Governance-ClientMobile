@@ -28,7 +28,7 @@ jest.mock("../workRecovery", () => ({
 
 test("a confirmed rejection restores saved Subtask details with the specific error", async () => {
   const data = {
-    root: { id: "task", kind: "office", office: "office", project: "project",
+    root: { status: "in_progress", id: "task", kind: "office", office: "office", project: "project",
       open: true, people: [], capabilities: { create_child: { allowed: true, reason_code: null } } },
     revision: 3,
     nodes: [],
@@ -55,7 +55,7 @@ test("a confirmed rejection restores saved Subtask details with the specific err
 
 test("a confirmed save closes the editor and refreshes the list without a notice", async () => {
   const data = {
-    root: {
+    root: { status: "in_progress",
       id: "task", kind: "office", office: "office", project: "project",
       open: true, lead: "task-lead", people: [],
       scheduling: { version: 1, today: "2026-11-13" },
@@ -87,7 +87,7 @@ test("a confirmed save closes the editor and refreshes the list without a notice
 
 test.each(["create", "edit"] as const)("Office Subtask %s saves the selected priority with the work request", async (command) => {
   const data = {
-    root: { id: "task", kind: "office", office: "office", project: "project",
+    root: { status: "in_progress", id: "task", kind: "office", office: "office", project: "project",
       open: true, people: [], capabilities: { create_child: { allowed: true, reason_code: null } } },
     revision: 3,
     supportsSubtaskDependencies: true,
@@ -118,7 +118,7 @@ test.each(["create", "edit"] as const)("Office Subtask %s saves the selected pri
 
 test("an authorized Subtask editor replaces legacy sequencing with selected sibling prerequisites", async () => {
   const data = {
-    root: { id: "task", kind: "office", office: "office", project: "project", open: true, people: [] },
+    root: { status: "in_progress", id: "task", kind: "office", office: "office", project: "project", open: true, people: [] },
     supportsSubtaskDependencies: true,
     revision: 3,
     nodes: [
@@ -153,9 +153,38 @@ test("an authorized Subtask editor replaces legacy sequencing with selected sibl
   })));
 });
 
+test("an authorized pre-start editor can remove a visible cancelled selected prerequisite", async () => {
+  const data = {
+    root: { status: "in_progress", id: "task", kind: "office", office: "office", project: "project", open: true, people: [] },
+    supportsSubtaskDependencies: true, revision: 3,
+    nodes: [
+      { id: "cancelled", task_id: "task", parent_subtask_id: null, title: "Cancelled prerequisite",
+        sibling_order: 0, status: "cancelled" },
+      { id: "target", task_id: "task", parent_subtask_id: null, title: "Target", sibling_order: 1,
+        status: "todo", dependency_ids: ["cancelled"], can_edit_dependencies: true, assigned_to_ids: [],
+        capabilities: { edit_details: { allowed: true, reason_code: null } } },
+    ], people: [],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(data, "actor");
+  jest.mocked(draftStore.get).mockResolvedValue(null);
+  jest.mocked(fetchWorkTree).mockResolvedValue(data);
+  jest.mocked(saveWorkTree).mockResolvedValue(data);
+  await render(<WorkEditorSheet data={data} edit={{ command: "edit", node: data.nodes[1] }}
+    onClose={jest.fn()} onSaved={async () => {}} />);
+  expect(screen.queryByText(/restricted prerequisite.*read-only/)).toBeNull();
+  await fireEvent.press(await screen.findByRole("button", { name: "Prerequisite subtasks" }));
+  await fireEvent.press(await screen.findByRole("checkbox", { name: "Unavailable prerequisite — remove to continue" }));
+  const close = screen.getAllByLabelText("Close dialog").at(-1);
+  if (close) await fireEvent.press(close);
+  await fireEvent.press(screen.getByRole("button", { name: "Save subtask" }));
+  await waitFor(() => expect(saveWorkTree).toHaveBeenCalledWith("task", expect.objectContaining({
+    command: "edit", payload: expect.objectContaining({ id: "target", dependency_ids: [] }),
+  })));
+});
+
 test("Subtask creation exposes Prerequisite subtasks directly and saves selected prerequisites in two steps", async () => {
   const data = {
-    root: {
+    root: { status: "in_progress",
       id: "task-create-deps",
       kind: "office",
       office: "office",
@@ -268,7 +297,7 @@ test("Subtask creation exposes Prerequisite subtasks directly and saves selected
 
 test("Subtask creation without prerequisites sends standalone true and persists empty explicit list", async () => {
   const data = {
-    root: {
+    root: { status: "in_progress",
       id: "task-create-empty-deps",
       kind: "office",
       office: "office",
@@ -334,7 +363,7 @@ test("Subtask creation without prerequisites sends standalone true and persists 
 
 test("Subtask creation avoids duplicate create if step 2 prerequisite write fails", async () => {
   const data = {
-    root: {
+    root: { status: "in_progress",
       id: "task-step2-fail",
       kind: "office",
       office: "office",
@@ -396,16 +425,18 @@ test("Subtask creation avoids duplicate create if step 2 prerequisite write fail
   await waitFor(() => expect(saveWorkTree).toHaveBeenCalledTimes(2));
   expect(createdSnapshot).toBeDefined();
   await waitFor(() => expect(onSaved).toHaveBeenCalledWith(createdSnapshot));
-  const doneButton = await screen.findByRole("button", { name: "Done" });
+  expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+  const doneButton = await screen.findByRole("button", { name: "Close work form" });
   await fireEvent.press(doneButton);
   expect(saveWorkTree).toHaveBeenCalledTimes(2);
   expect(onClose).toHaveBeenCalled();
 });
 
-test("Subtask editor rejects dependency cycles and prerequisite due-date conflicts before saving", async () => {
+test("Subtask editor rejects dependency cycles but permits an overlapping prerequisite", async () => {
   const data = {
-    root: {
+    root: { status: "in_progress",
       id: "task-cycle",
+      scheduleBounds: { projectStart: "2026-11-01", projectDue: "2026-11-30", taskStart: "2026-11-01", taskDue: "2026-11-30" },
       kind: "office",
       office: "office",
       project: "project",
@@ -469,22 +500,25 @@ test("Subtask editor rejects dependency cycles and prerequisite due-date conflic
 
   await fireEvent.press(await screen.findByRole("button", { name: "Prerequisite subtasks" }));
   await fireEvent.press(await screen.findByRole("checkbox", { name: "Second step" }));
+  expect(await screen.findByText("These prerequisites would create a circular dependency.")).toBeOnTheScreen();
   const closeDialog1 = screen.getAllByLabelText("Close dialog").at(-1);
   if (closeDialog1) await fireEvent.press(closeDialog1);
   await fireEvent.press(screen.getByRole("button", { name: "Save subtask" }));
 
-  expect(await screen.findByText("These prerequisites would create a circular dependency.")).toBeOnTheScreen();
+  expect((await screen.findAllByText("These prerequisites would create a circular dependency.")).length).toBeGreaterThan(0);
   expect(saveWorkTree).not.toHaveBeenCalled();
 
   await fireEvent.press(screen.getByRole("button", { name: "Prerequisite subtasks" }));
   await fireEvent.press(await screen.findByRole("checkbox", { name: "Second step" }));
   await fireEvent.press(await screen.findByRole("checkbox", { name: "Later step" }));
+  expect(screen.queryByText("The subtask starts before a selected prerequisite is due. Adjust the schedule first.")).toBeNull();
   const closeDialog2 = screen.getAllByLabelText("Close dialog").at(-1);
   if (closeDialog2) await fireEvent.press(closeDialog2);
   await fireEvent.press(screen.getByRole("button", { name: "Save subtask" }));
 
-  expect(await screen.findByText("The subtask starts before a selected prerequisite is due. Adjust the schedule first.")).toBeOnTheScreen();
-  expect(saveWorkTree).not.toHaveBeenCalled();
+  await waitFor(() => expect(saveWorkTree).toHaveBeenCalledWith("task-cycle", expect.objectContaining({
+    payload: expect.objectContaining({ id: "a", dependency_ids: ["c"] }),
+  })));
 });
 
 test("Personal tasks show honest prerequisite notice without Can start independently", async () => {
@@ -514,9 +548,9 @@ test("Personal tasks show honest prerequisite notice without Can start independe
   expect(screen.queryByRole("button", { name: "Choose explicit prerequisites" })).toBeNull();
 });
 
-test("WorkEditorSheet hides Appointed Lead and Contributors on create for active Project Lead while allowing them in planning", async () => {
+test("WorkEditorSheet omits Appointed Lead and Contributors on create in both active and planning projects", async () => {
   const data = {
-    root: {
+    root: { status: "in_progress",
       id: "task-staffing-gate",
       kind: "office",
       office: "office",
@@ -547,7 +581,7 @@ test("WorkEditorSheet hides Appointed Lead and Contributors on create for active
   expect(await activeView.findByText("Subtask name *")).toBeOnTheScreen();
   expect(activeView.queryByRole("button", { name: "Appointed Lead" })).toBeNull();
   expect(activeView.queryByRole("button", { name: "Contributors" })).toBeNull();
-  activeView.unmount();
+  await activeView.unmount();
 
   const planningView = await render(
     <WorkEditorSheet
@@ -559,6 +593,78 @@ test("WorkEditorSheet hides Appointed Lead and Contributors on create for active
       onSaved={async () => {}}
     />,
   );
-  expect(await planningView.findByRole("button", { name: "Appointed Lead" })).toBeOnTheScreen();
-  expect(planningView.getByRole("button", { name: "Contributors" })).toBeOnTheScreen();
+  expect(await planningView.findByText("Subtask name *")).toBeOnTheScreen();
+  expect(planningView.queryByRole("button", { name: "Appointed Lead" })).toBeNull();
+  expect(planningView.queryByRole("button", { name: "Contributors" })).toBeNull();
+  await planningView.unmount();
+});
+
+test("WorkEditorSheet keeps Search options on Appointed Lead with fewer than six people while omitting it on static Priority", async () => {
+  const data = {
+    root: { status: "in_progress",
+      id: "task-search-options",
+      kind: "office",
+      office: "office",
+      project: "project",
+      lead: "actor",
+      open: true,
+      people: [],
+      capabilities: { create_child: { allowed: true, reason_code: null } },
+    },
+    supportsSubtaskDependencies: true,
+    revision: 1,
+    nodes: [
+      {
+        id: "node-search-options",
+        task_id: "task-search-options",
+        parent_subtask_id: null,
+        title: "Staffable item",
+        sibling_order: 0,
+        status: "todo",
+        lead_id: null,
+        assigned_to_ids: [],
+        capabilities: {
+          appoint_lead: { allowed: true, reason_code: null },
+          edit_details: { allowed: true, reason_code: null },
+        },
+      },
+    ],
+    people: [
+      { id: "actor", name: "Andres Manili" },
+      { id: "worker-1", name: "Cheryl Gallo" },
+    ],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(data, "actor");
+  jest.mocked(draftStore.get).mockResolvedValue(null);
+  jest.mocked(fetchWorkTree).mockResolvedValue(data);
+
+  const staffView = await render(
+    <WorkEditorSheet
+      data={data}
+      edit={{ command: "staff", node: data.nodes[0] }}
+      onClose={jest.fn()}
+      onSaved={async () => {}}
+    />,
+  );
+
+  await fireEvent.press(await staffView.findByRole("button", { name: "Appointed Lead" }));
+  expect(staffView.getByLabelText("Search options")).toBeOnTheScreen();
+  await fireEvent.changeText(staffView.getByLabelText("Search options"), "Cheryl");
+  expect(staffView.queryByRole("radio", { name: "Andres Manili" })).toBeNull();
+  expect(staffView.getByRole("radio", { name: "Cheryl Gallo" })).toBeOnTheScreen();
+  await fireEvent.press(staffView.getByRole("radio", { name: "Cheryl Gallo" }));
+  await staffView.unmount();
+
+  const createView = await render(
+    <WorkEditorSheet
+      data={data}
+      edit={{ command: "create" }}
+      onClose={jest.fn()}
+      onSaved={async () => {}}
+    />,
+  );
+  await fireEvent.press(await createView.findByRole("button", { name: "Priority" }));
+  expect(createView.queryByLabelText("Search options")).toBeNull();
+  expect(createView.getByRole("radio", { name: "High" })).toBeOnTheScreen();
+  await createView.unmount();
 });

@@ -50,14 +50,16 @@ function DraftHarness({
   draftKey,
   active = true,
   initialValue = "",
+  restoreOnOpen = true,
 }: {
   draftKey: string;
   active?: boolean;
   initialValue?: string;
+  restoreOnOpen?: boolean;
 }) {
   const [draft, update, clear] = useRetainedDraft(draftKey, active, () => ({
     note: initialValue,
-  }));
+  }), { restoreOnOpen });
   return (
     <>
       <TextInput
@@ -99,4 +101,17 @@ test("useRetainedDraft does not persist edits when inactive", async () => {
   await render(<DraftHarness draftKey={key} active={false} />);
   await fireEvent.changeText(screen.getByLabelText("Draft note"), "Read only");
   expect(readFormDraft(key)).toBeUndefined();
+});
+
+
+test("ordinary edit reopening ignores an old typed draft and keeps failures in the current form", async () => {
+ const key=formDraftKey("actor","edit:task");writeFormDraft(key,{note:"Yesterday's unsaved draft"});
+ const first=await render(<DraftHarness draftKey={key} initialValue="Saved server value" restoreOnOpen={false} />);
+ expect(screen.getByLabelText("Draft note").props.value).toBe("Saved server value");
+ await fireEvent.changeText(screen.getByLabelText("Draft note"),"Current attempted edit");
+ await first.rerender(<DraftHarness draftKey={key} initialValue="Saved server value" restoreOnOpen={false} />);
+ expect(screen.getByLabelText("Draft note").props.value).toBe("Current attempted edit");
+ await first.unmount();
+ await render(<DraftHarness draftKey={key} initialValue="New saved value" restoreOnOpen={false} />);
+ expect(screen.getByLabelText("Draft note").props.value).toBe("New saved value");
 });

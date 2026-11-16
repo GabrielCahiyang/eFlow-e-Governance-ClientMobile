@@ -159,7 +159,7 @@ export function OfficeAccessPanel({
                         variant="outline"
                         onPress={() => void change(key, true)}
                       >
-                        Allow
+                        Allow access
                       </Button>
                       <Button
                         disabled={
@@ -170,7 +170,7 @@ export function OfficeAccessPanel({
                         variant="outline"
                         onPress={() => void change(key, false)}
                       >
-                        Deny
+                        Deny access
                       </Button>
                     </Row>
                   </Card>

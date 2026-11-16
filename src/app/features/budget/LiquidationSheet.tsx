@@ -305,7 +305,7 @@ export function LiquidationSheet({
             }
             onPress={confirmed ? close : () => void submit()}
           >
-            {confirmed ? "Done" : "Submit receipts for review"}
+            {confirmed ? "Close receipt form" : "Submit receipts for review"}
           </Button>
         </>
       }

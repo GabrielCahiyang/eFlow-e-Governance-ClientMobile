@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -148,7 +148,14 @@ export function WorkProposalReview({
   const submit = () =>
     void action
       .run(async () => {
-        if (!selected || recovery.loading || recovery.error || readOnly || !canDecideProposals) return;
+        if (
+          !selected ||
+          recovery.loading ||
+          recovery.error ||
+          readOnly ||
+          !canDecideProposals
+        )
+          return;
         if (!pending && !selected.approve && !reason.trim())
           throw new PublicMessageError("Explain what needs to change.");
         const current = (await fetchWorkProposals(root, node)).items.find(
@@ -304,6 +311,9 @@ export function WorkProposalReview({
             <Text selectable>Blocker · {item.terms.blocker}</Text>
           )}
           <Text selectable>{item.terms.note}</Text>
+          {!!item.terms.next_step?.trim() && (
+            <Text selectable>Next step · {item.terms.next_step}</Text>
+          )}
           {item.terms.attachments?.map((file) => (
             <EvidenceAttachment
               key={file.filePath}
@@ -376,7 +386,7 @@ export function WorkProposalReview({
                     setDecision({ id: item.id, approve: true });
                   }}
                 >
-                  Approve
+                  Approve work
                 </Button>
                 <Button
                   variant="outline"
@@ -429,7 +439,7 @@ export function WorkProposalReview({
               {pending
                 ? "Verify decision"
                 : selected.approve
-                  ? "Approve"
+                  ? "Approve work"
                   : "Request changes"}
             </Button>
           }
@@ -452,6 +462,7 @@ export function WorkProposalReview({
           node={node}
           kind={resubmission.kind}
           supersedes={resubmission.id}
+          initialNextStep={resubmission.terms.next_step}
           canParticipate={canParticipate}
           onClose={() => setResubmission(undefined)}
           onSaved={refresh}
@@ -468,6 +479,7 @@ export function WorkProposalSheet({
   kind,
   supersedes,
   initialBlocker,
+  initialNextStep,
   currentProgress,
   canParticipate = true,
   onClose,
@@ -479,12 +491,15 @@ export function WorkProposalSheet({
   kind: ProposalKind;
   supersedes?: string;
   initialBlocker?: string | null;
+  initialNextStep?: string | null;
   currentProgress?: number | null;
   canParticipate?: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
   const scope = `work-proposal:${root}:${node ?? "task"}:${kind}`;
+  const isProgress = kind === "progress";
+  const activeBlocker = isProgress ? initialBlocker?.trim() || "" : "";
   const saved = useFacts(`proposal-recovery:${actor}:${scope}`, () =>
     draftStore.get<ProposalRequest>(actor, scope),
   );
@@ -494,13 +509,38 @@ export function WorkProposalSheet({
     formDraftKey(actor, scope + ":" + (supersedes ?? "new")),
     true,
     () => ({
-      state: "in_progress" as "in_progress" | "stuck",
-      blocker: "",
+      state: (activeBlocker ? "stuck" : "in_progress") as
+        "in_progress" | "stuck",
+      blocker: activeBlocker,
       note: "",
-      nextStep: "",
+      nextStep: isProgress ? (initialNextStep ?? "") : "",
       files: [] as EvidenceFile[],
+      seededBlocker: activeBlocker,
+      dirty: false,
+      stateTouched: false,
     }),
   );
+  useEffect(() => {
+    if (action.busy || !isProgress) return;
+    const seeded = draft.seededBlocker ?? "";
+    if (seeded === activeBlocker) return;
+    if (!draft.dirty || (!draft.stateTouched && draft.blocker === seeded)) {
+      updateDraft({
+        state: activeBlocker ? "stuck" : "in_progress",
+        blocker: activeBlocker,
+        seededBlocker: activeBlocker,
+      });
+    }
+  }, [
+    action.busy,
+    activeBlocker,
+    draft.blocker,
+    draft.dirty,
+    draft.seededBlocker,
+    draft.stateTouched,
+    isProgress,
+    updateDraft,
+  ]);
   const { state, blocker, note, nextStep, files } = draft;
   const workState = state === "stuck" ? "stuck" : "in_progress";
   const close = () => {
@@ -508,7 +548,6 @@ export function WorkProposalSheet({
     action.clear();
     onClose();
   };
-  const isProgress = kind === "progress";
   const request = saved.data;
   const submit = () =>
     void action
@@ -545,21 +584,20 @@ export function WorkProposalSheet({
         }
         if (!next) {
           if (isProgress && workState === "stuck" && !blocker.trim())
-            throw new PublicMessageError(
-              "Describe what is blocking the work.",
-            );
+            throw new PublicMessageError("Describe what is blocking the work.");
           const trimmedNote = note.trim();
           const trimmedNextStep = isProgress ? nextStep.trim() : "";
           if (!trimmedNote)
             throw new PublicMessageError(
               isProgress ? "Enter a work note." : "Enter a completion note.",
             );
-          const submissionNote = trimmedNextStep
-            ? `${trimmedNote}\n\nNext step: ${trimmedNextStep}`
-            : trimmedNote;
-          if (submissionNote.length > 3000)
+          if (trimmedNote.length > 3000)
             throw new PublicMessageError(
-              "Work note and next step must be 3000 characters or fewer.",
+              "Work note must be 3000 characters or fewer.",
+            );
+          if (trimmedNextStep.length > 300)
+            throw new PublicMessageError(
+              "Next step must be 300 characters or fewer.",
             );
           const issue = evidenceIssue(files);
           if (issue) throw new PublicMessageError(issue);
@@ -586,7 +624,8 @@ export function WorkProposalSheet({
               p_request: id,
               p_kind: kind,
               p_terms: {
-                note: submissionNote,
+                note: trimmedNote,
+                ...(trimmedNextStep ? { next_step: trimmedNextStep } : {}),
                 ...(isProgress && workState === "stuck"
                   ? { blocker: blocker.trim() }
                   : {}),
@@ -675,7 +714,7 @@ export function WorkProposalSheet({
                 state: terms?.blocker?.trim() ? "stuck" : "in_progress",
                 blocker: String(terms?.blocker ?? ""),
                 note: String(terms?.note ?? ""),
-                nextStep: "",
+                nextStep: String(terms?.next_step ?? ""),
               });
               await saved.refresh();
             })
@@ -689,6 +728,7 @@ export function WorkProposalSheet({
           <Choice
             label="Work state"
             value={activeState}
+            searchable={false}
             disabled={!!request || action.busy}
             options={[
               { value: "in_progress", label: "In progress" },
@@ -697,6 +737,8 @@ export function WorkProposalSheet({
             onChange={(nextValue) =>
               updateDraft({
                 state: nextValue === "stuck" ? "stuck" : "in_progress",
+                dirty: true,
+                stateTouched: true,
               })
             }
           />
@@ -705,7 +747,9 @@ export function WorkProposalSheet({
               label="Blocker"
               required
               value={terms?.blocker ?? blocker}
-              onChangeText={(nextValue) => updateDraft({ blocker: nextValue })}
+              onChangeText={(nextValue) =>
+                updateDraft({ blocker: nextValue, dirty: true })
+              }
               editable={!request && !action.busy}
               multiline
               maxLength={3000}
@@ -717,17 +761,21 @@ export function WorkProposalSheet({
         label={isProgress ? "Work note" : "Completion note"}
         required
         value={terms?.note ?? note}
-        onChangeText={(nextValue) => updateDraft({ note: nextValue })}
+        onChangeText={(nextValue) =>
+          updateDraft({ note: nextValue, dirty: true })
+        }
         editable={!request && !action.busy}
         multiline
         maxLength={3000}
       />
-      {isProgress && !request && (
+      {isProgress && (!request || !!terms?.next_step?.trim()) && (
         <Field
           label="Next step"
-          value={nextStep}
-          onChangeText={(nextValue) => updateDraft({ nextStep: nextValue })}
-          editable={!action.busy}
+          value={terms?.next_step ?? nextStep}
+          onChangeText={(nextValue) =>
+            updateDraft({ nextStep: nextValue, dirty: true })
+          }
+          editable={!request && !action.busy}
           maxLength={300}
         />
       )}

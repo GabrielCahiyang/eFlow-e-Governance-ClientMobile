@@ -110,6 +110,7 @@ export function PdfImportSheet({
               <Choice
                 label="Add participating offices from the PDF"
                 value={offices ? "yes" : "no"}
+                searchable={false}
                 onChange={(v) => updateDraft({ offices: v === "yes" })}
                 options={[
                   { value: "no", label: "Do not add offices" },
@@ -119,6 +120,7 @@ export function PdfImportSheet({
               <Choice
                 label="AI assignment"
                 value={assign ? "yes" : "no"}
+                searchable={false}
                 onChange={(v) => updateDraft({ assign: v === "yes" })}
                 options={[
                   {

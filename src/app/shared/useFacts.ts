@@ -11,6 +11,7 @@ import {
   type DisplayCachePolicy,
 } from "./displayCache";
 import { readWithTimeout } from "./readTimeout";
+import { beginOperation, isPermissionRead } from "./operationActivity";
 
 type State<T> = {
   key: string;
@@ -57,6 +58,7 @@ export function useFacts<T>(
     }));
     const started = Date.now();
     const operation = /^[a-z][a-z-]{1,40}(?=:)/i.exec(key)?.[0] ?? "read";
+    const finish = isPermissionRead(key) ? beginOperation("permissions") : undefined;
     try {
       const requestLoader = loader.current;
       const data = await loadDisplayData(
@@ -109,7 +111,7 @@ export function useFacts<T>(
                   })
                 : new Error("Could not load this view."),
         }));
-    }
+    } finally { finish?.(); }
   }, [key, enabled]);
   const refreshIfStale = useCallback(async () => {
     if (

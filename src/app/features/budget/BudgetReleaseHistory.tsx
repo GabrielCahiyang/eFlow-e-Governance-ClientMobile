@@ -123,7 +123,7 @@ export function BudgetReleaseHistory({
         (target ? target.account + ":" + target.release : "none"),
     ),
     !!target,
-    () => ({ reference: "" }),
+    () => ({ reference: "" }), { restoreOnOpen: false },
   );
   const reference = draft.reference;
   const data = facts.error ? undefined : facts.data;
@@ -289,7 +289,7 @@ export function BudgetReleaseHistory({
                   setDay("");
                 }}
               >
-                Previous
+                Previous month
               </Button>
               <Text style={{ color: palette.text }}>
                 {monthDate.toLocaleDateString("en-PH", {
@@ -306,7 +306,7 @@ export function BudgetReleaseHistory({
                   setDay("");
                 }}
               >
-                Next
+                Next month
               </Button>
             </View>
             <View style={{ flexDirection: "row" }}>
@@ -449,7 +449,7 @@ export function BudgetReleaseHistory({
                   disabled={action.busy}
                   onPress={closeTarget}
                 >
-                  Cancel
+                  Cancel confirmation
                 </Button>
                 <Button
                   busy={action.busy}

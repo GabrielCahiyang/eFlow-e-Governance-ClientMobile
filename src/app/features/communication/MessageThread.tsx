@@ -346,7 +346,7 @@ export function MessageThread({
               disabled={busy}
               onPress={() => setConfirmRemoval(false)}
             >
-              Cancel
+              Keep message
             </Button>
             <Button
               variant="danger"

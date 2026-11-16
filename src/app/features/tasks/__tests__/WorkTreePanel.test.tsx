@@ -7,6 +7,9 @@ import { WorkTreePanel } from "../WorkTreePanel";
 import { ToastProvider } from "../../../components/ui/Toast";
 import { fetchWorkTree } from "../../../../core/web/app/features/nested-work/services/workTreeService";
 import { sharedWorkRpc } from "../../../shared/sharedWorkRequest";
+import { confirmAction } from "../../../shared/confirm";
+jest.mock("../../../shared/confirm", () => ({ confirmAction: jest.fn(async () => true) }));
+let mockEditorSaved: ((tree: WorkTreeSnapshot) => Promise<void>) | undefined;
 
 jest.mock("../../../../core/web/app/features/nested-work/services/workTreeService", () => ({
   fetchWorkTree: jest.fn(),
@@ -31,10 +34,13 @@ jest.mock("../WorkEditorSheet", () => {
     WorkEditorSheet: ({
       edit,
       readOnly,
+      onSaved,
     }: {
       edit?: { command?: string };
       readOnly?: boolean;
+      onSaved: (tree: WorkTreeSnapshot) => Promise<void>;
     }) => {
+      mockEditorSaved = onSaved;
       const { Text } = require("react-native");
       return (
         <Text testID="mock-work-editor">
@@ -50,6 +56,32 @@ jest.mock("../OfficeSubitemActivity", () => ({
     return <Text>Activity for {nodeId}</Text>;
   },
 }));
+
+test.each(["todo", "in_progress"])("Subtask visibility follows parent Task %s without giving an ordinary reader modification rights", async (parentStatus) => {
+  const tree = { revision: 1, root: { kind: "office", id: "root", project: "project", office: "office", lead: "other-task-lead", status: parentStatus, open: true },
+    nodes: [{ id: "sub", task_id: "root", parent_subtask_id: null, title: "Draft consultation agenda", status: "todo", lead_id: "worker", assigned_to_ids: [], percent_complete: 0, capabilities: {} }], people: [] } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(tree, "lead");
+  await render(<WorkTreePanel data={tree} focusNodeId="sub" onSaved={async () => {}} navigate={jest.fn()} />);
+  if (parentStatus === "todo") expect(screen.queryByText("Draft consultation agenda")).toBeNull();
+  else expect(screen.getByText("Draft consultation agenda")).toBeOnTheScreen();
+  expect(screen.queryByRole("button", { name: "Edit subtask" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Delete subtask" })).toBeNull();
+});
+
+test.each([false, true])("Task Lead sees deletion only before the Subtask starts; started=%s", async (started) => {
+  const tree = { revision: 1, root: { kind: "office", id: "root", project: "project", office: "office", lead: "lead", status: "todo", open: true },
+    nodes: [{ id: "sub", task_id: "root", parent_subtask_id: null, title: "Draft consultation agenda", status: "todo", started_at: started ? "2026-11-16T01:00:00Z" : null, lead_id: "worker", assigned_to_ids: [], percent_complete: 0, capabilities: { delete: { allowed: true, reason_code: null } } }], people: [] } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(tree, "lead");
+  const navigate = jest.fn();
+  await render(<WorkTreePanel data={tree} focusNodeId="sub" onSaved={async () => {}} navigate={navigate} />);
+  if (started) expect(screen.queryByRole("button", { name: "Delete subtask" })).toBeNull();
+  else {
+    await fireEvent.press(screen.getByRole("button", { name: "Delete subtask" }));
+    expect(screen.getByTestId("mock-work-editor")).toHaveTextContent("editor:delete:false");
+    await act(async () => { await mockEditorSaved?.({ ...tree, nodes: [] }); });
+    expect(navigate).toHaveBeenCalledWith({ name: "task", id: "root", projectId: "project", title: "Task details" });
+  }
+});
 
 test("a confirmed start updates the status while refresh is pending and refreshed fields win", async () => {
   const tree = {
@@ -67,7 +99,7 @@ test("a confirmed start updates the status while refresh is pending and refreshe
     people: [],
   } as unknown as WorkTreeSnapshot;
   rememberWorkCapabilityContext(tree, "lead");
-  const refreshed = {
+  const refreshed: WorkTreeSnapshot = {
     ...tree,
     nodes: [{
       ...tree.nodes[0],
@@ -116,7 +148,7 @@ test("a confirmed start updates the status while refresh is pending and refreshe
   expect(screen.getByText("Nov 19, 2026")).toBeOnTheScreen();
 });
 
-test("a linked Subtask navigates supporting boxes to dedicated subpages and exposes Branch actions in top actions", async () => {
+test("a linked Subtask navigates supporting boxes to dedicated subpages and omits Branch actions and Child subtasks", async () => {
   const nodeId = "linked-subtask";
   const tree = {
     revision: 1,
@@ -222,10 +254,10 @@ test("a linked Subtask navigates supporting boxes to dedicated subpages and expo
     title: "Planning details",
   });
 
-  const branchActionsBtn = screen.getByRole("button", { name: "Branch actions" });
-  expect(branchActionsBtn).toBeOnTheScreen();
-  await fireEvent.press(branchActionsBtn);
-  expect(screen.getAllByText("Branch actions").length).toBeGreaterThanOrEqual(2);
+  expect(screen.queryByRole("button", { name: "Branch actions" })).toBeNull();
+  expect(screen.queryByText("Branch actions")).toBeNull();
+  expect(screen.queryByText("Child subtasks")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Add child subtask" })).toBeNull();
 });
 
 test("when project is on hold, Subtask Details renders BentoProjectOnHoldCard and hides work actions", async () => {
@@ -303,6 +335,7 @@ test.each([
         status: "todo",
         lead_id: appointed ? "lead" : "other",
         started_at: status === "in_progress" ? "2026-11-13T00:00:00Z" : null,
+        dependency_ids: [],
         parent_subtask_id: null,
         assigned_to_ids: [],
         capabilities: {
@@ -719,7 +752,7 @@ test("Project Lead cannot assign subtask people or update/complete subtasks on a
   expect(activeView.queryByText("Update work")).toBeNull();
   expect(activeView.queryByText("Mark as complete")).toBeNull();
   expect(activeView.queryByText("Submit for review")).toBeNull();
-  activeView.unmount();
+  await activeView.unmount();
 
   // Root list on active project also hides Add subtask for non-Task-Lead Project Lead
   const activeRootView = await render(
@@ -732,7 +765,7 @@ test("Project Lead cannot assign subtask people or update/complete subtasks on a
     />,
   );
   expect(activeRootView.queryByText("Add subtask")).toBeNull();
-  activeRootView.unmount();
+  await activeRootView.unmount();
 
   // Planning project: Project Lead still can choose people / edit / add child subtasks,
   // while execution/completion still remains restricted to Leads and Contributors
@@ -751,4 +784,234 @@ test("Project Lead cannot assign subtask people or update/complete subtasks on a
   expect(planningView.queryByText("Update work")).toBeNull();
   expect(planningView.queryByText("Mark as complete")).toBeNull();
   expect(planningView.queryByText("Submit for review")).toBeNull();
+  await planningView.unmount();
+});
+
+test("unknown dependency state blocks both Start and Complete and shows an explanatory notice", async () => {
+  const unknownTodoTree = {
+    revision: 1,
+    root: {
+      id: "task-1",
+      kind: "office",
+      lead: "lead",
+      status: "in_progress",
+      open: true,
+      project: "proj-1",
+      office: "office-1",
+      scheduling: { version: 1, today: "2026-11-14" },
+      capabilities: {},
+    },
+    nodes: [
+      {
+        id: "sub-unknown",
+        task_id: "task-1",
+        title: "Unverified dependencies step",
+        status: "todo",
+        effective_status: "todo",
+        start_date: "2026-11-14",
+        lead_id: "lead",
+        parent_subtask_id: null,
+        sibling_order: 0,
+        assigned_to_ids: [],
+        capabilities: {
+          execute: { allowed: true, reason_code: null },
+          submit: { allowed: true, reason_code: null },
+        },
+      },
+    ],
+    people: [{ id: "lead", name: "Andres Manili" }],
+  } as unknown as WorkTreeSnapshot;
+
+  rememberWorkCapabilityContext(unknownTodoTree, "lead");
+  const todoView = await render(
+    <WorkTreePanel
+      data={unknownTodoTree}
+      focusNodeId="sub-unknown"
+      onSaved={async () => {}}
+      navigate={jest.fn()}
+    />,
+  );
+  expect(todoView.queryByText("Start work")).toBeNull();
+  expect(
+    todoView.getByText("Subtask dependencies could not be verified. Refresh this subtask."),
+  ).toBeOnTheScreen();
+  await todoView.unmount();
+
+  const unknownActiveTree = {
+    ...unknownTodoTree,
+    nodes: [
+      {
+        ...unknownTodoTree.nodes[0],
+        status: "in_progress",
+        effective_status: "in_progress",
+        started_at: "2026-11-14T00:00:00Z",
+      },
+    ],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(unknownActiveTree, "lead");
+  const activeView = await render(
+    <WorkTreePanel
+      data={unknownActiveTree}
+      focusNodeId="sub-unknown"
+      onSaved={async () => {}}
+      navigate={jest.fn()}
+    />,
+  );
+  expect(activeView.queryByText("Mark as complete")).toBeNull();
+  expect(activeView.queryByText("Submit for review")).toBeNull();
+  expect(
+    activeView.getByText("Subtask dependencies could not be verified. Refresh before completing this subtask."),
+  ).toBeOnTheScreen();
+  await activeView.unmount();
+});
+
+test("subtask start dates and prerequisite readiness show specific explanatory notices", async () => {
+  const baseTree = {
+    revision: 1,
+    root: {
+      id: "task-1",
+      kind: "office",
+      lead: "lead",
+      status: "in_progress",
+      open: true,
+      project: "proj-1",
+      office: "office-1",
+      scheduling: { version: 1, today: "2026-11-14" },
+      capabilities: {},
+    },
+    nodes: [
+      {
+        id: "prereq",
+        task_id: "task-1",
+        title: "First step",
+        status: "todo",
+        lead_id: "lead",
+        parent_subtask_id: null,
+        sibling_order: 0,
+        assigned_to_ids: [],
+        dependency_ids: [],
+      },
+      {
+        id: "target",
+        task_id: "task-1",
+        title: "Second step",
+        status: "todo",
+        effective_status: "todo",
+        start_date: "2026-11-14",
+        lead_id: "lead",
+        parent_subtask_id: null,
+        sibling_order: 1,
+        assigned_to_ids: [],
+        dependency_ids: ["prereq"],
+      },
+    ],
+    people: [{ id: "lead", name: "Andres Manili" }],
+  } as unknown as WorkTreeSnapshot;
+
+  rememberWorkCapabilityContext(baseTree, "lead");
+  const blockedByPrereq = await render(
+    <WorkTreePanel
+      data={baseTree}
+      focusNodeId="target"
+      onSaved={async () => {}}
+      navigate={jest.fn()}
+    />,
+  );
+  expect(blockedByPrereq.queryByText("Start work")).toBeNull();
+  expect(
+    blockedByPrereq.getByText("This subtask cannot start because its prerequisites are incomplete."),
+  ).toBeOnTheScreen();
+  await blockedByPrereq.unmount();
+
+  const futureStartTree = {
+    ...baseTree,
+    nodes: [
+      baseTree.nodes[0],
+      {
+        ...baseTree.nodes[1],
+        dependency_ids: [],
+        start_date: "2026-11-20",
+      },
+    ],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(futureStartTree, "lead");
+  const futureView = await render(
+    <WorkTreePanel
+      data={futureStartTree}
+      focusNodeId="target"
+      onSaved={async () => {}}
+      navigate={jest.fn()}
+    />,
+  );
+  expect(futureView.queryByText("Start work")).toBeNull();
+  expect(
+    futureView.getByText(
+      "Start work is available on or after the planned start date once prerequisites are complete.",
+    ),
+  ).toBeOnTheScreen();
+  await futureView.unmount();
+});
+
+test("explicit independence allows both Start and final completion while unrelated earlier siblings remain unfinished", async () => {
+  const tree = {
+    revision: 1,
+    root: { id: "task", kind: "office", lead: "lead", project: "project", office: "office",
+      status: "in_progress", open: true, scheduling: { version: 1, today: "2026-11-14" } },
+    nodes: [
+      { id: "earlier", task_id: "task", parent_subtask_id: null, sibling_order: 0,
+        title: "Earlier step", status: "todo", is_standalone: false, dependency_ids: [] },
+      { id: "later", task_id: "task", parent_subtask_id: null, sibling_order: 1,
+        title: "Independent prerequisites", status: "todo", is_standalone: false, dependency_ids: [],
+        start_date: "2026-11-14", lead_id: "lead", assigned_to_ids: [],
+        capabilities: { execute: { allowed: true, reason_code: null }, submit: { allowed: true, reason_code: null } } },
+    ], people: [],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(tree, "lead");
+  const renderPanel = (data: WorkTreeSnapshot) => <WorkTreePanel data={data} focusNodeId="later"
+    onSaved={async () => {}} navigate={jest.fn()} />;
+  const view = await render(renderPanel(tree));
+  expect(screen.getByText("Start work")).toBeOnTheScreen();
+  const active = { ...tree, nodes: [tree.nodes[0], { ...tree.nodes[1],
+    status: "in_progress", started_at: "2026-11-14T01:00:00Z" }] } as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(active, "lead");
+  await view.rerender(renderPanel(active));
+  expect(screen.getByText("Mark as complete")).toBeOnTheScreen();
+  expect(screen.queryByText("Complete earlier ordered subtasks before completing this subtask.")).toBeNull();
+  const ready = { ...active, nodes: [{ ...active.nodes[0], status: "completed" }, active.nodes[1]] } as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(ready, "lead");
+  await view.rerender(renderPanel(ready));
+  expect(screen.getByText("Mark as complete")).toBeOnTheScreen();
+});
+
+test("a cancelled legacy sibling never advertises Start even with a current actor appointment", async () => {
+  const tree = {
+    revision: 1,
+    root: { id: "task", kind: "office", lead: "lead", project: "project", office: "office",
+      status: "in_progress", open: true, scheduling: { version: 1, today: "2026-11-14" } },
+    nodes: [
+      { id: "cancelled", task_id: "task", parent_subtask_id: null, sibling_order: 0,
+        title: "Cancelled prerequisite", status: "cancelled", is_standalone: false },
+      { id: "later", task_id: "task", parent_subtask_id: null, sibling_order: 1,
+        title: "Later step", status: "todo", is_standalone: false, dependency_ids: null,
+        start_date: "2026-11-14", lead_id: "lead", assigned_to_ids: [] },
+    ], people: [],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(tree, "lead");
+  await render(<WorkTreePanel data={tree} focusNodeId="later" onSaved={async () => {}} navigate={jest.fn()} />);
+  expect(screen.queryByText("Start work")).toBeNull();
+  expect(screen.getByText("This subtask cannot start because its prerequisites are incomplete.")).toBeOnTheScreen();
+});
+
+
+test("cancelling Start subtask performs no access read or mutation", async () => {
+ jest.mocked(confirmAction).mockResolvedValueOnce(false);
+ jest.mocked(fetchWorkTree).mockClear();jest.mocked(sharedWorkRpc).mockClear();
+ const tree={revision:1,root:{id:"cancel-root",project:"project",office:"office",kind:"office",lead:"lead",status:"in_progress",open:true,people:[],scheduling:{version:1,today:"2026-11-16"}},
+ supportsSubtaskDependencies:true,people:[],nodes:[{id:"cancel-node",task_id:"cancel-root",title:"Cancel start",parent_subtask_id:null,status:"todo",lead_id:"lead",assigned_to_ids:["lead"],dependency_ids:[],percent_complete:0,sibling_order:0,start_date:"2026-11-16",due_date:"2026-11-20",started_at:null,capabilities:{}}]} as unknown as WorkTreeSnapshot;
+ rememberWorkCapabilityContext(tree,"lead");
+ await render(<WorkTreePanel data={tree} focusNodeId="cancel-node" navigate={jest.fn()} onSaved={async()=>{}} />);
+ await fireEvent.press(screen.getByRole("button",{name:"Start work"}));
+ await waitFor(()=>expect(confirmAction).toHaveBeenLastCalledWith("Start this subtask?","Ready to begin this work?","Start work"));
+ expect(fetchWorkTree).not.toHaveBeenCalled();expect(sharedWorkRpc).not.toHaveBeenCalled();
+ expect(screen.getByRole("button",{name:"Start work"})).toBeOnTheScreen();
 });

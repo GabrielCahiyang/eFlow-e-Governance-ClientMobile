@@ -120,7 +120,41 @@ test("a contributor with a current execute grant saves an update directly", asyn
   );
 });
 
-test("defaults to in_progress even when the subtask has an active blocker, while retaining user-edited draft values on reopen", async () => {
+test("a confirmed blocker change publishes the post-write snapshot rather than its preflight", async () => {
+  const initial = snapshot(4);
+  initial.nodes[0].blocker = "Permit pending";
+  const refreshed = snapshot(5);
+  refreshed.nodes[0].blocker = "Signature pending";
+  rememberWorkCapabilityContext(initial, "member");
+  jest.mocked(fetchWorkTree).mockResolvedValueOnce(initial).mockResolvedValueOnce(refreshed);
+  jest.mocked(saveSubtaskWorkUpdate).mockResolvedValueOnce(undefined as never);
+  const onSaved = jest.fn(async (_tree: WorkTreeSnapshot) => {});
+  const onClose = jest.fn();
+  await render(<OfficeSubitemUpdateSheet tree={initial} nodeId="node" actorId="member"
+    readOnly={false} onSaved={onSaved} onClose={onClose} />);
+  await fireEvent.changeText(screen.getByLabelText("Blocker"), "Signature pending");
+  await fireEvent.press(screen.getByRole("button", { name: "Post update" }));
+  await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  expect(onSaved).toHaveBeenCalledWith(refreshed);
+  expect(saveSubtaskWorkUpdate).toHaveBeenCalledTimes(1);
+});
+
+test("a failed refresh after a confirmed write never repeats the write or supplies stale blocker data", async () => {
+  const initial = snapshot(4);
+  rememberWorkCapabilityContext(initial, "member");
+  jest.mocked(fetchWorkTree).mockResolvedValueOnce(initial).mockRejectedValueOnce(new Error("offline"));
+  jest.mocked(saveSubtaskWorkUpdate).mockResolvedValueOnce(undefined as never);
+  const onSaved = jest.fn(async (_tree: WorkTreeSnapshot) => {});
+  const onClose = jest.fn();
+  await render(<OfficeSubitemUpdateSheet tree={initial} nodeId="node" actorId="member"
+    readOnly={false} onSaved={onSaved} onClose={onClose} />);
+  await fireEvent.press(screen.getByRole("button", { name: "Post update" }));
+  await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  expect(onSaved).not.toHaveBeenCalled();
+  expect(saveSubtaskWorkUpdate).toHaveBeenCalledTimes(1);
+});
+
+test("prefills the saved blocker on reopening instead of an abandoned draft and clears remotely resolved blockers", async () => {
   const tree = snapshot(5);
   (tree.nodes[0] as { blocker?: string | null }).blocker = "Existing blocker on record";
   rememberWorkCapabilityContext(tree, "lead");
@@ -137,12 +171,9 @@ test("defaults to in_progress even when the subtask has an active blocker, while
       onClose={onClose}
     />,
   );
-  expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent("In progress");
-  expect(screen.queryByLabelText("Blocker")).toBeNull();
+  expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent("Blocked");
+  expect(await screen.findByDisplayValue("Existing blocker on record")).toBeOnTheScreen();
 
-  await fireEvent.press(screen.getByRole("button", { name: "Work state" }));
-  expect(screen.queryByLabelText("Search options")).toBeNull();
-  await fireEvent.press(await screen.findByRole("radio", { name: "Blocked" }));
   await fireEvent.changeText(await screen.findByLabelText("Blocker"), "New user blocker");
   await fireEvent.changeText(screen.getByLabelText("Work note"), "User draft note");
   await fireEvent.press(screen.getByLabelText("Close dialog"));
@@ -160,9 +191,39 @@ test("defaults to in_progress even when the subtask has an active blocker, while
       onClose={jest.fn()}
     />,
   );
-  expect(await screen.findByDisplayValue("New user blocker")).toBeOnTheScreen();
-  expect(screen.getByDisplayValue("User draft note")).toBeOnTheScreen();
+  expect(await screen.findByDisplayValue("Existing blocker on record")).toBeOnTheScreen();
+  expect(screen.queryByDisplayValue("New user blocker")).toBeNull();
+  expect(screen.queryByDisplayValue("User draft note")).toBeNull();
   await view2.unmount();
+
+  // Reopening with a fresh actor after blocker is cleared resets to In progress
+  const clearedTree = snapshot(6);
+  clearedTree.nodes[0].blocker = null;
+  rememberWorkCapabilityContext(clearedTree, "lead-2");
+  const view3 = await render(
+    <OfficeSubitemUpdateSheet
+      tree={tree}
+      nodeId="node"
+      actorId="lead-2"
+      readOnly={false}
+      onSaved={async () => {}}
+      onClose={jest.fn()}
+    />,
+  );
+  expect(await screen.findByDisplayValue("Existing blocker on record")).toBeOnTheScreen();
+  await view3.rerender(
+    <OfficeSubitemUpdateSheet
+      tree={clearedTree}
+      nodeId="node"
+      actorId="lead-2"
+      readOnly={false}
+      onSaved={async () => {}}
+      onClose={jest.fn()}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Work state" })).toHaveTextContent("In progress");
+  expect(screen.queryByLabelText("Blocker")).toBeNull();
+  await view3.unmount();
 });
 
 test("rejects subtask work update when actor is not Task Lead, Subtask Lead, or Subtask Contributor even if execute is granted", async () => {

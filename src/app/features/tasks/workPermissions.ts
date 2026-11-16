@@ -1,7 +1,40 @@
 import type {
   WorkNode,
   WorkTreeSnapshot,
+  WorkCapabilityContext,
 } from "../../../core/web/app/features/nested-work/types";
+import { selectRootWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
+
+/** Keep Lead appointment and contributor management as separate server powers. */
+export function taskStaffingCapability(
+  tree: WorkTreeSnapshot | undefined,
+  context: WorkCapabilityContext,
+  action?: "appoint_lead" | "manage_contributors",
+) {
+  const appointment = selectRootWorkCapability(tree, "appoint_lead", context);
+  if (action === "appoint_lead" || (!action && appointment.allowed)) {
+    return appointment.reason_code === "appointment_denied" &&
+      tree?.root.kind === "office"
+      ? {
+          ...appointment,
+          disabledReason:
+            "Only the Project Lead or responsible Office Head can change the Task Lead.",
+        }
+      : appointment;
+  }
+  const contributors = selectRootWorkCapability(
+    tree,
+    "manage_contributors",
+    context,
+  );
+  return contributors.reason_code === "active_staffing_locked"
+    ? {
+        ...contributors,
+        disabledReason:
+          "Contributor changes are currently locked by the server for this task.",
+      }
+    : contributors;
+}
 
 export interface ProjectPlanningAccessOptions {
   projectStatus?: string | null;

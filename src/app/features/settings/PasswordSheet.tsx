@@ -26,7 +26,7 @@ export function PasswordSheet({
       current: "",
       next: "",
       confirmation: "",
-    })),
+    }), { restoreOnOpen: false }),
     { current, next, confirmation } = draft,
     action = useAction(),
     alive = useRef(true),

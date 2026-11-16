@@ -111,7 +111,7 @@ export function TaskEvidenceSheet({
           disabled={!confirmed && !request && !note.trim()}
           onPress={confirmed ? close : () => void save()}
         >
-          {confirmed ? "Done" : "Submit for review"}
+          {confirmed ? "Close completion form" : "Submit for review"}
         </Button>
       }
     >

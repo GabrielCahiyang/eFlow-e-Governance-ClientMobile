@@ -43,6 +43,11 @@ import { useNavigationFavorites } from "../../../core/web/app/shared/navigationP
 import { nativeWindow } from "../../../platform/webRuntime";
 import { netProjectUpdates } from "./subscriptions";
 import { BentoActionButtons } from "../tasks/TaskBentoComponents";
+import {
+  PostCreateStaffingSheet,
+  resolvePostCreateTaskStaffing,
+  type PostCreateStaffingTarget,
+} from "../tasks/PostCreateStaffingSheet";
 import { ProjectTaskEditor, useTaskStructure } from "./ProjectTaskEditor";
 import { readProjectSetup } from "./projectAccess";
 import { ProjectAnalysisSummary } from "./ProjectAnalysisSummary";
@@ -117,6 +122,20 @@ export function ProjectScreen({
   const [menu, setMenu] = useState(false);
   const [people, setPeople] = useState(false);
   const [addTask, setAddTask] = useState(false);
+  const [postCreateStaffing, setPostCreateStaffing] =
+    useState<PostCreateStaffingTarget>();
+  const postCreateStaffingRequest = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    postCreateStaffingRequest.current += 1;
+    setPostCreateStaffing(undefined);
+  }, [scope]);
   const [query, setQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const workView: ProjectWorkView =
@@ -428,6 +447,7 @@ export function ProjectScreen({
             label: "Add task",
             variant: "primary",
             icon: "plus",
+            busy: createAccess.loading || groupFacts.loading,
             onPress: () => setAddTask(true),
           },
         ]}
@@ -825,6 +845,35 @@ export function ProjectScreen({
           scope={taskScope}
           groups={groups}
           onClose={() => setAddTask(false)}
+          onCreated={(created) => {
+            const reqId = ++postCreateStaffingRequest.current;
+            void resolvePostCreateTaskStaffing({
+              taskId: created.id,
+              title: created.title,
+              actorId: profile?.id,
+              readOnly: closed,
+            }).then((target) => {
+              if (
+                !mountedRef.current ||
+                postCreateStaffingRequest.current !== reqId ||
+                !target
+              ) {
+                return;
+              }
+              setPostCreateStaffing(target);
+            });
+          }}
+          onSaved={refresh}
+        />
+      )}
+      {!!postCreateStaffing && (
+        <PostCreateStaffingSheet
+          key={`task:${postCreateStaffing.tree.root.id}`}
+          target={postCreateStaffing}
+          projectStatus={project.status}
+          projectLeadId={project.projectLeadId}
+          readOnly={closed}
+          onClose={() => setPostCreateStaffing(undefined)}
           onSaved={refresh}
         />
       )}

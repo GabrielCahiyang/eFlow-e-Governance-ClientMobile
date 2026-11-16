@@ -196,7 +196,19 @@ export function describeWorkEvent(event: WorkEvent, branchId?: string) {
     }
   } else if (old && next) {
     change("Title", old.title, next.title, String);
+    type DetailNode = WorkNode & { priority?: string; dependency_ids?: string[] | null; due_date_change_reason?: string };
+    const left = old as DetailNode, right = next as DetailNode;
+    change("Priority", left.priority, right.priority, value => value ? value.charAt(0).toUpperCase() + value.slice(1) : unavailable);
+    change("Start date", old.start_date, next.start_date, value => value === null ? "No start date" : calendarDate(value));
     change("Due date", old.due_date, next.due_date, calendarDate);
+    const prerequisiteNames = (ids: string[] | null | undefined, items: WorkNode[]) =>
+      ids === undefined ? unavailable : ids === null ? "Legacy sequential prerequisites" :
+        ids.map(id => items.find(item => item.id === id)?.title || "Historical prerequisite unavailable").join(", ") || "None";
+    const canonicalDependencies = (ids: string[] | null | undefined) => Array.isArray(ids) ? [...new Set(ids)].sort() : ids;
+    if (JSON.stringify(canonicalDependencies(left.dependency_ids)) !== JSON.stringify(canonicalDependencies(right.dependency_ids)))
+      add("Prerequisites", `${prerequisiteNames(left.dependency_ids, previous)} → ${prerequisiteNames(right.dependency_ids, current)}`);
+    if ((old.due_date !== next.due_date || old.start_date !== next.start_date) && right.due_date_change_reason)
+      add("Schedule change reason", right.due_date_change_reason);
     change("Sequencing", old.is_standalone, next.is_standalone, (value) =>
       typeof value !== "boolean"
         ? unavailable

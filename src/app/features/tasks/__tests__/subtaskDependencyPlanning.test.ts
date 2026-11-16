@@ -4,7 +4,7 @@ import {
   canCreateSubtaskDependencies,
   canEditSubtaskDependencies,
   legacySiblingDependencyIds,
-  subtaskDependencyScheduleError,
+  subtaskDependencySelectionError,
   subtaskDependencyWouldCycle,
   subtaskPrerequisiteSiblings,
   supportsSubtaskDependencies,
@@ -82,8 +82,22 @@ test("subtaskPrerequisiteSiblings and legacySiblingDependencyIds scope to siblin
   ];
   const tree = makeTree({ nodes });
   expect(subtaskPrerequisiteSiblings(tree, null, "d").map((item) => item.id)).toEqual(["a", "b"]);
-  expect(legacySiblingDependencyIds(tree, nodes[3] as never)).toEqual(["a", "b"]);
+  expect(legacySiblingDependencyIds(tree, nodes[3] as never)).toEqual(["a", "b", "c"]);
   expect(legacySiblingDependencyIds(tree, { ...nodes[3], is_standalone: true } as never)).toEqual([]);
+});
+
+test("a visible cancelled selected prerequisite blocks work but permits an authorized pre-start correction", () => {
+  const cancelled = { id: "cancelled", task_id: "task-1", parent_subtask_id: null,
+    title: "Cancelled selected prerequisite", sibling_order: 0, status: "cancelled" };
+  const node = { id: "target", task_id: "task-1", parent_subtask_id: null, title: "Target",
+    sibling_order: 1, status: "todo", dependency_ids: ["cancelled"], can_edit_dependencies: true,
+    percent_complete: 0, started_at: null };
+  const tree = makeTree({ nodes: [cancelled, node] });
+  expect(canEditSubtaskDependencies(tree, node as never)).toBe(true);
+  expect(subtaskPrerequisiteSiblings(tree, null, "target")).toEqual([]);
+  expect(canEditSubtaskDependencies(tree, { ...node, started_at: "2026-11-15T01:00:00Z" } as never)).toBe(false);
+  expect(canEditSubtaskDependencies(makeTree({ nodes: [node] }), node as never)).toBe(false);
+  expect(canEditSubtaskDependencies(tree, { ...node, restricted_dependency_count: 1 } as never)).toBe(false);
 });
 
 test("subtaskDependencyWouldCycle catches direct, transitive, and legacy sequential loops", () => {
@@ -106,16 +120,67 @@ test("subtaskDependencyWouldCycle catches direct, transitive, and legacy sequent
   expect(subtaskDependencyWouldCycle(mixedLegacyNodes, "y", ["x"])).toBe(false);
 });
 
-test("subtaskDependencyScheduleError flags start dates earlier than an incomplete prerequisite due date", () => {
-  const siblings = [
-    { id: "p1", status: "todo", due_date: "2026-11-20" },
-    { id: "p2", status: "completed", due_date: "2026-11-25" },
-  ] as never[];
+test("overlap and undated prerequisites are linkable while self/duplicate links stay rejected", () => {
+ const siblings=[{id:"a",task_id:"task",parent_subtask_id:null,title:"A",status:"todo",due_date:"2026-11-20",dependency_ids:[]},{id:"undated",task_id:"task",parent_subtask_id:null,title:"Undated",status:"todo",dependency_ids:[]}] as never[];
+ const select=(candidateIds:string[])=>subtaskDependencySelectionError({nodes:siblings,siblings,nodeId:"b",candidateIds,startDate:"2026-11-16",requireDueDates:true});
+ expect(select(["a","undated"])).toBe("");expect(select(["a","a"])).toMatch(/once/);expect(select(["b"])).toMatch(/itself/);
+});
 
-  expect(subtaskDependencyScheduleError(siblings, ["p1"], "2026-11-18")).toBe(
-    "The subtask starts before a selected prerequisite is due. Adjust the schedule first.",
-  );
-  expect(subtaskDependencyScheduleError(siblings, ["p1"], "2026-11-20")).toBe("");
-  expect(subtaskDependencyScheduleError(siblings, ["p2"], "2026-11-18")).toBe("");
-  expect(subtaskDependencyScheduleError(siblings, ["p1"], null)).toBe("");
+test("buildSubtaskPrerequisiteOptions allows undated incomplete prerequisites without requiring a schedule", () => {
+  const {
+    buildSubtaskPrerequisiteOptions,
+    subtaskDependencySelectionError,
+  } = require("../subtaskDependencies") as typeof import("../subtaskDependencies");
+  const nodes = [
+    { id: "target", task_id: "t1", parent_subtask_id: null, title: "Target", sibling_order: 3, status: "todo", dependency_ids: [] },
+    { id: "undated", task_id: "t1", parent_subtask_id: null, title: "No dates sibling", sibling_order: 0, status: "todo" },
+    { id: "startOnly", task_id: "t1", parent_subtask_id: null, title: "Start only sibling", sibling_order: 1, status: "todo", start_date: "2026-11-10" },
+    { id: "scheduled", task_id: "t1", parent_subtask_id: null, title: "Scheduled sibling", sibling_order: 2, status: "todo", start_date: "2026-11-10", due_date: "2026-11-15" },
+    { id: "doneUndated", task_id: "t1", parent_subtask_id: null, title: "Completed sibling", sibling_order: 4, status: "completed" },
+  ] as never[];
+  const siblings = nodes.slice(1);
+
+  const options = buildSubtaskPrerequisiteOptions({
+    siblings,
+    nodes,
+    selectedIds: [],
+    dependentStart: "2026-11-16",
+    requireScheduledIncomplete: true,
+  });
+  expect(options.find((o) => o.value === "undated")?.disabled).toBe(false);
+  expect(options.find((o) => o.value === "startOnly")?.disabled).toBe(false);
+  expect(options.find((o) => o.value === "scheduled")?.disabled).toBe(false);
+  expect(options.find((o) => o.value === "doneUndated")?.disabled).toBe(false);
+
+  // Already selected unscheduled item stays enabled so the user can uncheck it, while live validation catches it.
+  const withSelected = buildSubtaskPrerequisiteOptions({
+    siblings,
+    nodes,
+    selectedIds: ["undated"],
+    dependentStart: "2026-11-16",
+    requireScheduledIncomplete: true,
+  });
+  expect(withSelected.find((o) => o.value === "undated")?.disabled).toBe(false);
+
+  expect(
+    subtaskDependencySelectionError({
+      nodes,
+      siblings,
+      nodeId: "target",
+      candidateIds: ["undated"],
+      startDate: "2026-11-16",
+      requireDueDates: true,
+    }),
+  ).toBe("");
+
+  expect(
+    subtaskDependencySelectionError({
+      nodes,
+      siblings,
+      nodeId: "target",
+      candidateIds: ["startOnly"],
+      startDate: "2026-11-16",
+      requireDueDates: true,
+    }),
+  ).toBe("");
 });

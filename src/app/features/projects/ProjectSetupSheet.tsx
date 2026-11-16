@@ -94,7 +94,7 @@ export function ProjectSetupSheet({
       step: 0,
       rows: [{ partitionId: "", amount: "" }],
       reason: "",
-    }),
+    }), { restoreOnOpen: false },
   );
   const { step, rows, reason } = formDraft;
   const draft = formDraft.local ?? serverDraft ?? empty;
@@ -286,7 +286,7 @@ export function ProjectSetupSheet({
     <Row>
       {step > 0 && (
         <Button variant="outline" onPress={() => void openStep(step - 1)}>
-          Back
+          Previous step
         </Button>
       )}
       <Button
@@ -314,7 +314,7 @@ export function ProjectSetupSheet({
             })
           }
         >
-          Next
+          Next step
         </Button>
       ) : (
         <Button busy={action.busy} onPress={() => void finish()}>
@@ -341,6 +341,7 @@ export function ProjectSetupSheet({
           <Choice
             label="Setup step"
             value={String(step)}
+            searchable={false}
             onChange={(v) => {
               if (!locked) void openStep(Number(v));
             }}

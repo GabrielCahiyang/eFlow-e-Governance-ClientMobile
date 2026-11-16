@@ -186,7 +186,11 @@ export function ProjectInvitations({ project }: { project: string }) {
               ? "Reject invitation request?"
               : "Revoke invitation?",
           item.email,
-          "Confirm " + state,
+          state === "approved"
+            ? "Approve request"
+            : state === "rejected"
+              ? "Reject request"
+              : "Revoke invitation",
           state !== "approved",
         ))
       )
@@ -394,6 +398,7 @@ export function ProjectInvitations({ project }: { project: string }) {
         <Choice
           label="Engagement"
           value={pending?.draft.engagement || engagement}
+          searchable={false}
           disabled={!!pending}
           options={["Permanent", "Job Order", "OJT", "Consultant", "Other"].map(
             (value) => ({ value, label: value }),
@@ -403,6 +408,7 @@ export function ProjectInvitations({ project }: { project: string }) {
         <Choice
           label="Access duration"
           value={until ? "close" : "date"}
+          searchable={false}
           disabled={!!pending}
           options={[
             { value: "close", label: "Until project closes" },

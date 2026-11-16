@@ -23,7 +23,7 @@ import {
   postComment,
   fetchProgressUpdatesStrict,
 } from "../../../core/web/app/services/taskDiscussionService";
-import { fetchTaskActivityHistory } from "../../../core/web/app/features/tasks/services/taskActivityService";
+import { fetchTaskActivityHistory } from "./taskDetailActivity";
 import { EvidenceAttachment } from "./EvidenceAttachment";
 import { assertEvidenceActor } from "./taskEvidence";
 import { ActivityEntry, type TimelineEntry } from "./ActivityEntry";
@@ -32,6 +32,7 @@ import { useWorkActivityPages } from "./useWorkActivityPages";
 import { nativeWindow } from "../../../platform/webRuntime";
 import { readAllRows } from "../../../core/web/app/shared/readAllRows";
 import { statusLabel } from "../../shared/statusLabels";
+import { createLiveRefreshController } from "../../shared/liveUpdates";
 
 export function TaskActivity({
   taskId,
@@ -101,16 +102,16 @@ export function TaskActivity({
               : undefined;
           return {
             id: "event:" + item.id,
-            title: status
+            title: item.action === "work_details_edited" ? "Task details edited" : status
               ? "Task status updated"
               : words(item.action.replace(/^subitem_/, "subtask_")),
             actor: item.userName,
             time: item.timestamp,
-            fields: status
+            fields: item.fields ?? (status
               ? [{ label: "Status", value: statusLabel(status) }]
-              : undefined,
+              : undefined),
             body:
-              !status && item.details ? (
+              !status && !item.fields && item.details ? (
                 <Text selectable>{item.details}</Text>
               ) : undefined,
           };
@@ -194,27 +195,39 @@ export function TaskActivity({
     !!profile?.id,
   );
   useEffect(() => {
-    const live = createPostgresChannel("native-activity:" + taskId);
-    for (const table of [
-      "task_comments",
-      "task_progress_updates",
-      "task_activities",
-      "task_status_history",
-    ]) {
-      live.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table, filter: "task_id=eq." + taskId },
-        () => void facts.refresh(),
-      );
-    }
-    live.subscribe();
     const refresh = () => {
       void facts.refresh();
       void events.refresh();
       void reviews.refresh();
     };
+    const updates = createLiveRefreshController({
+      onRefresh: refresh,
+      hasRealtime: true,
+      pollWhileSubscribed: true,
+      pollIntervalMs: 30_000,
+      debounceMs: 120,
+    });
+    const live = createPostgresChannel("native-activity:" + taskId);
+    live.on("postgres_changes",
+      { event: "*", schema: "public", table: "tasks", filter: "id=eq." + taskId },
+      updates.schedule);
+    for (const table of [
+      "task_comments",
+      "task_progress_updates",
+      "task_activities",
+      "task_status_history",
+      "task_submissions",
+    ]) {
+      live.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table, filter: "task_id=eq." + taskId },
+        updates.schedule,
+      );
+    }
+    live.subscribe(updates.onChannelStatus);
     nativeWindow.addEventListener("eflow:work-updated", refresh);
     return () => {
+      updates.dispose();
       nativeWindow.removeEventListener("eflow:work-updated", refresh);
       void supabase.removeChannel(live);
     };

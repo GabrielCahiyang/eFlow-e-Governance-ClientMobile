@@ -6,12 +6,13 @@ import { Pressable, View, useWindowDimensions } from "react-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { nodeSchedule, plannedStartReached, subtaskDisplayStatus, workScheduleToday } from "./subtaskSchedule";
 import { subtaskDependencies } from "./subtaskDependencies";
+import { hiddenSubtasksMessage, subtasksVisibleForActor } from "./subtaskVisibility";
 import { WorkProposalReview, WorkProposalSheet } from "./WorkProposalSheet";
 import { useAction } from "../../shared/useAction";
+import { confirmAction } from "../../shared/confirm";
 import { PublicMessageError } from "../../shared/userMessages";
 import { sharedWorkRpc } from "../../shared/sharedWorkRequest";
 import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
-import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { useToast } from "../../components/ui/Toast";
 import {
   Button,
@@ -30,7 +31,6 @@ import {
   branchCompletion,
   branchRows,
   completionMode,
-  personalReviewAllowed,
   workNodeRoute,
   workScope,
 } from "./branchInspector";
@@ -46,6 +46,7 @@ import {
 } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type {
   WorkTreeSnapshot,
+  WorkNode,
   NodeWorkAction,
   WorkPerson,
 } from "../../../core/web/app/features/nested-work/types";
@@ -56,6 +57,7 @@ import {
   BentoBlockerCard,
   BentoDependenciesCard,
   BentoEditButton,
+  BentoDeleteButton,
   BentoScheduleCards,
   BentoAssignedTeamCard,
   BentoSubtasksCard,
@@ -95,6 +97,7 @@ export function WorkTreePanel({
   data,
   onSaved,
   readOnly = false,
+  refreshing = false,
   projectStatus,
   projectLeadId,
   projectOnHold = false,
@@ -110,6 +113,7 @@ export function WorkTreePanel({
   data: WorkTreeSnapshot;
   onSaved: (data: WorkTreeSnapshot) => Promise<void>;
   readOnly?: boolean;
+  refreshing?: boolean;
   projectStatus?: string;
   projectLeadId?: string;
   projectOnHold?: boolean;
@@ -130,7 +134,6 @@ export function WorkTreePanel({
   const { fontScale } = useWindowDimensions();
   const [edit, setEdit] = useState<WorkEdit>();
   const [completion, setCompletion] = useState<{ id: string; title: string }>();
-  const [menu, setMenu] = useState(false);
   const [officeUpdate, setOfficeUpdate] = useState<string>();
   const [proposal, setProposal] = useState<"progress" | "completion">();
   const startAction = useAction();
@@ -180,7 +183,6 @@ export function WorkTreePanel({
   const context = workScope(data, actor, readOnly, executionBlocked);
   const can = (action: NodeWorkAction) =>
     !!node && selectNodeWorkCapability(data, node.id, action, context).allowed;
-  const actions: { id: string; title: string; edit: WorkEdit }[] = [];
   const finish = node && completionMode(data, node.id, actor, readOnly, executionBlocked);
   const subtaskLead = !!actor && node?.lead_id === actor;
   const contributor = !!actor && !subtaskLead && !!node?.assigned_to_ids?.includes(actor);
@@ -189,50 +191,47 @@ export function WorkTreePanel({
   const canReviewProposals = !!node && canDecideSubtaskProposals(data, node, actor);
   const requiresCompletionReview = (subtaskLead || contributor) &&
     (actor !== data.root.lead || !subtaskLead);
-  if (node) {
-    if (!subtaskPlanningBlocked && (can("appoint_lead") || can("manage_contributors")))
-      actions.push({
-        id: "staff",
-        title: "Choose people",
-        edit: { command: "staff", node },
-      });
-    if (!subtaskPlanningBlocked && can("edit_details"))
-      actions.push({
-        id: "edit",
-        title: "Edit subtask",
-        edit: { command: "edit", node },
-      });
-    if (!subtaskPlanningBlocked && can("create_child"))
-      actions.push({
-        id: "create",
-        title: "Add child subtask",
-        edit: { command: "create", parent: node.id },
-      });
-    if (personalReviewAllowed(data, node.id, actor, effectiveReadOnly)) {
-      actions.push({
-        id: "review",
-        title: "Review subtask",
-        edit: { command: "review", node },
-      });
-    }
-  } else if (!focusNodeId) {
-    if (!subtaskPlanningBlocked && selectRootWorkCapability(data, "create_child", context).allowed)
-      actions.push({
-        id: "create",
-        title: "Add subtask",
-        edit: { command: "create" },
-      });
-  }
 
   const saved = async (receipt: WorkTreeSnapshot) => {
     nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
     await onSaved(receipt);
+    if (focusNodeId && !receipt.nodes.some((item) => item.id === focusNodeId)) {
+      const parentId = data.nodes.find((item) => item.id === focusNodeId)?.parent_subtask_id;
+      const parent = receipt.nodes.find((item) => item.id === parentId);
+      navigate(parent ? workNodeRoute(receipt, parent.id, parent.title) : receipt.root.kind === "personal"
+        ? { name: "personal_project", id: receipt.root.project, taskId: receipt.root.id, title: "Task details" }
+        : { name: "task", id: receipt.root.id, projectId: receipt.root.project, title: "Task details" });
+    }
   };
+
+  const workEditorModal = (
+    <>
+      {!!edit && (
+        <WorkEditorSheet
+          key={`${data.root.id}:${edit.command}:${edit.node?.id || edit.parent || "root"}`}
+          data={data}
+          edit={edit}
+          projectStatus={resolvedProjectStatus}
+          projectLeadId={resolvedProjectLeadId}
+          readOnly={
+            readOnly ||
+            (isHold &&
+              ["progress", "submit", "review"].includes(edit.command))
+          }
+          promptPostCreateStaffing={edit.command === "create"}
+          onClose={() => setEdit(undefined)}
+          onSaved={saved}
+        />
+      )}
+    </>
+  );
 
   if (focusNodeId && !node)
     return (
       <Notice>This subtask is no longer available in this work tree.</Notice>
     );
+
+  if (!subtasksVisibleForActor(data.root, actor)) return <Notice>{hiddenSubtasksMessage}</Notice>;
 
   // Focus node present: Render Subtask Details
   if (node) {
@@ -255,40 +254,16 @@ export function WorkTreePanel({
           },
       );
 
-    const childSubtaskItems: SubtaskItemData[] = children.map((child) => {
-      const record = data.nodes.find((item) => item.id === child.id);
-      const effectiveStatus = record
-        ? workDisplayStatus(subtaskDisplayStatus(record), record.blocker)
-        : "todo";
-      const memberIds = [
-        ...new Set([
-          ...(record?.lead_id ? [record.lead_id] : []),
-          ...(record?.assigned_to_ids || []),
-        ]),
-      ];
-      const members = memberIds
-        .map((mId) => data.people.find((p) => p.id === mId))
-        .filter((p): p is WorkPerson => !!p);
-
-      return {
-        id: child.id,
-        title: child.title,
-        status: effectiveStatus,
-        customStatusId: record?.custom_status_id,
-        percent: record
-          ? branchCompletion(data, record.status, record.id).percent
-          : undefined,
-        members,
-      };
-    });
-
     const displayStatus = subtaskDisplayStatus(node, confirmedStartedAt);
     const visualStatus = workDisplayStatus(displayStatus, node.blocker);
     const status = resolve(visualStatus, node.custom_status_id);
     const nodePriority = schedule?.priority;
 
-    const canStaff = !subtaskPlanningBlocked && (can("appoint_lead") || can("manage_contributors"));
-    const canCreateChild = !subtaskPlanningBlocked && can("create_child");
+    const canStaff = (!subtaskPlanningBlocked || subtaskLead) && (can("appoint_lead") || can("manage_contributors"));
+    const canDeleteSubtask = !effectiveReadOnly && !subtaskPlanningBlocked &&
+      (data.root.kind !== "office" || data.root.lead === actor) &&
+      node.status === "todo" && !schedule?.started_at && !confirmedStartedAt &&
+      !node.percent_complete && can("delete");
     const canEditSubtask = !subtaskPlanningBlocked && can("edit_details");
     const dependencies = subtaskDependencies(data, node);
     const childNodes = data.nodes.filter(
@@ -298,15 +273,17 @@ export function WorkTreePanel({
     const childrenComplete = childNodes.every(
       (child) => child.status === "completed",
     );
-    const dependenciesReady = dependencies.pendingCount === 0;
+    const dependenciesReady =
+      dependencies.known &&
+      dependencies.pendingCount === 0 &&
+      dependencies.missingCount === 0;
     const readyToComplete = childrenComplete && dependenciesReady;
     const parent = data.nodes.find((item) => item.id === node.parent_subtask_id);
     const parentWaiting = parent?.status === "todo" && !nodeSchedule(parent)?.started_at;
     const canStart = subtaskLead && !confirmedStartedAt && recordedStatus === "todo" &&
       !effectiveReadOnly && data.root.open &&
       isCurrentWorkSnapshot(data, context) && notStarted &&
-      data.root.status === "in_progress" && dependencies.known &&
-      dependencies.pendingCount === 0 && !parentWaiting &&
+      data.root.status === "in_progress" && dependenciesReady && !parentWaiting &&
       plannedStartReached(schedule?.start_date, workScheduleToday(data));
     const workSubmissions = actor && (
       <WorkProposalReview key={"proposals:" + node.id} actor={actor} root={data.root.id} node={node.id}
@@ -344,12 +321,18 @@ export function WorkTreePanel({
             >
               {node.title}
             </Text>
+            <View testID="subtask-detail-actions" style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
             {canEditSubtask && (
               <BentoEditButton
                 accessibilityLabel="Edit subtask"
+                busy={refreshing}
+                disabled={startAction.busy}
                 onPress={() => setEdit({ command: "edit", node })}
               />
             )}
+            {canDeleteSubtask && <BentoDeleteButton accessibilityLabel="Delete subtask"
+              disabled={startAction.busy} busy={refreshing} onPress={() => setEdit({ command: "delete", node })} />}
+            </View>
           </View>
 
           {/* Navigable parent task */}
@@ -393,8 +376,15 @@ export function WorkTreePanel({
                     busy: startAction.busy,
                     onPress: () =>
                       void startAction.run(async () => {
+                        if (!(await confirmAction("Start this subtask?", "Ready to begin this work?", "Start work"))) return;
                         const latest = await fetchWorkTree(data.root.id);
                         const current = latest.nodes.find((item) => item.id === node.id);
+                        const latestParent = current?.parent_subtask_id
+                          ? latest.nodes.find((item) => item.id === current.parent_subtask_id)
+                          : undefined;
+                        const latestParentWaiting =
+                          latestParent?.status === "todo" && !nodeSchedule(latestParent)?.started_at;
+                        const latestDeps = current ? subtaskDependencies(latest, current) : undefined;
                         const scope = workScope(latest, actor);
                         if (!current || !isCurrentWorkSnapshot(latest, scope) ||
                             latest.root.project !== data.root.project ||
@@ -402,8 +392,10 @@ export function WorkTreePanel({
                             latest.root.kind !== data.root.kind ||
                             !latest.root.open || scope.executionBlocked ||
                             latest.root.status !== "in_progress" || current.lead_id !== actor ||
+                            latestParentWaiting ||
+                            !latestDeps?.known || latestDeps.pendingCount > 0 || latestDeps.missingCount > 0 ||
                             !plannedStartReached(current.start_date, workScheduleToday(latest))) {
-                          throw new PublicMessageError("Current work access or scheduling could not be verified. Refresh this subtask.");
+                          throw new PublicMessageError("Current work access, prerequisites, or scheduling could not be verified. Refresh this subtask.");
                         }
                         const receipt = await sharedWorkRpc<{ id?: string; started_at?: string }>(
                           "m7_start_subtask", { p_root: data.root.id, p_node: node.id },
@@ -413,7 +405,11 @@ export function WorkTreePanel({
                           throw new PublicMessageError("The start could not be confirmed. Refresh this subtask.");
                         setConfirmedStart({ scope: startScope, startedAt: receipt.started_at });
                         toast("Subtask started.", "success");
-                        await saved(await fetchWorkTree(data.root.id));
+                        try {
+                          await saved(await fetchWorkTree(data.root.id));
+                        } catch {
+                          toast("Subtask started, but this page couldn't update. Refresh to see the latest work.", "info");
+                        }
                       }),
                   }
                 : null,
@@ -453,67 +449,33 @@ export function WorkTreePanel({
               (item): item is BentoAction => Boolean(item),
             );
 
-            const branchAction: BentoAction | null = actions.length
-              ? {
-                  label: "Branch actions",
-                  variant: "secondary",
-                  icon: "sliders",
-                  onPress: () => setMenu(true),
-                }
-              : null;
-
             if (isHold || showWaitingNotice) {
               return (
-                <>
-                  <BentoProjectOnHoldCard
-                    projectId={data.root.project}
-                    waitingForTask={!isHold && waitingForTask}
-                    isTaskLead={!isHold && waitingForTask && !!actor && data.root.lead === actor}
-                    onNavigateParentTask={
-                      !isHold && waitingForTask && !!actor && data.root.lead === actor
-                        ? () =>
-                            navigate({
-                              name: "task",
-                              id: data.root.id,
-                              projectId: data.root.project,
-                              title: "Task details",
-                            })
-                        : undefined
-                    }
-                    style={{ marginTop: 8, marginBottom: 8 }}
-                  />
-                  {branchAction && (
-                    <BentoActionButtons
-                      actions={[branchAction]}
-                      style={{ marginTop: 0, marginBottom: 8 }}
-                    />
-                  )}
-                </>
-              );
-            }
-
-            if (branchAction && executionActions.length <= 1) {
-              return (
-                <BentoActionButtons
-                  actions={[...executionActions, branchAction]}
+                <BentoProjectOnHoldCard
+                  projectId={data.root.project}
+                  waitingForTask={!isHold && waitingForTask}
+                  isTaskLead={!isHold && waitingForTask && !!actor && data.root.lead === actor}
+                  onNavigateParentTask={
+                    !isHold && waitingForTask && !!actor && data.root.lead === actor
+                      ? () =>
+                          navigate({
+                            name: "task",
+                            id: data.root.id,
+                            projectId: data.root.project,
+                            title: "Task details",
+                          })
+                      : undefined
+                  }
                   style={{ marginTop: 8, marginBottom: 8 }}
                 />
               );
             }
 
             return (
-              <>
-                <BentoActionButtons
-                  actions={executionActions}
-                  style={{ marginTop: 8, marginBottom: 8 }}
-                />
-                {branchAction && (
-                  <BentoActionButtons
-                    actions={[branchAction]}
-                    style={{ marginTop: 0, marginBottom: 8 }}
-                  />
-                )}
-              </>
+              <BentoActionButtons
+                actions={executionActions}
+                style={{ marginTop: 8, marginBottom: 8 }}
+              />
             );
           })()}
           {!isHold && !showWaitingNotice && readOnly && (
@@ -530,7 +492,11 @@ export function WorkTreePanel({
                   ? "Set a planned start date before starting this subtask."
                   : parentWaiting
                     ? "Start the parent subtask first."
-                    : "Start work is available on or after the planned start date once prerequisites are complete."
+                    : !dependencies.known
+                      ? "Subtask dependencies could not be verified. Refresh this subtask."
+                      : !dependenciesReady
+                        ? "This subtask cannot start because its prerequisites are incomplete."
+                        : "Start work is available on or after the planned start date once prerequisites are complete."
                 : "The Subtask Lead must start work before you can submit progress or completion."}
             </Notice>
           )}
@@ -544,7 +510,9 @@ export function WorkTreePanel({
               <Notice>
                 {!childrenComplete
                   ? "Complete all child subtasks before marking or submitting this subtask as complete."
-                  : "Complete all prerequisite subtasks before marking or submitting this subtask as complete."}
+                  : !dependencies.known
+                    ? "Subtask dependencies could not be verified. Refresh before completing this subtask."
+                    : "Complete all prerequisite subtasks before marking or submitting this subtask as complete."}
               </Notice>
             )}
 
@@ -591,7 +559,14 @@ export function WorkTreePanel({
         />
 
         {/* Conditional Blocker card */}
-        {!!node.blocker && <BentoBlockerCard blocker={node.blocker} />}
+        {!!node.blocker && (
+          <BentoBlockerCard
+            blocker={node.blocker}
+            onPressActivity={() =>
+              navigate(subtaskViewRoute(data, node.id, "activity", "Activity"))
+            }
+          />
+        )}
 
         {/* 3. Assigned team bento card */}
         <BentoAssignedTeamCard
@@ -601,20 +576,8 @@ export function WorkTreePanel({
           onChoosePeople={
             canStaff ? () => setEdit({ command: "staff", node }) : undefined
           }
+          peoplePending={refreshing}
         />
-
-        {/* 4. Child subtasks card (when applicable) */}
-        {(children.length > 0 || canCreateChild) && (
-          <BentoSubtasksCard
-            title="Child subtasks"
-            subtasks={childSubtaskItems}
-            canAdd={canCreateChild}
-            onAddSubtask={() => setEdit({ command: "create", parent: node.id })}
-            onPressSubtask={(item) =>
-              navigate(workNodeRoute(data, item.id, item.title))
-            }
-          />
-        )}
 
         {actor &&
           data.root.kind === "office" &&
@@ -628,6 +591,7 @@ export function WorkTreePanel({
               customId={node.custom_status_id}
             />
           )}
+
 
         {/* 5. Supporting navigation boxes */}
         <BentoSubtaskSupportingGrid
@@ -664,18 +628,6 @@ export function WorkTreePanel({
             onSaved={async () => saved(await fetchWorkTree(data.root.id))} />
         )}
 
-        {/* Selection sheet for extra branch actions if any */}
-        <SelectionSheet
-          open={menu && !!actions.length}
-          title="Branch actions"
-          options={actions}
-          onClose={() => setMenu(false)}
-          onSelect={(id) => {
-            setMenu(false);
-            setEdit(actions.find((action) => action.id === id)?.edit);
-          }}
-        />
-
         {/* Sheets for update, completion, editor */}
         {!!officeUpdate && !!actor && (
           <OfficeSubitemUpdateSheet
@@ -700,22 +652,7 @@ export function WorkTreePanel({
             onSaved={saved}
           />
         )}
-        {!!edit && (
-          <WorkEditorSheet
-            key={`${data.root.id}:${edit.command}:${edit.node?.id || edit.parent || "root"}`}
-            data={data}
-            edit={edit}
-            projectStatus={resolvedProjectStatus}
-            projectLeadId={resolvedProjectLeadId}
-            readOnly={
-              readOnly ||
-              (isHold &&
-                ["progress", "submit", "review"].includes(edit.command))
-            }
-            onClose={() => setEdit(undefined)}
-            onSaved={saved}
-          />
-        )}
+        {workEditorModal}
       </>
     );
   }
@@ -768,16 +705,6 @@ export function WorkTreePanel({
         }
       />
 
-      <SelectionSheet
-        open={menu && !!actions.length}
-        title="Subtask actions"
-        options={actions}
-        onClose={() => setMenu(false)}
-        onSelect={(id) => {
-          setMenu(false);
-          setEdit(actions.find((action) => action.id === id)?.edit);
-        }}
-      />
       {!!officeUpdate && !!actor && (
         <OfficeSubitemUpdateSheet
           key={officeUpdate + actor}
@@ -801,22 +728,7 @@ export function WorkTreePanel({
           onSaved={saved}
         />
       )}
-      {!!edit && (
-        <WorkEditorSheet
-          key={`${data.root.id}:${edit.command}:${edit.node?.id || edit.parent || "root"}`}
-          data={data}
-          edit={edit}
-          projectStatus={resolvedProjectStatus}
-          projectLeadId={resolvedProjectLeadId}
-          readOnly={
-            readOnly ||
-            (isHold &&
-              ["progress", "submit", "review"].includes(edit.command))
-          }
-          onClose={() => setEdit(undefined)}
-          onSaved={saved}
-        />
-      )}
+      {workEditorModal}
     </>
   );
 }

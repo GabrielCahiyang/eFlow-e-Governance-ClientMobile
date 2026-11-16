@@ -61,7 +61,7 @@ beforeEach(() => {
   jest.mocked(draftStore.get).mockResolvedValue(null);
 });
 
-test("AnnualBudgetSheet closes immediately without discarding edits and restores draft on reopen", async () => {
+test("AnnualBudgetSheet reopens from saved budget values instead of abandoned edits", async () => {
   const onClose = jest.fn();
   const bundle = {
     summary: {
@@ -69,6 +69,7 @@ test("AnnualBudgetSheet closes immediately without discarding edits and restores
       status: "draft",
       allocatedBudget: 50000,
       approvedAmount: 50000,
+      notes: "Saved budget notes",
     },
     lines: [],
     sections: [],
@@ -103,11 +104,11 @@ test("AnnualBudgetSheet closes immediately without discarding edits and restores
     />,
   );
   expect(screen.getByLabelText("Budget notes").props.value).toBe(
-    "Hold Q4 printing contingency",
+    "Saved budget notes",
   );
 });
 
-test("PasswordSheet closes immediately without alert and restores entered passwords on reopen", async () => {
+test("PasswordSheet reopens with empty password fields", async () => {
   const onClose = jest.fn();
   const first = await render(
     <PasswordSheet onClose={onClose} onSaved={() => {}} />,
@@ -125,18 +126,19 @@ test("PasswordSheet closes immediately without alert and restores entered passwo
   await first.unmount();
 
   await render(<PasswordSheet onClose={jest.fn()} onSaved={() => {}} />);
-  expect(screen.getByLabelText("Current password").props.value).toBe("OldPass1!");
-  expect(screen.getByLabelText("New password").props.value).toBe("NewPass123!");
+  expect(screen.getByLabelText("Current password").props.value).toBe("");
+  expect(screen.getByLabelText("New password").props.value).toBe("");
   expect(screen.getByLabelText("Confirm new password").props.value).toBe(
-    "NewPass123!",
+    "",
   );
 });
 
-test("CoachingSheet closes immediately without alert and restores coaching notes on reopen", async () => {
+test("CoachingSheet reopens from saved member context instead of an abandoned draft", async () => {
   const onClose = jest.fn();
   const employee = {
     id: "emp-1",
     full_name: "Maria Santos",
+    jobDescription: "Current job scope",
     role: "member",
   } as unknown as Employee;
 
@@ -171,10 +173,10 @@ test("CoachingSheet closes immediately without alert and restores coaching notes
     />,
   );
   expect(screen.getByLabelText("Strengths").props.value).toBe(
-    "Clear financial documentation",
+    "Current job scope",
   );
   expect(screen.getByLabelText("Manager notes").props.value).toBe(
-    "Follow up next Monday",
+    "",
   );
 });
 
