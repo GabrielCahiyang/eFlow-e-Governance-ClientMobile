@@ -125,7 +125,9 @@ test.each([
     await waitFor(() =>
       expect(
         screen.getByText(
-          failure.name === "TimeoutError" ? "Request timed out. Please try again." : "Connection unavailable. Try again when the service is reachable.",
+          failure.name === "TimeoutError"
+            ? "Request timed out. Please try again."
+            : "Connection unavailable. Try again when the service is reachable.",
         ),
       ).toBeOnTheScreen(),
     );
@@ -142,31 +144,36 @@ test.each([
   },
 );
 
-test.each([401, 423])("sign-in rejection %i uses the same credentials message and does not retry", async (status) => {
-  jest.mocked(signInWithAccountProtection).mockRejectedValueOnce(
-    Object.assign(new Error("Account sign-in rejected"), {
-      name: "AccountSignInError",
-      status,
-    }),
-  );
-  await render(
-    <MotionProvider reduceMotion>
-      <LoginScreen />
-    </MotionProvider>,
-  );
-  await fireEvent.changeText(
-    screen.getByLabelText("Email address"),
-    "qa@example.test",
-  );
-  await fireEvent.changeText(screen.getByLabelText("Password"), "test-only");
-  await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
-  await waitFor(() =>
-    expect(screen.getByText("Email or password is incorrect.")).toBeOnTheScreen(),
-  );
-  expect(screen.getByText("Couldn't sign in")).toBeOnTheScreen();
-  expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
-  expect(signInWithAccountProtection).toHaveBeenCalledTimes(1);
-});
+test.each([401, 423])(
+  "sign-in rejection %i uses the same credentials message and does not retry",
+  async (status) => {
+    jest.mocked(signInWithAccountProtection).mockRejectedValueOnce(
+      Object.assign(new Error("Account sign-in rejected"), {
+        name: "AccountSignInError",
+        status,
+      }),
+    );
+    await render(
+      <MotionProvider reduceMotion>
+        <LoginScreen />
+      </MotionProvider>,
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText("Email address"),
+      "qa@example.test",
+    );
+    await fireEvent.changeText(screen.getByLabelText("Password"), "test-only");
+    await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("Email or password is incorrect."),
+      ).toBeOnTheScreen(),
+    );
+    expect(screen.getByText("Couldn't sign in")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
+    expect(signInWithAccountProtection).toHaveBeenCalledTimes(1);
+  },
+);
 
 test("a slow sign-in explains the wait without retrying credentials and clears the notice when finished", async () => {
   jest.useFakeTimers();
@@ -206,4 +213,43 @@ test("a slow sign-in explains the wait without retrying credentials and clears t
     await view.unmount();
     jest.useRealTimers();
   }
+});
+
+test("password reveal and inline password help work accessibly without theme toggle or role-scope clutter", async () => {
+  await render(
+    <MotionProvider reduceMotion>
+      <LoginScreen />
+    </MotionProvider>,
+  );
+
+  expect(
+    screen.queryByRole("button", { name: /Switch to (?:dark|light) theme/ }),
+  ).toBeNull();
+  expect(screen.queryByText(/Head, Member & Accounting Staff/)).toBeNull();
+
+  const passwordInput = screen.getByLabelText("Password");
+  expect(passwordInput).toHaveProp("secureTextEntry", true);
+  await fireEvent.press(screen.getByRole("button", { name: "Show password" }));
+  expect(passwordInput).toHaveProp("secureTextEntry", false);
+  expect(
+    screen.getByRole("button", { name: "Hide password" }),
+  ).toBeOnTheScreen();
+
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Get password help" }),
+  );
+  expect(
+    screen.getByText(
+      "Ask your Office IT team or eFlow administrator to reset your password.",
+    ),
+  ).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Get password help" }),
+  );
+  expect(
+    screen.queryByText(
+      "Ask your Office IT team or eFlow administrator to reset your password.",
+    ),
+  ).toBeNull();
+  expect(signInWithAccountProtection).not.toHaveBeenCalled();
 });

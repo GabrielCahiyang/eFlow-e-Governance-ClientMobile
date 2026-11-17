@@ -1,15 +1,26 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Coins from "lucide-react-native/icons/coins";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Wallet from "lucide-react-native/icons/wallet";
+import X from "lucide-react-native/icons/x";
 import {
+  AllocationBar,
   Button,
   Card,
   Choice,
+  DetailGroup,
   ErrorState,
   Field,
   LabelValue,
   Loading,
+  MetricPair,
   Notice,
   Sheet,
 } from "../../components/ui";
+import { View } from "../../components/ui/Primitives";
+import { Text } from "../../components/ui/Typography";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { recordedPeso } from "../../components/ui/theme";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 import {
@@ -50,6 +61,8 @@ export function SubtaskBudgetDistribution({
 }) {
   const [selected, setSelected] = useState<string>();
   const { toast } = useToast();
+  const palette = useTheme();
+  const { isDark } = useAppearance();
   const totals = context.distribution;
   if (!totals) return null;
   const rows = context.subtaskBudgets ?? [];
@@ -58,71 +71,166 @@ export function SubtaskBudgetDistribution({
     actor === context.taskLeaderId &&
     Boolean(context.canManageDistribution);
   const row = rows.find(({ id }) => id === selected);
-  const metrics: [string, number][] = context.subtaskId
-    ? [
-        ["Approved task budget", context.taskBudget],
-        ["Subtask budget", context.cap?.amount ?? 0],
-        [
-          context.cap ? "Available to request" : "Available from task budget",
-          context.available,
-        ],
-      ]
-    : [
-        ["Approved task budget", context.taskBudget],
-        ["Allocated to subtasks", totals.allocated],
-        ["Unallocated", totals.unallocated],
-        ["Available to allocate", totals.available],
-      ];
+  const allocPct =
+    context.taskBudget > 0
+      ? Math.min(100, Math.round((totals.allocated / context.taskBudget) * 100))
+      : 0;
+  const insetSurface = isDark ? "#0f1733" : palette.background;
+
   return (
     <>
-      {metrics.map(([label, amount]) => (
-        <LabelValue key={label} label={label} value={recordedPeso(amount)} />
-      ))}
-      <LabelValue label="Cash released" value={recordedPeso(totals.released)} />
-      <LabelValue label="Actual spent" value={recordedPeso(totals.spent)} />
+      {context.subtaskId ? (
+        <>
+          <MetricPair
+            items={[
+              {
+                label: "Approved task budget",
+                value: recordedPeso(context.taskBudget),
+                icon: <Wallet size={18} color={palette.primary} />,
+              },
+              {
+                label: context.cap
+                  ? "Available to request"
+                  : "Available from task budget",
+                value: recordedPeso(context.available),
+                tone: "success",
+                icon: <Coins size={18} color={palette.success} />,
+              },
+            ]}
+          />
+          <DetailGroup>
+            <LabelValue
+              label="Subtask budget"
+              value={recordedPeso(context.cap?.amount ?? 0)}
+            />
+            <LabelValue
+              label="Cash released"
+              value={recordedPeso(totals.released)}
+            />
+            <LabelValue
+              label="Actual spent"
+              value={recordedPeso(totals.spent)}
+            />
+          </DetailGroup>
+        </>
+      ) : (
+        <>
+          <MetricPair
+            items={[
+              {
+                label: "Approved task budget",
+                value: recordedPeso(context.taskBudget),
+                icon: <Wallet size={18} color={palette.primary} />,
+              },
+              {
+                label: "Available to allocate",
+                value: recordedPeso(totals.available),
+                tone: "success",
+                icon: <Coins size={18} color={palette.success} />,
+              },
+            ]}
+          />
+          {context.taskBudget > 0 && (
+            <AllocationBar
+              label="Subtask allocation progress"
+              summary={`${allocPct}% · ${recordedPeso(totals.allocated)}`}
+              percent={
+                context.taskBudget > 0
+                  ? (totals.allocated / context.taskBudget) * 100
+                  : 0
+              }
+            />
+          )}
+          <DetailGroup>
+            <LabelValue
+              label="Allocated to subtasks"
+              value={recordedPeso(totals.allocated)}
+            />
+            <LabelValue
+              label="Unallocated"
+              value={recordedPeso(totals.unallocated)}
+            />
+            <LabelValue
+              label="Cash released"
+              value={recordedPeso(totals.released)}
+            />
+            <LabelValue
+              label="Actual spent"
+              value={recordedPeso(totals.spent)}
+            />
+          </DetailGroup>
+        </>
+      )}
       {rows.length > 0 && (
         <Card
+          flat
           title={
             context.subtaskId ? "Allocation details" : "Subtask allocations"
           }
+          badge={String(rows.length)}
         >
           {!context.subtaskId && (
-            <Notice>Allocations divide the approved task budget.</Notice>
+            <Notice tone="neutral">
+              Allocations divide the approved task budget.
+            </Notice>
           )}
           {rows.map((item) => {
             const sourceName = context.parentSources?.find(
               (source) => source.id === item.sourceId,
             )?.name;
             return (
-              <Card key={item.id} title={item.title}>
-                {!!sourceName && (
-                  <LabelValue label="Account" value={sourceName} />
-                )}
-                <LabelValue
-                  label="Allocated"
-                  value={recordedPeso(item.amount)}
-                />
-                {!!item.capId && (
+              <View
+                key={item.id}
+                style={{
+                  backgroundColor: insetSurface,
+                  borderColor: palette.border,
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 14,
+                  gap: 10,
+                }}
+              >
+                <Text
+                  accessibilityRole="header"
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "700",
+                    color: palette.text,
+                  }}
+                >
+                  {item.title}
+                </Text>
+                <DetailGroup inset={false}>
+                  {!!sourceName && (
+                    <LabelValue label="Account" value={sourceName} />
+                  )}
                   <LabelValue
-                    label="Unused"
-                    value={recordedPeso(item.returnable)}
+                    label="Allocated"
+                    value={recordedPeso(item.amount)}
                   />
-                )}
+                  {!!item.capId && (
+                    <LabelValue
+                      label="Unused"
+                      value={recordedPeso(item.returnable)}
+                    />
+                  )}
+                </DetailGroup>
                 {item.blocked && (
-                  <Notice>
+                  <Notice tone="warning">
                     Resolve the open cash request before changing this budget.
                   </Notice>
                 )}
                 {canManage && (
                   <Button
                     variant="outline"
+                    icon={<Wallet size={15} color={palette.primary} />}
                     disabled={readOnly}
                     onPress={() => setSelected(item.id)}
                   >
                     Manage budget
                   </Button>
                 )}
-              </Card>
+              </View>
             );
           })}
         </Card>
@@ -157,6 +265,7 @@ function DistributionSheet({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const palette = useTheme();
   const assertAccess = useAccountActionAccess();
   const scope = `work-allocation:${context.taskId}:${row.id}`;
   const recovery = useFacts(`distribution-recovery:${actor}:${scope}`, () =>
@@ -297,6 +406,13 @@ function DistributionSheet({
       {recovery.data ? (
           <Button
             busy={action.busy}
+            icon={
+              "p_cap_allocation_id" in recovery.data.args ? (
+                <RotateCcw size={15} color={palette.onPrimary} />
+              ) : (
+                <Check size={15} color={palette.onPrimary} />
+              )
+            }
             disabled={readOnly || recovery.loading || !!recovery.error}
             onPress={submit}
           >
@@ -370,6 +486,13 @@ function DistributionSheet({
           />
           <Button
             busy={action.busy}
+            icon={
+              mode === "return" ? (
+                <RotateCcw size={15} color={palette.onPrimary} />
+              ) : (
+                <Check size={15} color={palette.onPrimary} />
+              )
+            }
             onPress={submit}
             disabled={
               readOnly ||
@@ -390,7 +513,12 @@ function DistributionSheet({
           </Notice>
         )
       )}
-      <Button variant="outline" disabled={action.busy} onPress={close}>
+      <Button
+        variant="outline"
+        icon={<X size={15} color={palette.primary} />}
+        disabled={action.busy}
+        onPress={close}
+      >
         Cancel budget edit
       </Button>
     </Sheet>

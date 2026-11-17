@@ -1,15 +1,14 @@
-import { HomeBody, HomeHero, HomeHeroStats } from "./HomeHero";
-import { useEffect } from "react";
-import { View } from "react-native";
+import { HomeBody, HomeHero, HomeHeroMetrics, HomeHeroStats } from "./HomeHero";
+import { useCallback, useEffect } from "react";
+import { StyleSheet, View } from "react-native";
 import Banknote from "lucide-react-native/icons/banknote";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import CircleCheck from "lucide-react-native/icons/circle-check-big";
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
+import Coins from "lucide-react-native/icons/coins";
 import Receipt from "lucide-react-native/icons/receipt";
-import { ErrorState, Loading, Screen } from "../../components/ui";
-import { useTheme } from "../../components/ui/Appearance";
+import { Empty, ErrorState, Loading, Screen, Status } from "../../components/ui";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
-import { radius, recordedPeso, space } from "../../components/ui/theme";
+import { recordedPeso, space, type, withOpacity } from "../../components/ui/theme";
 import { statusLabel } from "../../shared/statusLabels";
 import { useFacts } from "../../shared/useFacts";
 import type { AppRoute, Navigate } from "../../shared/routes";
@@ -18,8 +17,18 @@ import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/cons
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
 import { accountingHomeQueue, assignedFinanceReviews } from "./homeFinance";
-import { officeFinancialSummary } from "../budget/officeFinancialSummary";
-import { HomeCard, HomeMessage, HomeRow, HomeSection } from "./HomeSections";
+import {
+  officeBudgetPosition,
+  type OfficeBudgetPosition,
+} from "../budget/officeFinancialSummary";
+import { useOfficeFinanceUpdates } from "../budget/useOfficeFinanceUpdates";
+import {
+  HomeCard,
+  HomeMessage,
+  HomeRow,
+  HomeRowChevron,
+  HomeSection,
+} from "./HomeSections";
 
 export function AccountingHome({ navigate }: { navigate: Navigate }) {
   const { profile, organization, can } = useAuth();
@@ -41,7 +50,7 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
   );
   const summary = useFacts(
     "accounting-home-summary:" + scope,
-    () => officeFinancialSummary(office!, year),
+    () => officeBudgetPosition(office!, year),
     !!office && canOpenAccounting,
   );
   const reviews = useFacts(
@@ -49,9 +58,15 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
     () => assignedFinanceReviews(actor, office!),
     !!office && !!actor,
   );
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     await Promise.all([queue.refresh(), summary.refresh(), reviews.refresh()]);
-  };
+  }, [queue.refresh, summary.refresh, reviews.refresh]);
+  useOfficeFinanceUpdates(
+    office || "",
+    year,
+    !!office && (canOpenQueue || canOpenAccounting),
+    refresh,
+  );
   useEffect(() => {
     const reload = () => void refresh();
     nativeWindow.addEventListener("eflow:work-updated", reload);
@@ -60,7 +75,7 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
       nativeWindow.removeEventListener("eflow:work-updated", reload);
       nativeWindow.removeEventListener("eflow:finance-updated", reload);
     };
-  }, [queue.refresh, summary.refresh, reviews.refresh]);
+  }, [refresh]);
   const transactions = queue.error ? undefined : queue.data;
   const totals = summary.error ? undefined : summary.data;
   const sortedActions = [
@@ -91,42 +106,76 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
     <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
       <HomeHero navigate={navigate} subtitle={organization?.name}>
         {!!office && (
-          <HomeHeroStats
-            stats={[
-              {
-                key: "decisions",
-                label: "Actions required",
-                value: actionTotal,
-                onPress: canOpenQueue ? openQueue : undefined,
-                accessibilityLabel: `${actionTotal} financial action${actionTotal === 1 ? "" : "s"} required`,
-              },
-              {
-                key: "today",
-                label: "Scheduled releases",
-                value: scheduledCount,
-                onPress: canOpenQueue ? openQueue : undefined,
-                accessibilityLabel: `${scheduledCount} scheduled release${scheduledCount === 1 ? "" : "s"}`,
-              },
-              {
-                key: "risk",
-                label: "Outstanding",
-                value: transactions?.outstanding.length ?? 0,
-                onPress: canOpenQueue ? openQueue : undefined,
-                accessibilityLabel: `${transactions?.outstanding.length ?? 0} outstanding transaction${(transactions?.outstanding.length ?? 0) === 1 ? "" : "s"}`,
-              },
-            ]}
-          />
+          <>
+            <HomeHeroStats
+              stats={[
+                {
+                  key: "decisions",
+                  label: "Actions required",
+                  value: actionTotal,
+                  accessibilityLabel: `${actionTotal} financial action${actionTotal === 1 ? "" : "s"} required`,
+                },
+                {
+                  key: "today",
+                  label: "Scheduled releases",
+                  value: scheduledCount,
+                  accessibilityLabel: `${scheduledCount} scheduled release${scheduledCount === 1 ? "" : "s"}`,
+                },
+                {
+                  key: "risk",
+                  label: "Outstanding",
+                  value: transactions?.outstanding.length ?? 0,
+                  accessibilityLabel: `${transactions?.outstanding.length ?? 0} outstanding transaction${(transactions?.outstanding.length ?? 0) === 1 ? "" : "s"}`,
+                },
+              ]}
+            />
+            {canOpenAccounting && (
+              <HomeHeroMetrics
+                loadingLabel={
+                  summary.loading && !totals
+                    ? "Loading financial summary"
+                    : undefined
+                }
+                items={[
+                  {
+                    key: "approved",
+                    label: "Approved appropriation",
+                    value: recordedPeso(totals?.approved),
+                    accessibilityLabel: `Approved appropriation ${totals?.approved != null ? recordedPeso(totals.approved) : "unavailable"}`,
+                  },
+                  {
+                    key: "settled",
+                    label: "Settled expenditure",
+                    value: recordedPeso(totals?.settled),
+                    accessibilityLabel: `Settled expenditure ${totals?.settled != null ? recordedPeso(totals.settled) : "unavailable"}`,
+                  },
+                ]}
+              />
+            )}
+          </>
         )}
       </HomeHero>
       <HomeBody>
       {!office ? (
-        <HomeMessage>
-          An assigned Office is required to see financial work.
-        </HomeMessage>
+        <HomeCard>
+          <Empty
+            compact
+            kind="people"
+            title="Assigned Office required"
+            description="An assigned Office is required to see financial work."
+          />
+        </HomeCard>
       ) : (
         <>
           <HomeSection
             title="Action required"
+            tone={actionTotal > 0 ? "warning" : "primary"}
+            icon={
+              <Banknote
+                size={15}
+                color={actionTotal > 0 ? palette.warning : palette.primary}
+              />
+            }
             badge={actionTotal ? String(actionTotal) : undefined}
             onAction={canOpenQueue ? openQueue : undefined}
             actionAccessibilityLabel="See all financial actions required"
@@ -159,36 +208,12 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
               ) : (
                 !error && (
                   <HomeCard>
-                    <View
-                      style={{
-                        padding: space.md,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: space.md,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
-                          backgroundColor: palette.successSoft,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <CircleCheck size={18} color={palette.success} />
-                      </View>
-                      <Text
-                        style={{
-                          flex: 1,
-                          fontSize: 13,
-                          color: palette.mutedLabel,
-                        }}
-                      >
-                        No verified actions in your assigned Office.
-                      </Text>
-                    </View>
+                    <Empty
+                      compact
+                      kind="complete"
+                      title="All clear"
+                      description="No verified actions in your assigned Office."
+                    />
                   </HomeCard>
                 )
               ))}
@@ -198,68 +223,20 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
               </HomeMessage>
             )}
           </HomeSection>
-          {canOpenQueue && (
-            <>
-              <HomeSection
-                title="Financial workflow"
-                onAction={openQueue}
-                actionAccessibilityLabel="See all requests and releases"
-              >
-                <FinancialWorkflowCard
-                  counts={transactions?.counts}
-                  loading={queue.loading && !transactions}
-                  error={queue.error ? new Error("Request counts are unavailable.") : undefined}
-                  office={office}
-                  year={year}
-                  navigate={navigate}
-                />
-              </HomeSection>
-              <HomeSection
-                title="Outstanding transactions"
-                badge={
-                  transactions?.outstanding.length
-                    ? String(transactions.outstanding.length)
-                    : undefined
-                }
-                onAction={openQueue}
-                actionAccessibilityLabel="See all outstanding transactions"
-              >
-                {!!transactions?.outstanding.length && (
-                  <HomeCard>
-                    {transactions.outstanding.slice(0, 3).map((row, index) => (
-                      <OutstandingTransactionCardItem
-                        key={row.key}
-                        row={row}
-                        isFirst={index === 0}
-                        navigate={navigate}
-                      />
-                    ))}
-                  </HomeCard>
-                )}
-                {transactions && !transactions.outstanding.length && (
-                  <HomeMessage>
-                    No unresolved requests in this preview.
-                  </HomeMessage>
-                )}
-                {queue.error && (
-                  <HomeMessage>
-                    Outstanding requests are unavailable.
-                  </HomeMessage>
-                )}
-              </HomeSection>
-            </>
-          )}
           {canOpenAccounting && (
             <HomeSection
-              title="Financial summary"
+              title="Cash & budget position"
+              tone="success"
+              icon={<Coins size={15} color={palette.success} />}
+              actionLabel="Open budget"
               onAction={() =>
                 navigate({
                   name: "accounting_overview",
-                  view: "budget",
+                  view: "overview",
                   fiscalYear: year,
                 })
               }
-              actionAccessibilityLabel="See full office financial summary"
+              actionAccessibilityLabel="Open Office budget summary"
             >
               {summary.error ? (
                 <ErrorState
@@ -267,25 +244,71 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
                   retry={() => void summary.refresh()}
                 />
               ) : totals ? (
-                totals.approved != null || totals.settled != null ? (
-                  <FinancialSummaryTiles
-                    approved={totals.approved}
-                    settled={totals.settled}
-                  />
+                hasAnyBudgetMetric(totals) ? (
+                  <CashBudgetPositionCard totals={totals} />
                 ) : (
-                  <HomeMessage>
-                    Verified financial amounts are unavailable.
-                  </HomeMessage>
+                  <HomeCard>
+                    <Empty
+                      compact
+                      kind="budget"
+                      title="Verified financial amounts unavailable"
+                    />
+                  </HomeCard>
                 )
               ) : summary.loading ? (
                 <Loading
-                  label="Loading financial summary"
+                  label="Loading budget position"
                   layout="summary"
-                  rows={2}
+                  rows={3}
                 />
               ) : (
+                <HomeCard>
+                  <Empty
+                    compact
+                    kind="budget"
+                    title={`No fiscal budget is set for FY ${year}`}
+                  />
+                </HomeCard>
+              )}
+            </HomeSection>
+          )}
+          {canOpenQueue && (
+            <HomeSection
+              title="Outstanding transactions"
+              tone="primary"
+              icon={<Receipt size={15} color={palette.primary} />}
+              badge={
+                transactions?.outstanding.length
+                  ? String(transactions.outstanding.length)
+                  : undefined
+              }
+              onAction={openQueue}
+              actionAccessibilityLabel="See all outstanding transactions"
+            >
+              {!!transactions?.outstanding.length && (
+                <HomeCard>
+                  {transactions.outstanding.slice(0, 3).map((row, index) => (
+                    <OutstandingTransactionCardItem
+                      key={row.key}
+                      row={row}
+                      isFirst={index === 0}
+                      navigate={navigate}
+                    />
+                  ))}
+                </HomeCard>
+              )}
+              {transactions && !transactions.outstanding.length && (
+                <HomeCard>
+                  <Empty
+                    compact
+                    kind="budget"
+                    title="No unresolved requests in this preview"
+                  />
+                </HomeCard>
+              )}
+              {queue.error && (
                 <HomeMessage>
-                  No financial summary is available for this fiscal year.
+                  Outstanding requests are unavailable.
                 </HomeMessage>
               )}
             </HomeSection>
@@ -305,25 +328,20 @@ function AccountingActionCardItem({
   row: {
     key: string;
     title: string;
-    description: string;
     route: AppRoute;
   };
   isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
-  const isRelease =
-    row.key.startsWith("release:") ||
-    row.description.toLowerCase().includes("release");
-  const isReview =
-    row.key.startsWith("finance-review:") ||
-    row.description.toLowerCase().includes("review");
+  const isRelease = row.key.startsWith("cash-release:");
+  const isReview = row.key.startsWith("finance-review:");
 
-  const categoryLabel = isRelease
-    ? "Cash release due"
+  const actionLabel = isRelease
+    ? "Release cash"
     : isReview
-      ? "Review required"
-      : "Settlement due";
+      ? "Review receipts"
+      : "Post settlement";
 
   const iconColor = isRelease
     ? palette.warning
@@ -346,156 +364,317 @@ function AccountingActionCardItem({
   return (
     <HomeRow
       isFirst={isFirst}
-      accessibilityLabel={row.title}
-      accessibilityHint={row.description}
+      accessibilityLabel={`${actionLabel}, ${row.title}`}
+      accessibilityHint="Opens the financial record"
       onPress={() => navigate(row.route)}
     >
       <View
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
           backgroundColor: iconBg,
+          borderWidth: 1,
+          borderColor: withOpacity(iconColor, 0.2),
           alignItems: "center",
           justifyContent: "center",
+          flexShrink: 0,
         }}
       >
-        <IconComponent size={18} color={iconColor} />
+        <IconComponent size={16} color={iconColor} />
       </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text
+      <View style={{ flex: 1, gap: 4 }}>
+        <View
           style={{
-            fontSize: 11,
-            fontWeight: "700",
-            color: iconColor,
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
+            alignSelf: "flex-start",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 999,
+            backgroundColor: iconBg,
+            borderWidth: 1,
+            borderColor: withOpacity(iconColor, 0.24),
           }}
         >
-          {categoryLabel}
-        </Text>
+          <IconComponent size={11.5} color={iconColor} />
+          <Text
+            style={{
+              fontWeight: "700",
+              fontSize: 11,
+              color: iconColor,
+            }}
+          >
+            {actionLabel}
+          </Text>
+        </View>
         <Text
           style={{
+            fontSize: 14,
             fontWeight: "700",
-            fontSize: 15,
             color: palette.text,
+            lineHeight: 19,
           }}
-          numberOfLines={2}
         >
           {row.title}
         </Text>
-        <Text
-          style={{
-            fontSize: 13,
-            color: palette.mutedLabel,
-            lineHeight: 18,
-          }}
-          numberOfLines={2}
-        >
-          {row.description}
-        </Text>
       </View>
-      <ChevronRight size={18} color={palette.mutedLabel} />
+      <HomeRowChevron />
     </HomeRow>
   );
 }
 
-function FinancialWorkflowCard({
-  counts,
-  loading,
-  error,
-  office,
-  year,
-  navigate,
+function hasAnyBudgetMetric(totals: OfficeBudgetPosition) {
+  return (
+    totals.available != null ||
+    totals.released != null ||
+    totals.pending != null ||
+    totals.dailyRemaining != null ||
+    totals.approved != null ||
+    totals.settled != null
+  );
+}
+
+function BudgetPositionRow({
+  label,
+  value,
+  caption,
+  toneColor,
+  captionToneColor,
+  isFirst = false,
+  children,
 }: {
-  counts?: { label: string; count: number | null }[];
-  loading: boolean;
-  error?: Error;
-  office: string;
-  year: number;
-  navigate: Navigate;
+  label: string;
+  value: string;
+  caption?: string;
+  toneColor?: string;
+  captionToneColor?: string;
+  isFirst?: boolean;
+  children?: React.ReactNode;
 }) {
   const palette = useTheme();
   return (
-    <HomeCard>
-      <View style={{ padding: space.md, gap: space.md }}>
-      {error ? (
-        <HomeMessage>Request counts are unavailable.</HomeMessage>
-      ) : counts ? (
-        <>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: space.xs,
-            }}
-          >
-            {counts.map(({ label, count }) => {
-              const active = (count ?? 0) > 0;
-              return (
-                <View
-                  key={label}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    paddingHorizontal: space.sm,
-                    paddingVertical: 5,
-                    borderRadius: radius.pill,
-                    backgroundColor: active
-                      ? palette.primarySoft
-                      : palette.background,
-                    borderWidth: 1,
-                    borderColor: active ? "transparent" : palette.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "800",
-                      color: active
-                        ? palette.primaryDark ?? palette.primary
-                        : palette.mutedLabel,
-                    }}
-                  >
-                    {count == null ? "—" : count}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "600",
-                      color: active ? palette.text : palette.mutedLabel,
-                    }}
-                  >
-                    {label}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-          <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-            {counts
-              .filter(({ count }) => (count ?? 0) > 0)
-              .map(({ label, count }) => `${count} ${label.toLowerCase()}`)
-              .join(" · ") ||
-              (counts.some(({ count }) => count == null)
-                ? "Request counts are incomplete."
-                : "No requests in the tracked stages.")}
-            {counts.some(({ count }) => count == null) &&
-            counts.some(({ count }) => (count ?? 0) > 0)
-              ? " · Some stages unavailable"
-              : ""}
-          </Text>
-        </>
-      ) : loading ? (
-        <Loading label="Loading request counts" layout="summary" rows={2} />
-      ) : (
-        <HomeMessage>
-          No authorized fiscal budget is available for this year.
-        </HomeMessage>
-      )}
+    <View
+      accessible
+      accessibilityLabel={[label, value, caption].filter(Boolean).join(", ")}
+      style={{
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        gap: 6,
+        borderTopWidth: isFirst ? 0 : StyleSheet.hairlineWidth,
+        borderTopColor: palette.border,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: space.xs,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "600",
+            color: palette.text,
+            flexShrink: 1,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontSize: type.body,
+            fontWeight: "800",
+            color: toneColor ?? palette.text,
+            fontVariant: ["tabular-nums"],
+          }}
+        >
+          {value}
+        </Text>
       </View>
-    </HomeCard>
+      {children}
+      {!!caption && (
+        <Text
+          style={{
+            fontSize: type.small,
+            color: captionToneColor ?? palette.mutedLabel,
+          }}
+        >
+          {caption}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function BudgetPositionPod({
+  label,
+  value,
+  caption,
+  toneColor,
+  captionToneColor,
+}: {
+  label: string;
+  value: string;
+  caption?: string;
+  toneColor?: string;
+  captionToneColor?: string;
+}) {
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  return (
+    <View
+      accessible
+      accessibilityLabel={[label, value, caption].filter(Boolean).join(", ")}
+      style={{
+        flex: 1,
+        minWidth: 140,
+        borderRadius: 14,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: palette.border,
+        backgroundColor: isDark
+          ? withOpacity(palette.background, 0.72)
+          : "#f7f9fd",
+        gap: 3,
+      }}
+    >
+      <Text style={{ fontSize: 11, fontWeight: "600", color: palette.mutedLabel }}>
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontSize: 14.5,
+          fontWeight: "800",
+          color: toneColor ?? palette.text,
+          fontVariant: ["tabular-nums"],
+        }}
+      >
+        {value}
+      </Text>
+      {!!caption && (
+        <Text
+          style={{
+            fontSize: 11,
+            lineHeight: 15,
+            color: captionToneColor ?? palette.mutedLabel,
+          }}
+        >
+          {caption}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function CashBudgetPositionCard({ totals }: { totals: OfficeBudgetPosition }) {
+  const palette = useTheme();
+  const approved = totals.approved ?? 0;
+  const settled = totals.settled ?? 0;
+  const committed = totals.committed ?? 0;
+  const settledPct =
+    approved > 0 ? Math.min(100, Math.max(0, (settled / approved) * 100)) : 0;
+  const unspentCommittedPct =
+    approved > 0 && totals.committed != null
+      ? Math.min(
+          100 - settledPct,
+          Math.max(0, ((committed - settled) / approved) * 100),
+        )
+      : 0;
+
+  const availableCaption = [
+    totals.settled != null
+      ? `${recordedPeso(totals.settled)} settled`
+      : undefined,
+    totals.committed != null
+      ? `${recordedPeso(totals.committed)} authorized commitments`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const limitReached =
+    totals.dailyRemaining === 0 && (totals.dailyLimit ?? 0) > 0;
+  const dailyCaption = limitReached
+    ? totals.releasedToday != null
+      ? `Daily ceiling reached · ${recordedPeso(totals.releasedToday)} released today`
+      : "Daily ceiling reached for today"
+    : [
+        totals.releasedToday != null
+          ? `${recordedPeso(totals.releasedToday)} released today`
+          : undefined,
+        totals.scheduledToday != null
+          ? `${recordedPeso(totals.scheduledToday)} scheduled`
+          : undefined,
+        totals.dailyLimit != null
+          ? `${recordedPeso(totals.dailyLimit)} ceiling`
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        <BudgetPositionPod
+          label="Available Office budget"
+          value={recordedPeso(totals.available)}
+          caption={availableCaption || undefined}
+        />
+        <BudgetPositionPod
+          label="Daily release capacity"
+          value={recordedPeso(totals.dailyRemaining)}
+          toneColor={limitReached ? palette.danger : undefined}
+          caption={dailyCaption || undefined}
+          captionToneColor={limitReached ? palette.danger : undefined}
+        />
+      </View>
+      {approved > 0 && (
+        <View
+          style={{
+            height: 7,
+            borderRadius: 4,
+            backgroundColor: palette.border,
+            overflow: "hidden",
+            flexDirection: "row",
+          }}
+        >
+          {settledPct > 0 && (
+            <View
+              style={{
+                height: 7,
+                width: `${settledPct}%`,
+                backgroundColor: palette.primary,
+              }}
+            />
+          )}
+          {unspentCommittedPct > 0 && (
+            <View
+              style={{
+                height: 7,
+                width: `${unspentCommittedPct}%`,
+                backgroundColor: withOpacity(palette.blue, 0.35),
+              }}
+            />
+          )}
+        </View>
+      )}
+      <HomeCard>
+        <BudgetPositionRow
+          isFirst
+          label="Budget released"
+          value={recordedPeso(totals.released)}
+        />
+        <BudgetPositionRow
+          label="Pending release"
+          value={recordedPeso(totals.pending)}
+        />
+      </HomeCard>
+    </View>
   );
 }
 
@@ -534,104 +713,54 @@ function OutstandingTransactionCardItem({
       accessibilityHint={description}
       onPress={() => navigate(row.route)}
     >
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text
-          style={{ fontWeight: "700", fontSize: 15, color: palette.text }}
-          numberOfLines={2}
+      <View style={{ flex: 1, gap: 5 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
         >
-          {row.title}
-        </Text>
-        <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-          {description}
-        </Text>
+          <Text
+            style={{
+              fontWeight: "700",
+              fontSize: 14,
+              color: palette.text,
+              flex: 1,
+            }}
+            numberOfLines={2}
+          >
+            {row.title}
+          </Text>
+          {row.amount.value != null && (
+            <Text
+              style={{
+                fontWeight: "800",
+                fontSize: 13.5,
+                color: palette.text,
+                fontVariant: ["tabular-nums"],
+              }}
+            >
+              {recordedPeso(row.amount.value)}
+            </Text>
+          )}
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Status value={row.status} domain="finance" variant="pill" />
+          <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+            Monitoring
+          </Text>
+        </View>
       </View>
-      <ChevronRight size={18} color={palette.mutedLabel} />
+      <HomeRowChevron />
     </HomeRow>
-  );
-}
-
-function FinancialSummaryTiles({
-  approved,
-  settled,
-}: {
-  approved: number | null | undefined;
-  settled: number | null | undefined;
-}) {
-  const palette = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: space.sm,
-      }}
-    >
-      <View
-        style={{
-          flexGrow: 1,
-          flexBasis: 140,
-          minHeight: 76,
-          padding: space.md,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: palette.border,
-          backgroundColor: palette.surface,
-          justifyContent: "space-between",
-          gap: space.xs,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: "600",
-            color: palette.mutedLabel,
-          }}
-        >
-          Approved appropriation
-        </Text>
-        <Text
-          style={{
-            fontWeight: "800",
-            fontSize: 20,
-            color: palette.text,
-          }}
-        >
-          {recordedPeso(approved)}
-        </Text>
-      </View>
-      <View
-        style={{
-          flexGrow: 1,
-          flexBasis: 140,
-          minHeight: 76,
-          padding: space.md,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: palette.border,
-          backgroundColor: palette.surface,
-          justifyContent: "space-between",
-          gap: space.xs,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: "600",
-            color: palette.mutedLabel,
-          }}
-        >
-          Settled expenditure
-        </Text>
-        <Text
-          style={{
-            fontWeight: "800",
-            fontSize: 20,
-            color: palette.text,
-          }}
-        >
-          {recordedPeso(settled)}
-        </Text>
-      </View>
-    </View>
   );
 }

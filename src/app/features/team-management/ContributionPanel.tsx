@@ -68,7 +68,11 @@ export function ContributionPanel({
       ) : !current && historical.loading && !historical.data ? (
         <Loading />
       ) : !rows.length ? (
-        <Empty title="No approved contributions for this month" />
+        <Empty
+          compact
+          kind="complete"
+          title="No approved contributions for this month"
+        />
       ) : (
         rows.map((row) => (
           <Card key={row.userId} title={`${row.rank}. ${row.employeeName}`}>

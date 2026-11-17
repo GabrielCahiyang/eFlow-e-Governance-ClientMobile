@@ -1,4 +1,6 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   ErrorState,
@@ -7,6 +9,7 @@ import {
   Row,
   Sheet,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAuth } from "../authentication";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { PublicMessageError } from "../../shared/userMessages";
@@ -20,7 +23,8 @@ export function AllocationDecision({
   allocation: WorkBudgetAllocation;
   onSaved: () => Promise<void>;
 }) {
-  const { profile } = useAuth(),
+  const palette = useTheme(),
+    { profile } = useAuth(),
     [decision, setDecision] = useState<"approve" | "reject">(),
     action = useFinancialAction(
       profile!.id,
@@ -40,6 +44,7 @@ export function AllocationDecision({
     <>
       <Row>
         <Button
+          icon={<Check size={15} color={palette.onPrimary} />}
           onPress={() => {
             action.clear();
             setDecision("approve");
@@ -49,6 +54,7 @@ export function AllocationDecision({
         </Button>
         <Button
           variant="danger"
+          icon={<X size={15} color={palette.onDanger} />}
           onPress={() => {
             action.clear();
             setDecision("reject");
@@ -83,6 +89,13 @@ export function AllocationDecision({
         <Button
           variant={decision === "reject" ? "danger" : "primary"}
           busy={action.busy}
+          icon={
+            decision === "reject" ? (
+              <X size={15} color={palette.onDanger} />
+            ) : (
+              <Check size={15} color={palette.onPrimary} />
+            )
+          }
           onPress={() =>
             void action.run(async () => {
               if (!reason.trim()) throw new PublicMessageError("Record a decision reason.");

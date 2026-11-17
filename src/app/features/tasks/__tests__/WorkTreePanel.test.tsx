@@ -209,9 +209,9 @@ test("a linked Subtask navigates supporting boxes to dedicated subpages and omit
   await fireEvent.press(
     screen.getByRole("button", { name: "Files, Attachments" }),
   );
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Planning details, Additional fields" }),
-  );
+  expect(
+    screen.queryByRole("button", { name: "Planning details, Additional fields" }),
+  ).toBeNull();
 
   expect(navigate).toHaveBeenNthCalledWith(1, {
     name: "task",
@@ -245,14 +245,7 @@ test("a linked Subtask navigates supporting boxes to dedicated subpages and omit
     view: "files",
     title: "Files",
   });
-  expect(navigate).toHaveBeenNthCalledWith(5, {
-    name: "task",
-    id: "task",
-    projectId: "project",
-    nodeId,
-    view: "planning",
-    title: "Planning details",
-  });
+  expect(navigate).toHaveBeenCalledTimes(4);
 
   expect(screen.queryByRole("button", { name: "Branch actions" })).toBeNull();
   expect(screen.queryByText("Branch actions")).toBeNull();

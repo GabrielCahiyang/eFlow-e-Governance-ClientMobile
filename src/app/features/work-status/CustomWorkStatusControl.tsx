@@ -1,4 +1,6 @@
 import { useState } from "react";
+import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import { useTheme } from "../../components/ui/Appearance";
 import { customStatusChoices } from "../../../core/web/app/features/work-status/statusDefinitions";
 import { supabase } from "../../../platform/supabase";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -25,6 +27,7 @@ export function CustomWorkStatusControl({
   customId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const palette = useTheme();
   const { toast } = useToast();
   const action = useAction();
   const { definitions, ready } = useWorkStatusCatalog();
@@ -61,6 +64,7 @@ export function CustomWorkStatusControl({
       <Button
         variant="outline"
         disabled={!ready || action.busy}
+        icon={<SlidersHorizontal size={16} color={palette.primary} />}
         onPress={() => setOpen(true)}
       >
         In-progress label

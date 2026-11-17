@@ -1,7 +1,13 @@
 import { Text } from "./Typography";
-import type { ReactNode } from "react";
+import {
+  Children,
+  Fragment,
+  isValidElement,
+  type ReactNode,
+} from "react";
 import {
   StyleSheet,
+  useWindowDimensions,
   type FlatListProps,
   type StyleProp,
   type ViewStyle,
@@ -9,9 +15,13 @@ import {
 import { ScrollView, View } from "./Primitives";
 import Animated from "react-native-reanimated";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
+import CircleCheck from "lucide-react-native/icons/circle-check";
 import ClockAlert from "lucide-react-native/icons/clock-alert";
+import Info from "lucide-react-native/icons/info";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import ShieldAlert from "lucide-react-native/icons/shield-alert";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import WifiOff from "lucide-react-native/icons/wifi-off";
 import { EmptyIllustration, type EmptyKind } from "./EmptyIllustration";
 import { colors, withOpacity } from "./theme";
@@ -22,6 +32,8 @@ import {
   type LoadingLayout,
 } from "./loading/ViewLoadingState";
 import { useAppearance, useTheme } from "./Appearance";
+import { PageHeader } from "./PageHeader";
+import { useNavigationHeader } from "../../features/navigation/navigationHeaderContext";
 import { usePullRefresh } from "../../shared/usePullRefresh";
 import { FolderPullArea, RefreshFlatList } from "./FolderRefresh";
 import {
@@ -35,6 +47,7 @@ const RefreshScreenScroll = Animated.createAnimatedComponent(ScrollView);
 export function Screen<T = never>({
   title,
   description,
+  headerRight,
   actions,
   children,
   onRefresh,
@@ -46,6 +59,7 @@ export function Screen<T = never>({
 }: {
   title?: string;
   description?: string;
+  headerRight?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   onRefresh?: () => Promise<unknown>;
@@ -64,6 +78,7 @@ export function Screen<T = never>({
   >;
 }) {
   const palette = useTheme();
+  const navHeader = useNavigationHeader();
   const pull = usePullRefresh(onRefresh);
   const ContentScroll = onRefresh ? RefreshScreenScroll : ScrollView;
   const scrollProps = {
@@ -75,6 +90,10 @@ export function Screen<T = never>({
     contentContainerStyle: [
       s.content,
       compact && s.compact,
+      !edgeToEdge &&
+        !!navHeader?.topInset && {
+          paddingTop: (compact ? 10 : 16) + navHeader.topInset,
+        },
       { backgroundColor: palette.background },
       style,
     ],
@@ -83,17 +102,13 @@ export function Screen<T = never>({
     <>
       <OperationStatus />
       {!!title && (
-        <View style={s.header}>
-          <View style={s.heading}>
-            <Text
-              accessibilityRole="header"
-              style={[s.title, compact && s.compactTitle]}
-            >
-              {title}
-            </Text>
-            {!!description && <Text style={s.description}>{description}</Text>}
-          </View>
-          {actions}
+        <View style={{ gap: 10 }}>
+          <PageHeader title={title} subtitle={description} right={headerRight} />
+          {!!actions && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {actions}
+            </View>
+          )}
         </View>
       )}
       {!!pull.error && (
@@ -125,21 +140,113 @@ export function Screen<T = never>({
     </View>
   );
 }
+export type CardBadgeTone =
+  | "neutral"
+  | "success"
+  | "warning"
+  | "info"
+  | "danger"
+  | "review";
+
 export function Card({
   title,
+  badge,
+  badgeTone = "neutral",
+  icon,
+  action,
+  flat = false,
   children,
   style,
 }: {
   title?: string;
+  badge?: string;
+  badgeTone?: CardBadgeTone;
+  icon?: ReactNode;
+  action?: ReactNode;
+  flat?: boolean;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const palette = useTheme();
+  const hasHeader = Boolean(title || badge || icon || action);
+  const badgeStyle =
+    badgeTone === "success"
+      ? { backgroundColor: palette.successSoft, textColor: palette.success }
+      : badgeTone === "warning"
+        ? { backgroundColor: palette.warningSoft, textColor: palette.warning }
+        : badgeTone === "info"
+          ? { backgroundColor: palette.blueSoft, textColor: palette.blue }
+          : badgeTone === "danger"
+            ? { backgroundColor: palette.dangerSoft, textColor: palette.danger }
+            : badgeTone === "review"
+              ? { backgroundColor: palette.reviewSoft, textColor: palette.review }
+              : {
+                  backgroundColor: palette.primarySoft,
+                  textColor: palette.primaryDark,
+                };
+
   return (
-    <View style={[s.card, style]}>
-      {!!title && (
-        <Text accessibilityRole="header" style={s.cardTitle}>
-          {title}
-        </Text>
+    <View
+      style={[
+        s.card,
+        {
+          backgroundColor: flat ? "transparent" : palette.surface,
+          borderColor: flat ? "transparent" : palette.border,
+          borderWidth: flat ? 0 : 1,
+          padding: flat ? 0 : 16,
+        },
+        style,
+      ]}
+    >
+      {hasHeader && (
+        <View style={s.cardHeader}>
+          <View style={s.cardHeaderLead}>
+            {!!icon && (
+              <View
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={[
+                  s.cardIconChip,
+                  { backgroundColor: palette.primarySoft },
+                ]}
+              >
+                {icon}
+              </View>
+            )}
+            {!!title && (
+              <Text
+                accessibilityRole="header"
+                style={[
+                  s.cardTitle,
+                  { color: palette.text },
+                  flat && s.cardTitleFlat,
+                ]}
+              >
+                {title}
+              </Text>
+            )}
+          </View>
+          {(!!badge || !!action) && (
+            <View style={s.cardHeaderTrail}>
+              {!!badge && (
+                <View
+                  style={[
+                    s.cardBadge,
+                    { backgroundColor: badgeStyle.backgroundColor },
+                  ]}
+                >
+                  <Text
+                    style={[s.cardBadgeText, { color: badgeStyle.textColor }]}
+                  >
+                    {badge}
+                  </Text>
+                </View>
+              )}
+              {action}
+            </View>
+          )}
+        </View>
       )}
       {children}
     </View>
@@ -211,18 +318,22 @@ export function ErrorState({
         {
           backgroundColor: isDark ? "#1d1a30" : "#fffafb",
           borderColor: withOpacity(palette.danger, isDark ? 0.32 : 0.2),
-          borderLeftColor: palette.danger,
         },
       ]}
     >
       <View
         accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
         style={[
           s.errorBadge,
           {
-            backgroundColor: palette.dangerSoft,
-            borderColor: withOpacity(palette.danger, isDark ? 0.35 : 0.16),
+            backgroundColor: isDark
+              ? withOpacity(palette.danger, 0.18)
+              : "#ffffff",
+            borderColor: withOpacity(palette.danger, isDark ? 0.32 : 0.22),
           },
+          !isDark && s.alertBadgeShadowLight,
         ]}
       >
         <Icon size={18} color={palette.danger} />
@@ -235,9 +346,10 @@ export function ErrorState({
         {!!retry && (
           <Button
             variant="outline"
+            compact
             accessibilityLabel="Retry"
             onPress={retry}
-            icon={<RotateCcw size={14} color={palette.text} />}
+            icon={<RotateCcw size={12} color={palette.text} />}
             style={[
               s.errorRetry,
               {
@@ -259,7 +371,7 @@ export function Empty({
   description,
   action,
   compact = false,
-  kind = "work",
+  kind = "empty",
 }: {
   title?: string;
   description?: string;
@@ -303,25 +415,72 @@ export function Empty({
     </View>
   );
 }
+function flattenGroupItems(node: ReactNode): ReactNode[] {
+  const items: ReactNode[] = [];
+  Children.forEach(node, (child) => {
+    if (child == null || typeof child === "boolean") return;
+    if (isValidElement(child) && child.type === Fragment) {
+      items.push(
+        ...flattenGroupItems(
+          (child.props as { children?: ReactNode }).children,
+        ),
+      );
+      return;
+    }
+    items.push(child);
+  });
+  return items;
+}
+
+export type LabelValueTone =
+  | "neutral"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info";
+
 export function LabelValue({
   label,
   value,
   stacked = false,
+  tone = "neutral",
 }: {
   label: string;
   value: ReactNode;
   stacked?: boolean;
+  tone?: LabelValueTone;
 }) {
+  const palette = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const isStacked = stacked || fontScale > 1.35;
+  const valueColor =
+    tone === "success"
+      ? palette.success
+      : tone === "warning"
+        ? palette.warning
+        : tone === "danger"
+          ? palette.danger
+          : tone === "info"
+            ? palette.blue
+            : palette.text;
+
   return (
-    <View style={stacked ? s.stackedValue : s.labelValue}>
-      <Text style={[s.description, !stacked && { flexShrink: 1 }]}>
+    <View style={isStacked ? s.stackedValue : s.labelValue}>
+      <Text
+        style={[
+          s.description,
+          { color: palette.muted },
+          !isStacked && { flexShrink: 1 },
+        ]}
+      >
         {label}
       </Text>
       {typeof value === "string" || typeof value === "number" ? (
         <Text
           style={[
             s.value,
-            stacked && { textAlign: "left", alignSelf: "stretch" },
+            { color: valueColor },
+            isStacked && { textAlign: "left", alignSelf: "stretch" },
           ]}
         >
           {value}
@@ -332,10 +491,139 @@ export function LabelValue({
     </View>
   );
 }
-export function Notice({ children }: { children: ReactNode }) {
+
+export function DetailGroup({
+  children,
+  inset = true,
+  style,
+}: {
+  children: ReactNode;
+  inset?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  const items = flattenGroupItems(children);
+  if (!items.length) return null;
+
+  const insetBg = isDark ? "#0f1733" : palette.background;
+
   return (
-    <View style={s.notice}>
-      <Text style={s.description}>{children}</Text>
+    <View
+      style={[
+        s.detailGroup,
+        inset && {
+          backgroundColor: insetBg,
+          borderColor: palette.border,
+          borderWidth: 1,
+          borderRadius: 16,
+          paddingHorizontal: 14,
+          paddingVertical: 2,
+        },
+        style,
+      ]}
+    >
+      {items.map((item, idx) => (
+        <View
+          key={
+            isValidElement(item) && item.key != null
+              ? item.key
+              : `detail-${idx}`
+          }
+          style={[
+            s.detailGroupRow,
+            idx > 0 && {
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: palette.border,
+            },
+          ]}
+        >
+          {item}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export type NoticeTone =
+  | "info"
+  | "warning"
+  | "danger"
+  | "success"
+  | "review"
+  | "neutral";
+
+export function Notice({
+  children,
+  tone = "info",
+  title,
+  icon,
+  action,
+}: {
+  children: ReactNode;
+  tone?: NoticeTone;
+  title?: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+}) {
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  const toneSpec =
+    tone === "warning"
+      ? { bg: palette.warningSoft, accent: palette.warning, Icon: TriangleAlert }
+      : tone === "danger"
+        ? { bg: palette.dangerSoft, accent: palette.danger, Icon: AlertCircle }
+        : tone === "success"
+          ? { bg: palette.successSoft, accent: palette.success, Icon: CircleCheck }
+          : tone === "review"
+            ? { bg: palette.reviewSoft, accent: palette.review, Icon: ShieldCheck }
+            : tone === "neutral"
+              ? { bg: palette.primarySoft, accent: palette.primary, Icon: Info }
+              : { bg: palette.blueSoft, accent: palette.blue, Icon: Info };
+
+  const DefaultIcon = toneSpec.Icon;
+  const badgeBg = isDark ? withOpacity(toneSpec.accent, 0.18) : "#ffffff";
+  const badgeBorder = withOpacity(toneSpec.accent, isDark ? 0.32 : 0.22);
+  const containerBorder = withOpacity(toneSpec.accent, isDark ? 0.3 : 0.2);
+
+  return (
+    <View
+      style={[
+        s.notice,
+        {
+          backgroundColor: toneSpec.bg,
+          borderColor: containerBorder,
+        },
+      ]}
+    >
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          s.noticeBadge,
+          {
+            backgroundColor: badgeBg,
+            borderColor: badgeBorder,
+          },
+          !isDark && s.alertBadgeShadowLight,
+        ]}
+      >
+        {icon ?? <DefaultIcon size={18} color={toneSpec.accent} />}
+      </View>
+      <View style={s.noticeBody}>
+        {!!title && (
+          <Text style={[s.noticeTitle, { color: toneSpec.accent }]}>
+            {title}
+          </Text>
+        )}
+        {children != null && (
+          <Text style={[s.noticeText, { color: palette.text }]}>
+            {children}
+          </Text>
+        )}
+        {action}
+      </View>
     </View>
   );
 }
@@ -347,32 +635,62 @@ const s = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    gap: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-  },
   compact: { gap: 10, paddingTop: 10, paddingBottom: 24 },
-  compactTitle: { fontSize: 21, lineHeight: 28 },
-  compactEmpty: { gap: 8, paddingVertical: 12, alignItems: "center" },
-  heading: { flex: 1, minWidth: 190, gap: 6 },
-  title: {
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "600",
-    color: colors.text,
+  compactEmpty: {
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    alignItems: "center",
   },
   description: { fontSize: 13, lineHeight: 20, color: colors.muted },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: 20,
     padding: 16,
     gap: 12,
   },
-  cardTitle: { fontSize: 17, fontWeight: "600", color: colors.text },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  cardHeaderLead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  cardHeaderTrail: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  cardIconChip: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  cardTitle: { fontSize: 17, fontWeight: "700", color: colors.text, flexShrink: 1 },
+  cardTitleFlat: { fontSize: 15, fontWeight: "700" },
+  cardBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  cardBadgeText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
   empty: {
     paddingHorizontal: 16,
     paddingVertical: 32,
@@ -387,17 +705,23 @@ const s = StyleSheet.create({
     padding: 14,
     gap: 12,
     borderWidth: 1,
-    borderLeftWidth: 4,
-    borderRadius: 14,
+    borderRadius: 18,
   },
   errorBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  alertBadgeShadowLight: {
+    shadowColor: "#101849",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   errorBody: {
     flex: 1,
@@ -422,7 +746,7 @@ const s = StyleSheet.create({
     minHeight: 38,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 999,
+    borderRadius: 18,
     alignSelf: "flex-start",
   },
   errorRetryText: {
@@ -440,13 +764,47 @@ const s = StyleSheet.create({
   value: {
     color: colors.text,
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
     flexShrink: 1,
     textAlign: "right",
   },
+  detailGroup: {
+    gap: 0,
+  },
+  detailGroupRow: {
+    paddingVertical: 10,
+  },
   notice: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: 12,
-    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  noticeBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  noticeBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  noticeTitle: {
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontWeight: "700",
+  },
+  noticeText: {
+    fontSize: 13,
+    lineHeight: 19,
   },
 });

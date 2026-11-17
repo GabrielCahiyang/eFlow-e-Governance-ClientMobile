@@ -3,7 +3,7 @@ import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { workDisplayStatus } from "../../shared/statusLabels";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import { nodeSchedule, plannedStartReached, subtaskDisplayStatus, workScheduleToday } from "./subtaskSchedule";
 import { subtaskDependencies } from "./subtaskDependencies";
 import { hiddenSubtasksMessage, subtasksVisibleForActor } from "./subtaskVisibility";
@@ -16,9 +16,9 @@ import { fetchWorkTree } from "../../../core/web/app/features/nested-work/servic
 import { useToast } from "../../components/ui/Toast";
 import {
   Button,
-  EditorialMetadataStrip,
   ErrorState,
   Notice,
+  PageHeader,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
@@ -58,6 +58,7 @@ import {
   BentoDependenciesCard,
   BentoEditButton,
   BentoDeleteButton,
+  BentoOverviewHeroCard,
   BentoScheduleCards,
   BentoAssignedTeamCard,
   BentoSubtasksCard,
@@ -297,45 +298,62 @@ export function WorkTreePanel({
         onSaved={async () => saved(await fetchWorkTree(data.root.id))} />
     );
 
+    const subtaskCompletion = branchCompletion(data, node.status, node.id);
+    const subtaskPercent =
+      subtaskCompletion.total > 0 || node.status === "completed"
+        ? subtaskCompletion.percent
+        : typeof node.percent_complete === "number"
+          ? node.percent_complete
+          : 0;
+    const subtaskSubtitle =
+      subtaskCompletion.total > 0
+        ? `${subtaskCompletion.completed} of ${subtaskCompletion.total} child ${subtaskCompletion.total === 1 ? "subtask" : "subtasks"} completed`
+        : node.status === "completed"
+          ? "Subtask completed"
+          : status.label;
+
     return (
       <>
         {/* 1. Subtask Header */}
         <View style={{ gap: 4, marginBottom: 4 }}>
-          <View
-            style={{
-              flexDirection: fontScale > 1.8 ? "column" : "row",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              gap: 10,
-            }}
-          >
-            <Text
-              accessibilityRole="header"
-              style={{
-                flex: fontScale > 1.8 ? undefined : 1,
-                fontSize: 26,
-                fontWeight: "700",
-                color: palette.text,
-                lineHeight: 32,
-              }}
-            >
-              {node.title}
-            </Text>
-            <View testID="subtask-detail-actions" style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-            {canEditSubtask && (
-              <BentoEditButton
-                accessibilityLabel="Edit subtask"
-                busy={refreshing}
-                disabled={startAction.busy}
-                onPress={() => setEdit({ command: "edit", node })}
-              />
-            )}
-            {canDeleteSubtask && <BentoDeleteButton accessibilityLabel="Delete subtask"
-              disabled={startAction.busy} busy={refreshing} onPress={() => setEdit({ command: "delete", node })} />}
-            </View>
-          </View>
+          <PageHeader
+            title={node.title}
+            subtitle={subtaskSubtitle}
+            right={
+              canEditSubtask || canDeleteSubtask ? (
+                <View
+                  testID="subtask-detail-actions"
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    alignItems: "center",
+                  }}
+                >
+                  {canEditSubtask && (
+                    <BentoEditButton
+                      accessibilityLabel="Edit subtask"
+                      busy={refreshing}
+                      disabled={startAction.busy}
+                      onPress={() => setEdit({ command: "edit", node })}
+                    />
+                  )}
+                  {canDeleteSubtask && (
+                    <BentoDeleteButton
+                      accessibilityLabel="Delete subtask"
+                      disabled={startAction.busy}
+                      busy={refreshing}
+                      onPress={() => setEdit({ command: "delete", node })}
+                    />
+                  )}
+                </View>
+              ) : (
+                <View testID="subtask-detail-actions" />
+              )
+            }
+          />
 
-          {/* Navigable parent task */}
+          {/* Navigable parent task pill */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Back to parent task: ${resolvedParentTitle}`}
@@ -351,18 +369,25 @@ export function WorkTreePanel({
                 });
               }
             }}
-            style={{
+            style={({ pressed }) => ({
               flexDirection: "row",
               alignItems: "center",
-              gap: 4,
-              paddingVertical: 2,
+              gap: 5,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              marginTop: 2,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: palette.border,
+              backgroundColor: palette.surface,
               alignSelf: "flex-start",
-            }}
+              opacity: pressed ? 0.78 : 1,
+            })}
           >
-            <Text style={{ fontSize: 14, color: palette.mutedLabel }}>
+            <ChevronLeft size={14} color={palette.primary} />
+            <Text style={{ fontSize: 13, fontWeight: "600", color: palette.primary }}>
               {resolvedParentTitle}
             </Text>
-            <ChevronRight size={14} color={palette.mutedLabel} />
           </Pressable>
 
           {/* Authorized work-action buttons immediately below parent task link */}
@@ -479,14 +504,14 @@ export function WorkTreePanel({
             );
           })()}
           {!isHold && !showWaitingNotice && readOnly && (
-            <Notice>
+            <Notice tone="neutral">
               Work actions are unavailable while access is being refreshed or this
               work is closed.
             </Notice>
           )}
           {!!startAction.error && <ErrorState context="action" error={startAction.error} />}
           {displayStatus === "todo" && notStarted && !waitingForTask && !isHold && (subtaskLead || contributor) && (
-            <Notice>
+            <Notice tone="warning">
               {subtaskLead
                 ? !schedule?.start_date
                   ? "Set a planned start date before starting this subtask."
@@ -507,7 +532,7 @@ export function WorkTreePanel({
             !readyToComplete &&
             ["todo", "in_progress", "changes_requested"].includes(node.status) &&
             (subtaskLead || contributor || actor === data.root.lead) && (
-              <Notice>
+              <Notice tone="warning">
                 {!childrenComplete
                   ? "Complete all child subtasks before marking or submitting this subtask as complete."
                   : !dependencies.known
@@ -516,26 +541,22 @@ export function WorkTreePanel({
               </Notice>
             )}
 
-          {/* Editorial Status / Priority metadata strip */}
-          <EditorialMetadataStrip
-            variant="card"
-            items={[
-              {
-                label: "Status",
-                value: status.label,
-                status: visualStatus,
-                accent: status.color,
-              },
-              {
-                label: "Priority",
-                value: nodePriority ? priorityLabel(nodePriority) : "—",
-                accent:
-                  nodePriority === "high" || nodePriority === "urgent"
-                    ? palette.danger
-                    : palette.text,
-              },
-            ]}
-            style={{ marginTop: 2, marginBottom: 10 }}
+          {/* Unified Overview Hero Card (Progress + Status + Priority) */}
+          <BentoOverviewHeroCard
+            title={
+              subtaskCompletion.total > 0
+                ? "Subtask completion"
+                : "Subtask summary"
+            }
+            subtitle={subtaskSubtitle}
+            percent={subtaskPercent}
+            completionAccessibilityLabel={`Subtask completion: ${Math.round(subtaskPercent)}%`}
+            statusLabel={status.label}
+            statusCode={visualStatus}
+            priorityLabel={nodePriority ? priorityLabel(nodePriority) : "—"}
+            priorityRaw={nodePriority}
+            statusAccessibilityLabel={`Status: ${status.label}`}
+            priorityAccessibilityLabel={`Priority: ${nodePriority ? priorityLabel(nodePriority) : "—"}`}
           />
         </View>
 
@@ -548,7 +569,11 @@ export function WorkTreePanel({
         />
 
         {/* Conditional Dependencies card */}
-        {!dependencies.known && <Notice>Subtask dependencies are unavailable.</Notice>}
+        {!dependencies.known && (
+          <Notice tone="warning">
+            Subtask dependencies are unavailable.
+          </Notice>
+        )}
         <BentoDependenciesCard
           items={dependencies.items}
           missingCount={dependencies.missingCount}
@@ -612,11 +637,6 @@ export function WorkTreePanel({
           }
           onPressFiles={() =>
             navigate(subtaskViewRoute(data, node.id, "files", "Files"))
-          }
-          onPressPlanning={() =>
-            navigate(
-              subtaskViewRoute(data, node.id, "planning", "Planning details"),
-            )
           }
         />
 

@@ -1,13 +1,13 @@
 {
-  "at": "2026-11-16T18:11:38.020Z",
+  "at": "2026-11-17T13:14:46.529Z",
   "method": "Exact Hermes string-table entries; quoted literals for JavaScript. Numeric substrings are not credential matches.",
   "platforms": [
     "android",
     "ios"
   ],
   "bundles": [
-    "dist/android/_expo/static/js/android/index-8ff68c00cda11abfccde60c2a0b611b8.hbc",
-    "dist/ios/_expo/static/js/ios/index-6c3dbebf8b9c5620bb0e5fa41927bbd5.hbc"
+    "dist/android/_expo/static/js/android/index-0b857e9c14ca6b9a08e34ebaed392df8.hbc",
+    "dist/ios/_expo/static/js/ios/index-f02cb5ff5cffe829c21eccbc56a73dfe.hbc"
   ],
   "developmentAccountLiteralCount": 6,
   "developmentAccountLiteralsFound": 0

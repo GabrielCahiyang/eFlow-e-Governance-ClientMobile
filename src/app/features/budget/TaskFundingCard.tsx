@@ -1,13 +1,21 @@
 import { useCallback, useState } from "react";
+import ArrowRight from "lucide-react-native/icons/arrow-right";
+import Coins from "lucide-react-native/icons/coins";
+import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import Wallet from "lucide-react-native/icons/wallet";
 import {
   Button,
   Card,
+  DetailGroup,
   Empty,
   ErrorState,
   LabelValue,
   Loading,
+  MetricPair,
   Notice,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { recordedPeso } from "../../components/ui/theme";
 import { PublicMessageError } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
@@ -51,6 +59,7 @@ export function TaskFundingCard({
   onOpenLinkedSubitem?: (id: string) => void;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const [request, setRequest] = useState(false);
   const [correction, setCorrection] = useState<PettyCashRequest>();
   const funding = useFacts(
@@ -129,27 +138,56 @@ export function TaskFundingCard({
 
   return (
     <>
-      <Card title={subtaskId ? "Subtask funding" : "Task funding"}>
+      <Card
+        title={subtaskId ? "Subtask funding" : "Task funding"}
+        icon={<Wallet size={16} color={palette.primary} />}
+        badge={
+          context?.fiscalYear != null ? `FY ${context.fiscalYear}` : undefined
+        }
+      >
         {!recordId && (
           <>
             {expenses.loading && !expenses.data ? (
               <Loading label="Loading expenses" layout="summary" rows={2} />
             ) : expenses.error || !expenses.data ? (
-              <Notice>Actual expense totals are unavailable.</Notice>
+              <Notice tone="info">
+                Actual expense totals are unavailable.
+              </Notice>
             ) : (
               <>
-                <Notice>
-                  {expenses.data.complete ? "Work totals across fiscal years and funding sources." :
-                    "Totals from the cash records you can access, across fiscal years and funding sources."}
+                <Notice tone="neutral">
+                  {expenses.data.complete
+                    ? "Work totals across fiscal years and funding sources."
+                    : "Totals from the cash records you can access, across fiscal years and funding sources."}
                 </Notice>
-                <LabelValue label="Settled expenses" value={expenses.data.settled == null
-                  ? "Unavailable" : recordedPeso(expenses.data.settled / 100)} />
-                <LabelValue label="Pending liquidation" value={expenses.data.pending == null
-                  ? "Unavailable" : recordedPeso(expenses.data.pending / 100)} />
+                <DetailGroup>
+                  <LabelValue
+                    label="Settled expenses"
+                    value={
+                      expenses.data.settled == null
+                        ? "Unavailable"
+                        : recordedPeso(expenses.data.settled / 100)
+                    }
+                  />
+                  <LabelValue
+                    label="Pending liquidation"
+                    value={
+                      expenses.data.pending == null
+                        ? "Unavailable"
+                        : recordedPeso(expenses.data.pending / 100)
+                    }
+                  />
+                </DetailGroup>
               </>
             )}
             {!!expenses.error && (
-              <Button variant="outline" onPress={() => void expenses.refresh()}>Retry expenses</Button>
+              <Button
+                variant="outline"
+                icon={<RefreshCw size={15} color={palette.primary} />}
+                onPress={() => void expenses.refresh()}
+              >
+                Retry expenses
+              </Button>
             )}
           </>
         )}
@@ -164,35 +202,35 @@ export function TaskFundingCard({
         )}
         {context && !funding.error && (
           <>
-            {context.fiscalYear != null && (
-              <LabelValue
-                label="Fiscal year"
-                value={String(context.fiscalYear)}
-              />
-            )}
             {context.funded && !context.distribution && (
-              <LabelValue
-                label={
-                  subtaskId ? "Authorized task budget" : "Authorized budget"
-                }
-                value={recordedPeso(context.taskBudget)}
-              />
-            )}
-            {context.funded && !context.distribution && (
-              <LabelValue
-                label={
-                  subtaskId && !context.cap
-                    ? "Task funds available to request"
-                    : "Available to request"
-                }
-                value={recordedPeso(context.available)}
+              <MetricPair
+                items={[
+                  {
+                    label: subtaskId
+                      ? "Authorized task budget"
+                      : "Authorized budget",
+                    value: recordedPeso(context.taskBudget),
+                    icon: <Wallet size={18} color={palette.primary} />,
+                  },
+                  {
+                    label:
+                      subtaskId && !context.cap
+                        ? "Task funds available to request"
+                        : "Available to request",
+                    value: recordedPeso(context.available),
+                    tone: "success",
+                    icon: <Coins size={18} color={palette.success} />,
+                  },
+                ]}
               />
             )}
             {!!context.cap && !context.distribution && (
-              <LabelValue
-                label="Subtask funding cap"
-                value={recordedPeso(context.cap.amount)}
-              />
+              <DetailGroup>
+                <LabelValue
+                  label="Subtask funding cap"
+                  value={recordedPeso(context.cap.amount)}
+                />
+              </DetailGroup>
             )}
             {!!context.distribution && (
               <SubtaskBudgetDistribution
@@ -204,10 +242,12 @@ export function TaskFundingCard({
               />
             )}
             {!context.funded && (
-              <Notice>This work has no authorized funding yet.</Notice>
+              <Notice tone="warning">
+                This work has no authorized funding yet.
+              </Notice>
             )}
             {!recordId && requiresSubtaskBudget && (
-              <Notice>
+              <Notice tone="warning">
                 Ask the task lead to allocate a budget to this subtask before
                 requesting cash.
               </Notice>
@@ -222,6 +262,9 @@ export function TaskFundingCard({
               context.available > 0 &&
               (profile?.id === context.taskLeaderId || canManage) && (
                 <Button
+                  icon={
+                    <Plus size={16} color={palette.onPrimary} strokeWidth={2.4} />
+                  }
                   onPress={() => {
                     setCorrection(undefined);
                     setRequest(true);
@@ -247,6 +290,7 @@ export function TaskFundingCard({
                 : undefined
             }
             readOnly={readOnly}
+            nested
             onSaved={refresh}
           />
         )}
@@ -268,6 +312,7 @@ export function TaskFundingCard({
             action={
               <Button
                 variant="outline"
+                icon={<ArrowRight size={15} color={palette.primary} />}
                 onPress={() => onOpenLinkedSubitem(linkedSubitem)}
               >
                 Open linked subtask funding

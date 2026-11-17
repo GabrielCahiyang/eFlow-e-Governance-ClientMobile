@@ -12,6 +12,8 @@ export function NavigationRow({
   onPress,
   disabled = false,
   accessibilityHint,
+  glass = false,
+  divider = true,
 }: {
   title: string;
   description?: string;
@@ -20,6 +22,8 @@ export function NavigationRow({
   onPress: () => void;
   disabled?: boolean;
   accessibilityHint?: string;
+  glass?: boolean;
+  divider?: boolean;
 }) {
   const palette = useTheme();
   return (
@@ -34,15 +38,20 @@ export function NavigationRow({
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 56,
-        padding: 16,
+        minHeight: glass ? 60 : 56,
+        paddingHorizontal: 16,
+        paddingVertical: glass ? 13 : 16,
         gap: 12,
         flexDirection: "row",
         alignItems: "center",
-        borderBottomWidth: 0.5,
+        borderBottomWidth: divider ? (glass ? 1 : 0.5) : 0,
         borderBottomColor: palette.border,
         backgroundColor:
-          pressed || selected ? palette.primarySoft : palette.surface,
+          pressed || selected
+            ? palette.primarySoft
+            : glass
+              ? "transparent"
+              : palette.surface,
         opacity: disabled ? 0.5 : 1,
       })}
     >

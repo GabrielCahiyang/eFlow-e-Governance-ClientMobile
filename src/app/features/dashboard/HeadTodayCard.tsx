@@ -1,14 +1,12 @@
 import type { ReactNode } from "react";
 import { View } from "react-native";
-import { Text } from "../../components/ui/Typography";
+import AlertCircle from "lucide-react-native/icons/circle-alert";
 import { useTheme } from "../../components/ui/Appearance";
-import { HomeCard } from "./HomeSections";
+import { HomeCard, HomeSection } from "./HomeSections";
 
 /**
- * "Needs your decision" on Home. Decisions are a single vertical list so the
- * first one is always the most obvious next action; the Office, project and
- * risk numbers live in the hero. `children` shows when there are no decision
- * cards (loading, empty or error states).
+ * "Needs your decision" on Home. Decisions are a single vertical list inside a
+ * Card v2 container so the first one is always the most obvious next action.
  */
 export function HeadTodayCard({
   attentionCount,
@@ -21,32 +19,17 @@ export function HeadTodayCard({
 }) {
   const palette = useTheme();
   return (
-    <View style={{ gap: 10 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Text
-          accessibilityRole="header"
-          style={{ fontSize: 18, fontWeight: "800", color: palette.text }}
-        >
-          Needs your decision
-        </Text>
-        {attentionCount > 0 && (
-          <View
-            style={{
-              minWidth: 24,
-              height: 24,
-              borderRadius: 12,
-              paddingHorizontal: 7,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: palette.dangerSoft,
-            }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: "800", color: palette.danger }}>
-              {attentionCount}
-            </Text>
-          </View>
-        )}
-      </View>
+    <HomeSection
+      title="Needs your decision"
+      tone={attentionCount > 0 ? "danger" : "primary"}
+      badge={attentionCount > 0 ? attentionCount : undefined}
+      icon={
+        <AlertCircle
+          size={15}
+          color={attentionCount > 0 ? palette.danger : palette.primary}
+        />
+      }
+    >
       {decisions.length > 0 ? (
         <HomeCard>{decisions}</HomeCard>
       ) : (
@@ -56,6 +39,6 @@ export function HeadTodayCard({
           </View>
         </HomeCard>
       )}
-    </View>
+    </HomeSection>
   );
 }

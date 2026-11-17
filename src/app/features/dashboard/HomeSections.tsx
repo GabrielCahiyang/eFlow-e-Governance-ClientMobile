@@ -9,13 +9,36 @@ import {
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { Text } from "../../components/ui/Typography";
-import { useTheme } from "../../components/ui/Appearance";
-import { space, type } from "../../components/ui/theme";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
+import { space, type, withOpacity } from "../../components/ui/theme";
 import type { AppRoute, Navigate } from "../../shared/routes";
 
-/** One radius and one surface for every grouped list on Home. */
-const homeCardRadius = 14;
+export type HomeSectionTone =
+  | "primary"
+  | "danger"
+  | "warning"
+  | "review"
+  | "success";
 
+function tonePalette(
+  tone: HomeSectionTone,
+  palette: ReturnType<typeof useTheme>,
+) {
+  switch (tone) {
+    case "danger":
+      return { bg: palette.dangerSoft, fg: palette.danger };
+    case "warning":
+      return { bg: palette.warningSoft, fg: palette.warning };
+    case "review":
+      return { bg: palette.reviewSoft, fg: palette.review };
+    case "success":
+      return { bg: palette.successSoft, fg: palette.success };
+    default:
+      return { bg: palette.primarySoft, fg: palette.primary };
+  }
+}
+
+/** Inset grouped list container inside HomeSection Card v2. */
 export function HomeCard({
   children,
   style,
@@ -24,14 +47,17 @@ export function HomeCard({
   style?: StyleProp<ViewStyle>;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   return (
     <View
       style={[
         {
-          borderRadius: homeCardRadius,
+          borderRadius: 16,
           borderWidth: 1,
           borderColor: palette.border,
-          backgroundColor: palette.surface,
+          backgroundColor: isDark
+            ? withOpacity(palette.background, 0.72)
+            : "#f7f9fd",
           overflow: "hidden",
         },
         style,
@@ -42,9 +68,33 @@ export function HomeCard({
   );
 }
 
+/** Circular right chevron indicator matching unified Card v2 rows. */
+export function HomeRowChevron() {
+  const palette = useTheme();
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: palette.surface,
+        borderWidth: 1,
+        borderColor: palette.border,
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <ChevronRight size={13} color={palette.mutedLabel} strokeWidth={2.4} />
+    </View>
+  );
+}
+
 /**
  * A full-width tappable row inside HomeCard. Rows share one separator and one
- * padding rhythm so Home reads as a column of lists, not a wall of cards.
+ * padding rhythm so Home reads cleanly inside inset Card v2 groups.
  */
 export function HomeRow({
   children,
@@ -72,9 +122,9 @@ export function HomeRow({
         alignItems: "center",
         gap: space.md,
         minHeight: 56,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderTopWidth: isFirst ? 0 : StyleSheet.hairlineWidth,
+        paddingHorizontal: 13,
+        paddingVertical: 11,
+        borderTopWidth: isFirst ? 0 : 1,
         borderTopColor: palette.border,
         backgroundColor: pressed && onPress ? palette.primarySoft : "transparent",
       })}
@@ -87,6 +137,8 @@ export function HomeRow({
 export function HomeSection({
   title,
   badge,
+  icon,
+  tone = "primary",
   action,
   onAction,
   actionLabel = "See all",
@@ -95,6 +147,8 @@ export function HomeSection({
 }: {
   title: string;
   badge?: string | number;
+  icon?: ReactNode;
+  tone?: HomeSectionTone;
   action?: {
     label?: string;
     onPress: () => void;
@@ -106,6 +160,8 @@ export function HomeSection({
   children: ReactNode;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
+  const accent = tonePalette(tone, palette);
   const handleAction = action?.onPress ?? onAction;
   const label = action?.label ?? actionLabel;
   const a11yLabel =
@@ -114,32 +170,63 @@ export function HomeSection({
     `${label} ${title}`;
 
   return (
-    <View style={{ gap: space.xs, marginTop: space.xs }}>
+    <View
+      style={{
+        borderRadius: 20,
+        padding: 14,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: palette.border,
+        backgroundColor: palette.surface,
+        shadowColor: isDark ? "#000" : palette.primaryDark,
+        shadowOpacity: isDark ? 0.2 : 0.04,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 2,
+      }}
+    >
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          minHeight: 44,
-          marginBottom: 2,
+          gap: 8,
         }}
       >
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
-            gap: space.xs,
-            flexShrink: 1,
-            paddingVertical: 4,
+            gap: 9,
+            flex: 1,
+            minWidth: 0,
           }}
         >
+          {!!icon && (
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: accent.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {icon}
+            </View>
+          )}
           <Text
             accessibilityRole="header"
             style={{
-              fontSize: type.heading,
+              fontSize: 15,
               fontWeight: "700",
               color: palette.text,
+              flexShrink: 1,
             }}
           >
             {title}
@@ -148,16 +235,16 @@ export function HomeSection({
             <View
               style={{
                 paddingHorizontal: 8,
-                paddingVertical: 2,
+                paddingVertical: 2.5,
                 borderRadius: 999,
-                backgroundColor: palette.primarySoft,
+                backgroundColor: accent.bg,
               }}
             >
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: "700",
-                  color: palette.primaryDark ?? palette.primary,
+                  color: accent.fg,
                 }}
               >
                 {badge}
@@ -173,28 +260,30 @@ export function HomeSection({
             onPress={handleAction}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={({ pressed }) => ({
-              minHeight: 44,
-              minWidth: 48,
+              minHeight: 30,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 999,
+              backgroundColor: pressed
+                ? withOpacity(palette.primary, 0.16)
+                : palette.primarySoft,
               flexDirection: "row",
               alignItems: "center",
-              justifyContent: "flex-end",
-              paddingVertical: 8,
-              paddingLeft: space.sm,
-              opacity: pressed ? 0.6 : 1,
-              gap: 2,
+              justifyContent: "center",
+              gap: 3,
             })}
           >
             <Text
               style={{
-                fontSize: 13,
-                fontWeight: "600",
+                fontSize: 11.5,
+                fontWeight: "700",
                 color: palette.primary,
               }}
             >
               {label}
             </Text>
             <ChevronRight
-              size={14}
+              size={13}
               color={palette.primary}
               strokeWidth={2.5}
             />

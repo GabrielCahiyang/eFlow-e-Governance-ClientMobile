@@ -1,5 +1,8 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import X from "lucide-react-native/icons/x";
 import { Button, Field, Notice, Sheet } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -34,6 +37,7 @@ export function TaskEvidenceSheet({
   onClose: () => void;
 }) {
   const { toast } = useToast();
+  const palette = useTheme();
   const action = useAction();
   const [request, setRequest] = useState(saved);
   const [stage, report] = useState("");
@@ -109,6 +113,13 @@ export function TaskEvidenceSheet({
         <Button
           busy={action.busy}
           disabled={!confirmed && !request && !note.trim()}
+          icon={
+            confirmed ? (
+              <X size={16} color={palette.onPrimary} />
+            ) : (
+              <Check size={16} color={palette.onPrimary} />
+            )
+          }
           onPress={confirmed ? close : () => void save()}
         >
           {confirmed ? "Close completion form" : "Submit for review"}

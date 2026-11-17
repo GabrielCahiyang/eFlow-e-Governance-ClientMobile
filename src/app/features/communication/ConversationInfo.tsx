@@ -1,3 +1,7 @@
+import Pin from "lucide-react-native/icons/pin";
+import PinOff from "lucide-react-native/icons/pin-off";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -51,6 +55,7 @@ export function ConversationInfo({
     open,
   );
   const { toast } = useToast();
+  const palette = useTheme();
   const pin = useAction();
   const changed = async () => {
     await Promise.all([onChanged(), facts.refresh()]);
@@ -75,7 +80,14 @@ export function ConversationInfo({
       title="Conversation info"
       onClose={onClose}
       busy={pin.busy}
-      footer={<Button onPress={onClose}>Close conversation info</Button>}
+      footer={
+        <Button
+          icon={<X size={16} color={palette.onPrimary} />}
+          onPress={onClose}
+        >
+          Close conversation info
+        </Button>
+      }
     >
       <Card>
         <Row>
@@ -95,6 +107,13 @@ export function ConversationInfo({
           <Button
             variant="outline"
             disabled={pin.busy}
+            icon={
+              channel.personalPin ? (
+                <PinOff size={16} color={palette.primary} />
+              ) : (
+                <Pin size={16} color={palette.primary} />
+              )
+            }
             onPress={() =>
               void pin.run(async () => {
                 const nextPinned = !channel.personalPin;
@@ -143,7 +162,7 @@ export function ConversationInfo({
               ),
             )}
             {!facts.data.people.length && (
-              <Empty compact title="No members to show" />
+              <Empty compact kind="people" title="No members to show" />
             )}
           </Card>
           <Card title="Pinned messages">
@@ -153,7 +172,7 @@ export function ConversationInfo({
               </Text>
             ))}
             {!facts.data.pins.length && (
-              <Empty compact title="No pinned messages" />
+              <Empty compact kind="chat" title="No pinned messages" />
             )}
           </Card>
           <Card title="Shared images and links">
@@ -170,7 +189,11 @@ export function ConversationInfo({
               </Text>
             ))}
             {!media.length && !links.length && (
-              <Empty compact title="No media or links in loaded messages" />
+              <Empty
+                compact
+                kind="files"
+                title="No media or links in loaded messages"
+              />
             )}
           </Card>
         </>

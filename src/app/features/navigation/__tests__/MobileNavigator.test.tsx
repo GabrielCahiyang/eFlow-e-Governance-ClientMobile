@@ -288,7 +288,7 @@ test.each(["head", "member", "accounting_staff"])(
   },
 );
 
-test("Accounting opens Projects in More and linked projects in Accounting, retaining Back", async () => {
+test("Accounting opens Projects and Office budget & releases in More, and Petty cash on Tab 4, retaining Back", async () => {
   mockRole = "accounting_staff";
   await render(<MobileNavigator />);
   expect(screen.queryByRole("tab", { name: "Projects" })).toBeNull();
@@ -303,16 +303,21 @@ test("Accounting opens Projects in More and linked projects in Accounting, retai
     screen.getByRole("button", { name: "Back to previous" }),
   );
   expect(await screen.findByText("Body projects")).toBeOnTheScreen();
-  await fireEvent.press(screen.getByRole("tab", { name: "Accounting" }));
-  expect(await screen.findByText("Body accounting_overview")).toBeOnTheScreen();
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Open linked project" }),
-  );
-  expect(await screen.findByText("Body project")).toBeOnTheScreen();
   await fireEvent.press(
     screen.getByRole("button", { name: "Back to previous" }),
   );
-  expect(await screen.findByText("Body accounting_overview")).toBeOnTheScreen();
+  expect(await screen.findByRole("header", { name: "More" })).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("tab", { name: "Petty cash" }));
+  expect(await screen.findByText("Body financial_reviews")).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("tab", { name: "More" }));
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Office budget & releases" }),
+  );
+  expect(await screen.findByText("Body accounting_releases")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Back to previous" }),
+  );
+  expect(await screen.findByRole("header", { name: "More" })).toBeOnTheScreen();
 });
 
 test("switching Office/personal context blocks stale work and retains the exact original task destination for a return", async () => {
@@ -356,4 +361,13 @@ test("switching Office/personal context blocks stale work and retains the exact 
   await waitFor(() =>
     expect(screen.getByText("Body task node-eight")).toBeOnTheScreen(),
   );
+});
+
+test("missing workspace empty state renders without a Try again refresh button", async () => {
+  mockWorkspace.selected = undefined;
+  mockWorkspace.loading = false;
+  mockWorkspace.error = undefined;
+  await render(<MobileNavigator initialRoute={{ name: "projects" }} />);
+  expect(await screen.findByText("No workspace available")).toBeOnTheScreen();
+  expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
 });

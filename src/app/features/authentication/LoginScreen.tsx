@@ -1,3 +1,10 @@
+import {
+  forwardRef,
+  useRef,
+  useState,
+  type ComponentRef,
+  type ReactNode,
+} from "react";
 import { useNativeLogin } from "./useNativeLogin";
 import { SignInProgressNotice } from "./SignInProgressNotice";
 import { validateLoginFields } from "../../../core/web/app/features/authentication/services/loginValidation";
@@ -7,39 +14,104 @@ import {
   Linking,
   Platform,
   useWindowDimensions,
+  type TextInput as NativeTextInput,
+  type TextInputProps,
 } from "react-native";
-import { Pressable, ScrollView, View } from "../../components/ui/Primitives";
-import { SafeAreaView } from "../../components/ui/Primitives";
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  View,
+} from "../../components/ui/Primitives";
+import { LinearGradient } from "expo-linear-gradient";
+import CirclePlay from "lucide-react-native/icons/circle-play";
 import Eye from "lucide-react-native/icons/eye";
 import EyeOff from "lucide-react-native/icons/eye-off";
 import Info from "lucide-react-native/icons/info";
 import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
-import {
-  Button,
-  Choice,
-  ErrorState,
-  Field,
-  Notice,
-  Sheet,
-} from "../../components/ui";
-import { Text } from "../../components/ui/Typography";
+import LogIn from "lucide-react-native/icons/log-in";
+import { Button, Choice, ErrorState, Notice, Sheet } from "../../components/ui";
+import { Text, TextInput } from "../../components/ui/Typography";
+import { brandColors, withOpacity } from "../../components/ui/theme";
 import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { EFlowMark } from "../../components/brand/EFlowMark";
 import { ErrorShake, MotionView } from "../../shared/motion";
+import { userErrorMessage } from "../../shared/userMessages";
 import { backendConfig, configurationError } from "../../../platform/config";
 import { webHandoffUrl } from "../../../platform/webHandoff";
+
+const PASSWORD_HELP_NOTICE =
+  "Ask your Office IT team or eFlow administrator to reset your password.";
+
+type LoginFieldProps = Omit<TextInputProps, "style"> & {
+  label: string;
+  required?: boolean;
+  error?: string;
+  focused?: boolean;
+  insetBackground: string;
+  trailing?: ReactNode;
+};
+
+/** Shared login field shell keeping inset contrast and trailing controls aligned at high font scales. */
+const LoginField = forwardRef<
+  ComponentRef<typeof NativeTextInput>,
+  LoginFieldProps
+>(function LoginField(
+  { label, required, error, focused, insetBackground, trailing, ...inputProps },
+  ref,
+) {
+  const palette = useTheme();
+  const borderColor = error
+    ? palette.danger
+    : focused
+      ? palette.blue
+      : palette.border;
+
+  return (
+    <View style={s.field}>
+      <Text style={[s.fieldLabel, { color: palette.text }]}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
+      <View
+        style={[s.inputRow, { backgroundColor: insetBackground, borderColor }]}
+      >
+        <TextInput
+          ref={ref}
+          accessibilityLabel={label}
+          accessibilityHint={required ? "Required" : undefined}
+          placeholderTextColor={palette.mutedLabel}
+          selectionColor={palette.blue}
+          {...inputProps}
+          style={[s.inputControl, { color: palette.text }]}
+        />
+        {trailing}
+      </View>
+      {!!error && (
+        <Text
+          accessibilityRole="alert"
+          style={[s.fieldError, { color: palette.danger }]}
+        >
+          {userErrorMessage(error, "action")}
+        </Text>
+      )}
+    </View>
+  );
+});
 
 export function LoginScreen() {
   const palette = useTheme();
   const { isDark } = useAppearance();
-  const linkColor = palette.blue;
   const walkthroughUrl = webHandoffUrl(
     { name: "walkthrough" },
     backendConfig.webOrigin,
   );
-  const { width } = useWindowDimensions(),
-    wide = width >= 1200,
-    small = width < 768;
+  const { width } = useWindowDimensions();
+  const small = width < 768;
+  const passwordRef = useRef<ComponentRef<typeof NativeTextInput>>(null);
+  const [focusedField, setFocusedField] = useState<"email" | "password" | null>(
+    null,
+  );
   const {
     email,
     setEmail,
@@ -68,33 +140,62 @@ export function LoginScreen() {
     markState,
   } = useNativeLogin();
 
+  const insetFieldBg = isDark ? "#0d152d" : "#f7f9fd";
+  const showWalkthrough = !recovery && !!walkthroughUrl;
+  const showScenarios = Boolean(__DEV__ && !recovery);
+
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={[s.safe, { backgroundColor: palette.background }]}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          withOpacity(
+            isDark ? palette.primary : brandColors.blue,
+            isDark ? 0.14 : 0.11,
+          ),
+          withOpacity(palette.background, 0),
+        ]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={s.ambientWash}
+      />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={[s.page, wide && { flexDirection: "row" }]}
+          contentContainerStyle={[
+            s.page,
+            small && { paddingHorizontal: 16, paddingVertical: 20 },
+          ]}
         >
-          <View
-            style={[
-              s.auth,
-              wide && { width: "34%", minWidth: 380 },
-              small && { paddingHorizontal: 20, paddingVertical: 24 },
-            ]}
-          >
-            <View style={[s.form, small && { maxWidth: "100%" }]}>
-              <View style={s.mobileBrand}>
-                <EFlowMark variant="white" height={36} state={markState} />
-                <Text style={s.mobileCity}>LGU Ormoc City</Text>
-              </View>
-              <MotionView
-                kind="login"
-                index={0}
-                style={{ gap: 6, marginBottom: 6 }}
-              >
+          <View style={s.column}>
+            {/* Lightweight brand lockup */}
+            <View style={s.brandRow}>
+              <EFlowMark variant="default" height={28} state={markState} />
+              <View
+                importantForAccessibility="no"
+                style={[s.brandDivider, { backgroundColor: palette.border }]}
+              />
+              <Text style={[s.brandOrg, { color: palette.muted }]}>
+                LGU Ormoc City
+              </Text>
+            </View>
+
+            {/* Floating elevated authentication surface card */}
+            <View
+              style={[
+                s.card,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+                small && { paddingHorizontal: 18, paddingVertical: 22 },
+                !isDark && s.cardShadowLight,
+              ]}
+            >
+              <MotionView kind="login" index={0} style={s.headerGroup}>
                 <Text
                   accessibilityRole="header"
                   style={[s.heading, { color: palette.text }]}
@@ -107,6 +208,7 @@ export function LoginScreen() {
                     : "Use your official LGU account."}
                 </Text>
               </MotionView>
+
               {!!configurationError && (
                 <ErrorState error={configurationError} />
               )}
@@ -115,83 +217,92 @@ export function LoginScreen() {
                   <ErrorState error={error} />
                 </MotionView>
               )}
-              {!!notice && <Notice>{notice}</Notice>}
               <SignInProgressNotice waiting={busy && slow} />
+
               <MotionView kind="login" index={1}>
                 <ErrorShake trigger={errors.email ? shake : 0}>
-                  <Field
+                  <LoginField
                     label="Email address"
                     required
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="email"
+                    returnKeyType={recovery ? "go" : "next"}
                     value={email}
                     editable={!busy}
                     error={errors.email}
+                    focused={focusedField === "email"}
+                    insetBackground={insetFieldBg}
                     onChangeText={setEmail}
-                    onBlur={() =>
+                    onFocus={() => setFocusedField("email")}
+                    onBlur={() => {
+                      setFocusedField((cur) => (cur === "email" ? null : cur));
                       setErrors((previous) => ({
                         ...previous,
                         email: validateLoginFields(email, password).email,
-                      }))
-                    }
+                      }));
+                    }}
+                    onSubmitEditing={() => {
+                      if (!recovery) passwordRef.current?.focus();
+                      else void signIn();
+                    }}
                   />
                 </ErrorShake>
               </MotionView>
+
               {!recovery && (
                 <MotionView kind="login" index={2}>
                   <ErrorShake trigger={!errors.email ? shake : 0}>
-                    <View>
-                      <Field
-                        label="Password"
-                        required
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry={!show}
-                        editable={!busy}
-                        autoComplete="current-password"
-                        error={errors.password}
-                        style={{ paddingRight: 54 }}
-                        onBlur={() =>
-                          setErrors((previous) => ({
-                            ...previous,
-                            password: validateLoginFields(email, password)
-                              .password,
-                          }))
-                        }
-                        onSubmitEditing={() => void signIn()}
-                      />
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                          show ? "Hide password" : "Show password"
-                        }
-                        disabled={busy}
-                        onPress={() => setShow(!show)}
-                        style={s.reveal}
-                      >
-                        {show ? (
-                          <EyeOff color={palette.mutedLabel} size={19} />
-                        ) : (
-                          <Eye color={palette.mutedLabel} size={19} />
-                        )}
-                      </Pressable>
-                    </View>
+                    <LoginField
+                      ref={passwordRef}
+                      label="Password"
+                      required
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!show}
+                      editable={!busy}
+                      autoComplete="current-password"
+                      returnKeyType="go"
+                      error={errors.password}
+                      focused={focusedField === "password"}
+                      insetBackground={insetFieldBg}
+                      onFocus={() => setFocusedField("password")}
+                      onBlur={() => {
+                        setFocusedField((cur) =>
+                          cur === "password" ? null : cur,
+                        );
+                        setErrors((previous) => ({
+                          ...previous,
+                          password: validateLoginFields(email, password)
+                            .password,
+                        }));
+                      }}
+                      onSubmitEditing={() => void signIn()}
+                      trailing={
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            show ? "Hide password" : "Show password"
+                          }
+                          disabled={busy}
+                          hitSlop={4}
+                          onPress={() => setShow(!show)}
+                          style={s.reveal}
+                        >
+                          {show ? (
+                            <EyeOff color={palette.mutedLabel} size={19} />
+                          ) : (
+                            <Eye color={palette.mutedLabel} size={19} />
+                          )}
+                        </Pressable>
+                      }
+                    />
                   </ErrorShake>
                 </MotionView>
               )}
-              <MotionView
-                kind="login"
-                index={3}
-                style={{
-                  gap: 8,
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+
+              <MotionView kind="login" index={3} style={s.utilityRow}>
                 {!recovery && (
                   <Pressable
                     accessibilityRole="checkbox"
@@ -200,62 +311,75 @@ export function LoginScreen() {
                     accessibilityState={{ checked: remember, disabled: busy }}
                     disabled={busy}
                     onPress={() => setRemember(!remember)}
-                    style={{
-                      flexDirection: "row",
-                      gap: 8,
-                      minHeight: 44,
-                      alignItems: "center",
-                    }}
+                    style={s.rememberBtn}
                   >
                     <View
-                      style={{
-                        width: 20,
-                        height: 20,
-                        borderWidth: 1.5,
-                        borderColor: remember ? linkColor : palette.mutedLabel,
-                        backgroundColor: remember ? linkColor : palette.surface,
-                        borderRadius: 4,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
+                      style={[
+                        s.checkbox,
+                        {
+                          borderColor: remember
+                            ? palette.primary
+                            : palette.mutedLabel,
+                          backgroundColor: remember
+                            ? palette.primary
+                            : palette.surface,
+                        },
+                      ]}
                     >
                       {!!remember && (
                         <Text
                           style={{
-                            color: isDark ? palette.onPrimary : "#fff",
-                            fontSize: 14,
+                            color: palette.onPrimary,
+                            fontSize: 13,
                             fontWeight: "700",
+                            lineHeight: 16,
                           }}
                         >
                           ✓
                         </Text>
                       )}
                     </View>
-                    <Text style={{ fontSize: 13, color: palette.muted }}>
+                    <Text style={{ fontSize: 13.5, color: palette.muted }}>
                       Keep me signed in
                     </Text>
                   </Pressable>
                 )}
-                <Button
-                  variant="ghost"
-                  textStyle={{ color: linkColor, fontSize: 13 }}
+                <Pressable
+                  accessibilityRole="button"
                   disabled={busy}
+                  hitSlop={6}
                   onPress={() => {
                     setError("");
                     setErrors({});
-                    setNotice(
-                      "Ask your Office IT team or eFlow administrator to reset your password.",
+                    setNotice((current) =>
+                      current === PASSWORD_HELP_NOTICE
+                        ? ""
+                        : PASSWORD_HELP_NOTICE,
                     );
                   }}
+                  style={({ pressed }) => [
+                    s.helpLink,
+                    busy ? { opacity: 0.45 } : pressed && { opacity: 0.7 },
+                  ]}
                 >
-                  Get password help
-                </Button>
+                  <Text style={[s.linkText, { color: palette.blue }]}>
+                    Get password help
+                  </Text>
+                </Pressable>
               </MotionView>
+
+              {!!notice && (
+                <MotionView kind="enter">
+                  <Notice>{notice}</Notice>
+                </MotionView>
+              )}
+
               <MotionView kind="login" index={4}>
                 <Button
                   style={[
                     s.submit,
-                    { backgroundColor: isDark ? palette.primary : linkColor },
+                    { backgroundColor: palette.primary },
+                    !isDark && s.submitShadowLight,
                   ]}
                   textStyle={{ fontSize: 15, fontWeight: "700" }}
                   busy={busy}
@@ -264,42 +388,75 @@ export function LoginScreen() {
                   icon={
                     recovery ? (
                       <LockKeyhole color={palette.onPrimary} size={18} />
-                    ) : undefined
+                    ) : (
+                      <LogIn color={palette.onPrimary} size={18} />
+                    )
                   }
                 >
                   {recovery ? "Send recovery link" : "Sign in"}
                 </Button>
               </MotionView>
-              {!recovery && !!walkthroughUrl && (
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onPress={() => {
-                    void Linking.openURL(walkthroughUrl).catch(() =>
-                      setNotice("Could not open the eFlow Web walkthroughs."),
-                    );
-                  }}
-                >
-                  Watch the eFlow Web walkthroughs
-                </Button>
-              )}
-              {!!(__DEV__ && !recovery) && (
-                <MotionView kind="login" index={5}>
-                  <Button
-                    variant="ghost"
-                    textStyle={{ color: palette.blue }}
-                    disabled={busy}
-                    icon={<Info color={palette.blue} size={16} />}
-                    onPress={() => void openScenarios()}
-                  >
-                    Usage scenarios
-                  </Button>
-                </MotionView>
-              )}
             </View>
+
+            {/* Quiet footer links below the card */}
+            {(showWalkthrough || showScenarios) && (
+              <MotionView kind="login" index={5} style={s.footer}>
+                <View style={s.footerLinks}>
+                  {showWalkthrough && (
+                    <Pressable
+                      accessibilityRole="link"
+                      disabled={busy}
+                      hitSlop={6}
+                      onPress={() => {
+                        void Linking.openURL(walkthroughUrl).catch(() =>
+                          setNotice(
+                            "Could not open the eFlow Web walkthroughs.",
+                          ),
+                        );
+                      }}
+                      style={({ pressed }) => [
+                        s.footerLink,
+                        busy ? { opacity: 0.45 } : pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <CirclePlay size={15} color={palette.blue} />
+                      <Text style={[s.linkText, { color: palette.blue }]}>
+                        Watch the eFlow Web walkthroughs
+                      </Text>
+                    </Pressable>
+                  )}
+                  {showWalkthrough && showScenarios && (
+                    <Text
+                      importantForAccessibility="no"
+                      style={[s.footerDot, { color: palette.border }]}
+                    >
+                      •
+                    </Text>
+                  )}
+                  {showScenarios && (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={busy}
+                      hitSlop={6}
+                      onPress={() => void openScenarios()}
+                      style={({ pressed }) => [
+                        s.footerLink,
+                        busy ? { opacity: 0.45 } : pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Info size={15} color={palette.blue} />
+                      <Text style={[s.linkText, { color: palette.blue }]}>
+                        Usage scenarios
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              </MotionView>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
       <Sheet
         open={!!scenarios}
         title="Usage scenarios"
@@ -310,6 +467,7 @@ export function LoginScreen() {
           <Button
             busy={busy}
             disabled={!selected}
+            icon={<LogIn size={16} color={palette.onPrimary} />}
             onPress={() => {
               const account = scenarios?.find((a) => a.email === selected);
               if (account) {

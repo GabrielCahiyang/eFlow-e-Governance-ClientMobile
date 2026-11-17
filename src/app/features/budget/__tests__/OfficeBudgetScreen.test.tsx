@@ -37,26 +37,28 @@ jest.mock("../../../../platform/supabase", () => ({
     }),
   },
 }));
+const defaultReportRequests = [
+  {
+    id: "request-a",
+    request_number: 1,
+    purpose: "Approved QA release",
+    status: "scheduled_for_release",
+    requested_amount: 250,
+  },
+  {
+    id: "request-b",
+    request_number: 2,
+    purpose: "Awaiting Head",
+    status: "pending_department_approval",
+    requested_amount: 100,
+  },
+];
+let mockReportRequests = defaultReportRequests;
 jest.mock(
   "../../../../core/web/app/features/budget/services/budgetReportReads",
   () => ({
     budgetReportRead: async () => ({
-      data: [
-        {
-          id: "request-a",
-          request_number: 1,
-          purpose: "Approved QA release",
-          status: "scheduled_for_release",
-          requested_amount: 250,
-        },
-        {
-          id: "request-b",
-          request_number: 2,
-          purpose: "Awaiting Head",
-          status: "pending_department_approval",
-          requested_amount: 100,
-        },
-      ],
+      data: mockReportRequests,
     }),
   }),
 );
@@ -68,6 +70,12 @@ test("Accounting shows only the cash work entry points even when the Office summ
     await screen.findByText(
       "We couldn't load this information. Please try again.",
     ),
+  ).toBeOnTheScreen();
+  expect(
+    screen.getByText(`QA Office · FY ${new Date().getFullYear()}`),
+  ).toBeOnTheScreen();
+  expect(
+    screen.getByRole("header", { name: "Accounting" }),
   ).toBeOnTheScreen();
   for (const label of [
     "Annual budget",
@@ -116,4 +124,37 @@ test("the queue is independent of the summary and opens the exact authorized req
       fiscalYear: new Date().getFullYear(),
     }),
   );
+});
+
+test("queue renders the compact pipeline summary and filters requests by workflow stage", async () => {
+  await render(<OfficeBudgetScreen initialView="requests" navigate={jest.fn()} />);
+  expect(await screen.findByText("READY TO RELEASE")).toBeOnTheScreen();
+  expect(screen.getByText("IN REVIEW")).toBeOnTheScreen();
+  expect(
+    screen.getByRole("button", { name: "FR-00001 · Approved QA release" }),
+  ).toBeOnTheScreen();
+
+  await fireEvent.press(screen.getByRole("button", { name: "Settled · 0" }));
+  expect(
+    screen.queryByRole("button", { name: "FR-00001 · Approved QA release" }),
+  ).toBeNull();
+  expect(screen.getByText("No matching cash requests")).toBeOnTheScreen();
+
+  await fireEvent.press(screen.getByRole("button", { name: "Clear filters" }));
+  expect(
+    screen.getByRole("button", { name: "FR-00001 · Approved QA release" }),
+  ).toBeOnTheScreen();
+});
+
+test("empty cash request queue renders without a refresh button", async () => {
+  mockReportRequests = [];
+  try {
+    await render(<OfficeBudgetScreen initialView="requests" navigate={jest.fn()} />);
+    expect(await screen.findByText("No cash requests here yet")).toBeOnTheScreen();
+    expect(
+      screen.queryByRole("button", { name: "Refresh cash requests" }),
+    ).toBeNull();
+  } finally {
+    mockReportRequests = defaultReportRequests;
+  }
 });

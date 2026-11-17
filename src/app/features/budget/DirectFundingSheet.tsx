@@ -1,5 +1,8 @@
 import { Text } from "../../components/ui/Typography";
 import { useRef } from "react";
+import Check from "lucide-react-native/icons/check";
+import Plus from "lucide-react-native/icons/plus";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -9,6 +12,7 @@ import {
   Sheet,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -40,7 +44,8 @@ export function DirectFundingSheet({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const { profile } = useAuth(),
+  const palette = useTheme(),
+    { profile } = useAuth(),
     { toast } = useToast(),
     action = useAction();
   const [draft, updateDraft, clearDraft] = useRetainedDraft(
@@ -139,7 +144,11 @@ export function DirectFundingSheet({
       onClose={close}
       busy={action.busy}
       footer={
-        <Button busy={action.busy} onPress={() => void save()}>
+        <Button
+          busy={action.busy}
+          icon={<Check size={15} color={palette.onPrimary} />}
+          onPress={() => void save()}
+        >
           Authorize work funding
         </Button>
       }
@@ -194,6 +203,7 @@ export function DirectFundingSheet({
           <Button
             variant="ghost"
             disabled={!!frozen.current || action.busy}
+            icon={<X size={15} color={palette.primary} />}
             onPress={() =>
               updateDraft((old) => ({
                 ...old,
@@ -208,6 +218,7 @@ export function DirectFundingSheet({
       <Button
         variant="outline"
         disabled={!!frozen.current || action.busy}
+        icon={<Plus size={15} color={palette.primary} />}
         onPress={() =>
           updateDraft((old) => ({
             ...old,

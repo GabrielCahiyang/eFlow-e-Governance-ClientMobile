@@ -1,4 +1,11 @@
 import * as DocumentPicker from "expo-document-picker";
+import Check from "lucide-react-native/icons/check";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import Trash2 from "lucide-react-native/icons/trash";
+import Upload from "lucide-react-native/icons/upload";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -31,6 +38,7 @@ export function PdfImportSheet({
   onImported: () => Promise<unknown>;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const { toast } = useToast();
   const imp = useNativePdfImport(project, () => void onImported()),
     action = useAction();
@@ -96,7 +104,12 @@ export function PdfImportSheet({
             label="Assigned tasks"
             value={imp.result.assignedTaskCount || 0}
           />
-          <Button onPress={close}>Open project table</Button>
+          <Button
+            icon={<ExternalLink size={16} color={palette.onPrimary} />}
+            onPress={close}
+          >
+            Open project table
+          </Button>
         </Card>
       ) : (
         <>
@@ -181,6 +194,7 @@ export function PdfImportSheet({
                   />
                   <Button
                     variant="danger"
+                    icon={<X size={16} color={palette.onDanger} />}
                     onPress={() =>
                       updateDraft({
                         review: items.filter((_, i) => i !== index),
@@ -193,6 +207,7 @@ export function PdfImportSheet({
               ))}
               <Button
                 disabled={imp.busy || items.some((item) => !item.name.trim())}
+                icon={<Check size={16} color={palette.onPrimary} />}
                 onPress={() => void imp.confirmOffices(items)}
               >
                 Confirm offices and continue
@@ -200,7 +215,11 @@ export function PdfImportSheet({
             </>
           ) : (
             !imp.busy && (
-              <Button busy={action.busy} onPress={() => void select()}>
+              <Button
+                busy={action.busy}
+                icon={<Upload size={16} color={palette.onPrimary} />}
+                onPress={() => void select()}
+              >
                 {imp.session
                   ? "Choose original PDF again"
                   : "Choose PDF · up to 20 MB"}
@@ -208,13 +227,17 @@ export function PdfImportSheet({
             )
           )}
           {!!imp.session && !imp.busy && !officeReview && (
-            <Button onPress={() => void imp.resume()}>
+            <Button
+              icon={<RefreshCw size={16} color={palette.onPrimary} />}
+              onPress={() => void imp.resume()}
+            >
               Resume saved import
             </Button>
           )}
           {!!imp.session && !imp.busy && (
             <Button
               variant="danger"
+              icon={<Trash2 size={16} color={palette.onDanger} />}
               onPress={() =>
                 void action.run(async () => {
                   if (

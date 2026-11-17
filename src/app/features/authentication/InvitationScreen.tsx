@@ -1,5 +1,11 @@
 import { ProjectGuestProfile } from "./ProjectGuestProfile";
 import { useRef, useState } from "react";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import Check from "lucide-react-native/icons/check";
+import LogIn from "lucide-react-native/icons/log-in";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import UserPlus from "lucide-react-native/icons/user-plus";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -37,6 +43,7 @@ export function InvitationScreen({
   onClose: () => void;
 }) {
   const { user, refresh, signOut } = useAuth(),
+    palette = useTheme(),
     action = useAction({ requireAccess: false }),
     attempt = useRef(crypto.randomUUID());
   const invite = useFacts<InvitationMetadata & { id?: string }>(
@@ -169,6 +176,7 @@ export function InvitationScreen({
               </Notice>
               <Button
                 busy={action.busy}
+                icon={<RefreshCw size={16} color={palette.onPrimary} />}
                 onPress={() =>
                   void action.run(async () => {
                     await signOut();
@@ -217,7 +225,17 @@ export function InvitationScreen({
                   editable={!action.busy}
                 />
               )}
-              <Button busy={action.busy} onPress={() => void finish()}>
+              <Button
+                busy={action.busy}
+                icon={
+                  isExisting || user ? (
+                    <Check size={16} color={palette.onPrimary} />
+                  ) : (
+                    <UserPlus size={16} color={palette.onPrimary} />
+                  )
+                }
+                onPress={() => void finish()}
+              >
                 {isExisting || user
                   ? data.project_title
                     ? "Join project"
@@ -228,6 +246,13 @@ export function InvitationScreen({
                 <Button
                   variant="ghost"
                   disabled={action.busy}
+                  icon={
+                    isExisting ? (
+                      <UserPlus size={16} color={palette.primary} />
+                    ) : (
+                      <LogIn size={16} color={palette.primary} />
+                    )
+                  }
                   onPress={() => {
                     setExisting(!isExisting);
                     setPassword("");
@@ -253,7 +278,12 @@ export function InvitationScreen({
         />
       )}{" "}
       {!!action.error && <ErrorState context="action" error={action.error} />}
-      <Button variant="ghost" disabled={action.busy} onPress={onClose}>
+      <Button
+        variant="ghost"
+        disabled={action.busy}
+        icon={<ArrowLeft size={16} color={palette.primary} />}
+        onPress={onClose}
+      >
         Back to eFlow
       </Button>
     </Screen>

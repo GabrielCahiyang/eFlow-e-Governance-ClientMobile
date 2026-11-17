@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -69,6 +72,7 @@ export function ProjectFundingCloseout({
   onChanged: () => Promise<unknown>;
 }) {
   const scope = "project-funding-return:" + project;
+  const palette = useTheme();
   const facts = useFacts(scope + ":" + actor, () => loadFunding(project));
   const draft = useFacts(scope + ":retry:" + actor, () =>
     draftStore.get<Attempt>(actor, scope),
@@ -208,6 +212,7 @@ export function ProjectFundingCloseout({
                   />
                   <Button
                     variant="outline"
+                    icon={<RotateCcw size={16} color={palette.primary} />}
                     disabled={
                       !!pending ||
                       draft.loading ||
@@ -235,6 +240,7 @@ export function ProjectFundingCloseout({
                   <LabelValue label={row.name} value={peso(row.available)} />
                   <Button
                     variant="outline"
+                    icon={<RotateCcw size={16} color={palette.primary} />}
                     disabled={
                       !!pending ||
                       draft.loading ||
@@ -281,6 +287,7 @@ export function ProjectFundingCloseout({
               disabled={
                 draft.loading || !!draft.error || (!pending && !reason.trim())
               }
+              icon={<Check size={16} color={palette.onPrimary} />}
               onPress={() => void save()}
             >
               Confirm return

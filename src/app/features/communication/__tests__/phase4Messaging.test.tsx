@@ -126,3 +126,66 @@ test("deleted messages keep their place and archived messages expose no mutation
   const bubble = view.getByRole("button", { name: /QA Reviewer: Approved/ });
   expect(bubble.props.accessibilityActions).toEqual([]);
 });
+
+test("filter sheet and quick unread pill trigger filter changes cleanly and pinned bar opens info", async () => {
+  const onFilter = jest.fn();
+  const project: Channel = {
+    id: "p",
+    kind: "project",
+    name: "Outreach",
+    projectId: "p",
+    unread: true,
+    lastMessage: "Please review budget",
+    lastMessageAt: "2026-11-10T10:30:00Z",
+  };
+  const view = await render(
+    <ConversationList
+      actor="me"
+      channels={[project]}
+      allChannels={[project]}
+      total={1}
+      query=""
+      onQuery={jest.fn()}
+      filter="all"
+      onFilter={onFilter}
+      onOpen={jest.fn()}
+    />,
+  );
+  await fireEvent.press(
+    view.getByRole("button", { name: "Unread conversations" }),
+  );
+  expect(onFilter).toHaveBeenCalledWith("unread");
+  await fireEvent.press(
+    view.getByRole("button", { name: "Filter conversations" }),
+  );
+  await fireEvent.press(view.getByText("Archived"));
+  expect(onFilter).toHaveBeenCalledWith("archive");
+
+  const onOpenInfo = jest.fn();
+  const pinnedMsg: Message = {
+    id: "pin-1",
+    sender_id: "me",
+    sender_name: "Sender",
+    content: "Bring gate pass",
+    created_at: "2026-11-10T12:00:00Z",
+    pinned_at: "2026-11-10T12:05:00Z",
+  };
+  const thread = await render(
+    <MessageThread
+      actor="me"
+      channel={project}
+      people={[]}
+      messages={[pinnedMsg]}
+      onPin={jest.fn()}
+      onReact={jest.fn()}
+      onRemove={async () => true}
+      onOpenInfo={onOpenInfo}
+    />,
+  );
+  await fireEvent.press(
+    thread.getByRole("button", {
+      name: "View pinned message in Conversation info",
+    }),
+  );
+  expect(onOpenInfo).toHaveBeenCalledTimes(1);
+});

@@ -2,17 +2,21 @@ import { useState, type ReactNode } from "react";
 import {
   Pressable,
   ScrollView,
+  StyleSheet,
   View,
   useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle } from "react-native-svg";
 import Calendar from "lucide-react-native/icons/calendar";
 import UserPlus from "lucide-react-native/icons/user-plus";
+import Users from "lucide-react-native/icons/users";
 import Trash2 from "lucide-react-native/icons/trash";
 import { Button } from "../../components/ui/Button";
 import { BusyIndicator } from "../../components/ui/BusyIndicator";
+import { Empty, Notice } from "../../components/ui/Screen";
 import { SmallProgress } from "../../components/ui/OperationStatus";
 import Activity from "lucide-react-native/icons/activity";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
@@ -22,18 +26,22 @@ import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Plus from "lucide-react-native/icons/plus";
 import Pencil from "lucide-react-native/icons/pencil";
 import Check from "lucide-react-native/icons/check";
+import CircleCheck from "lucide-react-native/icons/circle-check";
+import Clock from "lucide-react-native/icons/clock";
+import Flag from "lucide-react-native/icons/flag";
+import AlertCircle from "lucide-react-native/icons/circle-alert";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import ListCollapse from "lucide-react-native/icons/list-collapse";
+import ListIcon from "lucide-react-native/icons/list";
 import Link2 from "lucide-react-native/icons/link-2";
 import CircleIcon from "lucide-react-native/icons/circle";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import { Text } from "../../components/ui/Typography";
-import { useTheme } from "../../components/ui/Appearance";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { Sheet } from "../../components/ui/Sheet";
 import { statusIndicatorColor } from "../../components/ui/Status";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { isRawEntityId } from "../../shared/entityId";
-import { dateLabel } from "../../components/ui/theme";
+import { dateLabel, withOpacity } from "../../components/ui/theme";
 import { workDay } from "../../../core/web/app/shared/workCalendar";
 import type { WorkPerson } from "../../../core/web/app/features/nested-work/types";
 
@@ -111,11 +119,13 @@ export function CircularProgressRing({
   percent,
   size = 50,
   strokeWidth = 4,
+  onHero = false,
   accessibilityLabel,
 }: {
   percent: number;
   size?: number;
   strokeWidth?: number;
+  onHero?: boolean;
   accessibilityLabel?: string;
 }) {
   const palette = useTheme();
@@ -123,6 +133,9 @@ export function CircularProgressRing({
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.min(100, Math.max(0, Math.round(percent)));
   const strokeDashoffset = circumference - (clamped / 100) * circumference;
+  const trackColor = onHero ? "rgba(255,255,255,0.22)" : palette.border;
+  const fillColor = onHero ? "#94baff" : palette.primary;
+  const textColor = onHero ? "#ffffff" : palette.text;
 
   return (
     <View
@@ -145,17 +158,17 @@ export function CircularProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={palette.border}
+          stroke={trackColor}
           strokeWidth={strokeWidth}
           fill="none"
-          opacity={0.4}
+          opacity={onHero ? 1 : 0.4}
         />
         {clamped > 0 ? (
           <Circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={palette.primary}
+            stroke={fillColor}
             strokeWidth={strokeWidth}
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
@@ -168,7 +181,7 @@ export function CircularProgressRing({
             cx={size / 2}
             cy={strokeWidth / 2 + 1}
             r={strokeWidth / 2 + 1}
-            fill={palette.primary}
+            fill={fillColor}
           />
         )}
       </Svg>
@@ -176,11 +189,318 @@ export function CircularProgressRing({
         style={{
           fontSize: 13,
           fontWeight: "700",
-          color: palette.text,
+          fontVariant: ["tabular-nums"],
+          color: textColor,
         }}
       >
         {clamped}%
       </Text>
+    </View>
+  );
+}
+
+function heroStatusTone(statusCode: string) {
+  const code = statusCode.trim().toLowerCase();
+  if (
+    ["completed", "approved", "active", "done"].includes(code)
+  ) {
+    return {
+      color: "#a2e8c6",
+      bg: "rgba(162,232,198,0.18)",
+      border: "rgba(162,232,198,0.38)",
+      Icon: CircleCheck,
+    };
+  }
+  if (["for_review", "pending_review", "submitted"].includes(code)) {
+    return {
+      color: "#dbcaff",
+      bg: "rgba(219,202,255,0.2)",
+      border: "rgba(219,202,255,0.38)",
+      Icon: ShieldCheck,
+    };
+  }
+  if (["stuck", "blocked", "overdue", "rejected", "denied"].includes(code)) {
+    return {
+      color: "#ffc2b8",
+      bg: "rgba(255,194,184,0.2)",
+      border: "rgba(255,194,184,0.38)",
+      Icon: AlertCircle,
+    };
+  }
+  if (code === "changes_requested") {
+    return {
+      color: "#f6d58b",
+      bg: "rgba(246,213,139,0.2)",
+      border: "rgba(246,213,139,0.38)",
+      Icon: TriangleAlert,
+    };
+  }
+  if (["in_progress", "pending", "on_hold"].includes(code)) {
+    return {
+      color: "#f6d58b",
+      bg: "rgba(246,213,139,0.2)",
+      border: "rgba(246,213,139,0.38)",
+      Icon: Clock,
+    };
+  }
+  return {
+    color: "#94baff",
+    bg: "rgba(148,186,255,0.2)",
+    border: "rgba(148,186,255,0.38)",
+    Icon: Clock,
+  };
+}
+
+function heroPriorityTone(priorityRaw?: string | null) {
+  const code = (priorityRaw || "").trim().toLowerCase();
+  if (code === "high" || code === "urgent") {
+    return {
+      color: "#ffc2b8",
+      bg: "rgba(255,194,184,0.2)",
+      border: "rgba(255,194,184,0.38)",
+    };
+  }
+  if (code === "medium" || code === "normal") {
+    return {
+      color: "#f6d58b",
+      bg: "rgba(246,213,139,0.2)",
+      border: "rgba(246,213,139,0.38)",
+    };
+  }
+  return {
+    color: "#94baff",
+    bg: "rgba(148,186,255,0.2)",
+    border: "rgba(148,186,255,0.38)",
+  };
+}
+
+/** Deep-navy hero summary card displaying progress ring, status, and priority pods with circular Lucide icon chips. */
+export function BentoOverviewHeroCard({
+  title,
+  subtitle,
+  percent,
+  completionAccessibilityLabel,
+  statusLabel,
+  statusCode,
+  priorityLabel: priorityText,
+  priorityRaw,
+  statusAccessibilityLabel,
+  priorityAccessibilityLabel,
+}: {
+  title: string;
+  subtitle?: string;
+  percent?: number;
+  completionAccessibilityLabel?: string;
+  statusLabel: string;
+  statusCode: string;
+  priorityLabel: string;
+  priorityRaw?: string | null;
+  statusAccessibilityLabel?: string;
+  priorityAccessibilityLabel?: string;
+}) {
+  const { isDark } = useAppearance();
+  const { fontScale, width } = useWindowDimensions();
+  const stacked = fontScale > 1.35 || width < 340;
+  const statusSpec = heroStatusTone(statusCode);
+  const prioritySpec = heroPriorityTone(priorityRaw);
+  const StatusIcon = statusSpec.Icon;
+  const gradientColors: readonly [string, string] = isDark
+    ? ["#162452", "#223570"]
+    : ["#00004f", "#0a1f7a"];
+
+  return (
+    <View
+      style={{
+        borderRadius: 22,
+        padding: 16,
+        gap: 14,
+        overflow: "hidden",
+        backgroundColor: gradientColors[0],
+        borderWidth: 1,
+        borderColor: "rgba(148,186,255,0.24)",
+        marginBottom: 12,
+      }}
+    >
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
+
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              lineHeight: 15,
+              fontWeight: "700",
+              letterSpacing: 0.6,
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.78)",
+            }}
+          >
+            {title}
+          </Text>
+          <Text
+            style={{
+              fontSize: 17,
+              lineHeight: 22,
+              fontWeight: "800",
+              color: "#ffffff",
+            }}
+          >
+            {subtitle || statusLabel}
+          </Text>
+        </View>
+        {typeof percent === "number" && (
+          <CircularProgressRing
+            percent={percent}
+            size={52}
+            onHero
+            accessibilityLabel={completionAccessibilityLabel}
+          />
+        )}
+      </View>
+
+      <View
+        style={{
+          flexDirection: stacked ? "column" : "row",
+          gap: 10,
+        }}
+      >
+        <View
+          accessible
+          accessibilityLabel={statusAccessibilityLabel ?? `Status: ${statusLabel}`}
+          style={{
+            flex: stacked ? undefined : 1,
+            minWidth: 0,
+            borderRadius: 16,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            backgroundColor: "rgba(255,255,255,0.12)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.18)",
+          }}
+        >
+          <View
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              backgroundColor: statusSpec.bg,
+              borderWidth: 1,
+              borderColor: statusSpec.border,
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <StatusIcon size={18} color={statusSpec.color} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+            <Text
+              style={{
+                fontSize: 10,
+                lineHeight: 14,
+                fontWeight: "700",
+                letterSpacing: 0.6,
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.75)",
+              }}
+            >
+              STATUS
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                lineHeight: 18,
+                fontWeight: "700",
+                color: "#ffffff",
+              }}
+            >
+              {statusLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View
+          accessible
+          accessibilityLabel={
+            priorityAccessibilityLabel ?? `Priority: ${priorityText}`
+          }
+          style={{
+            flex: stacked ? undefined : 1,
+            minWidth: 0,
+            borderRadius: 16,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            backgroundColor: "rgba(255,255,255,0.12)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.18)",
+          }}
+        >
+          <View
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              backgroundColor: prioritySpec.bg,
+              borderWidth: 1,
+              borderColor: prioritySpec.border,
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Flag size={18} color={prioritySpec.color} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+            <Text
+              style={{
+                fontSize: 10,
+                lineHeight: 14,
+                fontWeight: "700",
+                letterSpacing: 0.6,
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.75)",
+              }}
+            >
+              PRIORITY
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                lineHeight: 18,
+                fontWeight: "700",
+                color: "#ffffff",
+              }}
+            >
+              {priorityText}
+            </Text>
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -215,6 +535,7 @@ export function BentoActionButtons({
       style={[
         {
           flexDirection: fontScale > 1.8 ? "column" : "row",
+          flexWrap: "wrap",
           gap: 10,
           marginVertical: 10,
         },
@@ -223,61 +544,35 @@ export function BentoActionButtons({
     >
       {validActions.map((action, index) => {
         const isPrimary = action.variant === "primary";
-        const bg = isPrimary ? palette.primary : palette.surface;
-        const border = isPrimary ? palette.primary : palette.border;
-        const textColor = isPrimary ? palette.onPrimary : palette.text;
-        const iconColor = isPrimary ? palette.onPrimary : palette.text;
+        const iconColor = isPrimary ? palette.onPrimary : palette.primary;
+        const icon =
+          action.icon === "pencil" ? (
+            <Pencil size={16} color={iconColor} strokeWidth={2.2} />
+          ) : action.icon === "check" ? (
+            <Check size={16} color={iconColor} strokeWidth={2.4} />
+          ) : action.icon === "plus" ? (
+            <Plus size={16} color={iconColor} strokeWidth={2.2} />
+          ) : action.icon === "sliders" ? (
+            <SlidersHorizontal size={16} color={iconColor} strokeWidth={2.2} />
+          ) : undefined;
 
         return (
-          <Pressable
+          <Button
             key={`${action.label}-${index}`}
-            accessibilityRole="button"
+            variant={isPrimary ? "primary" : "outline"}
             accessibilityLabel={action.accessibilityLabel || action.label}
-            accessibilityState={{
-              disabled: action.disabled,
-              busy: action.busy,
-            }}
-            disabled={action.disabled || action.busy}
+            disabled={action.disabled}
+            busy={action.busy}
+            icon={icon}
             onPress={action.onPress}
-            style={({ pressed }) => ({
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              minHeight: 44,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              borderRadius: 12,
-              backgroundColor: bg,
-              borderWidth: 1,
-              borderColor: border,
-              opacity: action.disabled ? 0.5 : pressed ? 0.8 : 1,
-            })}
+            style={{
+              flexGrow: 1,
+              flexBasis: fontScale > 1.45 ? undefined : 155,
+              paddingHorizontal: 14,
+            }}
           >
-            {action.icon === "pencil" && (
-              <Pencil size={15} color={iconColor} strokeWidth={2.2} />
-            )}
-            {action.icon === "check" && (
-              <Check size={16} color={iconColor} strokeWidth={2.4} />
-            )}
-            {action.icon === "plus" && (
-              <Plus size={16} color={iconColor} strokeWidth={2.2} />
-            )}
-            {action.icon === "sliders" && (
-              <SlidersHorizontal size={15} color={iconColor} strokeWidth={2.2} />
-            )}
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: textColor,
-              }}
-            >
-              {action.label}
-            </Text>
-          </Pressable>
+            {action.label}
+          </Button>
         );
       })}
     </View>
@@ -300,40 +595,18 @@ export function BentoEditButton({
 }) {
   const palette = useTheme();
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled || busy}
-      hitSlop={6}
-      accessibilityRole="button"
+    <Button
+      variant="outline"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: disabled || busy, busy }}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        minHeight: 48,
-        paddingHorizontal: 11,
-        paddingVertical: 6,
-        borderRadius: 10,
-        backgroundColor: palette.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
-      })}
+      onPress={onPress}
+      disabled={disabled}
+      busy={busy}
+      icon={<Pencil size={16} color={palette.primary} strokeWidth={2.2} />}
+      style={{ paddingHorizontal: 12, gap: 8 }}
+      textStyle={{ fontSize: 13 }}
     >
-      {busy ? <BusyIndicator size={14} color={palette.text} /> : <Pencil size={14} color={palette.text} strokeWidth={2.2} />}
-      <Text
-        numberOfLines={1}
-        style={{
-          fontSize: 13,
-          fontWeight: "600",
-          color: palette.text,
-        }}
-      >
-        Edit
-      </Text>
-    </Pressable>
+      Edit
+    </Button>
   );
 }
 
@@ -341,10 +614,21 @@ export function BentoDeleteButton({ onPress, accessibilityLabel, disabled, busy 
   onPress: () => void; accessibilityLabel: string; disabled?: boolean; busy?: boolean;
 }) {
   const palette = useTheme();
-  return <Button variant="outline" accessibilityLabel={accessibilityLabel} onPress={onPress}
-    disabled={disabled} busy={busy} icon={<Trash2 size={14} color={palette.danger} />}
-    style={{ minHeight: 48, paddingHorizontal: 11, borderRadius: 10 }}
-    textStyle={{ fontSize: 13, color: palette.danger }}>Delete</Button>;
+  return (
+    <Button
+      variant="outline"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      disabled={disabled}
+      busy={busy}
+      icon={<Trash2 size={16} color={palette.danger} />}
+      iconBadgeColor={palette.dangerSoft}
+      style={{ paddingHorizontal: 12, gap: 8 }}
+      textStyle={{ fontSize: 13, color: palette.danger }}
+    >
+      Delete
+    </Button>
+  );
 }
 
 export interface DependencyItemData {
@@ -370,6 +654,7 @@ export function BentoDependenciesCard({
   onPressItem?: (item: DependencyItemData) => void;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   const total = items.length + missingCount;
   if (total === 0) return null;
 
@@ -379,6 +664,7 @@ export function BentoDependenciesCard({
   const allComplete = pendingCount === undefined
     ? completedCount === total && missingCount === 0
     : pendingCount === 0;
+  const insetSurface = isDark ? "#0f1733" : palette.background;
 
   return (
     <View
@@ -386,9 +672,9 @@ export function BentoDependenciesCard({
         backgroundColor: palette.surface,
         borderWidth: 1,
         borderColor: palette.border,
-        borderRadius: 14,
-        padding: 14,
-        gap: 10,
+        borderRadius: 20,
+        padding: 16,
+        gap: 12,
         marginBottom: 12,
       }}
     >
@@ -401,58 +687,92 @@ export function BentoDependenciesCard({
           flexWrap: "wrap",
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Link2 size={14} color={palette.muted} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: palette.primarySoft,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Link2 size={16} color={palette.primary} />
+          </View>
           <Text
             style={{
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: "700",
-              color: palette.muted,
+              color: palette.text,
               letterSpacing: 0.4,
             }}
           >
             DEPENDENCIES
           </Text>
         </View>
-        <Text
+        <View
           style={{
-            fontSize: 12,
-            fontWeight: "600",
-            color: allComplete ? palette.success : palette.warning,
+            backgroundColor: allComplete
+              ? palette.successSoft
+              : palette.warningSoft,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 999,
           }}
         >
-          {pendingCount === undefined
-            ? `${completedCount} of ${total} complete`
-            : `${pendingCount} pending`}
-        </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "700",
+              fontVariant: ["tabular-nums"],
+              color: allComplete ? palette.success : palette.warning,
+            }}
+          >
+            {pendingCount === undefined
+              ? `${completedCount} of ${total} complete`
+              : `${pendingCount} pending`}
+          </Text>
+        </View>
       </View>
 
-      <View style={{ gap: 6 }}>
-        {items.map((item) => {
+      <View
+        style={{
+          backgroundColor: insetSurface,
+          borderWidth: 1,
+          borderColor: palette.border,
+          borderRadius: 16,
+          paddingHorizontal: 12,
+          paddingVertical: 2,
+        }}
+      >
+        {items.map((item, idx) => {
           const isDone = Boolean(item.completed || item.status === "completed");
           const rowContent = (
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 8,
-                paddingVertical: 6,
-                paddingHorizontal: 8,
-                borderRadius: 8,
-                backgroundColor: palette.background,
+                gap: 10,
+                paddingVertical: 10,
+                borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
+                borderTopColor: palette.border,
               }}
             >
               {isDone ? (
-                <Check size={14} color={palette.success} strokeWidth={2.5} />
+                <CircleCheck size={16} color={palette.success} strokeWidth={2.2} />
               ) : (
-                <CircleIcon size={13} color={palette.muted} strokeWidth={2} />
+                <CircleIcon size={16} color={palette.mutedLabel} strokeWidth={2} />
               )}
               <Text
                 numberOfLines={1}
                 style={{
                   flex: 1,
-                  fontSize: 13,
-                  fontWeight: "500",
+                  fontSize: 13.5,
+                  fontWeight: isDone ? "500" : "600",
                   color: isDone ? palette.muted : palette.text,
                   textDecorationLine: isDone ? "line-through" : "none",
                 }}
@@ -460,7 +780,7 @@ export function BentoDependenciesCard({
                 {item.title}
               </Text>
               {onPressItem && (
-                <ChevronRight size={14} color={palette.muted} />
+                <ChevronRight size={15} color={palette.mutedLabel} />
               )}
             </View>
           );
@@ -487,7 +807,9 @@ export function BentoDependenciesCard({
             style={{
               fontSize: 12,
               color: palette.muted,
-              paddingHorizontal: 4,
+              paddingVertical: 8,
+              borderTopWidth: items.length > 0 ? StyleSheet.hairlineWidth : 0,
+              borderTopColor: palette.border,
             }}
           >
             +{missingCount} restricted or unavailable prerequisite
@@ -515,6 +837,7 @@ export function BentoBlockerCard({
   onPressActivity?: () => void;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   if (!blocker) return null;
 
   const metaParts = [
@@ -526,17 +849,47 @@ export function BentoBlockerCard({
     <View
       accessibilityRole="alert"
       style={{
-        backgroundColor: palette.dangerSoft || "rgba(239, 68, 68, 0.1)",
+        backgroundColor: palette.dangerSoft,
         borderWidth: 1,
-        borderColor: palette.danger,
-        borderRadius: 14,
+        borderColor: withOpacity(palette.danger, isDark ? 0.3 : 0.2),
+        borderRadius: 18,
         padding: 14,
-        gap: 6,
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 12,
         marginBottom: 12,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <TriangleAlert size={16} color={palette.danger} />
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          {
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            borderWidth: 1,
+            backgroundColor: isDark
+              ? withOpacity(palette.danger, 0.18)
+              : "#ffffff",
+            borderColor: withOpacity(palette.danger, isDark ? 0.32 : 0.22),
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          },
+          !isDark && {
+            shadowColor: "#101849",
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 1,
+          },
+        ]}
+      >
+        <AlertCircle size={18} color={palette.danger} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <Text
           style={{
             fontSize: 12,
@@ -547,7 +900,6 @@ export function BentoBlockerCard({
         >
           WORK BLOCKED
         </Text>
-      </View>
       <Text
         selectable
         style={{
@@ -599,6 +951,7 @@ export function BentoBlockerCard({
           <ChevronRight size={14} color={palette.danger} />
         </Pressable>
       )}
+      </View>
     </View>
   );
 }
@@ -619,24 +972,57 @@ export function BentoProjectOnHoldCard({
   isTaskLead?: boolean;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
 
   return (
     <View
       accessibilityRole="alert"
       style={[
         {
-          backgroundColor: palette.warningSoft || "rgba(245, 158, 11, 0.12)",
+          backgroundColor: palette.warningSoft,
           borderWidth: 1,
-          borderColor: palette.warning || "#F59E0B",
-          borderRadius: 14,
+          borderColor: withOpacity(palette.warning, isDark ? 0.3 : 0.2),
+          borderRadius: 18,
           padding: 14,
-          gap: 6,
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 12,
           marginTop: 8,
           marginBottom: 8,
         },
         style,
       ]}
     >
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          {
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            borderWidth: 1,
+            backgroundColor: isDark
+              ? withOpacity(palette.warning, 0.18)
+              : "#ffffff",
+            borderColor: withOpacity(palette.warning, isDark ? 0.32 : 0.22),
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          },
+          !isDark && {
+            shadowColor: "#101849",
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 1,
+          },
+        ]}
+      >
+        <TriangleAlert size={18} color={palette.warning} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
       <View
         style={{
           flexDirection: "row",
@@ -645,8 +1031,6 @@ export function BentoProjectOnHoldCard({
           gap: 6,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
-          <TriangleAlert size={16} color={palette.warning || "#F59E0B"} />
           <Text
             style={{
               fontSize: 14,
@@ -657,20 +1041,23 @@ export function BentoProjectOnHoldCard({
           >
             {waitingForTask ? "Waiting for the parent task" : "Project on hold"}
           </Text>
-        </View>
         <View
           style={{
-            backgroundColor: palette.warningSoft || "rgba(245, 158, 11, 0.18)",
+            backgroundColor: isDark
+              ? withOpacity(palette.warning, 0.16)
+              : "#ffffff",
+            borderWidth: 1,
+            borderColor: withOpacity(palette.warning, isDark ? 0.3 : 0.22),
             paddingHorizontal: 8,
             paddingVertical: 2,
-            borderRadius: 6,
+            borderRadius: 999,
           }}
         >
           <Text
             style={{
               fontSize: 11,
               fontWeight: "600",
-              color: palette.warning || "#D97706",
+              color: palette.warning,
               letterSpacing: 0.3,
             }}
           >
@@ -744,6 +1131,7 @@ export function BentoProjectOnHoldCard({
           <ChevronRight size={14} color={palette.primary} />
         </Pressable>
       )}
+      </View>
     </View>
   );
 }
@@ -758,7 +1146,9 @@ export function BentoScheduleCards({
   workTimezone?: string;
 }) {
   const palette = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const { isDark } = useAppearance();
+  const { fontScale, width } = useWindowDimensions();
+  const stacked = fontScale > 1.35 || width < 340;
   const format = (value?: string | null) => {
     if (!value) return "—";
     if (!workTimezone)
@@ -769,75 +1159,110 @@ export function BentoScheduleCards({
     }).format(day * 86400000);
   };
 
+  const tileSurface = isDark ? "#1a274d" : palette.glassSurface;
+  const gradTop = isDark ? withOpacity(palette.primary, 0.1) : palette.glassTop;
+  const gradBottom = isDark ? "rgba(10,16,40,0.22)" : palette.glassBottom;
+  const tileEdge = isDark ? palette.border : palette.glassEdge;
+  const badgeBg = isDark ? withOpacity(palette.primary, 0.18) : "#ffffff";
+  const badgeBorder = withOpacity(palette.primary, isDark ? 0.3 : 0.18);
+
+  const renderDateTile = (label: string, formatted: string) => (
+    <View
+      style={[
+        {
+          flex: stacked ? undefined : 1,
+          minWidth: 0,
+          backgroundColor: tileSurface,
+          borderWidth: 1.5,
+          borderColor: tileEdge,
+          borderRadius: 20,
+          padding: 14,
+          justifyContent: "space-between",
+          gap: 12,
+          overflow: "hidden",
+        },
+        !isDark && {
+          shadowColor: "#00004f",
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 2,
+        },
+      ]}
+    >
+      <LinearGradient
+        colors={[gradTop, gradBottom]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
+      <View
+        accessible={false}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            borderWidth: 1,
+            backgroundColor: badgeBg,
+            borderColor: badgeBorder,
+            alignItems: "center",
+            justifyContent: "center",
+            alignSelf: "flex-start",
+          },
+          !isDark && {
+            shadowColor: "#00004f",
+            shadowOpacity: 0.07,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 1,
+          },
+        ]}
+      >
+        <Calendar size={18} color={palette.primary} />
+      </View>
+      <View style={{ gap: 2 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            lineHeight: 15,
+            color: palette.mutedLabel,
+            fontWeight: "700",
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: 16,
+            lineHeight: 21,
+            fontWeight: "800",
+            fontVariant: ["tabular-nums"],
+            color: palette.text,
+          }}
+        >
+          {formatted}
+        </Text>
+      </View>
+    </View>
+  );
+
   return (
     <View
       style={{
-        flexDirection: fontScale > 1.8 ? "column" : "row",
-        gap: 12,
+        flexDirection: stacked ? "column" : "row",
+        gap: 10,
         marginBottom: 12,
       }}
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: palette.border,
-          borderRadius: 14,
-          padding: 14,
-          gap: 6,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Calendar size={14} color={palette.mutedLabel} />
-          <Text
-            style={{
-              fontSize: 12,
-              color: palette.mutedLabel,
-              fontWeight: "500",
-            }}
-          >
-            Start date
-          </Text>
-        </View>
-        <Text
-          numberOfLines={1}
-          style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-        >
-          {format(startDate)}
-        </Text>
-      </View>
-
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: palette.border,
-          borderRadius: 14,
-          padding: 14,
-          gap: 6,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Calendar size={14} color={palette.mutedLabel} />
-          <Text
-            style={{
-              fontSize: 12,
-              color: palette.mutedLabel,
-              fontWeight: "500",
-            }}
-          >
-            Due date
-          </Text>
-        </View>
-        <Text
-          numberOfLines={1}
-          style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-        >
-          {format(dueDate)}
-        </Text>
-      </View>
+      {renderDateTile("Start date", format(startDate))}
+      {renderDateTile("Due date", format(dueDate))}
     </View>
   );
 }
@@ -898,9 +1323,11 @@ export function ContributorsSheet({
             </View>
           ))
         ) : (
-          <Text style={{ color: palette.mutedLabel, paddingVertical: 12 }}>
-            No contributors assigned to this task.
-          </Text>
+          <Empty
+            compact
+            kind="people"
+            title="No contributors assigned to this task"
+          />
         )}
       </ScrollView>
     </Sheet>
@@ -921,9 +1348,11 @@ export function BentoAssignedTeamCard({
   peoplePending?: boolean;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   const [sheetOpen, setSheetOpen] = useState(false);
   const visibleContributors = contributors.slice(0, 3);
   const extraCount = Math.max(0, contributors.length - 3);
+  const insetSurface = isDark ? "#0f1733" : palette.background;
 
   let previewText = "No contributors assigned";
   if (contributors.length > 0) {
@@ -945,7 +1374,7 @@ export function BentoAssignedTeamCard({
           backgroundColor: palette.surface,
           borderWidth: 1,
           borderColor: palette.border,
-          borderRadius: 14,
+          borderRadius: 20,
           padding: 16,
           gap: 14,
           marginBottom: 12,
@@ -956,13 +1385,32 @@ export function BentoAssignedTeamCard({
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
+            gap: 8,
+            flexWrap: "wrap",
           }}
         >
-          <Text
-            style={{ fontSize: 16, fontWeight: "700", color: palette.text }}
-          >
-            Assigned team
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: palette.primarySoft,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Users size={16} color={palette.primary} />
+            </View>
+            <Text
+              style={{ fontSize: 16, fontWeight: "700", color: palette.text }}
+            >
+              Assigned team
+            </Text>
+          </View>
           {!!onChoosePeople && (
             <Pressable
               accessibilityRole="button"
@@ -970,15 +1418,40 @@ export function BentoAssignedTeamCard({
               disabled={peoplePending}
               accessibilityState={{ disabled: peoplePending, busy: peoplePending }}
               onPress={onChoosePeople}
-              style={{
+              style={({ pressed }) => ({
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 5,
-                minHeight: 36,
-                paddingHorizontal: 8,
-              }}
+                gap: 7,
+                minHeight: 38,
+                paddingLeft: 8,
+                paddingRight: 12,
+                paddingVertical: 6,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: palette.border,
+                backgroundColor: palette.surface,
+                opacity: peoplePending ? 0.6 : pressed ? 0.78 : 1,
+              })}
             >
-              {peoplePending ? <BusyIndicator size={14} color={palette.primary} /> : <UserPlus size={14} color={palette.primary} />}
+              <View
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                  backgroundColor: palette.primarySoft,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {peoplePending ? (
+                  <BusyIndicator size={12} color={palette.primary} />
+                ) : (
+                  <UserPlus size={12} color={palette.primary} />
+                )}
+              </View>
               <Text
                 style={{
                   fontSize: 13,
@@ -1007,20 +1480,23 @@ export function BentoAssignedTeamCard({
           </View>
         </View>
 
-        <View
-          style={{ height: 1, backgroundColor: palette.border, opacity: 0.6 }}
-        />
-
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Contributors: ${previewText}, view all ${contributors.length} contributors`}
           onPress={() => setSheetOpen(true)}
-          style={{
+          style={({ pressed }) => ({
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-            minHeight: 44,
-          }}
+            minHeight: 52,
+            backgroundColor: insetSurface,
+            borderColor: palette.border,
+            borderWidth: 1,
+            borderRadius: 16,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            opacity: pressed ? 0.8 : 1,
+          })}
         >
           <View style={{ gap: 3, flex: 1, paddingRight: 8 }}>
             <View
@@ -1069,7 +1545,7 @@ export function BentoAssignedTeamCard({
                     style={{
                       marginLeft: index === 0 ? 0 : -8,
                       borderWidth: 2,
-                      borderColor: palette.surface,
+                      borderColor: insetSurface,
                       borderRadius: 999,
                       zIndex: visibleContributors.length - index,
                     }}
@@ -1082,7 +1558,7 @@ export function BentoAssignedTeamCard({
                     style={{
                       marginLeft: -8,
                       borderWidth: 2,
-                      borderColor: palette.surface,
+                      borderColor: insetSurface,
                       borderRadius: 999,
                       backgroundColor: palette.primarySoft,
                       minWidth: 28,
@@ -1145,10 +1621,13 @@ export function BentoSubtasksCard({
   actionsPending?: boolean;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   const resolveStatus = useWorkStatus();
   const [allOpen, setAllOpen] = useState(false);
+  const insetSurface = isDark ? "#0f1733" : palette.background;
+
   const rows = (items: readonly SubtaskItemData[]) => (
-    <View style={{ gap: 2 }}>
+    <View>
       {items.map((item, index) => {
         const label = resolveStatus(item.status, item.customStatusId).label;
         return (
@@ -1160,20 +1639,21 @@ export function BentoSubtasksCard({
               setAllOpen(false);
               onPressSubtask(item);
             }}
-            style={{
+            style={({ pressed }) => ({
               flexDirection: "row",
               alignItems: "center",
-              paddingVertical: 10,
-              gap: 6,
-              borderTopWidth: index === 0 ? 0 : 0.5,
+              paddingVertical: 11,
+              gap: 8,
+              borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
               borderColor: palette.border,
-            }}
+              opacity: pressed ? 0.78 : 1,
+            })}
           >
-            <View style={{ gap: 3, flex: 1 }}>
-              <Text numberOfLines={2} style={{ fontSize: 15, fontWeight: "600", color: palette.text }}>
+            <View style={{ gap: 2, flex: 1 }}>
+              <Text numberOfLines={2} style={{ fontSize: 14.5, fontWeight: "600", color: palette.text }}>
                 {item.title}
               </Text>
-              <Text style={{ fontSize: 12, color: statusIndicatorColor(item.status, palette) }}>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: statusIndicatorColor(item.status, palette) }}>
                 {label}
               </Text>
             </View>
@@ -1193,7 +1673,7 @@ export function BentoSubtasksCard({
         backgroundColor: palette.surface,
         borderWidth: 1,
         borderColor: palette.border,
-        borderRadius: 14,
+        borderRadius: 20,
         padding: 16,
         gap: 12,
         marginBottom: 12,
@@ -1204,9 +1684,25 @@ export function BentoSubtasksCard({
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 8,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: palette.primarySoft,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <ListIcon size={16} color={palette.primary} />
+          </View>
           <Text
             style={{ fontSize: 16, fontWeight: "700", color: palette.text }}
           >
@@ -1224,6 +1720,7 @@ export function BentoSubtasksCard({
               style={{
                 fontSize: 12,
                 fontWeight: "700",
+                fontVariant: ["tabular-nums"],
                 color: palette.primary,
               }}
             >
@@ -1239,18 +1736,43 @@ export function BentoSubtasksCard({
             disabled={actionsPending}
             accessibilityState={{ disabled: actionsPending, busy: actionsPending }}
             onPress={onAddSubtask}
-            style={{
+            style={({ pressed }) => ({
               flexDirection: "row",
               alignItems: "center",
-              gap: 4,
-              minHeight: 36,
-              paddingHorizontal: 8,
-            }}
+              gap: 6,
+              minHeight: 38,
+              paddingLeft: 8,
+              paddingRight: 12,
+              paddingVertical: 6,
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: palette.border,
+              backgroundColor: palette.surface,
+              opacity: actionsPending ? 0.6 : pressed ? 0.78 : 1,
+            })}
           >
-            {actionsPending ? <BusyIndicator size={14} color={palette.primary} /> : <Plus size={15} color={palette.primary} />}
+            <View
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: palette.primarySoft,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {actionsPending ? (
+                <BusyIndicator size={12} color={palette.primary} />
+              ) : (
+                <Plus size={12} color={palette.primary} strokeWidth={2.4} />
+              )}
+            </View>
             <Text
               style={{
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: "600",
                 color: palette.primary,
               }}
@@ -1262,7 +1784,16 @@ export function BentoSubtasksCard({
       </View>
 
       {subtasks.length > 0 ? (
-        <View>
+        <View
+          style={{
+            backgroundColor: insetSurface,
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 16,
+            paddingHorizontal: 14,
+            paddingVertical: 2,
+          }}
+        >
           {rows(subtasks.slice(0, 3))}
           {subtasks.length > 3 && (
             <Pressable
@@ -1274,16 +1805,15 @@ export function BentoSubtasksCard({
                 alignItems: "center",
                 justifyContent: "space-between",
                 minHeight: 44,
-                paddingTop: 10,
-                paddingBottom: 2,
-                borderTopWidth: 0.5,
+                paddingVertical: 10,
+                borderTopWidth: StyleSheet.hairlineWidth,
                 borderColor: palette.border,
                 opacity: pressed ? 0.7 : 1,
               })}
             >
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: 13.5,
                   fontWeight: "600",
                   color: palette.primary,
                 }}
@@ -1295,17 +1825,15 @@ export function BentoSubtasksCard({
           )}
         </View>
       ) : (
-        <Text
-          style={{
-            fontSize: 13,
-            color: palette.mutedLabel,
-            paddingVertical: 8,
-          }}
-        >
-          {title === "Child subtasks"
-            ? "No child subtasks yet."
-            : "No subtasks yet."}
-        </Text>
+        <Empty
+          compact
+          kind="tasks"
+          title={
+            title === "Child subtasks"
+              ? "No child subtasks yet"
+              : "No subtasks yet"
+          }
+        />
       )}
       {allOpen && (
         <Sheet open title={title} onClose={() => setAllOpen(false)}>
@@ -1313,6 +1841,179 @@ export function BentoSubtasksCard({
         </Sheet>
       )}
     </View>
+  );
+}
+
+function SupportingTile({
+  icon,
+  accent,
+  soft,
+  title,
+  subtitle,
+  onPress,
+  fullWidth = false,
+  minHeight = 104,
+}: {
+  icon: ReactNode;
+  accent: string;
+  soft: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  fullWidth?: boolean;
+  minHeight?: number;
+}) {
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  const chipBg = isDark ? withOpacity(accent, 0.18) : "#ffffff";
+  const chipBorder = withOpacity(accent, isDark ? 0.3 : 0.18);
+  const gradTop = isDark ? withOpacity(palette.primary, 0.08) : palette.glassTop;
+  const gradBottom = isDark
+    ? "rgba(10,16,40,0.22)"
+    : withOpacity(soft, 0.85);
+  const surfaceBg = isDark ? "#172344" : palette.surface;
+
+  if (fullWidth) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, ${subtitle}`}
+        onPress={onPress}
+        style={({ pressed }) => ({
+          backgroundColor: surfaceBg,
+          borderWidth: 1,
+          borderColor: palette.border,
+          borderRadius: 20,
+          padding: 14,
+          minHeight: 60,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          overflow: "hidden",
+          opacity: pressed ? 0.82 : 1,
+        })}
+      >
+        <LinearGradient
+          colors={[gradTop, gradBottom]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            {
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              borderWidth: 1,
+              backgroundColor: chipBg,
+              borderColor: chipBorder,
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            },
+            !isDark && {
+              shadowColor: "#00004f",
+              shadowOpacity: 0.06,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 1,
+            },
+          ]}
+        >
+          {icon}
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: palette.text }}>
+            {title}
+          </Text>
+          <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+            {subtitle}
+          </Text>
+        </View>
+        <ChevronRight size={16} color={palette.mutedLabel} />
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}, ${subtitle}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flex: 1,
+        minWidth: 0,
+        backgroundColor: surfaceBg,
+        borderWidth: 1,
+        borderColor: palette.border,
+        borderRadius: 20,
+        padding: 14,
+        minHeight,
+        justifyContent: "space-between",
+        gap: 12,
+        overflow: "hidden",
+        opacity: pressed ? 0.82 : 1,
+      })}
+    >
+      <LinearGradient
+        colors={[gradTop, gradBottom]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <View
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            {
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              borderWidth: 1,
+              backgroundColor: chipBg,
+              borderColor: chipBorder,
+              alignItems: "center",
+              justifyContent: "center",
+            },
+            !isDark && {
+              shadowColor: "#00004f",
+              shadowOpacity: 0.06,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 1,
+            },
+          ]}
+        >
+          {icon}
+        </View>
+        <ChevronRight size={15} color={palette.mutedLabel} />
+      </View>
+      <View style={{ gap: 2 }}>
+        <Text
+          style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
+        >
+          {title}
+        </Text>
+        <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
+          {subtitle}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -1328,119 +2029,52 @@ export function BentoSupportingGrid({
   onPressFiles: () => void;
 }) {
   const palette = useTheme();
-  const { fontScale } = useWindowDimensions();
-
-  const cardStyle = {
-    flex: 1,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    padding: 14,
-    minHeight: fontScale > 1.5 ? 104 : 92,
-    justifyContent: "space-between" as const,
-  };
+  const { fontScale, width } = useWindowDimensions();
+  const stacked = fontScale > 1.8 || width < 340;
+  const minHeight = fontScale > 1.5 ? 112 : 104;
 
   return (
-    <View style={{ gap: 12, marginBottom: 16 }}>
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Activity, Updates & history"
+    <View style={{ gap: 10, marginBottom: 16 }}>
+      <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
+        <SupportingTile
+          icon={<Activity size={18} color={palette.blue} />}
+          accent={palette.blue}
+          soft={palette.blueSoft}
+          title="Activity"
+          subtitle="Updates & history"
           onPress={onPressActivity}
-          style={cardStyle}
-        >
-          <Activity size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
-              Activity
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Updates & history
-            </Text>
-          </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Evidence & review, Submissions"
+          minHeight={minHeight}
+        />
+        <SupportingTile
+          icon={<ShieldCheck size={18} color={palette.review} />}
+          accent={palette.review}
+          soft={palette.reviewSoft}
+          title="Evidence & review"
+          subtitle="Submissions"
           onPress={onPressReview}
-          style={cardStyle}
-        >
-          <ShieldCheck size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
-              Evidence & review
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Submissions
-            </Text>
-          </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
-        </Pressable>
+          minHeight={minHeight}
+        />
       </View>
 
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Funding, Financial records"
+      <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
+        <SupportingTile
+          icon={<Wallet size={18} color={palette.success} />}
+          accent={palette.success}
+          soft={palette.successSoft}
+          title="Funding"
+          subtitle="Financial records"
           onPress={onPressFunding}
-          style={cardStyle}
-        >
-          <Wallet size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
-              Funding
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Financial records
-            </Text>
-          </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Files, Attachments"
+          minHeight={minHeight}
+        />
+        <SupportingTile
+          icon={<Files size={18} color={palette.primary} />}
+          accent={palette.primary}
+          soft={palette.glassSurface}
+          title="Files"
+          subtitle="Attachments"
           onPress={onPressFiles}
-          style={cardStyle}
-        >
-          <Files size={20} color={palette.text} />
-          <View style={{ gap: 2, marginTop: 8 }}>
-            <Text
-              style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-            >
-              Files
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Attachments
-            </Text>
-          </View>
-          <ChevronRight
-            size={14}
-            color={palette.mutedLabel}
-            style={{ alignSelf: "flex-end" }}
-          />
-        </Pressable>
+          minHeight={minHeight}
+        />
       </View>
     </View>
   );
@@ -1451,145 +2085,74 @@ export function BentoSubtaskSupportingGrid({
   onPressReview,
   onPressFunding,
   onPressFiles,
-  onPressPlanning,
   showFunding = true,
 }: {
   onPressActivity?: () => void;
   onPressReview: () => void;
   onPressFunding?: () => void;
   onPressFiles: () => void;
-  onPressPlanning: () => void;
   showFunding?: boolean;
 }) {
   const palette = useTheme();
-  const { fontScale } = useWindowDimensions();
-
-  const cardStyle = {
-    flex: 1,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    padding: 14,
-    minHeight: fontScale > 1.5 ? 104 : 92,
-    justifyContent: "space-between" as const,
-  };
-
-  const renderTile = (
-    icon: ReactNode,
-    title: string,
-    subtitle: string,
-    onPress: () => void,
-  ) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${title}, ${subtitle}`}
-      onPress={onPress}
-      style={({ pressed }) => [cardStyle, pressed && { opacity: 0.78 }]}
-    >
-      {icon}
-      <View style={{ gap: 2, marginTop: 8 }}>
-        <Text style={{ fontSize: 15, fontWeight: "700", color: palette.text }}>
-          {title}
-        </Text>
-        <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-          {subtitle}
-        </Text>
-      </View>
-      <ChevronRight
-        size={14}
-        color={palette.mutedLabel}
-        style={{ alignSelf: "flex-end" }}
-      />
-    </Pressable>
-  );
+  const { fontScale, width } = useWindowDimensions();
+  const stacked = fontScale > 1.8 || width < 340;
+  const minHeight = fontScale > 1.5 ? 112 : 104;
 
   const hasFunding = showFunding && !!onPressFunding;
-  const activityTile = onPressActivity
-    ? renderTile(
-        <Activity size={20} color={palette.text} />,
-        "Activity",
-        "Updates & history",
-        onPressActivity,
-      )
-    : null;
-  const reviewTile = renderTile(
-    <ShieldCheck size={20} color={palette.text} />,
-    "Evidence & review",
-    "Submissions",
-    onPressReview,
+  const activityTile = onPressActivity ? (
+    <SupportingTile
+      icon={<Activity size={18} color={palette.blue} />}
+      accent={palette.blue}
+      soft={palette.blueSoft}
+      title="Activity"
+      subtitle="Updates & history"
+      onPress={onPressActivity}
+      minHeight={minHeight}
+    />
+  ) : null;
+  const reviewTile = (
+    <SupportingTile
+      icon={<ShieldCheck size={18} color={palette.review} />}
+      accent={palette.review}
+      soft={palette.reviewSoft}
+      title="Evidence & review"
+      subtitle="Submissions"
+      onPress={onPressReview}
+      minHeight={minHeight}
+    />
   );
-  const fundingTile = hasFunding
-    ? renderTile(
-        <Wallet size={20} color={palette.text} />,
-        "Funding",
-        "Financial records",
-        onPressFunding!,
-      )
-    : null;
-  const filesTile = renderTile(
-    <Files size={20} color={palette.text} />,
-    "Files",
-    "Attachments",
-    onPressFiles,
-  );
-  const planningTile = renderTile(
-    <ListCollapse size={20} color={palette.text} />,
-    "Planning details",
-    "Additional fields",
-    onPressPlanning,
+  const fundingTile = hasFunding ? (
+    <SupportingTile
+      icon={<Wallet size={18} color={palette.success} />}
+      accent={palette.success}
+      soft={palette.successSoft}
+      title="Funding"
+      subtitle="Financial records"
+      onPress={onPressFunding!}
+      minHeight={minHeight}
+    />
+  ) : null;
+  const filesTile = (
+    <SupportingTile
+      icon={<Files size={18} color={palette.primary} />}
+      accent={palette.primary}
+      soft={palette.glassSurface}
+      title="Files"
+      subtitle="Attachments"
+      onPress={onPressFiles}
+      minHeight={minHeight}
+    />
   );
 
   if (activityTile && hasFunding) {
     return (
-      <View style={{ gap: 12, marginBottom: 16 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Planning details, Additional fields"
-          onPress={onPressPlanning}
-          style={({ pressed }) => ({
-            backgroundColor: palette.surface,
-            borderWidth: 1,
-            borderColor: palette.border,
-            borderRadius: 14,
-            padding: 14,
-            minHeight: 56,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            opacity: pressed ? 0.78 : 1,
-          })}
-        >
-          <View
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              backgroundColor: palette.primarySoft,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <ListCollapse size={18} color={palette.primary} />
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: palette.text }}>
-              Planning details
-            </Text>
-            <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-              Additional fields
-            </Text>
-          </View>
-          <ChevronRight size={16} color={palette.mutedLabel} />
-        </Pressable>
-
-        <View style={{ flexDirection: "row", gap: 12 }}>
+      <View style={{ gap: 10, marginBottom: 16 }}>
+        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
           {activityTile}
           {reviewTile}
         </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
           {fundingTile}
           {filesTile}
         </View>
@@ -1599,29 +2162,49 @@ export function BentoSubtaskSupportingGrid({
 
   if (activityTile) {
     return (
-      <View style={{ gap: 12, marginBottom: 16 }}>
-        <View style={{ flexDirection: "row", gap: 12 }}>
+      <View style={{ gap: 10, marginBottom: 16 }}>
+        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
           {activityTile}
           {reviewTile}
         </View>
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          {filesTile}
-          {planningTile}
+        <SupportingTile
+          fullWidth
+          icon={<Files size={18} color={palette.primary} />}
+          accent={palette.primary}
+          soft={palette.glassSurface}
+          title="Files"
+          subtitle="Attachments"
+          onPress={onPressFiles}
+        />
+      </View>
+    );
+  }
+
+  if (hasFunding) {
+    return (
+      <View style={{ gap: 10, marginBottom: 16 }}>
+        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
+          {reviewTile}
+          {fundingTile}
         </View>
+        <SupportingTile
+          fullWidth
+          icon={<Files size={18} color={palette.primary} />}
+          accent={palette.primary}
+          soft={palette.glassSurface}
+          title="Files"
+          subtitle="Attachments"
+          onPress={onPressFiles}
+        />
       </View>
     );
   }
 
   return (
-    <View style={{ gap: 12, marginBottom: 16 }}>
-      <View style={{ flexDirection: "row", gap: 12 }}>
+    <View style={{ gap: 10, marginBottom: 16 }}>
+      <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
         {reviewTile}
-        {fundingTile ?? filesTile}
-      </View>
-
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        {hasFunding ? filesTile : null}
-        {planningTile}
+        {filesTile}
       </View>
     </View>
   );
@@ -1687,7 +2270,7 @@ export function PlanningDetailsView({
       </View>
 
       {!!acceptanceCriteria?.length && (
-        <View style={{ gap: 6 }}>
+        <View style={{ gap: 8 }}>
           <Text
             style={{
               fontSize: 12,
@@ -1699,34 +2282,39 @@ export function PlanningDetailsView({
             ACCEPTANCE CRITERIA
           </Text>
           {acceptanceCriteria.map((criterion, idx) => (
-            <Text
+            <View
               key={idx}
-              selectable
-              style={{ fontSize: 14, color: palette.text, lineHeight: 20 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 8,
+              }}
             >
-              • {criterion}
-            </Text>
+              <CircleCheck
+                size={16}
+                color={palette.success}
+                style={{ marginTop: 2 }}
+              />
+              <Text
+                selectable
+                style={{
+                  flex: 1,
+                  fontSize: 14,
+                  color: palette.text,
+                  lineHeight: 20,
+                }}
+              >
+                {criterion}
+              </Text>
+            </View>
           ))}
         </View>
       )}
 
-      <View
-        style={{
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: palette.border,
-          borderRadius: 10,
-          padding: 12,
-          marginTop: 4,
-        }}
-      >
-        <Text
-          style={{ fontSize: 12, color: palette.mutedLabel, lineHeight: 18 }}
-        >
-          Advanced planning, custom fields, dependencies, and branch
-          configuration are managed on eFlow Web.
-        </Text>
-      </View>
+      <Notice tone="info">
+        Advanced planning, custom fields, dependencies, and branch configuration
+        are managed on eFlow Web.
+      </Notice>
     </View>
   );
 }

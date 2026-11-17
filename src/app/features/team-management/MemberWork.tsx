@@ -1,4 +1,6 @@
 import { statusLabel } from "../../shared/statusLabels";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import { useTheme } from "../../components/ui/Appearance";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 import {
   Button,
@@ -23,6 +25,7 @@ export function MemberWork({
   navigate: Navigate;
 }) {
   const resolveStatus = useWorkStatus();
+  const palette = useTheme();
   const work = tasks.filter((task) =>
       taskParticipantIds(task).includes(employee),
     ),
@@ -54,7 +57,7 @@ export function MemberWork({
     <>
       <Card title="Task participation">
         {!work.length ? (
-          <Empty title="No recorded task participation" />
+          <Empty compact kind="tasks" title="No recorded task participation" />
         ) : (
           work.map((task) => (
             <Card key={task.id} title={task.title}>
@@ -67,6 +70,7 @@ export function MemberWork({
               />
               <Button
                 variant="outline"
+                icon={<ExternalLink size={16} color={palette.primary} />}
                 onPress={() =>
                   navigate({
                     name: "task",
@@ -83,7 +87,7 @@ export function MemberWork({
       </Card>
       <Card title="Delegated subtasks">
         {!nested.length ? (
-          <Empty title="No delegated subtasks" />
+          <Empty compact kind="projects" title="No delegated subtasks" />
         ) : (
           nested.map((item) => (
             <Card key={item.id} title={item.title}>
@@ -91,6 +95,7 @@ export function MemberWork({
               <LabelValue label="Progress" value={`${item.percentComplete}%`} />
               <Button
                 variant="outline"
+                icon={<ExternalLink size={16} color={palette.primary} />}
                 onPress={() =>
                   navigate({
                     name: "task",
@@ -108,13 +113,14 @@ export function MemberWork({
       </Card>
       <Card title="Source activity">
         {!activity.length ? (
-          <Empty title="No recorded activity" />
+          <Empty compact kind="files" title="No recorded activity" />
         ) : (
           activity.map((item) => (
             <Card key={item.id} title={item.title}>
               <LabelValue label="Recorded" value={dateLabel(item.at)} />
               <Button
                 variant="outline"
+                icon={<ExternalLink size={16} color={palette.primary} />}
                 onPress={() =>
                   navigate({ name: "task", id: item.taskId, view: "activity" })
                 }

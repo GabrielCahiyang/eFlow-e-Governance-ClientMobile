@@ -1,4 +1,8 @@
 import { useRef, useState } from "react";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import Check from "lucide-react-native/icons/check";
+import LogIn from "lucide-react-native/icons/log-in";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -26,6 +30,7 @@ export function ActivationScreen({
   token: string;
   onClose: () => void;
 }) {
+  const palette = useTheme();
   const preview = useFacts("activation", () =>
       validateAccountActivation(token),
     ),
@@ -55,7 +60,12 @@ export function ActivationScreen({
               ? "Your Admin needs to approve your role before you can sign in."
               : "Your account is activated. Sign in with your email and new password."}
           </Notice>
-          <Button onPress={onClose}>Sign in</Button>
+          <Button
+            icon={<LogIn size={16} color={palette.onPrimary} />}
+            onPress={onClose}
+          >
+            Sign in
+          </Button>
         </Card>
       ) : preview.data ? (
         <Card title="Welcome to eFlow">
@@ -100,6 +110,7 @@ export function ActivationScreen({
           />
           <Button
             busy={action.busy}
+            icon={<Check size={16} color={palette.onPrimary} />}
             onPress={() =>
               void action.run(async () => {
                 if (password.length < 12 || password.length > 128)
@@ -133,7 +144,12 @@ export function ActivationScreen({
       )}
       {!!action.error && <ErrorState context="action" error={action.error} />}{" "}
       {!result && (
-        <Button variant="ghost" disabled={action.busy} onPress={onClose}>
+        <Button
+          variant="ghost"
+          disabled={action.busy}
+          icon={<ArrowLeft size={16} color={palette.primary} />}
+          onPress={onClose}
+        >
           Back to sign in
         </Button>
       )}

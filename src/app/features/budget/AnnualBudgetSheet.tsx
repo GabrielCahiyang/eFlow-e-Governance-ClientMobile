@@ -4,6 +4,8 @@ import {
   releaseSchedulesYearError,
 } from "../../../core/web/app/features/budget/selectors/budgetReleaseSchedule";
 import { useRef, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Lock from "lucide-react-native/icons/lock";
 import {
   Button,
   Field,
@@ -13,6 +15,7 @@ import {
   Toggle,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAuth } from "../authentication";
 import { confirmAction } from "../../shared/confirm";
 import {
@@ -62,7 +65,8 @@ export function AnnualBudgetSheet({
   onSaved: () => Promise<void>;
   onClose: () => void;
 }) {
-  const { profile } = useAuth(),
+  const palette = useTheme(),
+    { profile } = useAuth(),
     summary = data.summary,
     locked = summary?.status === "locked",
     closed = summary?.status === "closed";
@@ -218,7 +222,11 @@ export function AnnualBudgetSheet({
       footer={
         <>
           {!closed && (
-            <Button busy={financial.busy} onPress={() => save()}>
+            <Button
+              busy={financial.busy}
+              icon={<Check size={15} color={palette.onPrimary} />}
+              onPress={() => save()}
+            >
               Save budget
             </Button>
           )}
@@ -226,6 +234,7 @@ export function AnnualBudgetSheet({
             <Button
               variant="outline"
               busy={financial.busy}
+              icon={<Lock size={15} color={palette.primary} />}
               onPress={() => save(true)}
             >
               Save and lock budget
@@ -308,6 +317,7 @@ export function AnnualBudgetSheet({
           <Button
             variant="danger"
             busy={financial.busy}
+            icon={<Lock size={15} color={palette.onDanger} />}
             disabled={!reason.trim()}
             onPress={() =>
               void (async () => {

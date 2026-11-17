@@ -1,4 +1,5 @@
 import { FilterChip } from "../../components/ui/FilterChip";
+import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { useTheme } from "../../components/ui/Appearance";
 import {
@@ -12,6 +13,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Star from "lucide-react-native/icons/star";
 import { useAuth } from "../authentication";
 import { useWorkspace } from "../workspaces";
@@ -23,6 +25,7 @@ import {
   Empty,
   ErrorState,
   Loading,
+  PageHeader,
   SearchField,
   workStatusTone,
 } from "../../components/ui";
@@ -42,6 +45,7 @@ const rail = 4;
 export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
   const { profile } = useAuth();
   const workspace = useWorkspace();
+  const navHeader = useNavigationHeader();
   const palette = useTheme();
   const resolveStatus = useWorkStatus();
   const { width, fontScale } = useWindowDimensions();
@@ -127,16 +131,23 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
       ListHeaderComponent={
         <Animated.View
           style={[
-            { width: Math.max(0, width - 32), gap: 12, marginBottom: 12 },
+            {
+              width: Math.max(0, width - 32),
+              gap: 12,
+              marginBottom: 12,
+              paddingTop: navHeader?.topInset ?? 0,
+            },
             pinned,
           ]}
         >
-          <Text
-            accessibilityRole="header"
-            style={{ fontSize: 24, fontWeight: "700", color: palette.text }}
-          >
-            Projects
-          </Text>
+          <PageHeader
+            title="Projects"
+            subtitle={
+              current
+                ? "Authorized Office & personal projects"
+                : "Select a workspace"
+            }
+          />
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
@@ -151,51 +162,59 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               Swipe sideways to see project details.
             </Text>
           )}
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder="Search projects"
+            filterTrigger={{
+              label: statuses.find((item) => item.id === status)?.title || "Filter",
+              active: status !== "current",
+              count: status !== "current" ? 1 : undefined,
+              accessibilityLabel: `Project status: ${statuses.find((item) => item.id === status)?.title}`,
+              onPress: () => setFilterOpen(true),
+            }}
+          />
           <View
             style={{
               flexDirection: "row",
               flexWrap: "wrap",
-              alignItems: "center",
               gap: 8,
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            <View style={{ flex: 1, minWidth: 152 }}>
-              <SearchField
-                value={search}
-                onChange={setSearch}
-                placeholder="Search projects"
-              />
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 6,
+                alignItems: "center",
+              }}
+            >
+              {status !== "current" && (
+                <FilterChip
+                  label={
+                    statuses.find((item) => item.id === status)?.title || status
+                  }
+                  tone="tinted"
+                  removable
+                  accessibilityLabel={`Remove filter: ${statuses.find((item) => item.id === status)?.title || status}`}
+                  onPress={() => setStatus("current")}
+                />
+              )}
+              {(status !== "current" || (!!search && total > 0)) && (
+                <FilterChip
+                  label="Clear filters"
+                  onPress={() => {
+                    setStatus("current");
+                    setSearch("");
+                  }}
+                />
+              )}
             </View>
-            <FilterChip
-              label={
-                statuses.find((item) => item.id === status)?.title || "Filter"
-              }
-              icon
-              onPress={() => setFilterOpen(true)}
-              selected={status !== "current"}
-              accessibilityLabel={`Project status: ${statuses.find((item) => item.id === status)?.title}`}
-            />
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 8,
-              alignItems: "center",
-            }}
-          >
-            {(status !== "current" || search) && (
-              <FilterChip
-                label="Clear filters"
-                onPress={() => {
-                  setStatus("current");
-                  setSearch("");
-                }}
-              />
-            )}
             <Text
               accessibilityLiveRegion="polite"
-              style={{ color: palette.mutedLabel, fontSize: 13 }}
+              style={{ color: palette.mutedLabel, fontSize: 12.5, fontWeight: "600" }}
             >
               {total} {total === 1 ? "project" : "projects"}
             </Text>
@@ -580,7 +599,13 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
           <Loading label="Loading projects" layout="projects" />
         ) : (
           <Empty
-            kind="projects"
+            kind={
+              current && (search || status !== "current")
+                ? "search"
+                : current
+                  ? "projects"
+                  : "people"
+            }
             title={
               current && (search || status !== "current")
                 ? "No projects match"
@@ -599,6 +624,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
               current && (search || status !== "current") ? (
                 <Button
                   variant="outline"
+                  icon={<RotateCcw size={15} color={palette.primary} />}
                   onPress={() => {
                     setSearch("");
                     setStatus("current");
@@ -606,11 +632,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                 >
                   Clear filters
                 </Button>
-              ) : (
-                <Button onPress={() => void workspace.refresh()}>
-                  Refresh projects
-                </Button>
-              )
+              ) : undefined
             }
           />
         )

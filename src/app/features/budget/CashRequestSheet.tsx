@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
+import Check from "lucide-react-native/icons/check";
 import FileText from "lucide-react-native/icons/file-text";
 import Paperclip from "lucide-react-native/icons/paperclip";
+import Plus from "lucide-react-native/icons/plus";
+import Upload from "lucide-react-native/icons/upload";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -285,6 +289,7 @@ export function CashRequestSheet({
         <Button
           busy={action.busy}
           disabled={readOnly || (!pendingIntent && bounds.expired)}
+          icon={<Check size={15} color={palette.onPrimary} />}
           onPress={() => void save()}
         >
           Submit cash request
@@ -329,6 +334,7 @@ export function CashRequestSheet({
             <Button
               variant="ghost"
               disabled={!!pendingIntent}
+              icon={<X size={15} color={palette.primary} />}
               onPress={() =>
                 setLines((old) => old.filter((_, index) => index !== i))
               }
@@ -342,6 +348,7 @@ export function CashRequestSheet({
         <Button
           variant="outline"
           disabled={!!pendingIntent}
+          icon={<Plus size={15} color={palette.primary} />}
           onPress={() =>
             setLines((old) => [...old, { allocationLineId: "", amount: 0 }])
           }
@@ -419,6 +426,7 @@ export function CashRequestSheet({
             <Button
               variant="outline"
               style={{ flex: 1 }}
+              icon={<Upload size={15} color={palette.primary} />}
               disabled={action.busy}
               onPress={() =>
                 void action.run(async () => {
@@ -431,6 +439,7 @@ export function CashRequestSheet({
             </Button>
             <Button
               variant="ghost"
+              icon={<X size={15} color={palette.primary} />}
               disabled={action.busy}
               onPress={() => setAttachment(undefined)}
             >

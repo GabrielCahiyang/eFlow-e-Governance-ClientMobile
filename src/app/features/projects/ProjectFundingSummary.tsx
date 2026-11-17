@@ -1,13 +1,21 @@
+import Coins from "lucide-react-native/icons/coins";
+import Wallet from "lucide-react-native/icons/wallet";
 import {
+  AllocationBar,
   Button,
   Card,
+  DetailGroup,
   Empty,
   ErrorState,
   LabelValue,
   Loading,
+  MetricPair,
   Notice,
   peso,
 } from "../../components/ui";
+import { View } from "../../components/ui/Primitives";
+import { Text } from "../../components/ui/Typography";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { useFacts } from "../../shared/useFacts";
 import { PublicMessageError } from "../../shared/userMessages";
 import { useAuth } from "../authentication";
@@ -53,6 +61,8 @@ export function ProjectFundingSummary({
   navigate: Navigate;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
+  const { isDark } = useAppearance();
   const facts = useFacts(
     `project-funding-summary:${profile?.id}:${projectId}`,
     async () => {
@@ -110,22 +120,53 @@ export function ProjectFundingSummary({
       view: "budget",
     });
 
+  const allocPct =
+    facts.data && facts.data.total > 0
+      ? Math.min(100, Math.round((facts.data.allocated / facts.data.total) * 100))
+      : 0;
+  const insetSurface = isDark ? "#0f1733" : palette.background;
+
   return (
-    <Card title="Project funding">
+    <Card
+      title="Project funding"
+      icon={<Wallet size={16} color={palette.primary} />}
+    >
       {facts.error ? (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       ) : facts.loading && !facts.data ? (
         <Loading label="Loading project funding" layout="summary" rows={4} />
       ) : facts.data ? (
         <>
-          <LabelValue label="Authorized" value={peso(facts.data.total)} />
-          <LabelValue label="Allocated" value={peso(facts.data.allocated)} />
-          <LabelValue
-            label="Unallocated"
-            value={peso(facts.data.unallocated)}
+          <MetricPair
+            items={[
+              {
+                label: "Authorized",
+                value: peso(facts.data.total),
+                icon: <Wallet size={18} color={palette.primary} />,
+              },
+              {
+                label: "Unallocated",
+                value: peso(facts.data.unallocated),
+                tone: "success",
+                icon: <Coins size={18} color={palette.success} />,
+              },
+            ]}
           />
-          <LabelValue label="Cash released" value={peso(facts.data.released)} />
-          <LabelValue label="Actual spent" value={peso(facts.data.spent)} />
+          {facts.data.total > 0 && (
+            <AllocationBar
+              label="Project allocation progress"
+              summary={`${allocPct}% · ${peso(facts.data.allocated)}`}
+              percent={(facts.data.allocated / facts.data.total) * 100}
+            />
+          )}
+          <DetailGroup>
+            <LabelValue label="Allocated" value={peso(facts.data.allocated)} />
+            <LabelValue
+              label="Cash released"
+              value={peso(facts.data.released)}
+            />
+            <LabelValue label="Actual spent" value={peso(facts.data.spent)} />
+          </DetailGroup>
         </>
       ) : (
         <Empty kind="finance" title="Project funding summary unavailable" />
@@ -137,66 +178,125 @@ export function ProjectFundingSummary({
         />
       )}
       {showCloseout && !closeout.error && closeout.data?.canComplete && (
-        <Notice>The project is ready to complete from Project options.</Notice>
+        <Notice tone="success">
+          The project is ready to complete from Project options.
+        </Notice>
       )}
       {cash.map((blocker) => (
-        <Card key={blocker.id} title={blocker.title}>
-          <Notice>{blocker.detail}</Notice>
+        <View
+          key={blocker.id}
+          style={{
+            backgroundColor: insetSurface,
+            borderColor: palette.border,
+            borderWidth: 1,
+            borderRadius: 16,
+            padding: 14,
+            gap: 10,
+          }}
+        >
+          <Text
+            accessibilityRole="header"
+            style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
+          >
+            {blocker.title}
+          </Text>
+          <Notice tone="danger">{blocker.detail}</Notice>
           {blocker.amount != null && (
-            <LabelValue label="Cash to clear" value={peso(blocker.amount)} />
+            <DetailGroup inset={false}>
+              <LabelValue
+                label="Cash to clear"
+                value={peso(blocker.amount)}
+                tone="danger"
+              />
+            </DetailGroup>
           )}
           {blocker.taskId && (
             <Button
               variant="outline"
+              icon={<Wallet size={16} color={palette.primary} />}
               onPress={() => openTaskFunding(blocker.taskId!)}
             >
               Open task funding
             </Button>
           )}
-        </Card>
+        </View>
       ))}
       {unusedSubtasks.length > 0 && (
-        <Card title="Unused subtask funding">
-          <Notice>
+        <Card
+          flat
+          title="Unused subtask funding"
+          badge={String(unusedSubtasks.length)}
+          badgeTone="warning"
+        >
+          <Notice tone="warning">
             The task lead returns these amounts to the parent task before
             closeout.
           </Notice>
           {unusedSubtasks.map((blocker) => (
-            <Card key={blocker.id} title={blocker.title}>
+            <View
+              key={blocker.id}
+              style={{
+                backgroundColor: insetSurface,
+                borderColor: palette.border,
+                borderWidth: 1,
+                borderRadius: 16,
+                padding: 14,
+                gap: 10,
+              }}
+            >
+              <Text
+                accessibilityRole="header"
+                style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
+              >
+                {blocker.title}
+              </Text>
               {blocker.amount != null && (
-                <LabelValue label="Unused" value={peso(blocker.amount)} />
+                <DetailGroup inset={false}>
+                  <LabelValue
+                    label="Unused"
+                    value={peso(blocker.amount)}
+                    tone="warning"
+                  />
+                </DetailGroup>
               )}
               {blocker.taskId && (
                 <Button
                   variant="outline"
+                  icon={<Wallet size={16} color={palette.primary} />}
                   onPress={() => openTaskFunding(blocker.taskId!)}
                 >
                   Open task funding
                 </Button>
               )}
-            </Card>
+            </View>
           ))}
         </Card>
       )}
       {unused && (
-        <Card title="Return unused funding before completion">
-          <Notice>
+        <Card
+          flat
+          title="Return unused funding before completion"
+          badgeTone="warning"
+        >
+          <Notice tone="warning">
             Return unused task allocations to the project, then release the
             remaining funds to Office Budget.
           </Notice>
-          {unused.taskAllocations.map((line) => (
-            <LabelValue
-              key={line.id}
-              label={`${line.task} · ${line.source}${line.fiscalYear ? ` · FY ${line.fiscalYear}` : ""}`}
-              value={peso(line.available)}
-            />
-          ))}
-          {unused.unallocated > 0 && (
-            <LabelValue
-              label="Unallocated in the project"
-              value={peso(unused.unallocated)}
-            />
-          )}
+          <DetailGroup>
+            {unused.taskAllocations.map((line) => (
+              <LabelValue
+                key={line.id}
+                label={`${line.task} · ${line.source}${line.fiscalYear ? ` · FY ${line.fiscalYear}` : ""}`}
+                value={peso(line.available)}
+              />
+            ))}
+            {unused.unallocated > 0 && (
+              <LabelValue
+                label="Unallocated in the project"
+                value={peso(unused.unallocated)}
+              />
+            )}
+          </DetailGroup>
         </Card>
       )}
     </Card>

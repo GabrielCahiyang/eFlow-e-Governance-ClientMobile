@@ -1,5 +1,5 @@
 import { expect, jest, test } from "@jest/globals";
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import { nativeWindow } from "../../../../platform/webRuntime";
 import { colors } from "../../../components/ui/theme";
@@ -78,6 +78,9 @@ jest.mock("../../authentication", () => ({
     can: () => true,
   }),
 }));
+jest.mock("../../communication", () => ({
+  useConversationDirectory: () => ({ data: [] }),
+}));
 jest.mock("../../workspaces", () => ({
   useWorkspace: () => ({ selected: mockSelected, refresh: async () => {} }),
 }));
@@ -131,10 +134,11 @@ test("Head Home displays exactly three Office projects with consistent totals an
   expect(
     view.getByLabelText("Project completion: 50%"),
   ).toBeOnTheScreen();
-  expect(view.getByText("Decisions")).toBeOnTheScreen();
-  expect(
-    view.getByRole("button", { name: "0 work items at risk" }),
-  ).toBeOnTheScreen();
+    expect(view.getByText("Decisions")).toBeOnTheScreen();
+    expect(view.getByLabelText("0 work items at risk")).toBeOnTheScreen();
+    expect(
+      view.queryByRole("button", { name: "0 work items at risk" }),
+    ).toBeNull();
   await fireEvent.press(view.getByRole("button", { name: "Bridge works" }));
   expect(navigate).toHaveBeenLastCalledWith({
     name: "project",
@@ -255,9 +259,10 @@ test("Head Home deduplicates the leading Action required prefix while preserving
         "Action required · Blocker reported · Bridge works · Task Lead",
       ),
     ).toBeNull();
+    expect(view.getByLabelText("1 work item at risk")).toBeOnTheScreen();
     expect(
-      view.getByRole("button", { name: "1 work item at risk" }),
-    ).toBeOnTheScreen();
+      view.queryByRole("button", { name: "1 work item at risk" }),
+    ).toBeNull();
   } finally {
     mockWorkRows = [];
   }
@@ -288,8 +293,12 @@ test("Member Home displays personalized command center with contributor visibili
     { ...row, key: "waiting", title: "Check permits", status: "for_review" },
     {
       ...row,
+      id: "inventory-node",
       key: "contributor",
+      kind: "office-node",
       title: "Verify inventory",
+      status: "in_progress",
+      blocker: "Waiting for the inventory list",
       leading: false,
       relation: "Contributor",
     },
@@ -316,10 +325,23 @@ test("Member Home displays personalized command center with contributor visibili
     // Section B: Needs your action - both lead and contributor visible
     expect(view.getByText("Needs your action")).toBeOnTheScreen();
     expect(view.getByText("Road survey")).toBeOnTheScreen();
-    expect(view.getByText("Review requested changes")).toBeOnTheScreen();
+    expect(
+      view.getByRole("button", {
+        name: "Road survey, Changes requested, Task Lead, Bridge works",
+      }),
+    ).toBeOnTheScreen();
 
-    expect(view.getByText("Verify inventory")).toBeOnTheScreen();
-    expect(view.getByText("Open assigned task")).toBeOnTheScreen();
+    const inventoryRow = view.getByRole("button", {
+      name: "Verify inventory, Stuck, Contributor, Bridge works, Blocker: Waiting for the inventory list",
+    });
+    expect(within(inventoryRow).getByText("Verify inventory")).toBeOnTheScreen();
+    expect(
+      within(inventoryRow).getByText("Blocker: Waiting for the inventory list"),
+    ).toBeOnTheScreen();
+    expect(view.queryByText("Status")).toBeNull();
+    expect(view.queryByText("Role")).toBeNull();
+    expect(view.queryByText("Review requested changes")).toBeNull();
+    expect(view.queryByText("Open assigned subtask")).toBeNull();
 
     // Section D: Latest updates
     expect(view.getByText("Latest updates")).toBeOnTheScreen();
@@ -330,23 +352,22 @@ test("Member Home displays personalized command center with contributor visibili
     expect(view.getByText("Check permits")).toBeOnTheScreen();
     expect(view.getByText("Awaiting independent review")).toBeOnTheScreen();
 
-    // Tile navigation
+    // Hero stat tiles are non-clickable across all roles
+    expect(view.queryByRole("button", { name: /overdue work item/ })).toBeNull();
+    expect(view.queryByRole("button", { name: /due today/ })).toBeNull();
+    expect(view.queryByRole("button", { name: /awaiting review/ })).toBeNull();
     await fireEvent.press(view.getByText("Overdue"));
-    expect(navigate).toHaveBeenCalledWith({
-      name: "personal_work",
-      view: "overdue",
-    });
-
     await fireEvent.press(view.getByText("Due today"));
-    expect(navigate).toHaveBeenCalledWith({
-      name: "personal_work",
-      view: "today",
-    });
-
     await fireEvent.press(view.getByText("Awaiting review"));
+    expect(navigate).not.toHaveBeenCalled();
+
+    await fireEvent.press(inventoryRow);
     expect(navigate).toHaveBeenCalledWith({
-      name: "personal_work",
-      view: "awaiting",
+      name: "task",
+      id: "task",
+      nodeId: "inventory-node",
+      view: "subitems",
+      workspaceId: "workspace",
     });
 
     // Compact "See all ›" section header actions

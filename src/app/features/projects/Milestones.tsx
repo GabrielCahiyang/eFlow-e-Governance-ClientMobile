@@ -1,4 +1,10 @@
 import { useState } from "react";
+import ArrowUpDown from "lucide-react-native/icons/arrow-up-down";
+import Check from "lucide-react-native/icons/check";
+import Pencil from "lucide-react-native/icons/pencil";
+import Plus from "lucide-react-native/icons/plus";
+import Trash2 from "lucide-react-native/icons/trash";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -47,6 +53,7 @@ export function Milestones({
   onTasksChanged: () => Promise<unknown>;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const { toast } = useToast();
   const facts = useFacts("milestones:" + project, async () => {
       const { data, error } = await supabase
@@ -87,9 +94,15 @@ export function Milestones({
       <Row>
         {editable && (
           <>
-            <Button onPress={() => edit(null)}>Add milestone</Button>
+            <Button
+              icon={<Plus size={16} color={palette.onPrimary} />}
+              onPress={() => edit(null)}
+            >
+              Add milestone
+            </Button>
             <Button
               variant="outline"
+              icon={<ArrowUpDown size={16} color={palette.primary} />}
               onPress={() => {
                 action.clear();
                 setOrdering(true);
@@ -122,11 +135,16 @@ export function Milestones({
                     tasks={tasks}
                     onSaved={onTasksChanged}
                   />
-                  <Button variant="outline" onPress={() => edit(item)}>
+                  <Button
+                    variant="outline"
+                    icon={<Pencil size={16} color={palette.primary} />}
+                    onPress={() => edit(item)}
+                  >
                     Edit milestone
                   </Button>
                   <Button
                     variant="danger"
+                    icon={<Trash2 size={16} color={palette.onDanger} />}
                     onPress={() =>
                       void action.run(async () => {
                         if (
@@ -201,6 +219,13 @@ export function Milestones({
         )}
         <Button
           busy={action.busy}
+          icon={
+            editing ? (
+              <Check size={16} color={palette.onPrimary} />
+            ) : (
+              <Plus size={16} color={palette.onPrimary} />
+            )
+          }
           onPress={() =>
             void action.run(async () => {
               if (editing) {

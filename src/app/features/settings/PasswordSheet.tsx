@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
+import KeyRound from "lucide-react-native/icons/key-round";
 import { Button, Field, Notice, Sheet } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
 import {
@@ -30,6 +32,7 @@ export function PasswordSheet({
     { current, next, confirmation } = draft,
     action = useAction(),
     alive = useRef(true),
+    palette = useTheme(),
     actor = useRef(user?.id);
   actor.current = user?.id;
   useEffect(
@@ -90,7 +93,11 @@ export function PasswordSheet({
       onClose={close}
       busy={action.busy}
       footer={
-        <Button busy={action.busy} onPress={() => void save()}>
+        <Button
+          busy={action.busy}
+          icon={<KeyRound size={16} color={palette.onPrimary} />}
+          onPress={() => void save()}
+        >
           Update password
         </Button>
       }

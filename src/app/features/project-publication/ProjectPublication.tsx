@@ -1,4 +1,17 @@
 import { useEffect, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import Eye from "lucide-react-native/icons/eye";
+import EyeOff from "lucide-react-native/icons/eye-off";
+import FileCheck from "lucide-react-native/icons/file-check";
+import FileText from "lucide-react-native/icons/file-text";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import Share2 from "lucide-react-native/icons/share-2";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Trash2 from "lucide-react-native/icons/trash";
+import Upload from "lucide-react-native/icons/upload";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import { AppState, Linking } from "react-native";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -82,6 +95,7 @@ export function ProjectPublication({
   projectId: string;
   canPublish: boolean;
 }) {
+  const palette = useTheme();
   const [open, setOpen] = useState(false);
   const index = useFacts("certificate:" + projectId, async () => {
     const { data, error } = await supabase
@@ -112,13 +126,18 @@ export function ProjectPublication({
   return (
     <>
       {canPublish && (
-        <Button variant="outline" onPress={() => setOpen(true)}>
+        <Button
+          variant="outline"
+          icon={<ShieldCheck size={16} color={palette.primary} />}
+          onPress={() => setOpen(true)}
+        >
           {index.data ? "View blockchain seal" : "Seal on blockchain"}
         </Button>
       )}
       {!!index.data && (
         <Button
           variant="outline"
+          icon={<ExternalLink size={16} color={palette.primary} />}
           onPress={() => void action.run(() => publicRecord(index.data!.id))}
         >
           Open public record
@@ -170,6 +189,7 @@ function SealSheet({
     ? JSON.parse(preview.data.manifest)
     : undefined;
   const { profile } = useAuth();
+  const palette = useTheme();
   const [section, setSection] = useState("");
   const [copy, setCopy] = useState<ArchiveFile>();
   const action = useAction();
@@ -235,6 +255,7 @@ function SealSheet({
           {!seal || seal.state === "cancelled" ? (
             <Button
               busy={action.busy}
+              icon={<FileCheck size={16} color={palette.onPrimary} />}
               onPress={() =>
                 run(() => gateway(projectId + "/prepare", { correction: null }))
               }
@@ -255,6 +276,7 @@ function SealSheet({
                   <Button
                     variant="outline"
                     busy={action.busy}
+                    icon={<Share2 size={16} color={palette.primary} />}
                     onPress={() =>
                       void action.run(() =>
                         shareFile(
@@ -271,6 +293,13 @@ function SealSheet({
                     <Card key={key} title={key.replace(/_/g, " ")}>
                       <Button
                         variant="ghost"
+                        icon={
+                          section === key ? (
+                            <EyeOff size={16} color={palette.primary} />
+                          ) : (
+                            <Eye size={16} color={palette.primary} />
+                          )
+                        }
                         onPress={() => setSection(section === key ? "" : key)}
                       >
                         {section === key ? "Hide details" : "Review details"}
@@ -288,6 +317,7 @@ function SealSheet({
                       <Button
                         variant="outline"
                         busy={action.busy}
+                        icon={<FileText size={16} color={palette.primary} />}
                         onPress={() =>
                           void action.run(async () => {
                             const response = await gateway(
@@ -306,6 +336,7 @@ function SealSheet({
                       {ready && (
                         <Button
                           variant="ghost"
+                          icon={<Upload size={16} color={palette.primary} />}
                           onPress={() => {
                             setCopy(f);
                             updateDraft({ consent: "" });
@@ -325,12 +356,14 @@ function SealSheet({
                       />
                       <Button
                         variant="ghost"
+                        icon={<X size={16} color={palette.primary} />}
                         onPress={() => setCopy(undefined)}
                       >
                         Cancel replacement
                       </Button>
                       <Button
                         busy={action.busy}
+                        icon={<Upload size={16} color={palette.onPrimary} />}
                         onPress={() =>
                           run(async () => {
                             if (copyReason.trim().length < 5)
@@ -404,6 +437,7 @@ function SealSheet({
                         !config.data.worker_enabled ||
                         (live && !config.data.configured)
                       }
+                      icon={<ShieldCheck size={16} color={palette.onPrimary} />}
                       onPress={() =>
                         run(() =>
                           rpc("approve_project_seal", {
@@ -428,6 +462,7 @@ function SealSheet({
                         rpc("discard_project_seal", { p_snapshot_id: seal.id }),
                       )
                     }
+                    icon={<Trash2 size={16} color={palette.primary} />}
                   >
                     Discard preview
                   </Button>
@@ -445,6 +480,7 @@ function SealSheet({
                       rpc("retry_project_seal", { p_snapshot_id: seal.id }),
                     )
                   }
+                  icon={<RefreshCw size={16} color={palette.primary} />}
                 >
                   Retry saved publication
                 </Button>
@@ -454,6 +490,7 @@ function SealSheet({
                   {!!seal.tx_hash && /^0x[0-9a-f]{64}$/i.test(seal.tx_hash) && (
                     <Button
                       variant="outline"
+                      icon={<ExternalLink size={16} color={palette.primary} />}
                       onPress={() =>
                         void action.run(() =>
                           Linking.openURL(
@@ -467,6 +504,7 @@ function SealSheet({
                   )}
                   <Button
                     variant="outline"
+                    icon={<ExternalLink size={16} color={palette.primary} />}
                     onPress={() => void action.run(() => onPublic(seal.id))}
                   >
                     Open public record
@@ -480,6 +518,7 @@ function SealSheet({
                   <Button
                     disabled={!correction.trim()}
                     busy={action.busy}
+                    icon={<Check size={16} color={palette.onPrimary} />}
                     onPress={() =>
                       run(async () => {
                         await gateway(projectId + "/prepare", {

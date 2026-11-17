@@ -2,6 +2,9 @@ import { expect, jest, test } from "@jest/globals";
 import { render, fireEvent } from "@testing-library/react-native";
 import * as Reanimated from "react-native-reanimated";
 import { Empty, ErrorState } from "../Screen";
+import { DataTable } from "../DataTable";
+import { type EmptyKind } from "../EmptyIllustration";
+import { storysetXml, type StorysetKind } from "../storysetIllustrations";
 import { Button } from "../Button";
 import {
   ViewLoadingState,
@@ -124,8 +127,49 @@ test("ErrorState pairs contextual titles with public messages and invokes its co
     />,
   );
   expect(view.getByText("Check before retrying")).toBeOnTheScreen();
-  expect(
-    view.getByText(/Refresh this page and check before trying again/),
-  ).toBeOnTheScreen();
+  expect(view.getByText(/Refresh this page and check before trying again/)).toBeOnTheScreen();
   expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
+});
+
+test("all Storyset empty illustrations use eFlow blue (never Web teal), render across all kinds, and DataTable shows compact illustrated empty state", async () => {
+  for (const kind of Object.keys(storysetXml) as StorysetKind[]) {
+    expect(storysetXml[kind]).not.toMatch(/#0c6f6b/i);
+    expect(storysetXml[kind]).toContain("#0073ea");
+  }
+  const allKinds: EmptyKind[] = [
+    "empty",
+    "search",
+    "inbox",
+    "projects",
+    "tasks",
+    "complete",
+    "files",
+    "chat",
+    "people",
+    "budget",
+    "work",
+    "messages",
+    "workspace",
+    "activity",
+    "finance",
+  ];
+  for (const kind of allKinds) {
+    const view = await render(
+      <Empty compact kind={kind} title={`Empty ${kind}`} />,
+    );
+    expect(view.getByRole("header", { name: `Empty ${kind}` })).toBeOnTheScreen();
+    await view.unmount();
+  }
+  const tableView = await render(
+    <DataTable
+      rows={[]}
+      rowKey={(item: { id: string }) => item.id}
+      columns={[{ id: "name", title: "Work item", width: 200, render: () => null }]}
+      empty="No records match these filters."
+      emptyKind="search"
+    />,
+  );
+  expect(
+    tableView.getByRole("header", { name: "No records match these filters." }),
+  ).toBeOnTheScreen();
 });

@@ -1,25 +1,26 @@
 import AlertCircle from "lucide-react-native/icons/circle-alert";
-import ArrowRight from "lucide-react-native/icons/arrow-right";
 import Banknote from "lucide-react-native/icons/banknote";
 import Bell from "lucide-react-native/icons/bell";
 import Calendar from "lucide-react-native/icons/calendar";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
+import CircleCheck from "lucide-react-native/icons/circle-check";
+import Clock from "lucide-react-native/icons/clock";
 import ChartColumn from "lucide-react-native/icons/chart-column";
+import FolderKanban from "lucide-react-native/icons/folder-kanban";
 import PiggyBank from "lucide-react-native/icons/piggy-bank";
-import CircleCheck from "lucide-react-native/icons/circle-check-big";
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import {
   Button,
-  EditorialMetadataStrip,
+  Empty,
   ErrorState,
   Loading,
   Screen,
 } from "../../components/ui";
 import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
-import { space } from "../../components/ui/theme";
+import { space, type, withOpacity } from "../../components/ui/theme";
 import { completionPercent } from "../../shared/completion";
 import { useFacts } from "../../shared/useFacts";
 import type { AppRoute, Navigate } from "../../shared/routes";
@@ -37,6 +38,7 @@ import {
   HomeCard,
   HomeMessage,
   HomeRow,
+  HomeRowChevron,
   HomeSection,
 } from "./HomeSections";
 import { AccountingHome } from "./AccountingHome";
@@ -272,9 +274,6 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                 key: "projects",
                 label: "Current projects",
                 value: currentProjects.length,
-                onPress: showProjects
-                  ? () => navigate({ name: "projects" })
-                  : undefined,
                 accessibilityLabel: `${currentProjects.length} current project${currentProjects.length === 1 ? "" : "s"}`,
               },
               {
@@ -287,22 +286,25 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                 key: "risk",
                 label: "At risk",
                 value: signals.overdueOrBlocked,
-                onPress: showAnalytics
-                  ? () => navigate({ name: "reports", view: "risks" })
-                  : undefined,
                 accessibilityLabel: `${signals.overdueOrBlocked} work item${signals.overdueOrBlocked === 1 ? "" : "s"} at risk`,
               },
             ]}
           />
         )}
       </HomeHero>
-      <HomeBody gap={0}>
+      <HomeBody>
       {workspace.error ? (
         <ErrorState error={workspace.error} retry={() => void refresh()} />
       ) : !scope && workspace.loading ? (
         <Loading label="Loading Office overview" layout="summary" />
       ) : !scope ? (
-        <HomeMessage>Office work isn't available right now.</HomeMessage>
+        <HomeCard>
+          <Empty
+            compact
+            kind="people"
+            title="Office work isn't available right now"
+          />
+        </HomeCard>
       ) : (
         <>
           <HeadTodayCard
@@ -326,36 +328,12 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
               ) : (
                 !incomplete &&
                 (rows || !showWork) && (
-                  <View
-                    style={{
-                      paddingVertical: 10,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 10,
-                        backgroundColor: palette.successSoft,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <CircleCheck size={17} color={palette.success} />
-                    </View>
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 13,
-                        color: palette.mutedLabel,
-                      }}
-                    >
-                      No Office work needs your attention right now.
-                    </Text>
-                  </View>
+                  <Empty
+                    compact
+                    kind="complete"
+                    title="All clear"
+                    description="No Office work needs your attention right now."
+                  />
                 )
               ))}
             {incomplete && (
@@ -369,17 +347,19 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
           {showProjects && (
             <HomeSection
               title="Current Projects"
+              tone="primary"
+              icon={<FolderKanban size={15} color={palette.primary} />}
               badge={projects.length ? String(projects.length) : undefined}
               onAction={() => navigate({ name: "projects" })}
               actionAccessibilityLabel="See all projects"
             >
               {!projects.length ? (
                 <HomeCard>
-                  <View style={{ paddingHorizontal: 14, paddingVertical: 14 }}>
-                    <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-                      No current Office projects.
-                    </Text>
-                  </View>
+                  <Empty
+                    compact
+                    kind="projects"
+                    title="No current Office projects"
+                  />
                 </HomeCard>
               ) : (
                 <HomeCard>
@@ -411,6 +391,7 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                       ))) && (
                     <Button
                       variant="ghost"
+                      icon={<RefreshCw size={15} color={palette.primary} />}
                       onPress={() => void progress.refresh()}
                     >
                       Retry project progress
@@ -449,6 +430,8 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
     () => fetchInboxUpdatePage(actor, false),
     !!actor,
   );
+  const palette = useTheme();
+  const hasUrgentAction = (data?.overdue ?? 0) > 0;
 
   const refresh = async () => {
     await Promise.all([
@@ -483,23 +466,18 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
                 key: "overdue",
                 label: "Overdue",
                 value: data.overdue,
-                onPress: () =>
-                  navigate({ name: "personal_work", view: "overdue" }),
                 accessibilityLabel: `${data.overdue} overdue work item${data.overdue === 1 ? "" : "s"}`,
               },
               {
                 key: "today",
                 label: "Due today",
                 value: data.today,
-                onPress: () => navigate({ name: "personal_work", view: "today" }),
                 accessibilityLabel: `${data.today} work item${data.today === 1 ? "" : "s"} due today`,
               },
               {
                 key: "awaiting",
                 label: "Awaiting review",
                 value: data.awaiting,
-                onPress: () =>
-                  navigate({ name: "personal_work", view: "awaiting" }),
                 accessibilityLabel: `${data.awaiting} work item${data.awaiting === 1 ? "" : "s"} awaiting review`,
               },
             ]}
@@ -513,16 +491,33 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
         workspace.loading ? (
           <Loading label="Loading your workspace" layout="summary" />
         ) : (
-          <HomeMessage>Your assignments aren't available right now.</HomeMessage>
+          <HomeCard>
+            <Empty
+              compact
+              kind="people"
+              title="Your assignments aren't available right now"
+            />
+          </HomeCard>
         )
       ) : !showWork ? (
-        <HomeMessage>
-          Work assignments are unavailable to this account.
-        </HomeMessage>
+        <HomeCard>
+          <Empty
+            compact
+            kind="people"
+            title="Work assignments are unavailable to this account"
+          />
+        </HomeCard>
       ) : (
         <>
           <HomeSection
             title="Needs your action"
+            tone={hasUrgentAction ? "danger" : "primary"}
+            icon={
+              <Clock
+                size={15}
+                color={hasUrgentAction ? palette.danger : palette.primary}
+              />
+            }
             badge={
               data?.priorities.length
                 ? String(data.priorities.length)
@@ -551,9 +546,14 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
               />
             )}
             {data && !data.priorities.length && !incomplete && (
-              <HomeMessage>
-                No assignments need your action right now.
-              </HomeMessage>
+              <HomeCard>
+                <Empty
+                  compact
+                  kind="complete"
+                  title="All caught up"
+                  description="No assignments need your action right now."
+                />
+              </HomeCard>
             )}
             {incomplete || (!data && !feed.loading) ? (
               <ErrorState
@@ -566,6 +566,8 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
           {data && !incomplete && !!data.comingUp.length && (
             <HomeSection
               title="Coming up"
+              tone="primary"
+              icon={<Calendar size={15} color={palette.primary} />}
               badge={String(data.comingUp.length)}
               onAction={() =>
                 navigate({ name: "personal_work", view: "deadlines" })
@@ -587,6 +589,8 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
 
           <HomeSection
             title="Latest updates"
+            tone="primary"
+            icon={<Bell size={15} color={palette.primary} />}
             badge={
               recentUpdates.length
                 ? String(recentUpdates.length)
@@ -621,7 +625,14 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
             ) : (
               !updates.loading &&
               !recentUpdates.length && (
-                <HomeMessage>No recent updates.</HomeMessage>
+                <HomeCard>
+                  <Empty
+                    compact
+                    kind="inbox"
+                    title="No recent updates"
+                    description="Assignments, reviews and mentions will appear here."
+                  />
+                </HomeCard>
               )
             )}
           </HomeSection>
@@ -629,6 +640,8 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
           {!!data?.waiting.length && (
             <HomeSection
               title="Waiting on others"
+              tone="review"
+              icon={<ClipboardCheck size={15} color={palette.review} />}
               badge={String(data.waiting.length)}
               onAction={() =>
                 navigate({ name: "personal_work", view: "awaiting" })
@@ -672,7 +685,6 @@ function MemberActionCardItem({
     isToday: boolean;
     relation: string;
     isLead: boolean;
-    actionable: boolean;
     actionLabel: string;
     blocker?: string | null;
     route: AppRoute;
@@ -698,20 +710,6 @@ function MemberActionCardItem({
               ? palette.primary
               : palette.mutedLabel;
 
-  const statusBg = isChangesRequested
-    ? palette.dangerSoft
-    : item.isOverdue
-      ? palette.dangerSoft
-      : isStuck
-        ? palette.dangerSoft
-        : item.isToday
-          ? palette.warningSoft
-          : item.blocker
-            ? palette.warningSoft
-            : item.status === "in_progress"
-              ? palette.primarySoft
-              : palette.surface;
-
   const statusText = isChangesRequested
     ? "Changes requested"
     : item.isOverdue
@@ -726,69 +724,137 @@ function MemberActionCardItem({
               ? "In progress"
               : "To do";
 
+  const statusBg = isChangesRequested || item.isOverdue || isStuck
+    ? palette.dangerSoft
+    : item.isToday || item.blocker
+      ? palette.warningSoft
+      : item.status === "in_progress"
+        ? palette.primarySoft
+        : palette.surface;
+  const StatusIcon =
+    isChangesRequested || item.isOverdue || isStuck
+      ? AlertCircle
+      : item.isToday || item.blocker
+        ? Clock
+        : CircleCheck;
+
+  const relation = item.relation || (item.isLead ? "Lead" : "Contributor");
+  const context = [
+    item.projectTitle || item.workspaceName,
+    item.dueLabel && statusText !== "Due today" && statusText !== "Overdue"
+      ? `Due ${item.dueLabel}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const blocker = item.blocker?.trim();
+
   return (
     <HomeRow
       isFirst={isFirst}
-      accessibilityLabel={`${item.title}, ${statusText}, ${item.relation}`}
+      accessibilityLabel={[
+        item.title,
+        statusText,
+        relation,
+        context,
+        blocker ? `Blocker: ${blocker}` : undefined,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       accessibilityHint={item.actionLabel}
       onPress={() => navigate(item.route)}
     >
-      <View style={{ flex: 1, gap: 6 }}>
-        <EditorialMetadataStrip
-          variant="flush"
-          items={[
-            { label: "Status", value: statusText, accent: statusColor },
-            {
-              label: "Role",
-              value: item.relation || (item.isLead ? "Lead" : "Contributor"),
-              accent: item.isLead
-                ? (palette.primaryDark ?? palette.primary)
-                : palette.text,
-            },
-          ]}
-        />
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: statusBg,
+          borderWidth: 1,
+          borderColor: withOpacity(statusColor, 0.2),
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <StatusIcon size={16} color={statusColor} />
+      </View>
+      <View style={{ flex: 1, gap: 4 }}>
         <Text
           style={{
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: "700",
             color: palette.text,
-            lineHeight: 20,
+            lineHeight: 19,
           }}
         >
           {item.title}
         </Text>
-        <Text style={{ fontSize: 13, color: palette.mutedLabel }} numberOfLines={1}>
-          {[
-            item.projectTitle || item.workspaceName,
-            item.dueLabel ? `Due ${item.dueLabel}` : undefined,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </Text>
-        {item.blocker ? (
-          <Text
-            style={{ fontSize: 12, color: palette.warning }}
-            numberOfLines={2}
-          >
-            Blocker: {item.blocker}
-          </Text>
-        ) : null}
-      </View>
-      <View style={{ alignItems: "flex-end", gap: 4 }}>
-        <Text
+        <View
           style={{
-            fontSize: 12,
-            fontWeight: "600",
-            color: item.actionable ? palette.primary : palette.mutedLabel,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 6,
           }}
         >
-          {item.actionLabel}
-        </Text>
-        <ArrowRight
-          size={16}
-          color={item.actionable ? palette.primary : palette.mutedLabel}
-        />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 999,
+              backgroundColor: statusBg,
+              borderWidth: 1,
+              borderColor: withOpacity(statusColor, 0.24),
+            }}
+          >
+            <StatusIcon size={11.5} color={statusColor} />
+            <Text
+              style={{
+                fontSize: 11,
+                lineHeight: 15,
+                fontWeight: "700",
+                color: statusColor,
+              }}
+            >
+              {statusText}
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontSize: 12,
+              lineHeight: 16,
+              color: palette.mutedLabel,
+              flexShrink: 1,
+            }}
+          >
+            {context ? `${relation} · ${context}` : relation}
+          </Text>
+        </View>
+        {!!blocker && (
+          <View
+            style={{
+              alignSelf: "flex-start",
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 9,
+              backgroundColor: palette.warningSoft,
+              borderWidth: 1,
+              borderColor: withOpacity(palette.warning, 0.22),
+            }}
+          >
+            <Text
+              style={{ fontSize: 11.5, lineHeight: 16, color: palette.warning }}
+            >
+              Blocker: {blocker}
+            </Text>
+          </View>
+        )}
       </View>
+      <HomeRowChevron />
     </HomeRow>
   );
 }
@@ -828,21 +894,24 @@ function MemberComingUpItem({
     >
       <View
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
           backgroundColor: palette.primarySoft,
+          borderWidth: 1,
+          borderColor: withOpacity(palette.primary, 0.14),
           alignItems: "center",
           justifyContent: "center",
+          flexShrink: 0,
         }}
       >
-        <Calendar size={18} color={palette.primary} />
+        <Calendar size={16} color={palette.primary} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text
           style={{
             fontSize: 14,
-            fontWeight: "600",
+            fontWeight: "700",
             color: palette.text,
           }}
           numberOfLines={1}
@@ -866,23 +935,25 @@ function MemberComingUpItem({
       </View>
       <View
         style={{
-          paddingHorizontal: space.sm,
-          paddingVertical: 3,
+          paddingHorizontal: 8,
+          paddingVertical: 2.5,
           borderRadius: 999,
-          backgroundColor: palette.primarySoft,
+          backgroundColor: palette.blueSoft,
+          borderWidth: 1,
+          borderColor: withOpacity(palette.blue, 0.24),
         }}
       >
         <Text
           style={{
             fontSize: 11,
-            fontWeight: "600",
-            color: palette.primary,
+            fontWeight: "700",
+            color: palette.blue,
           }}
         >
           {daysText}
         </Text>
       </View>
-      <ChevronRight size={18} color={palette.mutedLabel} />
+      <HomeRowChevron />
     </HomeRow>
   );
 }
@@ -929,23 +1000,38 @@ function MemberUpdateItem({
     >
       <View
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          backgroundColor: !item.read
-            ? palette.primarySoft
-            : palette.surface,
-          borderWidth: !item.read ? 0 : 1,
-          borderColor: palette.border,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: !item.read ? palette.primarySoft : palette.surface,
+          borderWidth: 1,
+          borderColor: !item.read
+            ? withOpacity(palette.primary, 0.16)
+            : palette.border,
           alignItems: "center",
           justifyContent: "center",
-          marginTop: 2,
+          flexShrink: 0,
         }}
       >
         <Bell
-          size={18}
+          size={16}
           color={!item.read ? palette.primary : palette.mutedLabel}
         />
+        {!item.read && (
+          <View
+            style={{
+              position: "absolute",
+              top: -1,
+              right: -1,
+              width: 9,
+              height: 9,
+              borderRadius: 4.5,
+              backgroundColor: palette.blue,
+              borderWidth: 1.5,
+              borderColor: palette.surface,
+            }}
+          />
+        )}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <View
@@ -970,6 +1056,7 @@ function MemberUpdateItem({
           <Text
             style={{
               fontSize: 11,
+              fontWeight: "600",
               color: palette.mutedLabel,
             }}
           >
@@ -987,17 +1074,6 @@ function MemberUpdateItem({
           {item.message}
         </Text>
       </View>
-      {!item.read && (
-        <View
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: palette.primary,
-            alignSelf: "center",
-          }}
-        />
-      )}
     </HomeRow>
   );
 }
@@ -1022,6 +1098,8 @@ function MemberWaitingItemCard({
 }) {
   const palette = useTheme();
   const isAwaiting = ["for_review", "submitted"].includes(item.status);
+  const fg = isAwaiting ? palette.review : palette.warning;
+  const bg = isAwaiting ? palette.reviewSoft : palette.warningSoft;
 
   return (
     <HomeRow
@@ -1031,51 +1109,78 @@ function MemberWaitingItemCard({
     >
       <View
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          backgroundColor: isAwaiting ? palette.reviewSoft : palette.warningSoft,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: bg,
+          borderWidth: 1,
+          borderColor: withOpacity(fg, 0.2),
           alignItems: "center",
           justifyContent: "center",
+          flexShrink: 0,
         }}
       >
-        <ClipboardCheck
-          size={18}
-          color={isAwaiting ? palette.review : palette.warning}
-        />
+        <ClipboardCheck size={16} color={fg} />
       </View>
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: 4 }}>
         <Text
           style={{
             fontSize: 14,
-            fontWeight: "600",
+            fontWeight: "700",
             color: palette.text,
           }}
           numberOfLines={1}
         >
           {item.title}
         </Text>
-        <Text
+        <View
           style={{
-            fontSize: 12,
-            color: palette.mutedLabel,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 6,
           }}
-          numberOfLines={1}
         >
-          {item.projectTitle || item.workspaceName}
-        </Text>
-        <Text
-          style={{
-            fontSize: 12,
-            fontWeight: "500",
-            color: isAwaiting ? palette.review : palette.warning,
-          }}
-          numberOfLines={1}
-        >
-          {item.reason}
-        </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 999,
+              backgroundColor: bg,
+              borderWidth: 1,
+              borderColor: withOpacity(fg, 0.24),
+            }}
+          >
+            <Clock size={11.5} color={fg} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: fg,
+              }}
+              numberOfLines={1}
+            >
+              {item.reason}
+            </Text>
+          </View>
+          {!!(item.projectTitle || item.workspaceName) && (
+            <Text
+              style={{
+                fontSize: 12,
+                color: palette.mutedLabel,
+                flexShrink: 1,
+              }}
+              numberOfLines={1}
+            >
+              {item.projectTitle || item.workspaceName}
+            </Text>
+          )}
+        </View>
       </View>
-      <ChevronRight size={18} color={palette.mutedLabel} />
+      <HomeRowChevron />
     </HomeRow>
   );
 }
@@ -1146,38 +1251,55 @@ function DecisionCard({
         style={{
           width: 34,
           height: 34,
-          borderRadius: 10,
+          borderRadius: 17,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: bg,
+          borderWidth: 1,
+          borderColor: withOpacity(fg, 0.2),
+          flexShrink: 0,
         }}
       >
-        <Icon size={17} color={fg} />
+        <Icon size={16} color={fg} />
       </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text
-          numberOfLines={1}
+      <View style={{ flex: 1, gap: 3 }}>
+        <View
           style={{
-            fontSize: 11,
-            fontWeight: "800",
-            letterSpacing: 0.5,
-            textTransform: "uppercase",
-            color: fg,
+            alignSelf: "flex-start",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 999,
+            backgroundColor: bg,
+            borderWidth: 1,
+            borderColor: withOpacity(fg, 0.24),
           }}
         >
-          {categoryLabel}
-        </Text>
+          <Icon size={11.5} color={fg} />
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 11,
+              fontWeight: "700",
+              color: fg,
+            }}
+          >
+            {categoryLabel}
+          </Text>
+        </View>
         <Text
           numberOfLines={1}
-          style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
+          style={{ fontSize: 14.5, fontWeight: "700", color: palette.text }}
         >
           {row.title}
         </Text>
-        <Text numberOfLines={1} style={{ fontSize: 13, color: palette.mutedLabel }}>
+        <Text numberOfLines={1} style={{ fontSize: 12.5, color: palette.mutedLabel }}>
           {detail}
         </Text>
       </View>
-      <ChevronRight size={16} color={palette.mutedLabel} />
+      <HomeRowChevron />
     </HomeRow>
   );
 }
@@ -1224,39 +1346,46 @@ function ProjectProgressRow({
         flexDirection: "row",
         alignItems: "center",
         minHeight: 56,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderTopWidth: isFirst ? 0 : 0.5,
+        paddingHorizontal: 13,
+        paddingVertical: 11,
+        borderTopWidth: isFirst ? 0 : 1,
         borderColor: palette.border,
         backgroundColor: pressed ? palette.primarySoft : "transparent",
         gap: 12,
       })}
     >
-      <View style={{ flex: 1, gap: 3 }}>
+      <View style={{ flex: 1, gap: 4 }}>
         <Text
           style={{
-            fontWeight: "600",
-            fontSize: 15,
+            fontWeight: "700",
+            fontSize: 14.5,
             color: palette.text,
           }}
           numberOfLines={2}
         >
           {title}
         </Text>
-        <Text style={{ color: palette.mutedLabel, fontSize: 13 }}>
+        <Text style={{ color: palette.mutedLabel, fontSize: 12.5 }}>
           {summary}
         </Text>
         {!!risk?.size && (
           <View
             style={{
+              alignSelf: "flex-start",
               flexDirection: "row",
               alignItems: "center",
-              gap: 5,
-              marginTop: 2,
+              gap: 4,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 999,
+              backgroundColor: palette.warningSoft,
+              borderWidth: 1,
+              borderColor: withOpacity(palette.warning, 0.24),
+              marginTop: 1,
             }}
           >
-            <AlertCircle size={13} color={palette.warning} />
-            <Text style={{ fontSize: 12, color: palette.warning, flex: 1 }}>
+            <AlertCircle size={11.5} color={palette.warning} />
+            <Text style={{ fontSize: 11, fontWeight: "700", color: palette.warning }}>
               {[...risk].join(" · ")}
             </Text>
           </View>
@@ -1267,12 +1396,12 @@ function ProjectProgressRow({
         {percent != null && (
           <CircularProgressRing
             percent={percent}
-            size={46}
+            size={44}
             strokeWidth={4.5}
             accessibilityLabel={`Project completion: ${percent}%`}
           />
         )}
-        <ChevronRight size={16} color={palette.mutedLabel} />
+        <HomeRowChevron />
       </View>
     </Pressable>
   );

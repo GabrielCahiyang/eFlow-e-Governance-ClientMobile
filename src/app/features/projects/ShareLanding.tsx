@@ -1,4 +1,7 @@
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import Check from "lucide-react-native/icons/check";
 import { Button, ErrorState, Notice, Screen } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { openShare } from "../../../core/web/app/features/project-access/services/accessService";
 import { selectWorkspace } from "../../../core/web/app/features/workspaces/services/workspaceService";
@@ -13,6 +16,7 @@ export function ShareLanding({
   onClose: () => void;
 }) {
   const action = useAction();
+  const palette = useTheme();
   return (
     <Screen title="Project invitation">
       <Notice>
@@ -20,6 +24,7 @@ export function ShareLanding({
       </Notice>
       <Button
         busy={action.busy}
+        icon={<Check size={16} color={palette.onPrimary} />}
         onPress={() =>
           void action.run(async () => {
             const receipt = await openShare(grant),
@@ -36,7 +41,12 @@ export function ShareLanding({
       >
         Accept and open project
       </Button>
-      <Button variant="outline" disabled={action.busy} onPress={onClose}>
+      <Button
+        variant="outline"
+        disabled={action.busy}
+        icon={<ArrowLeft size={16} color={palette.primary} />}
+        onPress={onClose}
+      >
         Back to eFlow
       </Button>
       {!!action.error && <ErrorState context="action" error={action.error} />}

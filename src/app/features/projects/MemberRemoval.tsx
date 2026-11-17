@@ -1,4 +1,6 @@
 import { useState } from "react";
+import UserMinus from "lucide-react-native/icons/user-minus";
+import { useTheme } from "../../components/ui/Appearance";
 import { Button, ErrorState, Notice, Sheet } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
 import { useAction } from "../../shared/useAction";
@@ -24,6 +26,7 @@ export function MemberRemoval({
   office?: string | null;
 }) {
   const { toast } = useToast();
+  const palette = useTheme();
   const action = useAction(),
     [preview, setPreview] = useState<{
       impact: RemovalImpact;
@@ -35,6 +38,7 @@ export function MemberRemoval({
         variant="danger"
         disabled={busy}
         busy={action.busy}
+        icon={<UserMinus size={16} color={palette.onDanger} />}
         onPress={() =>
           void action.run(async () =>
             setPreview({
@@ -74,6 +78,7 @@ export function MemberRemoval({
         <Button
           variant="danger"
           busy={action.busy}
+          icon={<UserMinus size={16} color={palette.onDanger} />}
           onPress={() =>
             void action.run(async () => {
               await removePerson(preview!.impact, preview!.request);

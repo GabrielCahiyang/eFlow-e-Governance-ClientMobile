@@ -1,4 +1,10 @@
 import { useCallback, useEffect } from "react";
+import Archive from "lucide-react-native/icons/archive";
+import Check from "lucide-react-native/icons/check";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import Wallet from "lucide-react-native/icons/wallet";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -56,6 +62,7 @@ export function ProjectCloseoutSheet({
   onSaved: () => Promise<void>;
 }) {
   const archive = mode === "archive";
+  const palette = useTheme();
   const label = archive ? "Archive project" : "Complete project";
   const [draft, updateDraft, clearDraft] = useRetainedDraft(
     formDraftKey(actor, "project-closeout:" + project.id + ":" + mode),
@@ -125,12 +132,24 @@ export function ProjectCloseoutSheet({
       onClose={close}
       footer={
         <Row>
-          <Button variant="outline" disabled={action.busy} onPress={close}>
+          <Button
+            variant="outline"
+            disabled={action.busy}
+            icon={<X size={16} color={palette.primary} />}
+            onPress={close}
+          >
             Cancel closeout
           </Button>
           <Button
             busy={action.busy}
             disabled={facts.loading || !ready(checks)}
+            icon={
+              archive ? (
+                <Archive size={16} color={palette.onPrimary} />
+              ) : (
+                <Check size={16} color={palette.onPrimary} />
+              )
+            }
             onPress={() => void submit()}
           >
             {archive ? "Confirm archive" : "Confirm completion"}
@@ -163,6 +182,7 @@ export function ProjectCloseoutSheet({
               <Button
                 variant="outline"
                 disabled={action.busy}
+                icon={<Wallet size={16} color={palette.primary} />}
                 onPress={onOpenFunding}
               >
                 Open project funding
@@ -172,6 +192,7 @@ export function ProjectCloseoutSheet({
               <Button
                 variant="outline"
                 disabled={action.busy}
+                icon={<ExternalLink size={16} color={palette.primary} />}
                 onPress={() => {
                   onClose();
                   navigate({

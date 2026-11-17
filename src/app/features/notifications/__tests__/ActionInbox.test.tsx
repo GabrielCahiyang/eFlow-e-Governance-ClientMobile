@@ -610,3 +610,46 @@ test("mark all read asks first, confirms the server write, and reports failures"
   );
   expect(markAllInboxUpdatesRead).toHaveBeenLastCalledWith("actor");
 });
+
+test("reviews renders summary hero counts, Waiting cash pill, and searchable recovery", async () => {
+  jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+  jest.mocked(fetchAssignedSubtaskReviews).mockResolvedValueOnce([
+    {
+      id: "prop-1",
+      root_id: "root-1",
+      node_id: "node-1",
+      task_title: "Site Fiber Upgrade",
+      subtask_title: "Configure floor 2 rack",
+      kind: "completion",
+      submitted_at: "2026-11-14",
+      cash_blocked: true,
+    },
+  ]);
+  await render(<ActionInbox navigate={jest.fn()} initialView="decisions" />);
+  expect(await screen.findByText("WORK REVIEWS")).toBeOnTheScreen();
+  expect(screen.getByText("FINANCIAL REVIEWS")).toBeOnTheScreen();
+  expect(screen.getByText("Waiting cash")).toBeOnTheScreen();
+
+  await fireEvent.changeText(
+    screen.getByPlaceholderText("Search reviews"),
+    "no-such-review",
+  );
+  expect(screen.getByText("No matching reviews")).toBeOnTheScreen();
+
+  await fireEvent.press(screen.getByRole("button", { name: "Clear filters" }));
+  expect(screen.getByText("Configure floor 2 rack")).toBeOnTheScreen();
+});
+
+test("empty updates and reviews views render caught-up states without refresh buttons", async () => {
+  jest.mocked(fetchInboxUpdatePage).mockResolvedValueOnce({ items: [] });
+  jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+  jest.mocked(fetchAssignedSubtaskReviews).mockResolvedValueOnce([]);
+
+  await render(<ActionInbox navigate={jest.fn()} initialView="notifications" />);
+  expect(await screen.findByText("You're all caught up")).toBeOnTheScreen();
+  expect(screen.queryByRole("button", { name: "Refresh updates" })).toBeNull();
+
+  await render(<ActionInbox navigate={jest.fn()} initialView="decisions" />);
+  expect(await screen.findByText("You're all caught up")).toBeOnTheScreen();
+  expect(screen.queryByRole("button", { name: "Refresh reviews" })).toBeNull();
+});

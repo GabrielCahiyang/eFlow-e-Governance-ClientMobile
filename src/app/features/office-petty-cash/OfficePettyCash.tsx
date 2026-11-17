@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
-import { Linking } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { createLiveRefreshController } from "../../shared/liveUpdates";
+import Banknote from "lucide-react-native/icons/banknote";
+import Check from "lucide-react-native/icons/check";
+import CircleAlert from "lucide-react-native/icons/circle-alert";
+import Coins from "lucide-react-native/icons/coins";
+import FileText from "lucide-react-native/icons/file-text";
+import Plus from "lucide-react-native/icons/plus";
+import Receipt from "lucide-react-native/icons/receipt";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Upload from "lucide-react-native/icons/upload";
+import Wallet from "lucide-react-native/icons/wallet";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -8,14 +20,16 @@ import {
   DateField,
   ErrorState,
   Field,
-  LabelValue,
   Loading,
   Notice,
   Row,
   Sheet,
   Status,
   peso,
+  withOpacity,
 } from "../../components/ui";
+import { Text } from "../../components/ui/Typography";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
 import { useToast } from "../../components/ui/Toast";
@@ -26,7 +40,7 @@ import {
   isDeterministicRejection,
 } from "../../shared/userMessages";
 import { supabase } from "../../../platform/supabase";
-import { chooseFiles } from "../../../platform/files";
+import { chooseFiles, openFileUrl } from "../../../platform/files";
 import { draftStore } from "../../../platform/draftStore";
 import { getPhilippineCalendarDate } from "../../../core/web/app/shared/calendarDates";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
@@ -84,6 +98,9 @@ export function OfficePettyCash({
   requestId?: string;
 }) {
   const { profile, organization } = useAuth();
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  const [filter, setFilter] = useState<"all" | "action" | "mine">("all");
   const assertAccess = useAccountActionAccess();
   const actor = profile?.id || "";
   const ownOffice = profile?.org_id === office;
@@ -120,6 +137,22 @@ export function OfficePettyCash({
   }, [office, actor, facts.refresh]);
   const { toast } = useToast();
   const action = useAction();
+  const viewReceipt = (path: string) =>
+    void action.run(async () => {
+      const opened = await openFileUrl(async () => {
+        const { data, error } = await supabase.storage
+          .from("office-petty-receipts")
+          .createSignedUrl(path, 60);
+        if (error) throw error;
+        if (!data?.signedUrl)
+          throw new PublicMessageError("This receipt is unavailable.");
+        return data.signedUrl;
+      });
+      if (!opened)
+        throw new PublicMessageError(
+          "Allow pop-ups for eFlow in your browser, then tap the receipt again.",
+        );
+    });
   const [edit, setEdit] = useState<{ kind: Kind; request?: Request }>();
   const data = facts.error ? undefined : facts.data;
   const ready =
@@ -240,17 +273,95 @@ export function OfficePettyCash({
       });
     }, "Office petty cash updated.");
   }
-  const commandButton = (kind: Kind, r: Request) => (
-    <Button key={kind} variant="outline" onPress={() => start(kind, r)}>
-      {labels[kind]}
-    </Button>
+  const primaryKinds = new Set<Kind>(["approve", "release", "endorse", "settle"]);
+  const compactLabels: Record<Kind, string> = {
+    request: "Request cash",
+    replenish: "Replenish",
+    approve: "Approve",
+    reject: "Reject",
+    cancel: "Cancel request",
+    release: "Record release",
+    receipts: "Submit receipts",
+    endorse: "Endorse",
+    return_receipts: "Return",
+    settle: "Settle",
+  };
+  const commandIcon = (kind: Kind, color: string) => {
+    switch (kind) {
+      case "approve":
+      case "settle":
+        return <Check size={12.5} color={color} />;
+      case "release":
+      case "replenish":
+        return <Banknote size={12.5} color={color} />;
+      case "endorse":
+        return <ShieldCheck size={12.5} color={color} />;
+      case "receipts":
+        return <Upload size={12.5} color={color} />;
+      case "request":
+        return <Plus size={12.5} color={color} />;
+      default:
+        return <X size={12.5} color={color} />;
+    }
+  };
+  const commandButton = (kind: Kind, r: Request) => {
+    const isPrimary = primaryKinds.has(kind);
+    const iconColor = isPrimary ? palette.onPrimary : palette.primary;
+    return (
+      <Button
+        key={kind}
+        compact
+        variant={isPrimary ? "primary" : "outline"}
+        icon={commandIcon(kind, iconColor)}
+        accessibilityLabel={`${labels[kind]} for ${r.purpose}`}
+        onPress={() => start(kind, r)}
+      >
+        {compactLabels[kind]}
+      </Button>
+    );
+  };
+  const needsActorAction = (r: Request) =>
+    (head &&
+      actor !== r.requester &&
+      (r.status === "pending" || r.status === "receipt_review")) ||
+    (accounting &&
+      (r.status === "approved" ||
+        (r.canSettle === true && r.status === "receipt_approved"))) ||
+    (actor === r.requester && r.status === "released");
+
+  const scopedRequests = (data?.requests ?? []).filter(
+    (r) => !requestId || r.id === requestId,
   );
+  const actionNeededCount = scopedRequests.filter(needsActorAction).length;
+  const mineCount = scopedRequests.filter((r) => r.requester === actor).length;
+  const visibleRequests = requestId
+    ? scopedRequests
+    : scopedRequests.filter((r) =>
+        filter === "action"
+          ? needsActorAction(r)
+          : filter === "mine"
+            ? r.requester === actor
+            : true,
+      );
+
+  const rowCommands = (r: Request): Kind[] => {
+    if (pending || !ready) return [];
+    const list: Kind[] = [];
+    if (actor === r.requester && ["pending", "approved"].includes(r.status))
+      list.push("cancel");
+    if (head && actor !== r.requester && r.status === "pending")
+      list.push("approve", "reject");
+    if (accounting && r.status === "approved") list.push("release");
+    if (actor === r.requester && r.status === "released") list.push("receipts");
+    if (head && actor !== r.requester && r.status === "receipt_review")
+      list.push("endorse", "return_receipts");
+    if (accounting && r.canSettle === true && r.status === "receipt_approved")
+      list.push("settle");
+    return list;
+  };
+
   return (
-    <Card title="Office petty cash">
-      <Notice>
-        One shared ₱30,000 starting fund. Up to ₱5,000 per receipt. Separate
-        from project and task budgets.
-      </Notice>
+    <View style={s.root}>
       {facts.loading && !data && (
         <Loading label="Loading Office petty cash" layout="summary" />
       )}
@@ -263,104 +374,281 @@ export function OfficePettyCash({
           retry={() => void recovery.refresh()}
         />
       )}
-      {!!action.notice && <Notice>{action.notice}</Notice>}
+      {!!action.notice && <Notice tone="neutral">{action.notice}</Notice>}
       {!!data && (
         <>
-          <LabelValue
-            label="Available to request"
-            value={peso(data.available)}
-          />
-          <LabelValue label="Reserved requests" value={peso(data.reserved)} />
-          <LabelValue
-            label="Outstanding advances"
-            value={peso(data.outstanding)}
-          />
-          {accounting && (
-            <LabelValue
-              label="Can replenish"
-              value={peso(data.replenishable)}
-            />
-          )}
+          <LinearGradient
+            colors={[palette.heroStart, palette.heroEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              s.heroCard,
+              {
+                borderColor: isDark
+                  ? withOpacity(palette.primary, 0.28)
+                  : "rgba(148, 186, 255, 0.24)",
+              },
+            ]}
+          >
+            <View>
+              <Text style={s.heroEyebrow}>Office revolving fund</Text>
+              <Text style={s.heroSub}>
+                ₱30,000 starting · ₱5,000/receipt · Separate from project budgets
+              </Text>
+            </View>
+            <View style={s.heroPods}>
+              <View style={s.heroPod}>
+                <View style={s.heroPodBadge}>
+                  <Coins size={16} color="#ffffff" />
+                </View>
+                <View style={s.podCopy}>
+                  <Text style={s.podLabel}>Available</Text>
+                  <Text style={s.podValue}>{peso(data.available)}</Text>
+                </View>
+              </View>
+              <View style={s.heroPod}>
+                <View style={s.heroPodBadge}>
+                  <Wallet size={16} color="#ffffff" />
+                </View>
+                <View style={s.podCopy}>
+                  <Text style={s.podLabel}>Reserved</Text>
+                  <Text style={s.podValue}>{peso(data.reserved)}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={s.heroPills}>
+              <View
+                style={[
+                  s.heroMicroPill,
+                  data.outstanding > 0 && s.heroMicroPillWarn,
+                ]}
+              >
+                <Text style={s.heroMicroText}>
+                  Outstanding {peso(data.outstanding)}
+                </Text>
+              </View>
+              {accounting && (
+                <View style={s.heroMicroPill}>
+                  <Text style={s.heroMicroText}>
+                    Can replenish {peso(data.replenishable)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </LinearGradient>
+
           {!requestId && !pending && ready && ownOffice && (
-            <Row>
-              <Button onPress={() => start("request")}>{labels.request}</Button>
+            <View style={s.topActions}>
+              <Button
+                style={s.topActionBtn}
+                icon={<Plus size={15} color={palette.onPrimary} />}
+                onPress={() => start("request")}
+              >
+                Request cash
+              </Button>
               {accounting && data.replenishable > 0 && (
-                <Button variant="outline" onPress={() => start("replenish")}>
-                  {labels.replenish}
+                <Button
+                  variant="outline"
+                  style={s.topActionBtn}
+                  icon={<Banknote size={15} color={palette.primary} />}
+                  onPress={() => start("replenish")}
+                >
+                  Replenish
                 </Button>
               )}
-            </Row>
+            </View>
           )}
-          {requestId && !data.requests.some((r) => r.id === requestId) && (
+
+          {!requestId && scopedRequests.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.filterRow}
+            >
+              {(
+                [
+                  { key: "all", label: `All (${scopedRequests.length})` },
+                  {
+                    key: "action",
+                    label: `Action needed (${actionNeededCount})`,
+                  },
+                  { key: "mine", label: `Mine (${mineCount})` },
+                ] as const
+              ).map((item) => {
+                const selected = filter === item.key;
+                return (
+                  <Pressable
+                    key={item.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => setFilter(item.key)}
+                    style={[
+                      s.filterChip,
+                      {
+                        borderColor: selected ? palette.primary : palette.border,
+                        backgroundColor: selected
+                          ? palette.primarySoft
+                          : palette.surface,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.filterChipText,
+                        { color: selected ? palette.primary : palette.muted },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {requestId && scopedRequests.length === 0 ? (
             <Empty
               compact
               kind="finance"
               title="This Office petty cash request is unavailable"
             />
+          ) : (
+            <Card
+              title="Fund requests"
+              icon={<Receipt size={16} color={palette.primary} />}
+              badge={`${visibleRequests.length} ${visibleRequests.length === 1 ? "item" : "items"}`}
+            >
+              {visibleRequests.length === 0 ? (
+                <Empty
+                  compact
+                  kind="finance"
+                  title={
+                    filter === "action"
+                      ? "No petty cash actions needed"
+                      : filter === "mine"
+                        ? "You have no petty cash requests"
+                        : "No petty cash requests yet"
+                  }
+                />
+              ) : (
+                <View
+                  style={[
+                    s.insetGroup,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: isDark
+                        ? withOpacity(palette.background, 0.72)
+                        : "#f7f9fd",
+                    },
+                  ]}
+                >
+                  {visibleRequests.map((r, index) => {
+                    const cmds = rowCommands(r);
+                    return (
+                      <View
+                        key={r.id}
+                        style={[
+                          s.reqRow,
+                          index < visibleRequests.length - 1 && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: palette.border,
+                          },
+                        ]}
+                      >
+                        <View style={s.reqTop}>
+                          <Text
+                            style={[s.reqPurpose, { color: palette.text }]}
+                          >
+                            {r.purpose}
+                          </Text>
+                          <Text style={[s.reqAmt, { color: palette.text }]}>
+                            {peso(r.amount)}
+                          </Text>
+                        </View>
+                        <View style={s.reqSub}>
+                          <Text style={[s.reqPerson, { color: palette.muted }]}>
+                            {r.requester === actor ? "You" : r.requesterName}
+                          </Text>
+                          <Status
+                            value={r.status}
+                            domain="finance"
+                            variant="pill"
+                          />
+                        </View>
+                        {r.settlementBlocked && (
+                          <View
+                            style={[
+                              s.blockedBanner,
+                              {
+                                backgroundColor: palette.dangerSoft,
+                                borderColor: withOpacity(palette.danger, 0.28),
+                              },
+                            ]}
+                          >
+                            <CircleAlert
+                              size={13}
+                              color={palette.danger}
+                              style={s.blockedIcon}
+                            />
+                            <Text
+                              style={[
+                                s.blockedText,
+                                { color: palette.danger },
+                              ]}
+                            >
+                              {r.headNotified
+                                ? "Escalated to the Head. "
+                                : ""}
+                              Staff cannot settle their own petty cash.
+                            </Text>
+                          </View>
+                        )}
+                        {(r.receipts.length > 0 || cmds.length > 0) && (
+                          <View style={s.reqActions}>
+                            <View style={s.receiptChips}>
+                              {r.receipts.map((receipt, i) => (
+                                <Pressable
+                                  key={receipt.path}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`View receipt ${i + 1} for ${r.purpose}`}
+                                  onPress={() => viewReceipt(receipt.path)}
+                                  style={({ pressed }) => [
+                                    s.receiptChip,
+                                    {
+                                      borderColor: palette.border,
+                                      backgroundColor: pressed
+                                        ? palette.primarySoft
+                                        : palette.surface,
+                                    },
+                                  ]}
+                                >
+                                  <FileText
+                                    size={12.5}
+                                    color={palette.primary}
+                                  />
+                                  <Text
+                                    style={[
+                                      s.receiptChipText,
+                                      { color: palette.primary },
+                                    ]}
+                                  >
+                                    Receipt {i + 1}
+                                  </Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                            {cmds.length > 0 && (
+                              <Row>{cmds.map((k) => commandButton(k, r))}</Row>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </Card>
           )}
-          {data.requests
-            .filter((r) => !requestId || r.id === requestId)
-            .map((r) => (
-              <Card key={r.id} title={r.purpose}>
-                <LabelValue label={r.requesterName} value={peso(r.amount)} />
-                <Status value={r.status} domain="finance" />
-                {r.settlementBlocked && (
-                  <Notice>
-                    {r.headNotified
-                      ? "Automatically escalated to the Head. "
-                      : ""}
-                    No eligible Accounting Officer is available. Staff cannot
-                    settle their own petty cash.
-                  </Notice>
-                )}
-                {r.receipts.map((receipt, i) => (
-                  <Button
-                    key={receipt.path}
-                    variant="outline"
-                    onPress={() =>
-                      void action.run(async () => {
-                        const { data, error } = await supabase.storage
-                          .from("office-petty-receipts")
-                          .createSignedUrl(receipt.path, 60);
-                        if (error) throw error;
-                        await Linking.openURL(data.signedUrl);
-                      })
-                    }
-                  >
-                    View receipt {i + 1}
-                  </Button>
-                ))}
-                {!pending && ready && (
-                  <Row>
-                    {actor === r.requester &&
-                      ["pending", "approved"].includes(r.status) &&
-                      commandButton("cancel", r)}
-                    {head &&
-                      actor !== r.requester &&
-                      r.status === "pending" && [
-                        commandButton("approve", r),
-                        commandButton("reject", r),
-                      ]}
-                    {accounting &&
-                      r.status === "approved" &&
-                      commandButton("release", r)}
-                    {actor === r.requester &&
-                      r.status === "released" &&
-                      commandButton("receipts", r)}
-                    {head &&
-                      actor !== r.requester &&
-                      r.status === "receipt_review" && [
-                        commandButton("endorse", r),
-                        commandButton("return_receipts", r),
-                      ]}
-                    {accounting &&
-                      r.canSettle === true &&
-                      r.status === "receipt_approved" &&
-                      commandButton("settle", r)}
-                  </Row>
-                )}
-              </Card>
-            ))}
         </>
       )}
       {!!(edit || pending) && (
@@ -379,6 +667,7 @@ export function OfficePettyCash({
             <Button
               busy={action.busy}
               disabled={!pending && !ready}
+              icon={commandIcon(pending?.action ?? edit!.kind, palette.onPrimary)}
               onPress={save}
             >
               {labels[pending?.action ?? edit!.kind]}
@@ -463,6 +752,7 @@ export function OfficePettyCash({
                       <Button
                         variant="outline"
                         busy={action.busy}
+                        icon={<Upload size={15} color={palette.primary} />}
                         onPress={() =>
                           void action.run(async () => {
                             const [file] = await chooseFiles(formats);
@@ -493,6 +783,7 @@ export function OfficePettyCash({
                       <Button
                         variant="ghost"
                         disabled={action.busy}
+                        icon={<X size={15} color={palette.primary} />}
                         onPress={() =>
                           updateDraft((old) => ({
                             ...old,
@@ -508,6 +799,7 @@ export function OfficePettyCash({
                     <Button
                       variant="outline"
                       disabled={action.busy}
+                      icon={<Plus size={15} color={palette.primary} />}
                       onPress={() =>
                         updateDraft((old) => ({
                           ...old,
@@ -536,6 +828,201 @@ export function OfficePettyCash({
       {!edit && !pending && !!action.error && (
         <ErrorState context="action" error={action.error} />
       )}
-    </Card>
+    </View>
   );
 }
+
+const s = StyleSheet.create({
+  root: { gap: 12 },
+  heroCard: {
+    borderRadius: 22,
+    padding: 14,
+    borderWidth: 1,
+    gap: 11,
+  },
+  heroEyebrow: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.75)",
+  },
+  heroSub: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: "rgba(255,255,255,0.84)",
+    marginTop: 2,
+  },
+  heroPods: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  heroPod: {
+    flex: 1,
+    minWidth: 140,
+    borderRadius: 15,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  heroPodBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  podCopy: { flex: 1, minWidth: 0 },
+  podLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.74)",
+  },
+  podValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#ffffff",
+    fontVariant: ["tabular-nums"],
+  },
+  heroPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  heroMicroPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  heroMicroPillWarn: {
+    backgroundColor: "rgba(251,191,36,0.22)",
+    borderColor: "rgba(251,191,36,0.38)",
+  },
+  heroMicroText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.94)",
+    fontVariant: ["tabular-nums"],
+  },
+  topActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  topActionBtn: {
+    flex: 1,
+    minWidth: 140,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 7,
+    paddingVertical: 1,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    minHeight: 34,
+    justifyContent: "center",
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  insetGroup: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  reqRow: {
+    padding: 12,
+    gap: 7,
+  },
+  reqTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  reqPurpose: {
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 19,
+    flex: 1,
+  },
+  reqAmt: {
+    fontSize: 14.5,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  reqSub: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  reqPerson: {
+    fontSize: 12.5,
+    fontWeight: "500",
+  },
+  blockedBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  blockedIcon: {
+    marginTop: 2,
+    flexShrink: 0,
+  },
+  blockedText: {
+    fontSize: 12,
+    lineHeight: 16,
+    flex: 1,
+  },
+  reqActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 2,
+  },
+  receiptChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  receiptChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    minHeight: 32,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  receiptChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+});

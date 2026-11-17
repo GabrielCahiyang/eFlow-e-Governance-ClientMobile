@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Search from "lucide-react-native/icons/search";
 import {
   Button,
   Card,
@@ -102,6 +105,7 @@ export function ProjectAuditTrail({
       />
       <Button
         variant="outline"
+        icon={<Search size={16} color={palette.primary} />}
         onPress={() => {
           setPage(firstPage);
           setFilters((current) => ({ ...current, search: search.trim() }));
@@ -139,6 +143,7 @@ export function ProjectAuditTrail({
             <Button
               variant="outline"
               disabled={facts.loading || page.index === 0}
+              icon={<ChevronLeft size={16} color={palette.primary} />}
               onPress={() =>
                 setPage({ index: page.index - 1, snapshot: history.snapshot })
               }
@@ -148,6 +153,7 @@ export function ProjectAuditTrail({
             <Button
               variant="outline"
               disabled={facts.loading || !history.more}
+              icon={<ChevronRight size={16} color={palette.primary} />}
               onPress={() =>
                 setPage({ index: page.index + 1, snapshot: history.snapshot })
               }
@@ -157,7 +163,7 @@ export function ProjectAuditTrail({
           </Row>
         </>
       ) : (
-        <Empty kind="activity" title="No matching activity" />
+        <Empty kind="search" title="No matching activity" />
       )}
     </Card>
   );

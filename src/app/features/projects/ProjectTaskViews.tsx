@@ -1,7 +1,9 @@
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
+import Wallet from "lucide-react-native/icons/wallet";
 import { StyleSheet } from "react-native";
+import { useTheme } from "../../components/ui/Appearance";
 import { Pressable, ScrollView, View } from "../../components/ui/Primitives";
 import {
   Button,
@@ -30,6 +32,7 @@ export function ProjectTaskTable({
   columns: string[];
 }) {
   const { organization } = useAuth();
+  const palette = useTheme();
   const text = (value: string) => (
     <Text style={{ color: colors.text, fontSize: 13, lineHeight: 19 }}>
       {value}
@@ -122,6 +125,7 @@ export function ProjectTaskTable({
       render: (t: Task) => (
         <Button
           variant="ghost"
+          icon={<Wallet size={16} color={palette.primary} />}
           onPress={() => navigate({ name: "task", id: t.id, view: "budget" })}
         >
           View funding
@@ -173,17 +177,9 @@ export function ProjectBoard({
       ].map((status) => (
         <View key={status} style={s.lane}>
           <Row>
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: resolve(status).color ?? STATUS_COLORS[status],
-              }}
-            />
+            <Status value={status} variant="pill" work />
             <Text style={s.heading}>
-              {resolve(status).label} (
-              {tasks.filter((t) => t.status === status).length})
+              ({tasks.filter((t) => t.status === status).length})
             </Text>
           </Row>
           {tasks

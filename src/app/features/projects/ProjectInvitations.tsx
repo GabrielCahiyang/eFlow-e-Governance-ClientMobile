@@ -1,4 +1,12 @@
 import { useState } from "react";
+import Building2 from "lucide-react-native/icons/building";
+import Check from "lucide-react-native/icons/check";
+import Mail from "lucide-react-native/icons/mail";
+import Paperclip from "lucide-react-native/icons/paperclip";
+import Send from "lucide-react-native/icons/send";
+import UserPlus from "lucide-react-native/icons/user-plus";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -53,6 +61,7 @@ type Saved = {
 export function ProjectInvitations({ project }: { project: string }) {
   const { profile, organization } = useAuth(),
     { toast } = useToast(),
+    palette = useTheme(),
     actor = profile!.id,
     facts = useFacts("project-invitations:" + actor + ":" + project, () =>
       listProjectInvitations(project),
@@ -221,6 +230,7 @@ export function ProjectInvitations({ project }: { project: string }) {
               disabled={
                 recovery.loading || !!recovery.error || !facts.data?.office_id
               }
+              icon={<UserPlus size={16} color={palette.onPrimary} />}
               onPress={() => {
                 action.clear();
                 setOpen(true);
@@ -244,6 +254,7 @@ export function ProjectInvitations({ project }: { project: string }) {
                 variant="outline"
                 disabled={!sponsor || !facts.data.workspace_id}
                 busy={action.busy}
+                icon={<Building2 size={16} color={palette.primary} />}
                 onPress={() =>
                   void action.run(async () => {
                     await designateSponsor(facts.data!.workspace_id!, sponsor);
@@ -265,11 +276,15 @@ export function ProjectInvitations({ project }: { project: string }) {
               <Row>
                 {item.can_approve && (
                   <>
-                    <Button onPress={() => void decide(item, "approved")}>
+                    <Button
+                      icon={<Check size={16} color={palette.onPrimary} />}
+                      onPress={() => void decide(item, "approved")}
+                    >
                       Approve request
                     </Button>
                     <Button
                       variant="danger"
+                      icon={<X size={16} color={palette.onDanger} />}
                       onPress={() => void decide(item, "rejected")}
                     >
                       Reject request
@@ -279,6 +294,7 @@ export function ProjectInvitations({ project }: { project: string }) {
                 {item.can_dispatch && (
                   <Button
                     busy={action.busy}
+                    icon={<Mail size={16} color={palette.onPrimary} />}
                     onPress={() =>
                       void action.run(async () => {
                         const resend =
@@ -306,6 +322,7 @@ export function ProjectInvitations({ project }: { project: string }) {
                 {item.can_revoke && item.state !== "accepted" && (
                   <Button
                     variant="danger"
+                    icon={<X size={16} color={palette.onDanger} />}
                     onPress={() => void decide(item, "revoked")}
                   >
                     Revoke request
@@ -329,6 +346,7 @@ export function ProjectInvitations({ project }: { project: string }) {
                 {item.can_complete_onboarding && (
                   <Button
                     busy={action.busy}
+                    icon={<Check size={16} color={palette.onPrimary} />}
                     onPress={() =>
                       void action.run(async () => {
                         await completeProjectOnboarding(item.id);
@@ -343,6 +361,7 @@ export function ProjectInvitations({ project }: { project: string }) {
                   <Button
                     variant="outline"
                     busy={action.busy}
+                    icon={<Paperclip size={16} color={palette.primary} />}
                     onPress={() =>
                       void action.run(async () => {
                         const file = (await chooseFiles("application/pdf"))[0];
@@ -432,6 +451,7 @@ export function ProjectInvitations({ project }: { project: string }) {
         <Button
           busy={action.busy}
           disabled={recovery.loading || !!recovery.error}
+          icon={<Send size={16} color={palette.onPrimary} />}
           onPress={() => void submit()}
         >
           {direct

@@ -22,6 +22,7 @@ export type Channel = {
   projectId?: string;
   projectTitle?: string;
   lastMessage?: string;
+  lastMessageAt?: string;
   unread?: boolean;
   otherId?: string;
   otherName?: string;
@@ -59,6 +60,7 @@ export async function loadChannels() {
     otherId: row.other_user_id || undefined,
     otherName: row.other_user_id ? row.name : undefined,
     lastMessage: row.last_message || undefined,
+    lastMessageAt: row.last_message_at || undefined,
     unread: row.unread === true,
   }));
 }

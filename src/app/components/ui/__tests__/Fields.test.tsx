@@ -1,6 +1,9 @@
 import { expect, jest, test } from "@jest/globals";
-import { fireEvent, render } from "@testing-library/react-native";
-import { Choice, DateField } from "../Fields";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { AppearanceProvider } from "../Appearance";
+import { Choice, DateField, SearchField } from "../Fields";
+import { FilterChip } from "../FilterChip";
 
 test.each([false, true])("confirmed picker stages changes and discards X/Cancel until explicit confirmation; multiple=%s", async (multiple) => {
   const onChange = jest.fn();
@@ -95,4 +98,71 @@ test("Choice renders inline errors inside the open picker and DateField uses Con
   await fireEvent.press(view.getByRole("button", { name: "Start date" }));
   expect(view.queryByRole("button", { name: "Done" })).toBeNull();
   expect(view.getByRole("button", { name: "Confirm date" })).toBeOnTheScreen();
+});
+
+test("SearchField applies dark mode theme tokens, clear action, and docked filterTrigger", async () => {
+  (AsyncStorage.getItem as jest.Mock).mockImplementation((key: unknown) =>
+    Promise.resolve(key === "eflow.appearance" ? "dark" : null),
+  );
+  const onChange = jest.fn();
+  const onFilterPress = jest.fn();
+
+  const view = await render(
+    <AppearanceProvider>
+      <SearchField
+        value="budget"
+        onChange={onChange}
+        placeholder="Search projects"
+        accessibilityLabel="Search projects"
+        filterTrigger={{
+          label: "Active",
+          accessibilityLabel: "Filter projects: Active",
+          active: true,
+          onPress: onFilterPress,
+        }}
+      />
+    </AppearanceProvider>,
+  );
+
+  const input = view.getByLabelText("Search projects");
+  await waitFor(() => {
+    expect(input).toHaveStyle({ color: "#eef3ff" });
+  });
+
+  await fireEvent.press(view.getByRole("button", { name: "Clear search text" }));
+  expect(onChange).toHaveBeenCalledWith("");
+
+  await fireEvent.press(view.getByRole("button", { name: "Filter projects: Active" }));
+  expect(onFilterPress).toHaveBeenCalledTimes(1);
+});
+
+test("FilterChip supports showZeroCount, selected state, and removable chips", async () => {
+  const onPress = jest.fn();
+  const view = await render(
+    <>
+      <FilterChip
+        label="Settled"
+        count={0}
+        showZeroCount
+        selected
+        accessibilityLabel="Settled · 0"
+        onPress={onPress}
+      />
+      <FilterChip
+        label="Archived"
+        tone="tinted"
+        removable
+        accessibilityLabel="Remove filter: Archived"
+        onPress={onPress}
+      />
+    </>,
+  );
+
+  const settledChip = view.getByRole("button", { name: "Settled · 0" });
+  expect(settledChip).toBeOnTheScreen();
+  expect(view.getByText("0")).toBeOnTheScreen();
+
+  const removeChip = view.getByRole("button", { name: "Remove filter: Archived" });
+  await fireEvent.press(removeChip);
+  expect(onPress).toHaveBeenCalledTimes(1);
 });

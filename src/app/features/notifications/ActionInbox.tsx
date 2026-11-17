@@ -9,12 +9,22 @@ import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
 import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { useEffect, useRef, useState } from "react";
 import { AppState, Pressable, ScrollView, View } from "react-native";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import CheckCheck from "lucide-react-native/icons/check-check";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import { useIsTabRoot } from "../navigation/tabRootContext";
-import { Button, Empty, ErrorState } from "../../components/ui";
-
-import ChevronRight from "lucide-react-native/icons/chevron-right";
+import { Button, Empty, ErrorState, PageHeader } from "../../components/ui";
+import {
+  ReviewsFilterBar,
+  ReviewsHeader,
+  ReviewsQueueCard,
+  ReviewsSummaryHero,
+  reviewKinds,
+  type DecisionItem,
+  type ReviewKind,
+} from "./ReviewsBoard";
 import { useTheme } from "../../components/ui/Appearance";
 import {
   FolderPullArea,
@@ -59,19 +69,7 @@ import {
 import { getActionableSettlementEscalations } from "../budget";
 import type { AppRoute, Navigate } from "../../shared/routes";
 
-type ReviewKind = "all" | "task" | "subtask" | "personal" | "financial";
-const reviewKinds: { kind: ReviewKind; label: string }[] = [
-  { kind: "all", label: "All" },
-  { kind: "task", label: "Tasks" },
-  { kind: "subtask", label: "Subtasks" },
-  { kind: "personal", label: "Personal" },
-  { kind: "financial", label: "Financial" },
-];
-type Decision = {
-  key: string;
-  kind: Exclude<ReviewKind, "all">;
-  title: string;
-  context: string;
+type Decision = DecisionItem & {
   route: AppRoute;
   verifyRoute?: () => Promise<AppRoute>;
 };
@@ -122,7 +120,8 @@ export function ActionInbox({
   const actor = profile!.id;
   const palette = useTheme();
   const tabRoot = useIsTabRoot(),
-    inset = useSafeAreaInsets();
+    inset = useSafeAreaInsets(),
+    navHeader = useNavigationHeader();
   const reviews = initialView === "decisions";
   const work = useMobileWorkFeed();
   const tasks = useTaskFacts("inbox-decisions", reviews);
@@ -139,6 +138,7 @@ export function ActionInbox({
   const [filter, setFilter] = useState<Filter>("all");
   const [category, setCategory] = useState<InboxCategory>("all");
   const [reviewKind, setReviewKind] = useState<ReviewKind>("all");
+  const [reviewSearch, setReviewSearch] = useState("");
   // The unfiltered feed stays loaded for staffing alerts and the default
   // view; any narrower view reads its own server-filtered pages.
   const [searchText, setSearchText] = useState("");
@@ -359,6 +359,7 @@ export function ActionInbox({
       context: review.cash_blocked
         ? `${review.task_title} · Waiting for cash settlement`
         : `${review.task_title} · ${review.kind === "completion" ? "Completion" : "Progress"} review`,
+      cashBlocked: Boolean(review.cash_blocked),
       route: assignedSubtaskReviewRoute(review),
       verifyRoute: async () => {
         const tree = await fetchWorkTree(review.root_id);
@@ -402,9 +403,12 @@ export function ActionInbox({
   const allAssigned = [
     ...new Map(decisions.map((item) => [item.key, item])).values(),
   ];
-  const assigned = allAssigned.filter(
-    (item) => reviewKind === "all" || item.kind === reviewKind,
-  );
+  const reviewQuery = reviewSearch.trim().toLowerCase();
+  const assigned = allAssigned.filter((item) => {
+    if (reviewKind !== "all" && item.kind !== reviewKind) return false;
+    if (!reviewQuery) return true;
+    return `${item.title} ${item.context}`.toLowerCase().includes(reviewQuery);
+  });
   const updatesTitle = updateViewTitle(filter, category);
   const updatesForView = feed.items
     .map((item) =>
@@ -415,12 +419,6 @@ export function ActionInbox({
         filter === "all" || (filter === "unread" ? !item.read : item.read),
     );
   const sections: { key: string; title: string; data: Entry[] }[] = [];
-  if (reviews && assigned.length)
-    sections.push({
-      key: "decisions",
-      title: "Awaiting your review",
-      data: assigned.map((decision) => ({ key: decision.key, decision })),
-    });
   if (!reviews && updatesForView.length)
     sections.push({
       key: `${filter}:${category}`,
@@ -514,6 +512,12 @@ export function ActionInbox({
     setSearch("");
   };
 
+  const openDecisionRoute = (decision: Decision) => {
+    const { verifyRoute, route } = decision;
+    if (!verifyRoute) navigate(route);
+    else void openDecision.run(async () => navigate(await verifyRoute()));
+  };
+
   const list = (
     <RefreshSectionList
       style={{ backgroundColor: palette.background }}
@@ -531,38 +535,33 @@ export function ActionInbox({
           style={{
             gap: space.md,
             marginBottom: space.xs,
-            // Tab roots have no fixed bar, so clear the status bar here.
-            paddingTop: tabRoot ? inset.top : 0,
+            paddingTop: navHeader?.topInset ?? (tabRoot ? inset.top : 0),
           }}
         >
-          {tabRoot && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              accessibilityHint="Returns to Home"
-              onPress={() => navigate({ name: "overview" })}
-              hitSlop={8}
-              style={({ pressed }) => ({
-                alignSelf: "flex-start",
-                width: 44,
-                height: 44,
-                marginLeft: -10,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 22,
-                backgroundColor: pressed ? palette.primarySoft : "transparent",
-              })}
-            >
-              <ArrowLeft size={24} color={palette.primary} />
-            </Pressable>
+          {!reviews && (
+            <PageHeader
+              title="Inbox"
+              subtitle={
+                filter === "unread"
+                  ? "Unread updates across your work"
+                  : "Task, project & workflow activity"
+              }
+              onBack={
+                navHeader?.onBack ??
+                (tabRoot ? () => navigate({ name: "overview" }) : undefined)
+              }
+              backHint={
+                navHeader?.backHint ??
+                (tabRoot ? "Returns to Home" : undefined)
+              }
+            />
           )}
-          {tabRoot && (
-            <Text
-              accessibilityRole="header"
-              style={{ fontSize: 24, fontWeight: "700", color: palette.text }}
-            >
-              {reviews ? "Reviews" : "Inbox"}
-            </Text>
+          {reviews && (
+            <ReviewsHeader
+              totalCount={allAssigned.length}
+              showBack={tabRoot || !!navHeader?.onBack}
+              onBack={navHeader?.onBack ?? (() => navigate({ name: "overview" }))}
+            />
           )}
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
@@ -572,8 +571,8 @@ export function ActionInbox({
               !reviews &&
               !!feed.data &&
               feed.stale &&
-              !feed.loading &&
-              !!feed.error
+              !feed.error &&
+              !feed.loading
             }
             loading={feed.loading}
           />
@@ -593,8 +592,9 @@ export function ActionInbox({
                   variant="outline"
                   busy={markingAll}
                   disabled={!hasUnread || markingAll || !!marking}
+                  icon={<CheckCheck size={15} color={palette.primary} />}
                   onPress={() => void markAll()}
-                  style={{ minHeight: 46 }}
+                  style={{ minHeight: 48 }}
                 >
                   Mark all read
                 </Button>
@@ -646,23 +646,15 @@ export function ActionInbox({
               </ScrollView>
             </View>
           )}
-          {reviews && (allAssigned.length > 0 || reviewKind !== "all") && (
-            <View
-              accessibilityLabel="Review type"
-              style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
-            >
-              {reviewKinds.map(({ kind, label }) => (
-                <FilterChip
-                  key={kind}
-                  label={label}
-                  accessibilityLabel={
-                    kind === "all" ? "All reviews" : `${label} reviews`
-                  }
-                  selected={reviewKind === kind}
-                  onPress={() => setReviewKind(kind)}
-                />
-              ))}
-            </View>
+          {reviews && !initial && <ReviewsSummaryHero items={allAssigned} />}
+          {reviews && (allAssigned.length > 0 || reviewKind !== "all" || !!reviewSearch) && (
+            <ReviewsFilterBar
+              items={allAssigned}
+              reviewKind={reviewKind}
+              onSelectKind={setReviewKind}
+              searchText={reviewSearch}
+              onChangeSearch={setReviewSearch}
+            />
           )}
 
           {!!issues.length && (
@@ -673,6 +665,9 @@ export function ActionInbox({
           )}
           {!!markError && <ErrorState error={markError} />}
           {!!openDecision.error && <ErrorState error={openDecision.error} />}
+          {reviews && assigned.length > 0 && (
+            <ReviewsQueueCard items={assigned} onOpen={openDecisionRoute} />
+          )}
         </View>
       }
       renderSectionHeader={({ section }) => (
@@ -725,20 +720,7 @@ export function ActionInbox({
       )}
       ItemSeparatorComponent={() => <View style={{ height: space.sm }} />}
       renderItem={({ item }) => {
-        if ("decision" in item)
-          return (
-            <InboxDecisionRow
-              decision={item.decision}
-              onPress={() => {
-                const { verifyRoute, route } = item.decision;
-                if (!verifyRoute) navigate(route);
-                else
-                  void openDecision.run(async () =>
-                    navigate(await verifyRoute()),
-                  );
-              }}
-            />
-          );
+        if ("decision" in item) return null;
         const update = item.update;
         const copy = normalizeWorkUpdateNotification({ ...update, title: workUpdateTitle(update.title) });
         const target = inboxUpdateRoute(update, profile!.role);
@@ -766,7 +748,8 @@ export function ActionInbox({
         );
       }}
       ListEmptyComponent={
-        initial || (!reviews && feed.hasMore && !feed.moreError) ? (
+        reviews && assigned.length > 0 ? undefined : initial ||
+          (!reviews && feed.hasMore && !feed.moreError) ? (
           <FeedSkeleton
             label="Loading your Inbox"
             layout={reviews ? "navigation" : "inbox"}
@@ -780,31 +763,54 @@ export function ActionInbox({
           />
         ) : (
           <Empty
-            kind="inbox"
+            kind={
+              (!reviews && search) || (reviews && !!reviewQuery)
+                ? "search"
+                : reviews || filter === "unread"
+                  ? "complete"
+                  : "inbox"
+            }
             title={
-              !reviews && search ? "No matching updates" : "You're all caught up"
+              (!reviews && search) || (reviews && !!reviewQuery)
+                ? !reviews
+                  ? "No matching updates"
+                  : "No matching reviews"
+                : "You're all caught up"
             }
             description={
               reviews
-                ? reviewKind === "all"
-                  ? "No reviews assigned to you"
-                  : `No ${reviewKinds
-                      .find((item) => item.kind === reviewKind)!
-                      .label.toLowerCase()} reviews assigned to you`
+                ? reviewQuery
+                  ? `No reviews match "${reviewSearch.trim()}". Try other words or clear filters.`
+                  : reviewKind === "all"
+                    ? "No reviews assigned to you"
+                    : `No ${reviewKinds
+                        .find((item) => item.kind === reviewKind)!
+                        .label.toLowerCase()} reviews assigned to you`
                 : search
                   ? `No updates match "${search}". Try other words or clear your filters.`
                   : emptyUpdatesDescription(filter, category)
             }
             action={
               !reviews && narrowed ? (
-                <Button variant="outline" onPress={resetFilters}>
+                <Button
+                  variant="outline"
+                  icon={<RotateCcw size={15} color={palette.primary} />}
+                  onPress={resetFilters}
+                >
                   Clear search and filters
                 </Button>
-              ) : (
-                <Button onPress={() => void refresh()}>
-                  {reviews ? "Refresh reviews" : "Refresh updates"}
+              ) : reviews && (!!reviewQuery || reviewKind !== "all") ? (
+                <Button
+                  variant="outline"
+                  icon={<RotateCcw size={15} color={palette.primary} />}
+                  onPress={() => {
+                    setReviewSearch("");
+                    setReviewKind("all");
+                  }}
+                >
+                  Clear filters
                 </Button>
-              )
+              ) : undefined
             }
           />
         )
@@ -822,6 +828,7 @@ export function ActionInbox({
                 variant="outline"
                 busy={feed.loadingMore}
                 disabled={feed.loadingMore}
+                icon={<ChevronDown size={15} color={palette.primary} />}
                 onPress={() => void feed.loadMore()}
               >
                 {feed.loadingMore ? "Loading more updates…" : "View more"}
@@ -858,65 +865,6 @@ export function ActionInbox({
           onClose={() => setStatusOpen(false)}
         />
       )}
-    </View>
-  );
-}
-
-/** Review decisions use the same leading-stripe row as My Work updates. */
-function InboxDecisionRow({
-  decision,
-  onPress,
-}: {
-  decision: Decision;
-  onPress: () => void;
-}) {
-  const palette = useTheme();
-  const accent =
-    decision.kind === "financial"
-      ? palette.success
-      : decision.kind === "personal"
-        ? palette.blue
-        : palette.review;
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "stretch",
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: palette.border,
-        backgroundColor: palette.surface,
-        overflow: "hidden",
-      }}
-    >
-      <View style={{ width: 5, backgroundColor: accent }} />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={decision.title}
-        accessibilityHint={decision.context}
-        onPress={onPress}
-        style={({ pressed }) => ({
-          flex: 1,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: space.sm,
-          paddingVertical: 12,
-          paddingHorizontal: 12,
-          backgroundColor: pressed ? palette.primarySoft : "transparent",
-        })}
-      >
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={{ color: palette.text, fontWeight: "600" }}>
-            {decision.title}
-          </Text>
-          <Text
-            style={{ color: palette.mutedLabel, fontSize: 13, lineHeight: 18 }}
-          >
-            {decision.context}
-          </Text>
-        </View>
-        <ChevronRight size={18} color={palette.mutedLabel} />
-      </Pressable>
     </View>
   );
 }

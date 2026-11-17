@@ -1,4 +1,7 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Link2 from "lucide-react-native/icons/link-2";
+import { useTheme } from "../../components/ui/Appearance";
 import { Button, Choice, ErrorState, Notice, Sheet } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -16,6 +19,7 @@ export function MilestoneTasks({
   onSaved: () => Promise<unknown>;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const { toast } = useToast();
   const [open, setOpen] = useState(false),
     action = useAction();
@@ -31,6 +35,7 @@ export function MilestoneTasks({
     <>
       <Button
         variant="outline"
+        icon={<Link2 size={16} color={palette.primary} />}
         onPress={() => {
           action.clear();
           setOpen(true);
@@ -65,6 +70,7 @@ export function MilestoneTasks({
         />
         <Button
           busy={action.busy}
+          icon={<Check size={16} color={palette.onPrimary} />}
           onPress={() =>
             void action.run(async () => {
               try {

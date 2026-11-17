@@ -9,7 +9,9 @@ import Animated, {
   type CSSAnimationKeyframes,
   type SharedValue,
 } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Banknote from "lucide-react-native/icons/banknote";
 import House from "lucide-react-native/icons/house";
 import CalendarCheck2 from "lucide-react-native/icons/calendar-check-2";
 import Bell from "lucide-react-native/icons/bell";
@@ -17,7 +19,8 @@ import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
 import Wallet from "lucide-react-native/icons/wallet";
 import FolderKanban from "lucide-react-native/icons/folder-kanban";
 import More from "lucide-react-native/icons/circle-ellipsis";
-import { useTheme } from "../../components/ui/Appearance";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
+import { withOpacity } from "../../components/ui/theme";
 import { Text } from "../../components/ui/Typography";
 import {
   motionDuration,
@@ -34,6 +37,7 @@ const icons = {
   work: CalendarCheck2,
   inbox: Bell,
   accounting: Wallet,
+  petty_cash: Banknote,
   projects: FolderKanban,
   more: More,
 };
@@ -102,9 +106,9 @@ function TabGlyph({
         ]}
       >
         {icon ? (
-          <Icon size={22} color={palette.primary} strokeWidth={2.4} />
+          <Icon size={22} color="#ffffff" strokeWidth={2.4} />
         ) : (
-          <SelectedTabIcon tab={tab} color={palette.primary} />
+          <SelectedTabIcon tab={tab} color="#ffffff" />
         )}
       </Animated.View>
     </>
@@ -132,6 +136,7 @@ export function NativeBottomNavigation({
   onSelect: (tab: PrimaryTab) => void;
 }) {
   const palette = useTheme(),
+    { isDark } = useAppearance(),
     inset = useSafeAreaInsets(),
     tabs = primaryTabs(role);
   type BarItem = {
@@ -203,25 +208,53 @@ export function NativeBottomNavigation({
   return (
     <View
       testID="native-bottom-navigation"
+      pointerEvents="box-none"
       style={{
-        alignItems: "center",
+        // Keep the bar in the navigator's layout so every screen ends above it.
         flexShrink: 0,
-        backgroundColor: palette.background,
-        paddingTop: 8,
+        alignItems: "center",
+        paddingTop: 16,
         paddingBottom: Math.max(12, inset.bottom),
         paddingHorizontal: 16,
       }}
     >
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          "transparent",
+          withOpacity(palette.background, 0.72),
+          withOpacity(palette.background, 0.92),
+        ]}
+        locations={[0, 0.55, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <View
         style={[
           styles.floatingBar,
           {
-            backgroundColor: palette.surface,
-            borderColor: palette.border,
-            shadowColor: "#000",
+            backgroundColor: isDark
+              ? withOpacity("#172554", 0.92)
+              : withOpacity(palette.surface, 0.94),
+            borderColor: isDark
+              ? "rgba(148, 186, 255, 0.42)"
+              : withOpacity(palette.primary, 0.18),
+            shadowColor: isDark ? "#020617" : palette.primaryDark,
+            shadowOpacity: isDark ? 0.56 : 0.2,
           },
         ]}
       >
+        <LinearGradient
+          testID="nav-glass-sheen"
+          pointerEvents="none"
+          colors={
+            isDark
+              ? ["rgba(34, 54, 114, 0.92)", "rgba(15, 23, 52, 0.88)"]
+              : ["rgba(255, 255, 255, 0.96)", "rgba(226, 236, 255, 0.86)"]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         <View
           testID="tab-track"
           onLayout={({ nativeEvent }) =>
@@ -241,7 +274,12 @@ export function NativeBottomNavigation({
                   width: size,
                   height: size,
                   borderRadius: size / 2,
-                  backgroundColor: palette.primarySoft,
+                  backgroundColor: isDark ? "#3b82f6" : palette.primary,
+                  shadowColor: isDark ? "#1d4ed8" : palette.primary,
+                  shadowOpacity: isDark ? 0.42 : 0.28,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 4,
                 },
                 indicatorMotion,
               ]}
@@ -386,11 +424,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderWidth: 1,
-    elevation: 8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
+    borderWidth: 1.5,
+    overflow: "hidden",
+    elevation: 14,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 22,
   },
   track: {
     flexDirection: "row",

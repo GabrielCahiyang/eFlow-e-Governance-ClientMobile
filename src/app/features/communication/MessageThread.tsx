@@ -17,13 +17,17 @@ import {
   View,
   type AccessibilityActionEvent,
 } from "react-native";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import ImagePlus from "lucide-react-native/icons/image-plus";
 import Info from "lucide-react-native/icons/info";
 import Pin from "lucide-react-native/icons/pin";
+import PinOff from "lucide-react-native/icons/pin-off";
+import Trash2 from "lucide-react-native/icons/trash";
 import X from "lucide-react-native/icons/x";
-import { brandColors } from "../../components/ui";
+import { brandColors, withOpacity } from "../../components/ui";
 import { useAppearance, useTheme } from "../../components/ui/Appearance";
+import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import { Text } from "../../components/ui/Typography";
 import { Button, ErrorState, Sheet } from "../../components/ui";
 import { ChatAvatar } from "./ChatAvatar";
@@ -111,19 +115,43 @@ export function ThreadHeader({
   shortcut?: { label: string; onPress: () => void };
 }) {
   const palette = useTheme();
+  const navHeader = useNavigationHeader();
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
-        gap: 12,
+        gap: 10,
         paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingTop: (navHeader?.topInset ?? 0) + 8,
+        paddingBottom: 8,
         backgroundColor: palette.surface,
         borderBottomWidth: 1,
         borderColor: palette.border,
       }}
     >
+      {!!navHeader?.onBack && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          accessibilityHint={navHeader.backHint}
+          onPress={navHeader.onBack}
+          hitSlop={8}
+          style={({ pressed }) => ({
+            width: 34,
+            height: 34,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: palette.border,
+            backgroundColor: pressed ? palette.primarySoft : palette.background,
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          })}
+        >
+          <ArrowLeft size={17} color={palette.text} />
+        </Pressable>
+      )}
       <ChatAvatar
         name={channel.name}
         kind={channel.kind}
@@ -152,17 +180,20 @@ export function ThreadHeader({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={shortcut.label}
+          hitSlop={4}
           onPress={shortcut.onPress}
-          style={{
-            minHeight: 44,
+          style={({ pressed }) => ({
+            minHeight: 34,
             justifyContent: "center",
-            paddingHorizontal: 12,
-            borderRadius: 22,
-            backgroundColor: palette.primarySoft,
-          }}
+            paddingHorizontal: 11,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: withOpacity(palette.primary, 0.2),
+            backgroundColor: pressed ? palette.background : palette.primarySoft,
+          })}
         >
           <Text
-            style={{ fontSize: 13, fontWeight: "600", color: palette.primary }}
+            style={{ fontSize: 12.5, fontWeight: "700", color: palette.primary }}
           >
             {shortcut.label}
           </Text>
@@ -171,16 +202,21 @@ export function ThreadHeader({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Conversation info"
-        hitSlop={4}
+        hitSlop={6}
         onPress={onInfo}
-        style={{
-          width: 44,
-          height: 44,
+        style={({ pressed }) => ({
+          width: 34,
+          height: 34,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: palette.border,
+          backgroundColor: pressed ? palette.primarySoft : palette.background,
           alignItems: "center",
           justifyContent: "center",
-        }}
+          flexShrink: 0,
+        })}
       >
-        <Info size={22} color={palette.primary} />
+        <Info size={17} color={palette.primary} />
       </Pressable>
     </View>
   );
@@ -197,6 +233,7 @@ export function MessageThread({
   onReact,
   onPin,
   onRemove,
+  onOpenInfo,
   people,
   busy,
 }: {
@@ -211,6 +248,7 @@ export function MessageThread({
   onReact: (message: Message, emoji: string) => void;
   onPin: (message: Message) => void;
   onRemove: (message: Message) => Promise<boolean>;
+  onOpenInfo?: () => void;
   people: ChatPerson[];
   busy?: boolean;
 }) {
@@ -219,6 +257,13 @@ export function MessageThread({
   const [selected, setSelected] = useState<string>();
   const [confirmRemoval, setConfirmRemoval] = useState(false);
   const [removeFailed, setRemoveFailed] = useState(false);
+  const latestPinned = useMemo(
+    () =>
+      onOpenInfo
+        ? [...messages].reverse().find((m) => !!m.pinned_at && !m.deleted_at)
+        : undefined,
+    [messages, onOpenInfo],
+  );
   const nicknames = useMemo(
     () => new Map(people.map((person) => [person.id, person.nickname])),
     [people],
@@ -261,6 +306,48 @@ export function MessageThread({
       );
   return (
     <>
+      {!!latestPinned && !!onOpenInfo && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View pinned message in Conversation info"
+          onPress={onOpenInfo}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            backgroundColor: pressed
+              ? withOpacity(palette.primary, 0.14)
+              : palette.primarySoft,
+            borderBottomWidth: 1,
+            borderColor: palette.border,
+          })}
+        >
+          <Pin size={13} color={palette.primary} />
+          <Text
+            numberOfLines={1}
+            style={{
+              flex: 1,
+              fontSize: 12.5,
+              fontWeight: "600",
+              color: palette.primary,
+            }}
+          >
+            Pinned:{" "}
+            {parseMessage(latestPinned.content).text.trim() || "Attachment"}
+          </Text>
+          <Text
+            style={{
+              fontSize: 11.5,
+              fontWeight: "700",
+              color: palette.primary,
+            }}
+          >
+            Info
+          </Text>
+        </Pressable>
+      )}
       <FlatList
         inverted
         style={{ flex: 1 }}
@@ -344,6 +431,7 @@ export function MessageThread({
             <Button
               variant="outline"
               disabled={busy}
+              icon={<X size={16} color={palette.primary} />}
               onPress={() => setConfirmRemoval(false)}
             >
               Keep message
@@ -351,6 +439,7 @@ export function MessageThread({
             <Button
               variant="danger"
               disabled={busy}
+              icon={<Trash2 size={16} color={palette.onDanger} />}
               onPress={async () => {
                 if (await onRemove(current)) closeActions();
                 else setRemoveFailed(true);
@@ -403,6 +492,13 @@ export function MessageThread({
               <Button
                 variant="outline"
                 disabled={busy}
+                icon={
+                  current.pinned_at ? (
+                    <PinOff size={16} color={palette.primary} />
+                  ) : (
+                    <Pin size={16} color={palette.primary} />
+                  )
+                }
                 onPress={() => {
                   onPin(current);
                   closeActions();
@@ -414,6 +510,7 @@ export function MessageThread({
                 <Button
                   variant="outline"
                   disabled={busy}
+                  icon={<Trash2 size={16} color={palette.primary} />}
                   onPress={() => setConfirmRemoval(true)}
                 >
                   Delete for everyone
@@ -465,27 +562,26 @@ function Bubble({
               ? "flex-end"
               : "flex-start",
           color: palette.mutedLabel,
-          fontSize: 13,
+          fontSize: 12.5,
           fontStyle: message.deleted_at ? "italic" : "normal",
           marginHorizontal: 12,
           marginVertical: 8,
-          padding: 8,
-          borderRadius: 12,
-          backgroundColor: palette.glassSurface,
+          paddingHorizontal: 12,
+          paddingVertical: 5,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: palette.border,
+          backgroundColor: palette.surface,
         }}
       >
         {messagePreview(message, actor)}
       </Text>
     );
   const reactions = reactionSummary(message, actor);
-  const fill = mine
-    ? isDark
-      ? palette.primary
-      : brandColors.blue
-    : palette.glassSurface;
-  const ink = mine ? (isDark ? palette.onPrimary : "#ffffff") : palette.text;
+  const fill = mine ? palette.primary : palette.surface;
+  const ink = mine ? palette.onPrimary : palette.text;
   const big = 18,
-    small = 4;
+    small = 5;
   const corners = mine
     ? {
         borderTopLeftRadius: big,
@@ -505,18 +601,29 @@ function Bubble({
   return (
     <View style={{ marginTop: first ? 8 : 2 }}>
       {!!separator && (
-        <Text
+        <View
           style={{
             alignSelf: "center",
             marginVertical: 10,
-            fontSize: 12,
-            lineHeight: 16,
-            fontWeight: "500",
-            color: palette.mutedLabel,
+            paddingHorizontal: 10,
+            paddingVertical: 3,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: palette.border,
+            backgroundColor: palette.surface,
           }}
         >
-          {separator}
-        </Text>
+          <Text
+            style={{
+              fontSize: 11.5,
+              lineHeight: 15,
+              fontWeight: "600",
+              color: palette.mutedLabel,
+            }}
+          >
+            {separator}
+          </Text>
+        </View>
       )}
       {!mine && !direct && first && (
         <Text
@@ -572,6 +679,8 @@ function Bubble({
               borderRadius: big,
               overflow: "hidden",
               backgroundColor: hasText ? fill : "transparent",
+              borderWidth: hasText && !mine ? 1 : 0,
+              borderColor: palette.border,
               paddingHorizontal: hasText ? 14 : 0,
               paddingVertical: hasText ? 8 : 0,
               gap: 6,
@@ -757,7 +866,7 @@ export function Composer({
   const { isDark } = useAppearance();
   const keyboard = useKeyboardVisible();
   const inset = useSafeAreaInsets();
-  const accent = isDark ? palette.primary : brandColors.blue;
+  const accent = palette.primary;
   const hasContent = !sendDisabled;
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
@@ -824,6 +933,7 @@ export function Composer({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Remove ${imageName}`}
+            disabled={busy || pickDisabled || !onPickImage}
             onPress={onPickImage}
             style={{
               width: 44,
@@ -836,22 +946,28 @@ export function Composer({
           </Pressable>
         </View>
       )}
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
         {!!onPickImage && !imageName && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Attach image"
             disabled={pickDisabled}
+            hitSlop={4}
             onPress={onPickImage}
-            style={{
-              width: 44,
-              height: 44,
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
               alignItems: "center",
               justifyContent: "center",
+              backgroundColor: pressed
+                ? withOpacity(palette.primary, 0.2)
+                : palette.primarySoft,
               opacity: pickDisabled ? 0.4 : 1,
-            }}
+              marginBottom: 2,
+            })}
           >
-            <ImagePlus size={24} color={accent} />
+            <ImagePlus size={20} color={accent} />
           </Pressable>
         )}
         <View
@@ -860,9 +976,11 @@ export function Composer({
             minHeight: 44,
             maxHeight: 132,
             justifyContent: "center",
-            paddingHorizontal: 16,
+            paddingHorizontal: 15,
             borderRadius: 22,
-            backgroundColor: palette.glassSurface,
+            borderWidth: 1,
+            borderColor: palette.border,
+            backgroundColor: isDark ? palette.background : "#f7f9fd",
           }}
         >
           <TextInput
@@ -906,24 +1024,19 @@ export function Composer({
           disabled={!hasContent || !!busy}
           onPress={onSend}
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
+            width: 42,
+            height: 42,
+            borderRadius: 21,
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: hasContent ? accent : palette.glassSurface,
             opacity: busy ? 0.6 : 1,
+            marginBottom: 1,
           }}
         >
           <ArrowUp
-            size={22}
-            color={
-              hasContent
-                ? isDark
-                  ? palette.onPrimary
-                  : "#ffffff"
-                : palette.mutedLabel
-            }
+            size={20}
+            color={hasContent ? palette.onPrimary : palette.mutedLabel}
           />
         </Pressable>
       </View>

@@ -28,7 +28,7 @@ export function ProjectActivity({ ids }: { ids: string[] }) {
           </Card>
         ))
       ) : (
-        <Empty kind="activity" title="No recorded activity" />
+        <Empty kind="files" title="No recorded activity" />
       )}
     </>
   );

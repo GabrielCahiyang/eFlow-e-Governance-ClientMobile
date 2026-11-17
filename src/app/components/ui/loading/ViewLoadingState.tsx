@@ -14,6 +14,7 @@ export type LoadingLayout =
   | "task"
   | "tree"
   | "summary"
+  | "reports"
   | "request"
   | "review"
   | "activity"
@@ -218,23 +219,25 @@ export function ViewLoadingState({
       break;
     case "task":
       content = (
-        <>
-          {line("84%", 26)}
-          {chips}
-          <Block style={s.button} />
-          {panel(
-            <>
-              {line("36%", 17)}
-              {navRows(false, false)}
-            </>,
-          )}
-          {panel(
-            <>
-              {line("54%", 17)}
-              {pairs(4)}
-            </>,
-          )}
-        </>
+        <View style={s.summaryWrap}>
+          <View style={s.row}>
+            <Block style={{ flex: 1, height: 28, borderRadius: 6 }} />
+            <Block style={{ width: 72, height: 34, borderRadius: 18 }} />
+          </View>
+          <View style={s.summaryMetricsRow}>
+            <Block style={{ flex: 1, height: 48, borderRadius: 18 }} />
+            <Block style={{ flex: 1, height: 48, borderRadius: 18 }} />
+          </View>
+          <Block style={{ height: 148, width: "100%", borderRadius: 22 }} />
+          <View style={s.summaryMetricsRow}>
+            <Block style={s.summaryMetricTile} />
+            <Block style={s.summaryMetricTile} />
+          </View>
+          <View style={s.summaryMetricsRow}>
+            <Block style={{ flex: 1, height: 100, borderRadius: 20 }} />
+            <Block style={{ flex: 1, height: 100, borderRadius: 20 }} />
+          </View>
+        </View>
       );
       break;
     case "tree":
@@ -250,7 +253,60 @@ export function ViewLoadingState({
       );
       break;
     case "summary":
-      content = <>{pairs(rows)}</>;
+      content = (
+        <View style={s.summaryWrap}>
+          <Block style={s.summaryNotice} />
+          <View style={s.summaryMetricsRow}>
+            <Block style={s.summaryMetricTile} />
+            <Block style={s.summaryMetricTile} />
+          </View>
+          <View
+            style={[
+              s.summaryDetailBox,
+              {
+                borderColor: palette.border,
+                backgroundColor: palette.background,
+              },
+            ]}
+          >
+            {pairs(rows)}
+          </View>
+        </View>
+      );
+      break;
+    case "reports":
+      content = (
+        <View style={s.reportsWrap}>
+          <View style={s.row}>
+            <Block style={s.reportPill} />
+            <Block style={s.reportPillWide} />
+            <Block style={s.reportPill} />
+          </View>
+          <Block style={s.reportSearch} />
+          <Block style={s.summaryNotice} />
+          {panel(
+            <>
+              <View style={s.summaryMetricsRow}>
+                <Block style={s.summaryMetricTile} />
+                <Block style={s.summaryMetricTile} />
+              </View>
+              <View
+                style={[
+                  s.summaryDetailBox,
+                  {
+                    borderColor: palette.border,
+                    backgroundColor: palette.background,
+                  },
+                ]}
+              >
+                {pairs(1)}
+              </View>
+            </>,
+          )}
+          <Block style={s.reportCard} />
+          <Block style={s.reportCard} />
+        </View>
+      );
       break;
     case "request":
     case "review":
@@ -272,21 +328,59 @@ export function ViewLoadingState({
         </>,
       );
       break;
-    case "messages":
     case "activity":
+      content = (
+        <View style={{ gap: 14 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            {line("42%", 18)}
+            <Block style={{ width: 72, height: 22, borderRadius: 999 }} />
+          </View>
+          {Array.from({ length: rows }, (_, i) => (
+            <View
+              key={i}
+              style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}
+            >
+              <Block style={{ width: 56, height: 12, marginTop: 14, borderRadius: 6 }} />
+              <View
+                style={[
+                  s.panel,
+                  {
+                    flex: 1,
+                    borderRadius: 20,
+                    borderColor: palette.border,
+                    backgroundColor: palette.surface,
+                    paddingVertical: 12,
+                    paddingHorizontal: 14,
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <Block style={{ width: 38, height: 38, borderRadius: 19 }} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    {line(i % 2 ? "68%" : "56%", 15)}
+                    {line("44%", 12)}
+                  </View>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+      break;
+    case "messages":
       content = (
         <>
           {Array.from({ length: rows }, (_, i) => (
             <View key={i} style={[s.entry, { borderColor: palette.border }]}>
               {line("42%", 14)}
-              {layout === "activity" && (
-                <View style={s.pair}>
-                  {line("30%", 12)}
-                  {line("32%", 12)}
-                </View>
-              )}
               {line(i % 2 ? "72%" : "94%")}
-              {layout === "messages" && line("34%", 12)}
+              {line("34%", 12)}
             </View>
           ))}
         </>
@@ -328,7 +422,52 @@ export function ViewLoadingState({
       );
       break;
     case "files":
-      content = <>{navRows(false, false)}</>;
+      content = (
+        <View style={s.summaryWrap}>
+          <View
+            style={[
+              s.filesCard,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
+            <View style={s.row}>
+              <Block style={s.fileHeadIcon} />
+              {line("42%", 15)}
+              <Block style={s.fileCountBadge} />
+            </View>
+            <View
+              style={[
+                s.summaryDetailBox,
+                {
+                  borderColor: palette.border,
+                  backgroundColor: palette.background,
+                },
+              ]}
+            >
+              {Array.from({ length: rows }, (_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    s.fileSkelRow,
+                    {
+                      borderBottomWidth:
+                        i === rows - 1 ? 0 : StyleSheet.hairlineWidth,
+                      borderColor: palette.border,
+                    },
+                  ]}
+                >
+                  <Block style={s.fileSkelCircle} />
+                  <View style={s.navCopy}>
+                    {line("74%", 14)}
+                    {line("48%", 11)}
+                  </View>
+                  <Block style={s.fileSkelAction} />
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
       break;
     default:
       content = <>{navRows(false, false)}</>;
@@ -374,4 +513,41 @@ const s = StyleSheet.create({
   icon: { width: 36, height: 36, borderRadius: 10 },
   button: { height: 42, width: 160, maxWidth: "100%" },
   entry: { gap: 8, paddingVertical: 12, borderBottomWidth: 0.5 },
+  summaryWrap: { gap: 12 },
+  summaryNotice: { height: 52, width: "100%", borderRadius: 18 },
+  summaryMetricsRow: { flexDirection: "row", gap: 10 },
+  summaryMetricTile: { flex: 1, height: 92, borderRadius: 20 },
+  summaryDetailBox: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  reportsWrap: { gap: 12 },
+  reportPill: { height: 36, width: 88, borderRadius: 18 },
+  reportPillWide: { height: 36, width: 108, borderRadius: 18 },
+  reportSearch: { height: 46, width: "100%", borderRadius: 14 },
+  reportCard: { height: 112, width: "100%", borderRadius: 18 },
+  filesCard: {
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+  fileHeadIcon: { width: 32, height: 32, borderRadius: 16 },
+  fileCountBadge: {
+    width: 64,
+    height: 22,
+    borderRadius: 11,
+    marginLeft: "auto",
+  },
+  fileSkelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingVertical: 10,
+  },
+  fileSkelCircle: { width: 38, height: 38, borderRadius: 19 },
+  fileSkelAction: { width: 32, height: 32, borderRadius: 16 },
 });

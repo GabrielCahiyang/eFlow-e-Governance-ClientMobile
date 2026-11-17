@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
+import { View, useWindowDimensions } from "react-native";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import MessageSquare from "lucide-react-native/icons/message-square";
+import Pencil from "lucide-react-native/icons/pencil";
+import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
-  Card,
   Empty,
   ErrorState,
   Field,
@@ -10,7 +17,8 @@ import {
   Notice,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
-import { words } from "../../components/ui/theme";
+import { useTheme } from "../../components/ui/Appearance";
+import { space, words } from "../../components/ui/theme";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
@@ -26,7 +34,11 @@ import {
 import { fetchTaskActivityHistory } from "./taskDetailActivity";
 import { EvidenceAttachment } from "./EvidenceAttachment";
 import { assertEvidenceActor } from "./taskEvidence";
-import { ActivityEntry, type TimelineEntry } from "./ActivityEntry";
+import {
+  ActivityLoadMore,
+  ActivityTimeline,
+  type TimelineEntry,
+} from "./ActivityEntry";
 import { describeWorkEvent } from "./activityPresentation";
 import { useWorkActivityPages } from "./useWorkActivityPages";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -38,12 +50,16 @@ export function TaskActivity({
   taskId,
   canDiscuss,
   verifyDiscussion,
+  onOpenConversation,
 }: {
   taskId: string;
   canDiscuss: boolean;
   verifyDiscussion: () => Promise<void>;
+  onOpenConversation?: () => void;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
+  const { fontScale } = useWindowDimensions();
   const events = useWorkActivityPages(
     JSON.stringify([profile?.id, taskId]),
     taskId,
@@ -259,20 +275,59 @@ export function TaskActivity({
       toast("Work note posted.", "success");
       await facts.refresh();
     });
+  const showActions = Boolean(onOpenConversation || (canDiscuss && !editing));
   return (
-    <>
-      {canDiscuss && !editing && (
-        <Button
-          variant="ghost"
-          style={{ alignSelf: "flex-start" }}
-          onPress={() => setEditing(true)}
+    <View style={{ gap: space.md }}>
+      {showActions && (
+        <View
+          style={{
+            flexDirection: fontScale > 1.45 ? "column" : "row",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
         >
-          Add work note
-        </Button>
+          {!!onOpenConversation && (
+            <Button
+              variant="outline"
+              align="start"
+              icon={<MessageSquare size={16} color={palette.primary} />}
+              trailing={<ChevronRight size={16} color={palette.mutedLabel} />}
+              style={{
+                flexGrow: 1,
+                flexBasis: fontScale > 1.45 ? undefined : 190,
+              }}
+              onPress={onOpenConversation}
+            >
+              Open task conversation
+            </Button>
+          )}
+          {canDiscuss && !editing && (
+            <Button
+              variant="primary"
+              icon={<Plus size={16} color={palette.onPrimary} strokeWidth={2.4} />}
+              style={{
+                flexGrow: 1,
+                flexBasis: fontScale > 1.45 ? undefined : 155,
+              }}
+              onPress={() => setEditing(true)}
+            >
+              Add work note
+            </Button>
+          )}
+        </View>
       )}
       {canDiscuss && editing && (
-        <Card>
-          <Text>
+        <View
+          style={{
+            backgroundColor: palette.surface,
+            borderWidth: 1,
+            borderColor: palette.border,
+            borderRadius: 20,
+            padding: 16,
+            gap: 12,
+          }}
+        >
+          <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 19 }}>
             Add a note to the task record. Use the task conversation for team
             discussion.
           </Text>
@@ -287,12 +342,17 @@ export function TaskActivity({
           <Button
             busy={action.busy}
             disabled={sendPending || !comment.trim()}
+            icon={<Check size={16} color={palette.onPrimary} />}
             onPress={() => void send()}
           >
             Save work note
           </Button>
           {!sendPending && !action.busy && (
-            <Button variant="ghost" onPress={() => setEditing(false)}>
+            <Button
+              variant="ghost"
+              icon={<X size={16} color={palette.primary} />}
+              onPress={() => setEditing(false)}
+            >
               Close editor
             </Button>
           )}
@@ -304,11 +364,16 @@ export function TaskActivity({
               <Notice>
                 Check the latest activity for your note before saving it again.
               </Notice>
-              <Button variant="outline" onPress={() => void facts.refresh()}>
+              <Button
+                variant="outline"
+                icon={<RefreshCw size={16} color={palette.primary} />}
+                onPress={() => void facts.refresh()}
+              >
                 Refresh activity
               </Button>
               <Button
                 variant="ghost"
+                icon={<Pencil size={16} color={palette.primary} />}
                 onPress={() => {
                   setSendPending(false);
                   action.clear();
@@ -318,7 +383,7 @@ export function TaskActivity({
               </Button>
             </>
           )}
-        </Card>
+        </View>
       )}
       {!!facts.error && (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
@@ -342,24 +407,14 @@ export function TaskActivity({
             <Empty compact kind="activity" title="No recorded task activity" />
           )
         ))}
-      {entries.map((entry, index) => (
-        <ActivityEntry
-          key={entry.id}
-          entry={entry}
-          last={index === entries.length - 1}
-        />
-      ))}
-      {!!events.paging.error && <ErrorState error={events.paging.error} />}
-      {events.more && (
-        <Button
-          variant="outline"
-          disabled={events.loading}
-          busy={events.paging.busy}
-          onPress={() => void events.loadOlder()}
-        >
-          {events.paging.error ? "Retry older activity" : "Load older activity"}
-        </Button>
-      )}
-    </>
+      <ActivityTimeline entries={entries} />
+      <ActivityLoadMore
+        more={events.more}
+        busy={events.paging.busy}
+        disabled={events.loading}
+        error={events.paging.error}
+        onPress={() => void events.loadOlder()}
+      />
+    </View>
   );
 }

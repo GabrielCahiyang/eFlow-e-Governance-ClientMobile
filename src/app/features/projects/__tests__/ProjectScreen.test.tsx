@@ -266,3 +266,16 @@ test.each(["board", "calendar"] as const)(
     expect(read).toHaveBeenCalledTimes(2);
   },
 );
+
+test("empty project renders without a refresh button", async () => {
+  jest.mocked(fetchProjectTaskPage).mockResolvedValueOnce({ tasks: [] });
+  const emptyView = await render(
+    <ProjectScreen id="empty-project" navigate={jest.fn()} />,
+  );
+  expect(
+    await emptyView.findByText("No tasks in this project"),
+  ).toBeOnTheScreen();
+  expect(
+    emptyView.queryByRole("button", { name: "Refresh project" }),
+  ).toBeNull();
+});

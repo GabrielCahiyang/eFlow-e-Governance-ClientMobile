@@ -4,6 +4,7 @@ import {
   Platform,
   StyleSheet,
   Switch,
+  useWindowDimensions,
   type TextInputProps,
 } from "react-native";
 import { Pressable, View } from "./Primitives";
@@ -11,9 +12,11 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Search from "lucide-react-native/icons/search";
+import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import X from "lucide-react-native/icons/x";
 import { Sheet } from "./Sheet";
 import { Button } from "./Button";
-import { useTheme } from "./Appearance";
+import { useAppearance, useTheme } from "./Appearance";
 import { isRawEntityId } from "../../shared/entityId";
 import { colors, dateLabel } from "./theme";
 import { userErrorMessage } from "../../shared/userMessages";
@@ -141,6 +144,7 @@ export function Choice({
             <>
               <Button
                 disabled={disabled || (required && !selected.length)}
+                icon={<Check size={16} color={palette.onPrimary} />}
                 onPress={() => {
                   onChange(multiple ? selected : (selected[0] ?? ""));
                   close();
@@ -148,7 +152,11 @@ export function Choice({
               >
                 {confirmationLabel}
               </Button>
-              <Button variant="ghost" onPress={close}>
+              <Button
+                variant="ghost"
+                icon={<X size={16} color={palette.primary} />}
+                onPress={close}
+              >
                 Cancel selection
               </Button>
             </>
@@ -329,29 +337,171 @@ export function Toggle({
     </View>
   );
 }
+export type SearchFilterTrigger = {
+  label: string;
+  active?: boolean;
+  count?: number;
+  accessibilityLabel?: string;
+  onPress: () => void;
+};
+
 export const SearchField = ({
   value,
   onChange,
   placeholder = "Search…",
   onFocus,
+  onBlur,
+  accessibilityLabel,
+  filterTrigger,
 }: {
   value: string;
   onChange: (text: string) => void;
   placeholder?: string;
   onFocus?: TextInputProps["onFocus"];
+  onBlur?: TextInputProps["onBlur"];
+  accessibilityLabel?: string;
+  filterTrigger?: SearchFilterTrigger;
 }) => {
   const palette = useTheme();
+  const { isDark } = useAppearance();
+  const { fontScale } = useWindowDimensions();
+  const [focused, setFocused] = useState(false);
+  const stackedFilter = Boolean(filterTrigger && fontScale > 1.45);
+  const badgeBg = isDark ? "rgba(8, 20, 47, 0.24)" : "rgba(255, 255, 255, 0.24)";
+
+  const renderFilterPill = (trigger: SearchFilterTrigger) => {
+    const active = !!trigger.active;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={trigger.accessibilityLabel || trigger.label}
+        accessibilityState={{ selected: active }}
+        onPress={trigger.onPress}
+        hitSlop={4}
+        style={({ pressed }) => [
+          s.searchFilterBtn,
+          {
+            backgroundColor: active
+              ? palette.primary
+              : pressed
+                ? palette.primarySoft
+                : palette.background,
+            borderColor: active ? palette.primary : palette.border,
+          },
+          stackedFilter && { alignSelf: "flex-start" as const },
+        ]}
+      >
+        <SlidersHorizontal
+          size={14}
+          color={active ? palette.onPrimary : palette.primary}
+        />
+        <Text
+          numberOfLines={1}
+          style={[
+            s.searchFilterText,
+            { color: active ? palette.onPrimary : palette.text },
+          ]}
+        >
+          {trigger.label}
+        </Text>
+        {!!trigger.count && trigger.count > 0 && (
+          <View
+            style={[
+              s.searchFilterCount,
+              {
+                backgroundColor: active ? badgeBg : palette.primary,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                s.searchFilterCountText,
+                { color: palette.onPrimary },
+              ]}
+            >
+              {trigger.count > 99 ? "99+" : trigger.count}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+    );
+  };
+
   return (
-    <View style={s.search}>
-      <Search size={18} color={palette.muted} />
-      <TextInput
-        accessibilityLabel={placeholder}
-        placeholder={placeholder}
-        value={value}
-        onChangeText={onChange}
-        onFocus={onFocus}
-        style={{ flex: 1, color: colors.text, minHeight: 44 }}
-      />
+    <View style={{ gap: 8 }}>
+      <View
+        style={[
+          s.search,
+          {
+            backgroundColor: palette.surface,
+            borderColor: focused ? palette.primary : palette.border,
+            paddingRight: filterTrigger && !stackedFilter ? 6 : 10,
+          },
+        ]}
+      >
+        <View
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            s.searchLeadIcon,
+            { backgroundColor: focused ? palette.primarySoft : "transparent" },
+          ]}
+        >
+          <Search
+            size={17}
+            color={focused ? palette.primary : palette.mutedLabel}
+          />
+        </View>
+        <TextInput
+          accessibilityLabel={accessibilityLabel || placeholder}
+          placeholder={placeholder}
+          placeholderTextColor={palette.mutedLabel}
+          selectionColor={palette.blue}
+          value={value}
+          onChangeText={onChange}
+          onFocus={(event) => {
+            setFocused(true);
+            onFocus?.(event);
+          }}
+          onBlur={(event) => {
+            setFocused(false);
+            onBlur?.(event);
+          }}
+          style={[s.searchInput, { color: palette.text }]}
+        />
+        {value.length > 0 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear search text"
+            onPress={() => onChange("")}
+            hitSlop={6}
+            style={({ pressed }) => [
+              s.searchClearBtn,
+              {
+                backgroundColor: pressed
+                  ? palette.primarySoft
+                  : isDark
+                    ? palette.primarySoft
+                    : palette.background,
+                borderColor: palette.border,
+              },
+            ]}
+          >
+            <X size={13} color={palette.muted} />
+          </Pressable>
+        )}
+        {filterTrigger && !stackedFilter && (
+          <>
+            <View
+              importantForAccessibility="no"
+              style={[s.searchSep, { backgroundColor: palette.border }]}
+            />
+            {renderFilterPill(filterTrigger)}
+          </>
+        )}
+      </View>
+      {filterTrigger && stackedFilter && renderFilterPill(filterTrigger)}
     </View>
   );
 };
@@ -395,13 +545,72 @@ const s = StyleSheet.create({
   help: { fontSize: 12, color: colors.muted, marginTop: 4 },
   toggle: { flexDirection: "row", alignItems: "center", gap: 12 },
   search: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderRadius: 24,
+    minHeight: 48,
+    paddingLeft: 10,
+    paddingVertical: 4,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: colors.surface,
+  },
+  searchLeadIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 72,
+    minHeight: 40,
+    paddingVertical: 6,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  searchClearBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  searchSep: {
+    width: 1,
+    height: 22,
+    flexShrink: 0,
+  },
+  searchFilterBtn: {
+    minHeight: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 0,
+    maxWidth: 190,
+  },
+  searchFilterText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  searchFilterCount: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchFilterCountText: {
+    fontSize: 11,
+    fontWeight: "800",
   },
 });

@@ -1,14 +1,17 @@
-import { AppState, KeyboardAvoidingView, Platform, Pressable, View } from "react-native";
+import { AppState, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
-import { useTheme } from "../../components/ui/Appearance";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { useEffect, useMemo, useRef, useState } from "react";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import SquarePen from "lucide-react-native/icons/square-pen";
 import {
   Empty,
   ErrorState,
-  Field,
   Loading,
   Notice,
   Screen,
+  SearchField,
   Sheet,
 } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
@@ -85,6 +88,7 @@ export function ChatScreen({
     refresh: refreshAccess,
   } = useAuth();
   const palette = useTheme();
+  const { isDark } = useAppearance();
   const actor = profile!.id;
   const focusedScreen = useIsFocused();
   const [appState, setAppState] = useState(AppState.currentState);
@@ -392,68 +396,130 @@ export function ChatScreen({
       navigate({ name: "messages", id, title: name || undefined });
       setNewChat(false);
     });
-  const peopleSheet = (
-    <Sheet
-      open={newChat}
-      title="New conversation"
-      busy={action.busy}
-      onClose={() => setNewChat(false)}
-    >
-      {people.error ? (
-        <ErrorState error={people.error} />
-      ) : (
-        <View style={{ gap: 8 }}>
-          <Field
-            label="Search people"
-            value={personQuery}
-            onChangeText={setPersonQuery}
-          />
-          {!people.data ? (
-            <Loading label="Loading people" layout="summary" />
-          ) : (
-            people.data
-              .filter(
-                (p) =>
-                  p.id !== actor &&
-                  (p.name || "")
-                    .toLowerCase()
-                    .includes(personQuery.trim().toLowerCase()),
-              )
-              .map((p) => (
-                <Pressable
-                  key={p.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Message ${p.name || "Colleague"}`}
-                  disabled={action.busy}
-                  onPress={() => void openPerson(p.id, p.name)}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
-                    minHeight: 56,
-                    paddingVertical: 6,
-                    paddingHorizontal: 8,
-                    borderRadius: 14,
-                    opacity: action.busy ? 0.6 : 1,
-                    backgroundColor: pressed
-                      ? palette.glassSurface
-                      : "transparent",
-                  })}
-                >
-                  <ChatAvatar name={p.name} size={44} />
-                  <Text style={{ flex: 1, fontWeight: "600" }}>
-                    {p.name || "Colleague"}
-                  </Text>
-                </Pressable>
-              ))
-          )}
-          {!!action.error && (
-            <ErrorState context="action" error={action.error} />
-          )}
-        </View>
-      )}
-    </Sheet>
-  );
+  const peopleSheet = (() => {
+    const filteredPeople = (people.data ?? []).filter(
+      (p) =>
+        p.id !== actor &&
+        (p.name || "")
+          .toLowerCase()
+          .includes(personQuery.trim().toLowerCase()),
+    );
+    return (
+      <Sheet
+        open={newChat}
+        title="New conversation"
+        busy={action.busy}
+        onClose={() => setNewChat(false)}
+      >
+        {people.error ? (
+          <ErrorState error={people.error} />
+        ) : (
+          <View style={{ gap: 12 }}>
+            <SearchField
+              placeholder="Search people by name"
+              accessibilityLabel="Search people"
+              value={personQuery}
+              onChange={setPersonQuery}
+            />
+            {!people.data ? (
+              <Loading label="Loading people" layout="summary" />
+            ) : !filteredPeople.length ? (
+              <Empty
+                compact
+                kind="people"
+                title="No matching people"
+                description="Try another name."
+              />
+            ) : (
+              <View
+                style={{
+                  borderRadius: 18,
+                  borderWidth: 1,
+                  borderColor: palette.border,
+                  backgroundColor: palette.surface,
+                  overflow: "hidden",
+                }}
+              >
+                {filteredPeople.map((p, index) => (
+                  <Pressable
+                    key={p.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Message ${p.name || "Colleague"}`}
+                    disabled={action.busy}
+                    onPress={() => void openPerson(p.id, p.name)}
+                    style={({ pressed }) => ({
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 12,
+                      minHeight: 58,
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      borderTopWidth:
+                        index > 0 ? StyleSheet.hairlineWidth : 0,
+                      borderTopColor: palette.border,
+                      opacity: action.busy ? 0.6 : 1,
+                      backgroundColor: pressed
+                        ? palette.primarySoft
+                        : "transparent",
+                    })}
+                  >
+                    <ChatAvatar name={p.name} size={42} />
+                    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            flexShrink: 1,
+                            fontWeight: "700",
+                            color: palette.text,
+                          }}
+                        >
+                          {p.name || "Colleague"}
+                        </Text>
+                        {p.is_lead && (
+                          <View
+                            style={{
+                              paddingHorizontal: 7,
+                              paddingVertical: 1.5,
+                              borderRadius: 999,
+                              backgroundColor: palette.primarySoft,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: "700",
+                                color: palette.primary,
+                              }}
+                            >
+                              Lead
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    <ChevronRight size={16} color={palette.mutedLabel} />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            {!!action.error && (
+              <ErrorState context="action" error={action.error} />
+            )}
+          </View>
+        )}
+      </Sheet>
+    );
+  })();
+  const unreadCount = available.filter(
+    (item) => item.unread && !item.archived,
+  ).length;
   if (!channel)
     return (
       <KeyboardAvoidingView
@@ -462,8 +528,40 @@ export function ChatScreen({
       >
         <Screen
           compact
+          title="Messages"
+          description={
+            unreadCount
+              ? `${unreadCount} unread · Team & direct conversations`
+              : "Team & direct conversations"
+          }
+          headerRight={
+            !contextual ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="New conversation"
+                accessibilityState={{ disabled: action.busy }}
+                disabled={action.busy}
+                hitSlop={6}
+                onPress={() => setNewChat(true)}
+                style={({ pressed }) => ({
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: pressed
+                    ? isDark
+                      ? palette.primarySoft
+                      : palette.primaryDark
+                    : palette.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: action.busy ? 0.5 : 1,
+                })}
+              >
+                <SquarePen size={17} color={palette.onPrimary} />
+              </Pressable>
+            ) : undefined
+          }
           onRefresh={() => channels.refresh()}
-          description={undefined}
         >
           {channels.error ? (
             <ErrorState
@@ -474,6 +572,7 @@ export function ChatScreen({
             <Loading label="Loading conversations" layout="navigation" />
           ) : route.id || route.taskId || route.projectId ? (
             <Empty
+              kind="chat"
               title="Conversation unavailable"
               description="This account has no authorized conversation at this location."
             />
@@ -481,6 +580,7 @@ export function ChatScreen({
             <ConversationList
               actor={actor}
               channels={matching}
+              allChannels={available}
               total={available.length}
               query={query}
               onQuery={setQuery}
@@ -494,8 +594,6 @@ export function ChatScreen({
                   title: item.name,
                 })
               }
-              onCompose={!contextual ? () => setNewChat(true) : undefined}
-              composeDisabled={action.busy}
             />
           )}
           {!!action.error && !newChat && (
@@ -568,12 +666,13 @@ export function ChatScreen({
         />
       )}
       <MessageThread
-        key={scope}
+        key={`thread:${scope}`}
         actor={actor}
         channel={channel}
         messages={shown}
         people={members.error ? [] : (members.data ?? [])}
         busy={action.busy}
+        onOpenInfo={() => setInfo(true)}
         placeholder={
           historyState === "unavailable" ? (
             <ErrorState
@@ -640,12 +739,14 @@ export function ChatScreen({
         }
       />
       {channel.archived ? (
-        <Notice>
-          This project chat is archived. You can still read its messages.
-        </Notice>
+        <SafeAreaView edges={["bottom"]}>
+          <Notice>
+            This project chat is archived. You can still read its messages.
+          </Notice>
+        </SafeAreaView>
       ) : (
         <Composer
-          key={scope}
+          key={`composer:${scope}`}
           value={original?.text ?? draft}
           mentionDraft={composer.draft}
           onMention={composer.setDraft}

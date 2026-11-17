@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import LogOut from "lucide-react-native/icons/log-out";
+import X from "lucide-react-native/icons/x";
 import { Button } from "../../components/ui/Button";
 import { Sheet } from "../../components/ui/Sheet";
 import { Text } from "../../components/ui/Typography";
@@ -59,6 +60,7 @@ export function MoreSheet({
             <Button
               variant="outline"
               disabled={signingOut}
+              icon={<X size={16} color={palette.primary} />}
               style={{ flex: 1 }}
               onPress={() => setConfirming(false)}
             >
@@ -67,6 +69,7 @@ export function MoreSheet({
             <Button
               variant="danger"
               busy={signingOut}
+              icon={<LogOut size={16} color={palette.onDanger} />}
               style={{ flex: 1 }}
               onPress={onSignOut}
             >

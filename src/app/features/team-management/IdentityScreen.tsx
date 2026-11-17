@@ -1,4 +1,7 @@
 import { useState } from "react";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -28,6 +31,7 @@ import {
 } from "./identityScope";
 export function IdentityScreen() {
   const { profile } = useAuth(),
+    palette = useTheme(),
     actor = profile!,
     [tab, setTab] = useState("people"),
     [search, setSearch] = useState(""),
@@ -138,7 +142,7 @@ export function IdentityScreen() {
             placeholder="Search Office name or email"
           />
           {!filtered.length ? (
-            <Empty title="No matching Office people" />
+            <Empty compact kind="search" title="No matching Office people" />
           ) : (
             filtered.map((person) => (
               <Card key={person.id} title={person.full_name}>
@@ -159,6 +163,7 @@ export function IdentityScreen() {
                         person,
                       )
                     }
+                    icon={<ShieldCheck size={16} color={palette.primary} />}
                     onPress={() => void update(person)}
                   >
                     {person.role === "accounting_staff"
@@ -182,6 +187,7 @@ export function IdentityScreen() {
           <Button
             disabled={action.busy}
             variant="outline"
+            icon={<RefreshCw size={16} color={palette.primary} />}
             onPress={() => void refresh()}
           >
             Refresh Office access

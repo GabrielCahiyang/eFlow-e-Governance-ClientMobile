@@ -10,6 +10,13 @@ import {
   Sheet,
   colors,
 } from "../../components/ui";
+import Archive from "lucide-react-native/icons/archive";
+import Check from "lucide-react-native/icons/check";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import Trash2 from "lucide-react-native/icons/trash";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import { ProjectSetupSheet } from "./ProjectSetupSheet";
 import { useAuth } from "../authentication";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -35,6 +42,7 @@ export function ProjectSettings({
   onDeleted: () => void;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const { toast } = useToast();
   const [setup, setSetup] = useState(false);
   const [title, setTitle] = useState(project.title),
@@ -95,7 +103,12 @@ export function ProjectSettings({
   return (
     <>
       {canManage && project.status === "planning" && (
-        <Button onPress={() => setSetup(true)}>Project setup</Button>
+        <Button
+          icon={<SlidersHorizontal size={16} color={palette.onPrimary} />}
+          onPress={() => setSetup(true)}
+        >
+          Project setup
+        </Button>
       )}
       {setup && (
         <ProjectSetupSheet
@@ -136,7 +149,11 @@ export function ProjectSettings({
           disabled={!canManage || closed}
         />
         {!!(canManage && !closed) && (
-          <Button busy={action.busy} onPress={() => void save()}>
+          <Button
+            busy={action.busy}
+            icon={<Check size={16} color={palette.onPrimary} />}
+            onPress={() => void save()}
+          >
             Save project details
           </Button>
         )}
@@ -156,6 +173,7 @@ export function ProjectSettings({
                 action.clear();
                 setOperation("archive");
               }}
+              icon={<Archive size={16} color={palette.primary} />}
             >
               Archive project
             </Button>
@@ -167,6 +185,7 @@ export function ProjectSettings({
                 action.clear();
                 setOperation("restore");
               }}
+              icon={<RotateCcw size={16} color={palette.primary} />}
             >
               Restore project
             </Button>
@@ -177,6 +196,7 @@ export function ProjectSettings({
               action.clear();
               setOperation("delete");
             }}
+            icon={<Trash2 size={16} color={palette.onDanger} />}
           >
             Permanently delete project
           </Button>
@@ -204,6 +224,7 @@ export function ProjectSettings({
             <Button
               variant="outline"
               disabled={action.busy}
+              icon={<X size={16} color={palette.primary} />}
               onPress={() => {
                 if (!action.busy) {
                   setOperation(undefined);
@@ -216,6 +237,15 @@ export function ProjectSettings({
             <Button
               variant={operation === "delete" ? "danger" : "primary"}
               busy={action.busy}
+              icon={
+                operation === "delete" ? (
+                  <Trash2 size={16} color={palette.onDanger} />
+                ) : operation === "restore" ? (
+                  <RotateCcw size={16} color={palette.onPrimary} />
+                ) : (
+                  <Archive size={16} color={palette.onPrimary} />
+                )
+              }
               onPress={() => void lifecycle()}
             >
               {operation === "delete"

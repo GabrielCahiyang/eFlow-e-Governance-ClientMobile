@@ -1,6 +1,9 @@
 import { statusLabel } from "../../shared/statusLabels";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { View } from "../../components/ui/Primitives";
 import { useTheme } from "../../components/ui/Appearance";
 import {
@@ -236,7 +239,10 @@ export function SettlementPanel({
   const saving = action.busy || escalation.busy;
   if (!leader && !pending) return null;
   return (
-    <Card title="Receipt review and settlement">
+    <Card
+      title="Receipt review and settlement"
+      icon={<ShieldCheck size={16} color={palette.primary} />}
+    >
       {!!leader && (
         <Notice>
           The assigned receipt reviewer must endorse this package before
@@ -320,6 +326,7 @@ export function SettlementPanel({
             <Button
               busy={escalation.busy}
               disabled={saving || !reason.trim()}
+              icon={<Check size={15} color={palette.onPrimary} />}
               onPress={() => void approveEscalation()}
             >
               {headAction === "post"
@@ -343,6 +350,7 @@ export function SettlementPanel({
                 variant="outline"
                 busy={action.busy}
                 disabled={!reviewer || !reason.trim()}
+                icon={<ShieldCheck size={15} color={palette.primary} />}
                 onPress={() =>
                   void action.run(async () => {
                     await routeIndependentReview(
@@ -361,9 +369,11 @@ export function SettlementPanel({
             </>
           )}
           {canReview && (
-            <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               <Button
+                style={{ flex: 1, minWidth: 140 }}
                 disabled={action.busy || !reason.trim()}
+                icon={<Check size={15} color={palette.onPrimary} />}
                 onPress={() =>
                   void action.run(async () => {
                     await decideIndependentReview(
@@ -381,7 +391,9 @@ export function SettlementPanel({
               </Button>
               <Button
                 variant="outline"
+                style={{ flex: 1, minWidth: 140 }}
                 disabled={action.busy || !reason.trim()}
+                icon={<RotateCcw size={15} color={palette.primary} />}
                 onPress={() =>
                   void action.run(async () => {
                     await decideIndependentReview(
@@ -400,8 +412,13 @@ export function SettlementPanel({
             </View>
           )}
           {showSettlementActions && (
-            <View style={{ gap: 8 }}>
-              <Button busy={action.busy} onPress={() => void settle(true)}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <Button
+                style={{ flex: 1, minWidth: 140 }}
+                busy={action.busy}
+                icon={<Check size={15} color={palette.onPrimary} />}
+                onPress={() => void settle(true)}
+              >
                 {leader
                   ? "Endorse receipt package"
                   : head && late
@@ -410,7 +427,9 @@ export function SettlementPanel({
               </Button>
               <Button
                 variant="outline"
+                style={{ flex: 1, minWidth: 140 }}
                 disabled={action.busy || !reason.trim()}
+                icon={<RotateCcw size={15} color={palette.primary} />}
                 onPress={() => void settle(false)}
               >
                 Request changes

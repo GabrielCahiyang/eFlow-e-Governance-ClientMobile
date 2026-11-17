@@ -2,7 +2,11 @@ import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
+import Check from "lucide-react-native/icons/check";
+import Mail from "lucide-react-native/icons/mail";
 import Plus from "lucide-react-native/icons/plus";
+import Send from "lucide-react-native/icons/send";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -165,6 +169,7 @@ export function ProjectOffices({
                   <Row>
                     <Button
                       variant="outline"
+                      icon={<Check size={16} color={palette.primary} />}
                       onPress={() =>
                         void action.run(async () => {
                           await confirmProjectOffice(office.id);
@@ -177,6 +182,7 @@ export function ProjectOffices({
                     </Button>
                     <Button
                       variant="outline"
+                      icon={<X size={16} color={palette.primary} />}
                       onPress={() =>
                         void action.run(async () => {
                           await withdrawProjectOffice(office.id);
@@ -211,6 +217,7 @@ export function ProjectOffices({
                   {!!(canManage && !closed) && (
                     <Button
                       variant="outline"
+                      icon={<Mail size={16} color={palette.primary} />}
                       onPress={() => {
                         action.clear();
                         setInvite({ id: identity.id, identity: true });
@@ -240,7 +247,17 @@ export function ProjectOffices({
         }}
         busy={action.busy}
         footer={
-          <Button busy={action.busy} onPress={() => void save()}>
+          <Button
+            busy={action.busy}
+            icon={
+              invite ? (
+                <Send size={16} color={palette.onPrimary} />
+              ) : (
+                <Plus size={16} color={palette.onPrimary} />
+              )
+            }
+            onPress={() => void save()}
+          >
             {invite ? "Send invitation" : "Add Office"}
           </Button>
         }

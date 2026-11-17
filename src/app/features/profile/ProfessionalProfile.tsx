@@ -1,4 +1,11 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Eye from "lucide-react-native/icons/eye";
+import FileText from "lucide-react-native/icons/file-text";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Upload from "lucide-react-native/icons/upload";
+import { useTheme } from "../../components/ui/Appearance";
 import { Linking } from "react-native";
 import {
   Button,
@@ -59,6 +66,7 @@ const empty: ProfessionalValues = {
 export function ProfessionalProfile({ userId }: { userId: string }) {
   const { profile } = useAuth(),
     { toast } = useToast(),
+    palette = useTheme(),
     own = profile?.id === userId,
     facts = useFacts(`professional:${profile?.id}:${userId}`, () =>
       readProfessionalRecord<{ profile: ProfessionalProfileRecord | null }>(
@@ -137,6 +145,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                 <Button
                   disabled={!draft || facts.loading}
                   busy={action.busy}
+                  icon={<Check size={16} color={palette.onPrimary} />}
                   onPress={() => void save()}
                 >
                   Save profile
@@ -149,6 +158,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                     facts.loading ||
                     action.busy
                   }
+                  icon={<ShieldCheck size={16} color={palette.primary} />}
                   onPress={() =>
                     void action.run(async () => {
                       if (
@@ -185,6 +195,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
             </Notice>
             <Button
               busy={action.busy}
+              icon={<Upload size={16} color={palette.onPrimary} />}
               onPress={() =>
                 void action.run(async () => {
                   const [file] = await chooseFiles("application/pdf");
@@ -225,6 +236,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                   <Row>
                     <Button
                       variant="outline"
+                      icon={<FileText size={16} color={palette.primary} />}
                       onPress={() =>
                         void action.run(async () => {
                           await Linking.openURL(
@@ -239,6 +251,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                       <Button
                         variant="outline"
                         busy={action.busy}
+                        icon={<RefreshCw size={16} color={palette.primary} />}
                         onPress={() =>
                           void action.run(async () => {
                             await retryPds(document.id);
@@ -253,6 +266,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                       <Button
                         variant="outline"
                         busy={action.busy}
+                        icon={<Eye size={16} color={palette.primary} />}
                         onPress={() =>
                           void action.run(async () => {
                             const result = await getPdsDraft(document.id);

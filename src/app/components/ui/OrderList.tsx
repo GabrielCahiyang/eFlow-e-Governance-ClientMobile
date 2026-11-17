@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PanResponder } from "react-native";
+import Check from "lucide-react-native/icons/check";
+import { useTheme } from "./Appearance";
 import { View } from "./Primitives";
 import { Button, Row } from "./index";
 import { colors } from "./theme";
@@ -13,6 +15,7 @@ export function OrderList({
   onSave: (ids: string[]) => Promise<unknown>;
   busy?: boolean;
 }) {
+  const palette = useTheme();
   const [order, setOrder] = useState(items),
     [drag, setDrag] = useState<string>(),
     [offset, setOffset] = useState(0);
@@ -98,7 +101,11 @@ export function OrderList({
         Hold the handle and drag, or use the arrow buttons. Save to apply this
         order.
       </Text>
-      <Button busy={busy} onPress={() => void onSave(order.map((i) => i.id))}>
+      <Button
+        busy={busy}
+        icon={<Check size={16} color={palette.onPrimary} />}
+        onPress={() => void onSave(order.map((i) => i.id))}
+      >
         Save order
       </Button>
     </View>

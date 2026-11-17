@@ -46,6 +46,7 @@ export type PrimaryTab =
   | "work"
   | "inbox"
   | "accounting"
+  | "petty_cash"
   | "projects"
   | "more";
 export interface AppRoute {

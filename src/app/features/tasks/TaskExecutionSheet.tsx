@@ -1,4 +1,7 @@
 import { useEffect } from "react";
+import Paperclip from "lucide-react-native/icons/paperclip";
+import Send from "lucide-react-native/icons/send";
+import Trash2 from "lucide-react-native/icons/trash";
 import { nativeWindow } from "../../../platform/webRuntime";
 import {
   Button,
@@ -8,6 +11,7 @@ import {
   Row,
   Sheet,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -34,6 +38,7 @@ export function TaskExecutionSheet({
 }) {
   const { profile } = useAuth(),
     { toast } = useToast(),
+    palette = useTheme(),
     action = useAction();
   const activeBlocker = initialBlocker?.trim() || "";
   const [draft, updateDraft, clearDraft] = useRetainedDraft<{
@@ -118,7 +123,11 @@ export function TaskExecutionSheet({
       onClose={close}
       busy={action.busy}
       footer={
-        <Button busy={action.busy} onPress={() => void save()}>
+        <Button
+          busy={action.busy}
+          icon={<Send size={16} color={palette.onPrimary} />}
+          onPress={() => void save()}
+        >
           Post update
         </Button>
       }
@@ -172,6 +181,7 @@ export function TaskExecutionSheet({
           <Button
             variant="outline"
             disabled={action.busy}
+            icon={<Trash2 size={16} color={palette.primary} />}
             onPress={() => updateDraft({ files: [] })}
           >
             Remove attachment
@@ -181,6 +191,7 @@ export function TaskExecutionSheet({
         <Button
           variant="outline"
           disabled={action.busy}
+          icon={<Paperclip size={16} color={palette.primary} />}
           onPress={() =>
             void action.run(async () => {
               const picked = await chooseFiles("*/*", false);

@@ -1,4 +1,8 @@
 import { useRef, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Plus from "lucide-react-native/icons/plus";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -10,6 +14,7 @@ import {
   Notice,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
 import { PublicMessageError } from "../../shared/userMessages";
@@ -69,6 +74,7 @@ export function ProjectTaskAccounts({
   readOnly: boolean;
   onSaved: () => Promise<void>;
 }) {
+  const palette = useTheme();
   const { profile } = useAuth();
   const facts = useFacts(
     "project-task-accounts:" + profile?.id + ":" + projectId,
@@ -206,6 +212,7 @@ export function ProjectTaskAccounts({
               {editable && line.available > 0 && !locked && (
                 <Button
                   variant="outline"
+                  icon={<RotateCcw size={15} color={palette.primary} />}
                   onPress={() => {
                     setReturning(line);
                     setReturnAmount(String(line.available));
@@ -234,6 +241,7 @@ export function ProjectTaskAccounts({
               {!locked && (
                 <Button
                   variant="outline"
+                  icon={<RotateCcw size={15} color={palette.primary} />}
                   onPress={() => {
                     setReturning(undefined);
                     setReason("");
@@ -286,6 +294,7 @@ export function ProjectTaskAccounts({
                     {!locked && rows.length > 1 && (
                       <Button
                         variant="ghost"
+                        icon={<X size={15} color={palette.primary} />}
                         onPress={() =>
                           setRows((old) => old.filter((_, i) => i !== index))
                         }
@@ -298,6 +307,7 @@ export function ProjectTaskAccounts({
                 {!locked && rows.length < sources.length && (
                   <Button
                     variant="outline"
+                    icon={<Plus size={15} color={palette.primary} />}
                     onPress={() => setRows((old) => [...old, blank()])}
                   >
                     Add another account
@@ -328,6 +338,13 @@ export function ProjectTaskAccounts({
               />
               <Button
                 busy={action.busy}
+                icon={
+                  returning ? (
+                    <RotateCcw size={15} color={palette.onPrimary} />
+                  ) : (
+                    <Check size={15} color={palette.onPrimary} />
+                  )
+                }
                 onPress={() => void action.run(save, "Task budget saved.")}
               >
                 {retry

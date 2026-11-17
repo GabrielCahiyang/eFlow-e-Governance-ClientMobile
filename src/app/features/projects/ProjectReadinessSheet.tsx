@@ -4,6 +4,9 @@ import { netProjectUpdates } from "./subscriptions";
 import { View } from "../../components/ui/Primitives";
 import CheckCircle2 from "lucide-react-native/icons/circle-check";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
+import Check from "lucide-react-native/icons/check";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -67,6 +70,7 @@ export function ProjectReadinessSheet({
     };
   }, [project.id, checks.refresh, completion.refresh]);
   const { profile } = useAuth();
+  const palette = useTheme();
   const { toast } = useToast();
   const action = useAction(),
     [confirm, setConfirm] = useState(false);
@@ -120,12 +124,18 @@ export function ProjectReadinessSheet({
       busy={action.busy}
       footer={
         <Row>
-          <Button variant="outline" disabled={action.busy} onPress={onClose}>
+          <Button
+            variant="outline"
+            disabled={action.busy}
+            icon={<X size={16} color={palette.primary} />}
+            onPress={onClose}
+          >
             Close readiness checklist
           </Button>
           {!!canManage && (
             <Button
               busy={action.busy}
+              icon={<Check size={16} color={palette.onPrimary} />}
               disabled={
                 !!checks.error ||
                 checks.loading ||
@@ -197,6 +207,7 @@ export function ProjectReadinessSheet({
                   <Button
                     variant="outline"
                     disabled={action.busy}
+                    icon={<Check size={16} color={palette.primary} />}
                     onPress={() =>
                       void action.run(async () => {
                         await reviewProject(

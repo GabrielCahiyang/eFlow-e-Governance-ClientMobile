@@ -3,6 +3,11 @@ import { Text } from "../../components/ui/Typography";
 import { useEffect, useRef, useState } from "react";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
+import Check from "lucide-react-native/icons/check";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import Trash2 from "lucide-react-native/icons/trash";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Choice,
@@ -218,6 +223,7 @@ export function WorkEditorSheet(
   const { profile } = useAuth(),
     { toast } = useToast(),
     { data, readOnly = false } = props,
+    palette = useTheme(),
     action = useAction();
   const [recoveredDone, setRecoveredDone] = useState(false);
   const [handoff, setHandoff] = useState<{
@@ -336,6 +342,13 @@ export function WorkEditorSheet(
             <Button
               busy={action.busy}
               disabled={!recoveredDone && (!canCheck || rejected)}
+              icon={
+                recoveredDone ? (
+                  <X size={16} color={palette.onPrimary} />
+                ) : (
+                  <RefreshCw size={16} color={palette.onPrimary} />
+                )
+              }
               onPress={() => {
                 if (recoveredDone) {
                   props.onClose();
@@ -406,6 +419,7 @@ export function WorkEditorSheet(
               <Button
                 variant="outline"
                 disabled={action.busy}
+                icon={<Trash2 size={16} color={palette.primary} />}
                 onPress={() =>
                   void action.run(async () => {
                     if (
@@ -492,6 +506,7 @@ function WorkEditorForm({
 }) {
   const { profile } = useAuth();
   const [data, setData] = useState(initialData);
+  const palette = useTheme();
   const [newer, setNewer] = useState<WorkTreeSnapshot>();
   const [committed, setCommitted] = useState(false);
   const dateTree = dateBounds ? { ...data, root: { ...data.root, scheduleBounds: dateBounds } } : data;
@@ -1082,6 +1097,16 @@ function WorkEditorForm({
           busy={action.busy}
           disabled={(taskStaffingDenied || (edit.command === "edit" && !capability.allowed)) && !request.current && !committed}
           variant={edit.command === "delete" && !committed ? "danger" : "primary"}
+          icon={(() => {
+            const color =
+              edit.command === "delete" && !committed
+                ? palette.onDanger
+                : palette.onPrimary;
+            if (committed) return <X size={16} color={color} />;
+            if (newer) return <RefreshCw size={16} color={color} />;
+            if (edit.command === "delete") return <Trash2 size={16} color={color} />;
+            return <Check size={16} color={color} />;
+          })()}
           onPress={() =>
             void (committed ? onClose() : newer ? reviewLatest() : save())
           }

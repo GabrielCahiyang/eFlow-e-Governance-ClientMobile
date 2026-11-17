@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
-import Clock from "lucide-react-native/icons/clock";
-import { Button, ErrorState, Loading } from "../../components/ui";
+import { Empty, ErrorState, Loading } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
-import { useTheme } from "../../components/ui/Appearance";
+import { space } from "../../components/ui/theme";
 import { useFacts } from "../../shared/useFacts";
 import { statusLabel } from "../../shared/statusLabels";
 import { nativeWindow } from "../../../platform/webRuntime";
@@ -11,7 +10,11 @@ import { EvidenceAttachment } from "./EvidenceAttachment";
 import { fetchSubitemInspectorRecord } from "../../../core/web/app/features/subtasks/services/subtaskWorkflowService";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
 import { selectFocusedWorkEvents } from "../../../core/web/app/features/nested-work/selectors/workActivityScope";
-import { ActivityEntry, type TimelineEntry } from "./ActivityEntry";
+import {
+  ActivityLoadMore,
+  ActivityTimeline,
+  type TimelineEntry,
+} from "./ActivityEntry";
 import { describeWorkEvent } from "./activityPresentation";
 import { useWorkActivityPages } from "./useWorkActivityPages";
 
@@ -149,33 +152,9 @@ function SubtaskTimeline({
   }
   entries.sort((a, b) => b.time - a.time || a.id.localeCompare(b.id));
   const loading = events.loading || history.loading;
-  const palette = useTheme();
 
   return (
-    <View
-      style={{
-        backgroundColor: palette.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        borderRadius: 14,
-        padding: 16,
-        gap: 12,
-        marginBottom: 12,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text style={{ fontSize: 16, fontWeight: "700", color: palette.text }}>
-          Activity
-        </Text>
-        <Clock size={16} color={palette.mutedLabel} />
-      </View>
-
+    <View style={{ gap: space.md, paddingBottom: space.md }}>
       {!!events.error && (
         <ErrorState error={events.error} retry={() => void events.refresh()} />
       )}
@@ -189,33 +168,21 @@ function SubtaskTimeline({
         <Loading label="Loading activity" layout="activity" />
       )}
       {!loading && !entries.length && !events.error && !history.error && (
-        <View style={{ gap: 4, paddingVertical: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: palette.text }}>
-            No activity yet
-          </Text>
-          <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-            Work updates and decisions will appear here.
-          </Text>
-        </View>
-      )}
-      {entries.map((entry, index) => (
-        <ActivityEntry
-          key={entry.id}
-          entry={entry}
-          last={index === entries.length - 1}
+        <Empty
+          compact
+          kind="tasks"
+          title="No activity yet"
+          description="Work updates and decisions will appear here."
         />
-      ))}
-      {!!events.paging.error && <ErrorState error={events.paging.error} />}
-      {events.more && (
-        <Button
-          variant="outline"
-          disabled={loading}
-          busy={events.paging.busy}
-          onPress={() => void events.loadOlder()}
-        >
-          {events.paging.error ? "Retry older activity" : "Load older activity"}
-        </Button>
       )}
+      <ActivityTimeline entries={entries} />
+      <ActivityLoadMore
+        more={events.more}
+        busy={events.paging.busy}
+        disabled={loading}
+        error={events.paging.error}
+        onPress={() => void events.loadOlder()}
+      />
     </View>
   );
 }

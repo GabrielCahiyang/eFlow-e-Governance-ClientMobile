@@ -404,3 +404,35 @@ test("project Audit Trail is native while project creation and AI tooling remain
     expect(resolveMobileRoute({ ...project, view }, "head", () => true).disposition).toBe("web");
   }
 });
+
+test("Accounting Staff puts Accounting in the bottom nav and routes Office petty cash through More", () => {
+  expect(primaryTabs("accounting_staff")).toEqual([
+    "home",
+    "reviews",
+    "work",
+    "accounting",
+    "inbox",
+    "more",
+  ]);
+  expect(
+    resolveMobileRoute(
+      { name: "accounting_overview", view: "overview" },
+      "accounting_staff",
+      () => true,
+    ),
+  ).toMatchObject({ tab: "accounting", disposition: "native" });
+  expect(
+    resolveMobileRoute(
+      { name: "accounting_releases" },
+      "accounting_staff",
+      () => true,
+    ),
+  ).toMatchObject({ tab: "accounting", disposition: "native" });
+  expect(
+    resolveMobileRoute(
+      { name: "financial_reviews", recordType: "office_petty_cash" },
+      "accounting_staff",
+      () => true,
+    ),
+  ).toMatchObject({ tab: "more", disposition: "native" });
+});

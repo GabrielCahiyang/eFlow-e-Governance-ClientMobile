@@ -1,4 +1,9 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -43,6 +48,7 @@ export function OfficeAccessPanel({
   onSelected: (id: string) => void;
 }) {
   const { profile } = useAuth(),
+    palette = useTheme(),
     { toast } = useToast(),
     [search, setSearch] = useState(""),
     [reconcile, setReconcile] = useState(false),
@@ -108,7 +114,11 @@ export function OfficeAccessPanel({
           <Notice>
             Refresh access to verify the last result before another change.
           </Notice>
-          <Button variant="outline" onPress={() => void refresh()}>
+          <Button
+            variant="outline"
+            icon={<RefreshCw size={16} color={palette.primary} />}
+            onPress={() => void refresh()}
+          >
             Refresh access
           </Button>
         </Card>
@@ -118,7 +128,7 @@ export function OfficeAccessPanel({
       ) : !facts.data ? (
         <Loading />
       ) : !person ? (
-        <Empty title="Choose an Office account" />
+        <Empty compact kind="people" title="Choose an Office account" />
       ) : (
         [
           { title: "Page access", keys: VISIBLE_PAGE_PERMISSION_KEYS },
@@ -148,6 +158,7 @@ export function OfficeAccessPanel({
                       <Button
                         disabled={action.busy || reconcile || !override}
                         variant="outline"
+                        icon={<RotateCcw size={16} color={palette.primary} />}
                         onPress={() => void change(key, null)}
                       >
                         Use role default
@@ -157,6 +168,7 @@ export function OfficeAccessPanel({
                           action.busy || reconcile || override?.allowed === true
                         }
                         variant="outline"
+                        icon={<Check size={16} color={palette.primary} />}
                         onPress={() => void change(key, true)}
                       >
                         Allow access
@@ -168,6 +180,7 @@ export function OfficeAccessPanel({
                           override?.allowed === false
                         }
                         variant="outline"
+                        icon={<X size={16} color={palette.primary} />}
                         onPress={() => void change(key, false)}
                       >
                         Deny access

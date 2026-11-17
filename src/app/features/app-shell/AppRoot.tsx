@@ -14,8 +14,10 @@ import {
   InvitationScreen,
   ActivationScreen,
 } from "../authentication";
+import LogOut from "lucide-react-native/icons/log-out";
 import { hydrateWebPreferences } from "../../../platform/webRuntime";
 import { Button, ErrorState, Screen } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { LoadingScreen } from "./LoadingScreen";
 import { NativeWorkspace } from "./NativeWorkspace";
 import { ShareLanding } from "../projects";
@@ -66,6 +68,7 @@ function ReadyAppRoot({ onRetry }: { onRetry: () => void }) {
 function SessionContent() {
   const { loading, accessError, user, profile, error, refresh, signOut } =
     useAuth();
+  const palette = useTheme();
   const { entry, close } = useNativeEntryLink();
   const [sharedRoute, setSharedRoute] = useState<AppRoute>();
   useEffect(() => setSharedRoute(undefined), [profile?.id]);
@@ -98,7 +101,11 @@ function SessionContent() {
       <SafeAreaView style={{ flex: 1 }}>
         <Screen title={denied ? "Sign in to eFlow" : "Check your account access"}>
           <ErrorState error={error} retry={denied ? undefined : () => void refresh()} />
-          <Button variant="outline" onPress={() => void signOut()}>
+          <Button
+            variant="outline"
+            icon={<LogOut size={16} color={palette.primary} />}
+            onPress={() => void signOut()}
+          >
             Back to sign in
           </Button>
         </Screen>

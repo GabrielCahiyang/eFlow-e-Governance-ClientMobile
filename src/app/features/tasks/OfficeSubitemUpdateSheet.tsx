@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import Paperclip from "lucide-react-native/icons/paperclip";
+import Send from "lucide-react-native/icons/send";
+import Trash2 from "lucide-react-native/icons/trash";
 import {
   Button,
   Choice,
@@ -8,6 +11,7 @@ import {
   Notice,
   Sheet,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useToast } from "../../components/ui/Toast";
 import { asServiceFile, chooseFiles, type PickedFile } from "../../../platform/files";
 import { useAction } from "../../shared/useAction";
@@ -40,6 +44,7 @@ export function OfficeSubitemUpdateSheet({
   onSaved: (data: WorkTreeSnapshot) => Promise<void>;
 }) {
   const baseline = useRef(tree).current;
+  const palette = useTheme();
   const activeBlocker =
     tree.nodes.find((item) => item.id === nodeId)?.blocker?.trim() || "";
   const { toast } = useToast();
@@ -146,6 +151,7 @@ export function OfficeSubitemUpdateSheet({
         <Button
           busy={action.busy}
           disabled={attempted || readOnly}
+          icon={<Send size={16} color={palette.onPrimary} />}
           onPress={() => void save()}
         >
           Post update
@@ -193,6 +199,7 @@ export function OfficeSubitemUpdateSheet({
           <Button
             variant="outline"
             disabled={attempted || readOnly || action.busy}
+            icon={<Trash2 size={16} color={palette.primary} />}
             onPress={() => updateDraft({ attachment: undefined })}
           >
             Remove attachment
@@ -202,6 +209,7 @@ export function OfficeSubitemUpdateSheet({
         <Button
           variant="outline"
           disabled={attempted || readOnly || action.busy}
+          icon={<Paperclip size={16} color={palette.primary} />}
           onPress={() =>
             void action.run(async () => {
               const picked = (await chooseFiles("*/*", false))[0];

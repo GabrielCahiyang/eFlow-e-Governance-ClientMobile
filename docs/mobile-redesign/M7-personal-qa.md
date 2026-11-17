@@ -2,6 +2,60 @@
 
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
+## Office Analytics exports and More cleanup — 18 November 2026
+
+Office Analytics saves CSV and PDF to a folder selected in the system picker and displays the filename and compatible viewers. Budget and Management brief were removed from Office Analytics. The More menu drops Announcements and Notification alerts while keeping Notifications and Messages. Existing announcement links from the Inbox still resolve.
+
+TypeScript, nine Metro checks and 19 focused tests passed. The tests cover the removed entries, filter and export routing, both file formats, viewer guidance, and dismissing the folder picker without saving or sharing. Full Jest was skipped for this development slice. Signed-in device and personal acceptance remain pending.
+
+Both production JavaScript exports, standalone Android compilation, signature verification, and the credential audit for three bundles passed. The [M7 review APK](../../artifacts/M7/eFlow-Mobile-M7-Office-Analytics-Export-REVIEW-v57-arm64-x86_64.apk) includes arm64-v8a and x86_64. The embedded source map matched the three updated app files. The APK installed and cold-launched to sign-in in a fresh Android API 36 x86_64 emulator profile. Native iOS compilation and rendered workflow checks require an Apple build environment.
+
+| Account | Check on Android and iOS |
+| --- | --- |
+| Approved Head appointed to an Office with visible report rows | In Office Analytics, confirm the Budget and Management brief buttons are gone. Filter the rows and export CSV and PDF to a QA folder. Confirm no share sheet appears and use a suggested app to open each saved file. Check that both files contain the filtered records. Dismiss the picker and confirm there is no success message. |
+| Approved Head, Member and Accounting Staff | Confirm More has no Announcements or Notification alerts entry. Check the authorized Messages, Notifications and Password & security entries. |
+| Approved Head | Repeat with light and dark themes, larger text, TalkBack or VoiceOver, reduced motion, and the search keyboard open before export. |
+
+## Messages redesign — 18 November 2026
+
+The redesigned directory keeps search, conversation filters and pinning. Opening a thread still marks it read. Starting a conversation uses the authorized people picker. Archived threads keep their history and Back action and reserve room above the system navigation area. Attachment removal is disabled while a send is in progress or awaiting confirmation. The thread and composer each have a distinct React key scoped to the actor and conversation.
+
+**Automated checks passed.** 44 tests across 14 focused suites covered messaging, shared search and headers, and the app shell. The screen tests use local fixtures for directory routing, new direct chats, marking a thread read, retaining a draft across a failed send, retrying with the same message ID, and archived history. TypeScript, Metro, both production JavaScript exports, and the credential audit of three bundles passed. An additional navigation run reported nine failures in the existing tab layout, role defaults and badge expectations. A full Jest run was skipped for this focused review.
+
+**Android review build.** [Standalone M7 Messages APK](../../artifacts/M7/eFlow-Mobile-M7-Messages-Redesign-REVIEW-v57-arm64-x86_64.apk). The v57 APK is signed for local QA, includes arm64-v8a and x86_64, and matched eight working-tree sources in the packaged bundle's source map. It installed and cold-launched to eFlow sign-in in a fresh Android API 36 x86_64 emulator profile. SHA-256 `013cda0f908082af8145f7d0769ebc4cc52057b79919e9b1139853922e09b683`.
+
+Signed-in Messages, physical Android, native iOS, and device theme, accessibility, motion and keyboard checks remain pending. No account signed in during the emulator smoke check. Signed-in scenarios require approved QA accounts and dedicated conversations. Repeat on Android and iOS through normal sign-in. Native iOS compilation requires an Apple build environment.
+
+| Account | Check |
+| --- | --- |
+| Approved Head, Member and Accounting Staff, each in a separate session | Confirm the role in Profile. Open **More → Messages**. Search, use the Unread and Archived filters, open an authorized conversation, and use Back to check the originating screen and filter. Open an authorized project or task chat from its record and return to that exact record. |
+| Approved sender and recipient in a dedicated direct chat | Open **New conversation**, choose the QA recipient, and send text and a permitted test image. Confirm both appear once for the recipient. Open the unread thread and verify its unread count clears. Confirm an unsent draft survives leaving and reopening the thread. |
+| Approved project or task participant and a second participant in a dedicated QA chat | Check older history, mentions, reactions, pinned messages and Conversation info. Verify read-only archived history on an existing archived fixture. Test reconnect and send recovery within the fixture. |
+| Any approved mobile role, on each platform | Check light and dark themes, 150% and 200% text, reduced motion, TalkBack or VoiceOver, and the composer with the keyboard open. On Android, verify gesture and three-button navigation clearance. |
+
+## Bottom tab bar clearance — 18 November 2026
+
+The floating tab bar has its own space below each screen. Projects, project work views, My Work, Inbox and Reviews can use their full scroll area above it. The bar handles the bottom system inset, and shared screens and Inbox no longer add separate bar padding. Open message threads still give the bottom edge to the composer.
+
+TypeScript, Metro, the Android and iOS JavaScript exports, and the new layout regression passed. The Projects, Project, Inbox and shared Screen suites passed. The full Jest run hit 17 existing navigation assertions reproduced against the pre-fix layout and one assertion that required the overlay. The updated More suite passed all five tests after removing that obsolete assertion. The browser check stopped before it could confirm the updated layout because automation could not verify the current URL.
+
+Android standalone compilation, signature verification, packaged source checks, and the credential audit passed for this [M7 review APK](../../artifacts/M7/eFlow-Mobile-M7-Tab-Bar-Clearance-REVIEW-v57-arm64-x86_64.apk). The APK contains arm64-v8a and x86_64 builds. SHA-256 `645a2c621e36754fc4c3974be3fe732357de9b9d01efa33ad7355f87b412b441`. It installed and reached sign-in from a cold launch on an Android API 36 x86_64 emulator with a fresh profile. No account was used for this smoke check. Native iOS compilation requires an Apple build environment. Signed-in layout, device accessibility, keyboard and motion acceptance remain pending on both platforms.
+
+On Android and iOS, use approved accounts and existing records for these read-only checks:
+
+| Account | Check |
+| --- | --- |
+| Head or Member | Scroll to the last Projects row. Confirm the full row and its controls are visible above the bar, then open the project and verify Back returns to Projects. Scroll to the end of its Main table, Board and Calendar. Check the Main table after swiping sideways. |
+| Head or Member | Scroll to the last row in My Work and Reviews, and the last update or **View more** button in Inbox opened from More. Check the end of Home and More. |
+| Accounting Staff | Scroll to the final visible item or action in Accounting, and check authorized Projects and Inbox destinations opened from More. |
+| Any approved mobile role | On a narrow screen, repeat with light and dark themes, larger text, a screen reader and reduced motion. Focus project search, dismiss the keyboard, and check that the final row remains reachable. Open an existing message thread, check that the composer clears the keyboard and system navigation, and use Back to confirm the tab bar returns. |
+
+## Office petty cash receipt links — 17 November 2026
+
+The Expo web preview opens a tab when the receipt is tapped, then loads the private, short-lived link in that tab. A blocked pop-up shows retry guidance, and an unavailable link closes the empty tab. The status pill uses an SVG-compatible accessibility attribute.
+
+TypeScript and 12 focused tests passed. With an approved Accounting Staff account and an existing test receipt, open Office petty cash, tap two different receipts, and verify each opens the corresponding file. Repeat on Android and iOS in the next device QA pass. The browser automation could not verify the browser URL. Live receipt checks, native device QA and packaging are pending for this source change.
+
 ## All Task edit-modal notices at the top — 16 November 2026 follow-up
 
 The placement request covers the entire informational/warning block, not only “Work has started…”. Task editor guidance and restriction banners now precede every input; field labels/errors remain with their inputs. No new SQL or authority change is involved. [Delta and verification limits](M7-modal-notices.md). PASS: 636 tests / 146 suites, TypeScript/Metro, Android+iOS JS exports, Android release/signature/30-source checks and three-executable credential audit. [Modal-Notices REVIEW APK](../../artifacts/M7/eFlow-Mobile-M7-Modal-Notices-REVIEW-v57-arm64-x86_64.apk) · [v2 Web handoff](../../artifacts/M7/eFlow-Web-Workflow-UX-Dependency-Linking-Handoff-2026-11-16-v2.zip). Previous packages do not include this clarification. Native visual/role acceptance remains pending.
@@ -812,6 +866,14 @@ Verified against authoritative eFlow Web Git revision `4ff217b84e3e8128555ffc87f
 
 - **Subtask start date and today default — integration blocked.** The Office and Personal subtask records and the `r7_work_command` and `nw_work_command` create payload accept a due date. The shared contract needs a persisted date on both subtask record types, create validation and calendar default semantics, and projection through `r7_work_tree`. The mobile form reports the unavailable field while retaining supported creation.
 - **Contributor submission and nearest-Lead approval — integration blocked.** `save_subtask_work_update` applies state and history immediately. The existing root progress/status and Personal nested-work commands also lack a pending change stage for every contributor execution action. The shared contract needs revision- and actor-scoped pending submissions, authorized nearest eligible Lead routing, a decision and notification surface, and atomic application of accepted changes with receipt recovery. Keep existing self-review, ancestor fallback, descendant completion and Responsible Office Head root-review checks. Mobile blocks the direct contributor execution paths, including retries of uncommitted Personal nested work. Existing finance and independent-review authorities continue to use their own contracts.
+
+## Web preview dependency repair — 16 November 2026
+
+Added `@lottiefiles/dotlottie-react` at the installed `lottie-react-native` version's declared peer range (`^0.13.5`) and updated the lockfile. The optional browser peer was missing, preventing Metro from bundling `FolderRefresh` for web.
+
+Verification: production web export passed; TypeScript and nine Metro checks passed; all 636 tests in 146 suites passed; Android and iOS production JS exports passed separately; the [release credential audit](../NATIVE_RELEASE_AUDIT.json) passed for both native exports. Browser interaction, protected sign-in, native compilation/install, themes, accessibility, font scaling, keyboard and reduced-motion workflows were not executed for this dependency repair. No new APK was produced. Personal acceptance remains pending.
+
+Personal preview check: restart Metro with `npm run web -- --clear`, then open the browser preview and confirm startup and the folder refresh animation load. Protected sign-in and authenticated workflow checks require an approved Head, Member or Accounting Staff account through the existing protected flow. A browser preview is supplemental evidence only.
 
 ## Integration dependencies
 

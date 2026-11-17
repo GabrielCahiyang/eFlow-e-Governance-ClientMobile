@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -26,6 +28,7 @@ import {
 
 export function AnnouncementsScreen() {
   const { profile } = useAuth();
+  const palette = useTheme();
   const actor = profile!.id;
   const [tab, setTab] = useState("all");
   const [read, setRead] = useState<Set<string>>(new Set());
@@ -89,12 +92,7 @@ export function AnnouncementsScreen() {
         <Loading label="Loading announcements" layout="announcements" />
       ) : !rows.length ? (
         <Empty
-          kind="inbox"
-          action={
-            <Button variant="outline" onPress={() => void facts.refresh()}>
-              Refresh announcements
-            </Button>
-          }
+          kind={tab === "unread" ? "complete" : "inbox"}
           title={
             tab === "unread"
               ? "No unread announcements"
@@ -110,11 +108,12 @@ export function AnnouncementsScreen() {
             />
             <Text selectable>{item.body}</Text>
             {item.readAt || read.has(item.id) ? (
-              <Notice>Read</Notice>
+              <Notice tone="success">Read</Notice>
             ) : item.canMarkRead ? (
               <Button
                 variant="outline"
                 disabled={facts.loading || action.busy}
+                icon={<Check size={16} color={palette.primary} />}
                 onPress={() =>
                   void action.run(async () => {
                     await confirmAnnouncementRead(actor, item.id);

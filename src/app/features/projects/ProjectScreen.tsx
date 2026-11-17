@@ -12,7 +12,9 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Star from "lucide-react-native/icons/star";
+import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import {
   Button,
   Card,
@@ -22,6 +24,7 @@ import {
   LabelValue,
   Loading,
   Notice,
+  PageHeader,
   Screen,
   SearchField,
   Tabs,
@@ -103,6 +106,7 @@ export function ProjectScreen({
 }) {
   const { profile } = useAuth();
   const workspace = useWorkspace();
+  const navHeader = useNavigationHeader();
   const palette = useTheme();
   const resolveStatus = useWorkStatus();
   const { width: windowWidth, fontScale } = useWindowDimensions();
@@ -340,7 +344,14 @@ export function ProjectScreen({
   const hasTable = main && sections.length > 0;
   const accents = new Map(groups.map((group) => [group.id, group.color]));
   const header = (
-    <View style={{ gap: 12, marginBottom: 8 }}>
+    <View
+      style={{
+        gap: 12,
+        marginBottom: 8,
+        paddingTop:
+          !auxiliary && navHeader?.topInset ? navHeader.topInset + 8 : 0,
+      }}
+    >
       {main && !auxiliary && groupFacts.error && (
         <ErrorState
           error={groupFacts.error}
@@ -351,37 +362,30 @@ export function ProjectScreen({
         <Loading label="Loading task groups" layout="summary" />
       )}
       {!!pull.error && <ErrorState error={pull.error} retry={pull.refresh} />}
-      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
-        <Text
-          accessibilityRole="header"
-          style={{
-            flex: 1,
-            color: palette.text,
-            fontSize: 26,
-            fontWeight: "600",
-          }}
-        >
-          {project.title}
-        </Text>
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityLabel="Favorite project"
-          accessibilityState={{ checked: favorites.favorites.has(id) }}
-          onPress={() => favorites.toggle(id)}
-          style={{
-            minWidth: 48,
-            minHeight: 48,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Star
-            size={22}
-            color={palette.primary}
-            fill={favorites.favorites.has(id) ? palette.primary : "transparent"}
-          />
-        </Pressable>
-      </View>
+      <PageHeader
+        title={project.title}
+        subtitle={workspace.selected?.workspace.name || "Project workspace"}
+        right={
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel="Favorite project"
+            accessibilityState={{ checked: favorites.favorites.has(id) }}
+            onPress={() => favorites.toggle(id)}
+            style={{
+              minWidth: 48,
+              minHeight: 48,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Star
+              size={22}
+              color={palette.primary}
+              fill={favorites.favorites.has(id) ? palette.primary : "transparent"}
+            />
+          </Pressable>
+        }
+      />
       <Card style={{ padding: 10, gap: 10 }}>
         <EditorialMetadataStrip
           variant="flush"
@@ -520,7 +524,7 @@ export function ProjectScreen({
               />
             ) : (
               <Empty
-                kind="work"
+                kind={needle ? "search" : "tasks"}
                 description={
                   needle
                     ? "Try a different task name or clear your search."
@@ -528,17 +532,14 @@ export function ProjectScreen({
                 }
                 action={
                   needle ? (
-                    <Button variant="outline" onPress={() => setQuery("")}>
-                      Clear search
-                    </Button>
-                  ) : (
                     <Button
                       variant="outline"
-                      onPress={() => void pull.refresh()}
+                      icon={<RotateCcw size={15} color={palette.primary} />}
+                      onPress={() => setQuery("")}
                     >
-                      Refresh project
+                      Clear search
                     </Button>
-                  )
+                  ) : undefined
                 }
                 title={
                   needle

@@ -1,4 +1,10 @@
 import { View } from "react-native";
+import Calendar from "lucide-react-native/icons/calendar";
+import Check from "lucide-react-native/icons/check";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import History from "lucide-react-native/icons/rotate-ccw-clock";
+import X from "lucide-react-native/icons/x";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
 import { budgetVersionChanges } from "../../../core/web/app/features/budget/selectors/budgetVersions";
@@ -215,7 +221,11 @@ export function BudgetReleaseHistory({
           <Notice>
             {latest.actorName} · {dateLabel(latest.createdAt)} · {latest.reason}
           </Notice>
-          <Button variant="outline" onPress={() => setHistory(!history)}>
+          <Button
+            variant="outline"
+            icon={<History size={15} color={palette.primary} />}
+            onPress={() => setHistory(!history)}
+          >
             {history ? "Hide version history" : "Show version history"}
           </Button>
           {history &&
@@ -284,6 +294,7 @@ export function BudgetReleaseHistory({
               <Button
                 variant="ghost"
                 disabled={month === 0}
+                icon={<ChevronLeft size={15} color={palette.primary} />}
                 onPress={() => {
                   setMonth(month - 1);
                   setDay("");
@@ -301,6 +312,7 @@ export function BudgetReleaseHistory({
               <Button
                 variant="ghost"
                 disabled={month === 11}
+                trailing={<ChevronRight size={15} color={palette.primary} />}
                 onPress={() => {
                   setMonth(month + 1);
                   setDay("");
@@ -360,7 +372,11 @@ export function BudgetReleaseHistory({
               ),
             )}
             {day && (
-              <Button variant="outline" onPress={() => setDay("")}>
+              <Button
+                variant="outline"
+                icon={<Calendar size={15} color={palette.primary} />}
+                onPress={() => setDay("")}
+              >
                 Show whole month
               </Button>
             )}
@@ -411,6 +427,7 @@ export function BudgetReleaseHistory({
                   <Button
                     variant="outline"
                     disabled={facts.loading}
+                    icon={<Check size={15} color={palette.primary} />}
                     onPress={() => {
                       action.clear();
                       setTarget({
@@ -447,6 +464,7 @@ export function BudgetReleaseHistory({
                 <Button
                   variant="outline"
                   disabled={action.busy}
+                  icon={<X size={15} color={palette.primary} />}
                   onPress={closeTarget}
                 >
                   Cancel confirmation
@@ -454,6 +472,7 @@ export function BudgetReleaseHistory({
                 <Button
                   busy={action.busy}
                   disabled={!reference.trim()}
+                  icon={<Check size={15} color={palette.onPrimary} />}
                   onPress={() => void submit()}
                 >
                   Confirm availability

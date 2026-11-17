@@ -4,6 +4,13 @@ import {
   pendingReleaseAmount,
 } from "../../../core/web/app/features/budget/selectors/budgetReleaseSchedule";
 import { useState } from "react";
+import ArrowDown from "lucide-react-native/icons/arrow-down";
+import ArrowUp from "lucide-react-native/icons/arrow-up";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Plus from "lucide-react-native/icons/plus";
+import Trash2 from "lucide-react-native/icons/trash";
+import X from "lucide-react-native/icons/x";
 import { View } from "../../components/ui/Primitives";
 import {
   colors,
@@ -16,6 +23,7 @@ import {
   Row,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import type { BudgetSection } from "../../../core/web/app/features/budget/types";
 import {
@@ -33,6 +41,7 @@ export function BudgetSectionEditor({
   onChange: (rows: BudgetSection[]) => void;
   disabled: boolean;
 }) {
+  const palette = useTheme();
   const [collapsed, setCollapsed] = useState(new Set<string>()),
     [parentNotice, setParentNotice] = useState("");
   const patch = (id: string, value: Partial<BudgetSection>) =>
@@ -94,6 +103,13 @@ export function BudgetSectionEditor({
               <Row>
                 <Button
                   variant="ghost"
+                  icon={
+                    collapsed.has(section.id) ? (
+                      <ChevronRight size={15} color={palette.primary} />
+                    ) : (
+                      <ChevronDown size={15} color={palette.primary} />
+                    )
+                  }
                   onPress={() =>
                     setCollapsed((old) => {
                       const next = new Set(old);
@@ -112,6 +128,7 @@ export function BudgetSectionEditor({
                   <>
                     <Button
                       variant="outline"
+                      icon={<Plus size={15} color={palette.primary} />}
                       onPress={() =>
                         onChange(addSectionChild(sections, section.id))
                       }
@@ -120,12 +137,14 @@ export function BudgetSectionEditor({
                     </Button>
                     <Button
                       variant="ghost"
+                      icon={<ArrowUp size={15} color={palette.primary} />}
                       onPress={() => order(section.id, -1)}
                     >
                       Move up
                     </Button>
                     <Button
                       variant="ghost"
+                      icon={<ArrowDown size={15} color={palette.primary} />}
                       onPress={() => order(section.id, 1)}
                     >
                       Move down
@@ -237,6 +256,7 @@ export function BudgetSectionEditor({
                             {!frozen && (
                               <Button
                                 variant="ghost"
+                                icon={<X size={15} color={palette.primary} />}
                                 onPress={() =>
                                   setRows(rows.filter((_, i) => i !== index))
                                 }
@@ -250,6 +270,7 @@ export function BudgetSectionEditor({
                       {!disabled && (
                         <Button
                           variant="outline"
+                          icon={<Plus size={15} color={palette.primary} />}
                           onPress={() =>
                             patch(section.id, {
                               releaseSchedule: [
@@ -272,6 +293,7 @@ export function BudgetSectionEditor({
                   {!disabled && (
                     <Button
                       variant="danger"
+                      icon={<Trash2 size={15} color={palette.onDanger} />}
                       onPress={() =>
                         void confirmAction(
                           "Remove budget account?",
@@ -305,6 +327,7 @@ export function BudgetSectionEditor({
       {!disabled && (
         <Button
           variant="outline"
+          icon={<Plus size={15} color={palette.primary} />}
           onPress={() => onChange(addSectionChild(sections))}
         >
           Add top-level section

@@ -1,4 +1,7 @@
 import { useRef, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Pencil from "lucide-react-native/icons/pencil";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -45,6 +48,7 @@ function Editor({
   onClose: () => void;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const { toast } = useToast();
   const [locked, setLocked] = useState(false),
     request = useRef(crypto.randomUUID()),
@@ -108,6 +112,7 @@ function Editor({
       </Notice>
       <Button
         busy={action.busy}
+        icon={<Check size={16} color={palette.onPrimary} />}
         onPress={() =>
           void action.run(async () => {
             if (!until && !end)
@@ -140,6 +145,7 @@ function Editor({
   );
 }
 export function MemberTerms({ project }: { project: string }) {
+  const palette = useTheme();
   const facts = useFacts("project-member-terms:" + project, () =>
       fetchMembers(project),
     ),
@@ -167,7 +173,11 @@ export function MemberTerms({ project }: { project: string }) {
                 (office) =>
                   office.can_select && office.office_id === member.office,
               )) && (
-              <Button variant="outline" onPress={() => setEditing(member)}>
+              <Button
+                variant="outline"
+                icon={<Pencil size={16} color={palette.primary} />}
+                onPress={() => setEditing(member)}
+              >
                 Edit access terms
               </Button>
             )}

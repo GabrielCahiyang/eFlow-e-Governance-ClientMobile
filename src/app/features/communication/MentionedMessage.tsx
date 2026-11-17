@@ -1,5 +1,7 @@
 import { View } from "react-native";
+import X from "lucide-react-native/icons/x";
 import { Button, Card } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { ChatImage } from "./chatImages";
 import { messagePreview } from "./messageHistory";
@@ -19,6 +21,7 @@ export function MentionedMessage({
   unavailable: boolean;
   onClose: () => void;
 }) {
+  const palette = useTheme();
   return (
     <View style={{ marginHorizontal: 12, marginTop: 8 }}>
       <Card title="Message from your notification">
@@ -43,7 +46,11 @@ export function MentionedMessage({
               : "This message is unavailable."}
           </Text>
         )}
-        <Button variant="outline" onPress={onClose}>
+        <Button
+          variant="outline"
+          icon={<X size={16} color={palette.primary} />}
+          onPress={onClose}
+        >
           Dismiss highlighted message
         </Button>
       </Card>

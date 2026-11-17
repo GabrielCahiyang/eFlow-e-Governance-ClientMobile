@@ -1,5 +1,6 @@
 import { expect, jest, test, describe } from "@jest/globals";
 import { fireEvent, render } from "@testing-library/react-native";
+import * as ReactNative from "react-native";
 import {
   AvatarBadge,
   BentoActionButtons,
@@ -7,6 +8,7 @@ import {
   BentoBlockerCard,
   BentoDependenciesCard,
   BentoEditButton,
+  BentoOverviewHeroCard,
   BentoScheduleCards,
   BentoSubtasksCard,
   BentoSupportingGrid,
@@ -297,31 +299,29 @@ describe("TaskBentoComponents", () => {
     expect(onFiles).toHaveBeenCalledTimes(1);
   });
 
-  test("BentoSubtaskSupportingGrid renders Subtask grid tiles and Planning details sheet", async () => {
+  test("BentoSubtaskSupportingGrid omits Planning details and handles Subtask grid tiles", async () => {
     const onReview = jest.fn();
     const onFunding = jest.fn();
     const onFiles = jest.fn();
-    const onPlanning = jest.fn();
 
     const view = await render(
       <BentoSubtaskSupportingGrid
         onPressReview={onReview}
         onPressFunding={onFunding}
         onPressFiles={onFiles}
-        onPressPlanning={onPlanning}
       />,
     );
 
     expect(view.getByText("Evidence & review")).toBeOnTheScreen();
     expect(view.getByText("Funding")).toBeOnTheScreen();
     expect(view.getByText("Files")).toBeOnTheScreen();
-    expect(view.getByText("Planning details")).toBeOnTheScreen();
-    expect(view.getByText("Additional fields")).toBeOnTheScreen();
+    expect(view.queryByText("Planning details")).toBeNull();
+    expect(view.queryByText("Additional fields")).toBeNull();
 
-    await fireEvent.press(view.getByLabelText("Planning details, Additional fields"));
-    expect(onPlanning).toHaveBeenCalledTimes(1);
+    await fireEvent.press(view.getByLabelText("Files, Attachments"));
+    expect(onFiles).toHaveBeenCalledTimes(1);
 
-    // Test PlanningDetailsSheet
+    // Test PlanningDetailsSheet standalone helper
     const sheetView = await render(
       <PlanningDetailsSheet
         open
@@ -335,7 +335,8 @@ describe("TaskBentoComponents", () => {
     expect(sheetView.getByText("Planning details")).toBeOnTheScreen();
     expect(sheetView.getByText("Comprehensive planning scope")).toBeOnTheScreen();
     expect(sheetView.getByText("All invitations delivered")).toBeOnTheScreen();
-    expect(sheetView.getByText("• Invitation emails dispatched")).toBeOnTheScreen();
+    expect(sheetView.getByText("Invitation emails dispatched")).toBeOnTheScreen();
+    expect(sheetView.getByText("RSVP sheet updated")).toBeOnTheScreen();
   });
 
   test("BentoProjectOnHoldCard renders warning state, explanation, and action unavailable badge", async () => {
@@ -461,12 +462,11 @@ describe("TaskBentoComponents", () => {
     expect(view.getByText("Subtask 4")).toBeOnTheScreen();
   });
 
-  test("BentoSubtaskSupportingGrid renders 5 tiles when showFunding is true and 4 tiles when false", async () => {
+  test("BentoSubtaskSupportingGrid renders 4 tiles when showFunding is true and 3 tiles when false (without Planning details)", async () => {
     const onPressActivity = jest.fn();
     const onPressReview = jest.fn();
     const onPressFunding = jest.fn();
     const onPressFiles = jest.fn();
-    const onPressPlanning = jest.fn();
 
     const officeView = await render(
       <BentoSubtaskSupportingGrid
@@ -475,13 +475,12 @@ describe("TaskBentoComponents", () => {
         onPressReview={onPressReview}
         onPressFunding={onPressFunding}
         onPressFiles={onPressFiles}
-        onPressPlanning={onPressPlanning}
       />,
     );
 
     expect(
-      officeView.getByRole("button", { name: "Planning details, Additional fields" }),
-    ).toBeOnTheScreen();
+      officeView.queryByRole("button", { name: "Planning details, Additional fields" }),
+    ).toBeNull();
     expect(
       officeView.getByRole("button", { name: "Activity, Updates & history" }),
     ).toBeOnTheScreen();
@@ -507,7 +506,6 @@ describe("TaskBentoComponents", () => {
         onPressActivity={onPressActivity}
         onPressReview={onPressReview}
         onPressFiles={onPressFiles}
-        onPressPlanning={onPressPlanning}
       />,
     );
 
@@ -521,10 +519,68 @@ describe("TaskBentoComponents", () => {
       personalView.getByRole("button", { name: "Files, Attachments" }),
     ).toBeOnTheScreen();
     expect(
-      personalView.getByRole("button", { name: "Planning details, Additional fields" }),
-    ).toBeOnTheScreen();
+      personalView.queryByRole("button", { name: "Planning details, Additional fields" }),
+    ).toBeNull();
     expect(
       personalView.queryByRole("button", { name: "Funding, Financial records" }),
     ).toBeNull();
+  });
+
+  test("BentoOverviewHeroCard renders navy hero completion ring, circular icon status/priority pods, and stacks at 200% fontScale", async () => {
+    const rowSpy = jest.spyOn(ReactNative.Dimensions, "get").mockReturnValue({
+      width: 390,
+      height: 844,
+      scale: 3,
+      fontScale: 1,
+    });
+    try {
+      const view = await render(
+        <BentoOverviewHeroCard
+          title="Task completion"
+          subtitle="2 of 3 subtasks completed"
+          percent={67}
+          statusLabel="In progress"
+          statusCode="in_progress"
+          priorityLabel="High"
+          priorityRaw="high"
+        />,
+      );
+
+      expect(view.getByText("Task completion")).toBeOnTheScreen();
+      expect(view.getByText("2 of 3 subtasks completed")).toBeOnTheScreen();
+      expect(view.getByText("67%")).toBeOnTheScreen();
+      expect(view.getByLabelText("Status: In progress")).toBeOnTheScreen();
+      expect(view.getByLabelText("Priority: High")).toBeOnTheScreen();
+
+      const statusPod = view.getByLabelText("Status: In progress");
+      expect(statusPod.parent).toHaveStyle({ flexDirection: "row" });
+    } finally {
+      rowSpy.mockRestore();
+    }
+
+    const scaledSpy = jest.spyOn(ReactNative.Dimensions, "get").mockReturnValue({
+      width: 390,
+      height: 844,
+      scale: 3,
+      fontScale: 2,
+    });
+    try {
+      const scaled = await render(
+        <BentoOverviewHeroCard
+          title="Subtask completion"
+          subtitle="1 of 2 child subtasks completed"
+          percent={50}
+          statusLabel="Awaiting approval"
+          statusCode="for_review"
+          priorityLabel="Urgent"
+          priorityRaw="urgent"
+        />,
+      );
+      expect(
+        scaled.getByLabelText("Status: Awaiting approval").parent,
+      ).toHaveStyle({ flexDirection: "column" });
+    } finally {
+      scaledSpy.mockRestore();
+    }
   });
 });

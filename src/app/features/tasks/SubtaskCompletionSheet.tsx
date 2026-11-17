@@ -1,5 +1,8 @@
 import { useRef, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import { Button, ErrorState, Field, Notice, Sheet } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -48,6 +51,7 @@ export function SubtaskCompletionSheet({
   onClose: () => void;
   onSaved: (tree: WorkTreeSnapshot) => Promise<void>;
 }) {
+  const palette = useTheme();
   const [locked, setLocked] = useState(false),
     [committed, setCommitted] = useState(false),
     [stage, report] = useState("");
@@ -226,6 +230,13 @@ export function SubtaskCompletionSheet({
       <Button
         busy={action.busy}
         disabled={recovery.loading || !!recovery.error}
+        icon={
+          committed ? (
+            <RefreshCw size={16} color={palette.onPrimary} />
+          ) : (
+            <Check size={16} color={palette.onPrimary} />
+          )
+        }
         onPress={() => void action.run(complete, "", close)}
       >
         {committed ? "Refresh work list" : "Mark as complete"}

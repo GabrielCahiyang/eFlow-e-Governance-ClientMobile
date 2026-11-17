@@ -1,6 +1,12 @@
 import { confirmAction } from "../../shared/confirm";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import MessageSquare from "lucide-react-native/icons/message-square";
+import Plus from "lucide-react-native/icons/plus";
+import Send from "lucide-react-native/icons/send";
+import Users from "lucide-react-native/icons/users";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Choice,
@@ -34,6 +40,7 @@ export function PersonalTaskSheet({
   ) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const palette = useTheme();
   const [draft, updateDraft, clearDraft] = useRetainedDraft(
       formDraftKey(actor, "personal-task:" + mode + ":" + (task?.id ?? "new")),
       true,
@@ -148,7 +155,23 @@ export function PersonalTaskSheet({
       onClose={close}
       busy={busy}
       footer={
-        <Button busy={busy} onPress={() => void save()}>
+        <Button
+          busy={busy}
+          icon={
+            mode === "create" ? (
+              <Plus size={16} color={palette.onPrimary} />
+            ) : mode === "staff" ? (
+              <Users size={16} color={palette.onPrimary} />
+            ) : mode === "submit" && task?.reviewer_id ? (
+              <Send size={16} color={palette.onPrimary} />
+            ) : mode === "review" && decision !== "approve" ? (
+              <MessageSquare size={16} color={palette.onPrimary} />
+            ) : (
+              <Check size={16} color={palette.onPrimary} />
+            )
+          }
+          onPress={() => void save()}
+        >
           {mode === "create"
             ? "Add personal task"
             : mode === "staff"

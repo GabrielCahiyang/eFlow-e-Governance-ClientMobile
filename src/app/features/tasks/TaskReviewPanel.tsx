@@ -1,5 +1,9 @@
 import { statusLabel } from "../../shared/statusLabels";
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import History from "lucide-react-native/icons/rotate-ccw-clock";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import { EvidenceAttachment } from "./EvidenceAttachment";
 import {
   Button,
@@ -15,6 +19,7 @@ import {
   Status,
   dateLabel,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
@@ -49,6 +54,7 @@ export function TaskReviewPanel({
   onSaved: () => Promise<void>;
   readOnly: boolean;
 }) {
+  const palette = useTheme();
   const { profile } = useAuth();
   const [selectedId, setSelectedId] = useState(initialSubmissionId);
   const [feedback, setFeedback] = useState("");
@@ -211,12 +217,18 @@ export function TaskReviewPanel({
               />
             )}
             {!!selected.decisionFeedback && (
-              <Notice>{selected.decisionFeedback}</Notice>
+              <Notice
+                tone={
+                  selected.status === "changes_requested" ? "warning" : "info"
+                }
+              >
+                {selected.decisionFeedback}
+              </Notice>
             )}
             {!!profile &&
               selected.submitterId === profile.id &&
               selected.status === "pending" && (
-                <Notice>
+                <Notice tone="review">
                   An independent reviewer must decide your submission.
                 </Notice>
               )}
@@ -236,7 +248,7 @@ export function TaskReviewPanel({
                 />
               ))
             ) : (
-              <Text>No files attached.</Text>
+              <Empty compact kind="files" title="No files attached" />
             )}
           </>
         )}
@@ -251,7 +263,9 @@ export function TaskReviewPanel({
           ) : clearance.loading && !clearance.data ? (
             <Loading label="Checking cash clearance" layout="verification" />
           ) : clearance.data?.length ? (
-            <Notice>Outstanding task cash blocks approval.</Notice>
+            <Notice tone="warning">
+              Outstanding task cash blocks approval.
+            </Notice>
           ) : null}
           <Field
             label="Feedback (required when requesting changes)"
@@ -263,6 +277,7 @@ export function TaskReviewPanel({
           />
           <Button
             busy={action.busy}
+            icon={<Check size={15} color={palette.onPrimary} />}
             disabled={
               attempted === selected?.id ||
               (clearance.loading && !clearance.data) ||
@@ -278,6 +293,7 @@ export function TaskReviewPanel({
           </Button>
           <Button
             variant="outline"
+            icon={<RotateCcw size={15} color={palette.primary} />}
             disabled={
               action.busy || attempted === selected?.id || !feedback.trim()
             }
@@ -288,10 +304,11 @@ export function TaskReviewPanel({
         </Card>
       )}
       {!!action.error && <ErrorState context="action" error={action.error} />}
-      {!!action.notice && <Notice>{action.notice}</Notice>}
+      {!!action.notice && <Notice tone="neutral">{action.notice}</Notice>}
       {!!attempted && !!action.error && (
         <Button
           variant="outline"
+          icon={<RefreshCw size={15} color={palette.primary} />}
           onPress={() =>
             void action.run(async () => {
               const fresh = await fetchTaskSubmissions(task.id);
@@ -314,6 +331,7 @@ export function TaskReviewPanel({
             <Button
               variant="ghost"
               key={item.id}
+              icon={<History size={15} color={palette.primary} />}
               disabled={action.busy || item.id === selected?.id}
               onPress={() => {
                 setSelectedId(item.id);

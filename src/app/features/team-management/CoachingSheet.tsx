@@ -1,3 +1,5 @@
+import Check from "lucide-react-native/icons/check";
+import { useTheme } from "../../components/ui/Appearance";
 import { Button, Field, Notice, Sheet } from "../../components/ui";
 import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
@@ -33,6 +35,7 @@ export function CoachingSheet({
     }), { restoreOnOpen: false }),
     { strengths, weaknesses, notes, tags } = draft,
     { toast } = useToast(),
+    palette = useTheme(),
     action = useAction();
   const save = () =>
     action.run(async () => {
@@ -77,7 +80,11 @@ export function CoachingSheet({
       onClose={close}
       busy={action.busy}
       footer={
-        <Button busy={action.busy} onPress={() => void save()}>
+        <Button
+          busy={action.busy}
+          icon={<Check size={16} color={palette.onPrimary} />}
+          onPress={() => void save()}
+        >
           Review and save context
         </Button>
       }

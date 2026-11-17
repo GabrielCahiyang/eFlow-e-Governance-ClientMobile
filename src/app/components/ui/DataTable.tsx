@@ -2,72 +2,155 @@ import { Text } from "./Typography";
 import type { ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { ScrollView, View } from "./Primitives";
-import { colors } from "./theme";
+import { useAppearance, useTheme } from "./Appearance";
+import type { EmptyKind } from "./EmptyIllustration";
+import { Empty } from "./Screen";
+
 export interface Column<T> {
   id: string;
   title: string;
   width: number;
   render: (row: T) => ReactNode;
 }
+
 export function DataTable<T>({
   rows,
   columns,
   rowKey,
   empty = "No records",
+  emptyKind = "empty",
+  hint,
 }: {
   rows: T[];
   columns: Column<T>[];
   rowKey: (row: T) => string;
   empty?: string;
+  emptyKind?: EmptyKind;
+  hint?: string;
 }) {
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  const headerSurface = isDark ? "#0f1733" : palette.background;
+
   return (
-    <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }}>
-      <View style={s.table}>
-        <View style={s.header}>
-          {columns.map((c) => (
-            <View key={c.id} style={[s.cell, { width: c.width }]}>
-              <Text style={s.heading}>{c.title}</Text>
-            </View>
-          ))}
+    <View
+      style={[
+        s.table,
+        { backgroundColor: palette.surface, borderColor: palette.border },
+      ]}
+    >
+      {!!hint && rows.length > 0 && (
+        <View
+          style={[
+            s.hintBar,
+            {
+              backgroundColor: headerSurface,
+              borderBottomColor: palette.border,
+            },
+          ]}
+        >
+          <Text style={[s.hintText, { color: palette.mutedLabel }]}>{hint}</Text>
         </View>
-        {rows.length ? (
-          rows.map((row) => (
-            <View key={rowKey(row)} style={s.row}>
-              {columns.map((c) => (
-                <View key={c.id} style={[s.cell, { width: c.width }]}>
+      )}
+      <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }}>
+        <View style={{ minWidth: "100%" }}>
+          <View style={[s.header, { backgroundColor: headerSurface }]}>
+            {columns.map((c, idx) => (
+              <View
+                key={c.id}
+                style={[
+                  s.cell,
+                  {
+                    width: c.width,
+                    borderRightWidth:
+                      idx < columns.length - 1 ? StyleSheet.hairlineWidth : 0,
+                    borderRightColor: palette.border,
+                  },
+                ]}
+              >
+                <Text style={[s.heading, { color: palette.mutedLabel }]}>
+                  {c.title}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {rows.map((row) => (
+            <View
+              key={rowKey(row)}
+              style={[s.row, { borderTopColor: palette.border }]}
+            >
+              {columns.map((c, idx) => (
+                <View
+                  key={c.id}
+                  style={[
+                    s.cell,
+                    {
+                      width: c.width,
+                      borderRightWidth:
+                        idx < columns.length - 1 ? StyleSheet.hairlineWidth : 0,
+                      borderRightColor: palette.border,
+                    },
+                  ]}
+                >
                   {c.render(row)}
                 </View>
               ))}
             </View>
-          ))
-        ) : (
-          <Text style={{ padding: 20, color: colors.muted }}>{empty}</Text>
-        )}
-      </View>
-    </ScrollView>
+          ))}
+        </View>
+      </ScrollView>
+      {!rows.length && (
+        <View
+          style={{
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: palette.border,
+            paddingVertical: 8,
+          }}
+        >
+          <Empty compact kind={emptyKind} title={empty} />
+        </View>
+      )}
+    </View>
   );
 }
+
 const s = StyleSheet.create({
   table: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: colors.surface,
   },
-  header: { flexDirection: "row", backgroundColor: colors.background },
+  hintBar: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  hintText: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  header: {
+    flexDirection: "row",
+  },
   row: {
     flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   cell: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     minHeight: 48,
     justifyContent: "center",
     gap: 5,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
   },
-  heading: { fontSize: 12, fontWeight: "600", color: colors.muted },
+  heading: {
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
 });

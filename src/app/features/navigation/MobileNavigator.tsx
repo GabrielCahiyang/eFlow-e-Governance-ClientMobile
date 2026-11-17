@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { View } from "react-native";
 import {
   NavigationContainer,
   DefaultTheme,
@@ -25,9 +25,11 @@ import {
   Loading,
   Screen,
 } from "../../components/ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { WorkspaceNavigationContext } from "../workspaces/WorkspaceNavigation";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import LogOut from "lucide-react-native/icons/log-out";
 import { useMotionPreferences } from "../../shared/motion";
 import { isMobileRole } from "../../shared/mobileRoles";
 import { feedback } from "../../shared/userMessages";
@@ -36,10 +38,8 @@ import { MobileContent } from "../app-shell/MobileContent";
 import { NativeBottomNavigation } from "./NativeBottomNavigation";
 import { MoreScreen } from "./MoreScreen";
 import { UnavailableDestination } from "./UnavailableDestination";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MoreSheet } from "./MoreSheet";
-import { moreDestinations } from "./moreDestinations";
-import { TabRootContext, inPageHeaderTabs } from "./tabRootContext";
+import { NavigationHeaderContext } from "./navigationHeaderContext";
+import { TabRootContext } from "./tabRootContext";
 import {
   bindWorkspace,
   defaultTab,
@@ -59,9 +59,6 @@ type TabParams = Record<
 const Tabs = createBottomTabNavigator<TabParams>();
 const Stack = createNativeStackNavigator<StackParams>();
 const TabContext = createContext<PrimaryTab>("home");
-/** Route the More tab opens on: the pinned destination, or the More list. */
-const PinnedRouteContext = createContext<AppRoute | undefined>(undefined);
-const pinnedKey = (actor: string) => `eflow.more.pinned.${actor}`;
 const ShellContext = WorkspaceNavigationContext;
 // Workspace switching is not offered on mobile: the app uses the actor's own
 // Office and selects another authorized workspace only when an opened record
@@ -101,42 +98,6 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     ? resolveMobileRoute(initialRoute, role, () => true).tab
     : defaultTab();
   const pendingPush = useRef(false);
-  const [sheetOpen, setSheetOpen] = useState(false),
-    [pinnedId, setPinnedId] = useState<string>(),
-    [signingOut, setSigningOut] = useState(false);
-  const extras = moreDestinations(role, can, !!profile?.org_id);
-  const pinned = extras.find((item) => item.id === pinnedId);
-  useEffect(() => {
-    // Per-device convenience only; a missing or blocked store means no pin.
-    let alive = true;
-    setPinnedId(undefined);
-    if (!profile?.id) return;
-    AsyncStorage.getItem(pinnedKey(profile.id))
-      .then((value) => {
-        if (alive && value) setPinnedId(value);
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [profile?.id]);
-  const pick = (id: string, route: AppRoute) => {
-    setSheetOpen(false);
-    setPinnedId(id);
-    if (profile?.id)
-      AsyncStorage.setItem(pinnedKey(profile.id), id).catch(() => undefined);
-    if (navigation.isReady())
-      navigation.navigate("more", { screen: "Root", params: route, pop: true });
-  };
-  const confirmSignOut = async () => {
-    setSheetOpen(false);
-    setSigningOut(true);
-    try {
-      await signOut();
-    } catch {
-      setSigningOut(false);
-    }
-  };
   const openInbox = () => {
     if (navigation.isReady()) navigation.navigate("inbox");
     else pendingPush.current = true;
@@ -147,7 +108,12 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
     return (
       <Screen title="Mobile access unavailable">
         <ErrorState error={feedback.invalidCredentials} />
-        <Button onPress={() => void signOut()}>Back to sign in</Button>
+        <Button
+          icon={<LogOut size={16} color={palette.onPrimary} />}
+          onPress={() => void signOut()}
+        >
+          Back to sign in
+        </Button>
       </Screen>
     );
   const base = isDark ? DarkTheme : DefaultTheme;
@@ -227,13 +193,6 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
                 <NativeBottomNavigation
                   role={role}
                   inboxUnread={inbox.unread}
-                  pinned={
-                    pinned
-                      ? { label: pinned.label, Icon: pinned.Icon }
-                      : undefined
-                  }
-                  onMore={() => setSheetOpen(true)}
-                  moreOpen={sheetOpen}
                   selected={state.routes[state.index].name as PrimaryTab}
                   onSelect={(tab) => {
                     const event = tabs.emit({
@@ -250,97 +209,38 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
           >
             {primaryTabs(role).map((tab) => (
               <Tabs.Screen key={tab} name={tab}>
-                {() => (
-                  <PinnedRouteContext.Provider
-                    value={tab === "more" ? pinned?.route : undefined}
-                  >
-                    <MobileTabStack tab={tab} />
-                  </PinnedRouteContext.Provider>
-                )}
+                {() => <MobileTabStack tab={tab} />}
               </Tabs.Screen>
             ))}
           </Tabs.Navigator>
         </NavigationContainer>
-        <MoreSheet
-          open={sheetOpen}
-          destinations={extras}
-          pinnedId={pinned?.id}
-          signingOut={signingOut}
-          onPick={(item) => pick(item.id, item.route)}
-          onSignOut={() => void confirmSignOut()}
-          onClose={() => setSheetOpen(false)}
-        />
       </View>
     </ShellContext.Provider>
     </InboxCountsContext.Provider>
   );
 }
 
-/** Top-left back arrow to Home on every other tab, like a pushed screen. */
-function HomeButton({ onPress }: { onPress: () => void }) {
-  const palette = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      accessibilityHint="Returns to Home"
-      onPress={onPress}
-      hitSlop={8}
-      style={({ pressed }) => ({
-        width: 44,
-        height: 44,
-        marginLeft: Platform.OS === "web" ? 4 : -8,
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 22,
-        backgroundColor: pressed ? palette.primarySoft : "transparent",
-      })}
-    >
-      <ArrowLeft size={24} color={palette.primary} />
-    </Pressable>
-  );
-}
-
 function MobileTabStack({ tab }: { tab: PrimaryTab }) {
   const palette = useTheme(),
     { reduced } = useMotionPreferences(),
-    { profile, can } = useAuth(),
-    pinnedRoute = useContext(PinnedRouteContext);
+    { profile, can } = useAuth();
   return (
     <TabContext.Provider value={tab}>
       <Stack.Navigator
         initialRouteName="Root"
         screenOptions={{
-          headerStyle: { backgroundColor: palette.background },
-          headerShadowVisible: false,
-          headerTintColor: palette.primary,
-          headerTitleStyle: { fontFamily: "HostGrotesk_600SemiBold", fontSize: 19 },
+          headerShown: false,
           contentStyle: { backgroundColor: palette.background },
           animation: reduced ? "none" : "default",
-          headerBackButtonDisplayMode: "minimal",
         }}
       >
         <Stack.Screen
           name="Root"
           component={MobileRoute}
-          initialParams={pinnedRoute ?? tabRootRoute(tab)}
-          options={({ navigation }) => ({
+          initialParams={tabRootRoute(tab)}
+          options={{
             title: tabLabels[tab],
-            // Home draws its own header inside the page so it scrolls away;
-            // other tab roots offer a way back to Home instead of a logo.
-            headerShown: !(inPageHeaderTabs as readonly string[]).includes(tab),
-            headerTitle: "",
-            headerLeft: () => (
-              <HomeButton
-                onPress={() =>
-                  navigation.getParent()?.navigate("home", {
-                    screen: "Root",
-                    pop: true,
-                  })
-                }
-              />
-            ),
-          })}
+          }}
         />
         <Stack.Screen
           name="Destination"
@@ -366,6 +266,8 @@ function MobileRoute({
   const tab = useContext(TabContext),
     workspace = useWorkspace(),
     focused = useIsFocused(),
+    inset = useSafeAreaInsets(),
+    palette = useTheme(),
     { profile, can } = useAuth();
   const destination = resolveMobileRoute(
     route.params,
@@ -461,29 +363,35 @@ function MobileRoute({
     if (navigation.canGoBack()) navigation.goBack();
     else navigation.getParent()?.navigate("more");
   };
-  // The More stack's root is the More list unless a destination is pinned.
-  if (
-    route.name === "Root" &&
-    tab === "more" &&
-    route.params?.name === tabRoots.more
-  )
-    return <MoreScreen navigate={navigate} />;
-  if (destination.disposition !== "native")
-    return (
-      <UnavailableDestination
-        destination={destination}
-        onBack={back}
-        backLabel={route.name === "Root" ? "More" : undefined}
-      />
-    );
+  const headerContext = {
+    onBack:
+      route.name === "Root"
+        ? () => navigation.getParent()?.navigate("home", { screen: "Root", pop: true })
+        : back,
+    backHint:
+      route.name === "Root" ? "Returns to Home" : "Returns to previous screen",
+    topInset: inset.top,
+    routeTitle: destination.title,
+  };
   const needsWorkspace = [
     "projects",
     "project",
     "personal_project",
     "task",
   ].includes(destination.route.name);
-  if (needsWorkspace && workspace.loading)
-    return (
+  // The More stack's root is always the full-page More list.
+  const screenContent =
+    route.name === "Root" &&
+    tab === "more" &&
+    route.params?.name === tabRoots.more ? (
+      <MoreScreen navigate={navigate} />
+    ) : destination.disposition !== "native" ? (
+      <UnavailableDestination
+        destination={destination}
+        onBack={back}
+        backLabel={route.name === "Root" ? "More" : undefined}
+      />
+    ) : needsWorkspace && workspace.loading ? (
       <Screen compact>
         <Loading
           label="Loading authorized workspace"
@@ -498,62 +406,58 @@ function MobileRoute({
           }
         />
       </Screen>
-    );
-  if (needsWorkspace && workspace.error)
-    return (
-      <Screen>
+    ) : needsWorkspace && workspace.error ? (
+      <Screen title={tabLabels[tab]}>
         <ErrorState
           error={workspace.error}
           retry={() => void workspace.refresh()}
         />
       </Screen>
-    );
-  if (needsWorkspace && !workspace.selected)
-    return (
-      <Screen>
+    ) : needsWorkspace && !workspace.selected ? (
+      <Screen title={tabLabels[tab]} onRefresh={() => workspace.refresh()}>
         <Empty
           kind="workspace"
           title="No workspace available"
           description="Projects are shown only inside an authorized Office or personal workspace."
-          action={
-            <Button onPress={() => void workspace.refresh()}>Try again</Button>
-          }
         />
       </Screen>
-    );
-  if (mismatch && unavailableKey === routeKey && !wantsHome)
-    return (
-      <Screen>
+    ) : mismatch && unavailableKey === routeKey && !wantsHome ? (
+      <Screen title={tabLabels[tab]}>
         <Empty
           kind="workspace"
           title="This item isn't available to you"
           description="None of your authorized workspaces include this record. It may have moved or your access changed."
           action={
-            <Button onPress={() => navigation.popToTop()}>
+            <Button
+              icon={<ArrowLeft size={16} color={palette.onPrimary} />}
+              onPress={() => navigation.popToTop()}
+            >
               Back to {tabLabels[tab]}
             </Button>
           }
         />
       </Screen>
-    );
-  if (mismatch && unavailableKey !== routeKey)
-    return (
+    ) : mismatch && unavailableKey !== routeKey ? (
       <Screen compact>
         <Loading label="Opening the right workspace" />
       </Screen>
+    ) : (
+      <TabRootContext.Provider value={route.name === "Root"}>
+        <MobileContent
+          key={[
+            profile?.id,
+            workspace.selected?.workspace.id,
+            destination.route.id,
+            destination.route.nodeId,
+          ].join(":")}
+          current={destination.route}
+          navigate={navigate}
+        />
+      </TabRootContext.Provider>
     );
   return (
-    <TabRootContext.Provider value={route.name === "Root"}>
-    <MobileContent
-      key={[
-        profile?.id,
-        workspace.selected?.workspace.id,
-        destination.route.id,
-        destination.route.nodeId,
-      ].join(":")}
-      current={destination.route}
-      navigate={navigate}
-    />
-    </TabRootContext.Provider>
+    <NavigationHeaderContext.Provider value={headerContext}>
+      {screenContent}
+    </NavigationHeaderContext.Provider>
   );
 }

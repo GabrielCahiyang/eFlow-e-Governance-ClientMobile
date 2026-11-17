@@ -9,11 +9,20 @@ import {
 } from "../../../core/web/app/features/analytics/selectors/deliveryAnalytics";
 import { ErrorState, DateField, Toggle } from "../../components/ui";
 import { useState } from "react";
+import Calendar from "lucide-react-native/icons/calendar";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import Filter from "lucide-react-native/icons/list-filter";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Users from "lucide-react-native/icons/users";
+import Wallet from "lucide-react-native/icons/wallet";
+import { useTheme } from "../../components/ui/Appearance";
 import { View } from "../../components/ui/Primitives";
 import {
   Button,
   Card,
   Choice,
+  Empty,
   LabelValue,
   Notice,
   SearchField,
@@ -31,6 +40,7 @@ export function DeliveryAnalytics({
   navigate: Navigate;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const ids = tasks.map((task) => task.id);
   const workflow = useFacts(
     "delivery-analytics:" + profile?.id + ":" + ids.join(","),
@@ -125,6 +135,7 @@ export function DeliveryAnalytics({
             </View>
             <Button
               variant="ghost"
+              icon={<Filter size={16} color={palette.primary} />}
               onPress={() => {
                 setStatus(value);
                 setLimit(25);
@@ -148,6 +159,7 @@ export function DeliveryAnalytics({
               key={week.from}
               variant="outline"
               disabled={!week.count}
+              icon={<Calendar size={16} color={palette.primary} />}
               onPress={() => {
                 setWeekIds(week.ids);
                 setStatus("");
@@ -173,6 +185,7 @@ export function DeliveryAnalytics({
               <Card key={p.id} title={p.name}>
                 <Button
                   variant="outline"
+                  icon={<Users size={16} color={palette.primary} />}
                   onPress={() => {
                     setPerson(p.id);
                     setWeekIds(undefined);
@@ -209,7 +222,11 @@ export function DeliveryAnalytics({
         </Card>
       )}
       {!!weekIds && (
-        <Button variant="outline" onPress={() => setWeekIds(undefined)}>
+        <Button
+          variant="outline"
+          icon={<RotateCcw size={16} color={palette.primary} />}
+          onPress={() => setWeekIds(undefined)}
+        >
           Clear completion week
         </Button>
       )}
@@ -230,6 +247,7 @@ export function DeliveryAnalytics({
       {!!project && (
         <Button
           variant="outline"
+          icon={<Wallet size={16} color={palette.primary} />}
           onPress={() =>
             navigate({ name: "project", id: project, view: "funding" })
           }
@@ -283,7 +301,14 @@ export function DeliveryAnalytics({
         }}
         placeholder="Find a task"
       />
-      {!filtered.length && <Notice>No matching tasks.</Notice>}
+      {!filtered.length && (
+        <Empty
+          compact
+          kind="search"
+          title="No matching tasks"
+          description="Try another search or filter."
+        />
+      )}
       {filtered.slice(0, limit).map((t) => (
         <Card key={t.id} title={t.title}>
           <LabelValue
@@ -306,6 +331,7 @@ export function DeliveryAnalytics({
           {!!t.linkedProjectId && (
             <Button
               variant="ghost"
+              icon={<Wallet size={16} color={palette.primary} />}
               onPress={() =>
                 navigate({ name: "task", id: t.id, view: "budget" })
               }
@@ -315,6 +341,7 @@ export function DeliveryAnalytics({
           )}
           <Button
             variant="outline"
+            icon={<ExternalLink size={16} color={palette.primary} />}
             onPress={() => navigate({ name: "task", id: t.id })}
           >
             Open task
@@ -322,7 +349,11 @@ export function DeliveryAnalytics({
         </Card>
       ))}
       {filtered.length > limit && (
-        <Button variant="outline" onPress={() => setLimit(limit + 25)}>
+        <Button
+          variant="outline"
+          icon={<ChevronDown size={16} color={palette.primary} />}
+          onPress={() => setLimit(limit + 25)}
+        >
           Show more tasks
         </Button>
       )}

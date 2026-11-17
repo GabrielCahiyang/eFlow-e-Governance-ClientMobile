@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import X from "lucide-react-native/icons/x";
 import { AccessibilityInfo, Platform, ScrollView, View } from "react-native";
 import { Host, BottomSheet, RNHostView } from "@expo/ui";
 import { useAppearance, useTheme } from "./Appearance";
@@ -72,7 +73,11 @@ export function SelectionSheet({
                 >
                   {title}
                 </Text>
-                <Button variant="ghost" onPress={onClose}>
+                <Button
+                  variant="ghost"
+                  icon={<X size={16} color={palette.primary} />}
+                  onPress={onClose}
+                >
                   Close
                 </Button>
               </View>

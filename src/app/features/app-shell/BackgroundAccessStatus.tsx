@@ -4,7 +4,8 @@ import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import WifiOff from "lucide-react-native/icons/wifi-off";
 import { Button } from "../../components/ui/Button";
 import { Text } from "../../components/ui/Typography";
-import { useTheme } from "../../components/ui/Appearance";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
+import { withOpacity } from "../../components/ui/theme";
 
 export function BackgroundAccessStatus({
   error,
@@ -14,6 +15,7 @@ export function BackgroundAccessStatus({
   retry: () => void;
 }) {
   const palette = useTheme(),
+    { isDark } = useAppearance(),
     insets = useSafeAreaInsets();
   if (!error) return null;
   return (
@@ -43,17 +45,32 @@ export function BackgroundAccessStatus({
       >
         <View
           accessible={false}
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 10,
-            backgroundColor: palette.warningSoft,
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            {
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              borderWidth: 1,
+              backgroundColor: isDark
+                ? withOpacity(palette.warning, 0.18)
+                : "#ffffff",
+              borderColor: withOpacity(palette.warning, isDark ? 0.32 : 0.22),
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            },
+            !isDark && {
+              shadowColor: "#101849",
+              shadowOpacity: 0.08,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 1,
+            },
+          ]}
         >
-          <WifiOff size={16} color={palette.warning} />
+          <WifiOff size={18} color={palette.warning} />
         </View>
         <Text
           accessibilityLiveRegion="polite"
@@ -69,14 +86,15 @@ export function BackgroundAccessStatus({
         </Text>
         <Button
           variant="outline"
+          compact
           accessibilityLabel="Retry"
           onPress={retry}
-          icon={<RotateCcw size={13} color={palette.text} />}
+          icon={<RotateCcw size={12} color={palette.text} />}
           style={{
             minHeight: 36,
             paddingHorizontal: 12,
             paddingVertical: 6,
-            borderRadius: 999,
+            borderRadius: 18,
             backgroundColor: palette.background,
             borderColor: palette.border,
             flexShrink: 0,

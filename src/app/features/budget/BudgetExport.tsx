@@ -1,4 +1,7 @@
+import Download from "lucide-react-native/icons/download";
+import FileText from "lucide-react-native/icons/file-text";
 import { Button, ErrorState, Row } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { exportTable } from "../../shared/exportTable";
 import type { DepartmentBudgetBundle } from "../../../core/web/app/features/budget/types";
@@ -11,6 +14,7 @@ export function BudgetExport({
   view: string;
   title: string;
 }) {
+  const palette = useTheme();
   const action = useAction();
   const output = (format: "csv" | "pdf") =>
     action.run(async () => {
@@ -82,6 +86,7 @@ export function BudgetExport({
         <Button
           variant="outline"
           busy={action.busy}
+          icon={<Download size={15} color={palette.primary} />}
           onPress={() => void output("csv")}
         >
           Export CSV
@@ -89,6 +94,7 @@ export function BudgetExport({
         <Button
           variant="outline"
           busy={action.busy}
+          icon={<FileText size={15} color={palette.primary} />}
           onPress={() => void output("pdf")}
         >
           Export PDF

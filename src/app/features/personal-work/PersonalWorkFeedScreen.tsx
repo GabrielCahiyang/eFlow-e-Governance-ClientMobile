@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import { DisplayUpdateNotice } from "../../components/ui/DisplayUpdateNotice";
 import { View } from "react-native";
-import { Button, Empty, ErrorState, SearchField } from "../../components/ui";
+import { Button, Empty, ErrorState, PageHeader, SearchField } from "../../components/ui";
+import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import { useTheme } from "../../components/ui/Appearance";
 import {
   FolderPullArea,
@@ -51,6 +53,7 @@ export function PersonalWorkFeedScreen({
 }) {
   const facts = useMobileWorkFeed();
   const pull = usePullRefresh(facts.refresh);
+  const navHeader = useNavigationHeader();
   const palette = useTheme();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<WorkGroup | "All work">(initialFilter);
@@ -219,45 +222,62 @@ export function PersonalWorkFeedScreen({
       stickySectionHeadersEnabled={false}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
-        <View style={{ gap: space.md, marginBottom: space.sm }}>
+        <View
+          style={{
+            gap: space.md,
+            marginBottom: space.sm,
+            paddingTop: navHeader?.topInset ?? 0,
+          }}
+        >
           {!!pull.error && (
             <ErrorState error={pull.error} retry={() => void pull.refresh()} />
           )}
-          <Text
-            accessibilityRole="header"
-            style={{ fontSize: 24, fontWeight: "700", color: palette.text }}
-          >
-            {dueOnly
-              ? "Deadlines"
-              : initial === "Subtasks"
-                ? "Assigned subtasks"
-                : initial === "Assigned work"
-                  ? "My Work"
-                  : initial}
-          </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: 8,
+          <PageHeader
+            title={
+              dueOnly
+                ? "Deadlines"
+                : initial === "Subtasks"
+                  ? "Assigned subtasks"
+                  : initial === "Assigned work"
+                    ? "My Work"
+                    : initial
+            }
+            subtitle={
+              total > 0
+                ? `${total} ${total === 1 ? "assignment" : "assignments"}${filter !== "All work" ? ` · ${filter}` : ""}`
+                : "Tasks and subtasks assigned to you"
+            }
+          />
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Search assignments"
+            filterTrigger={{
+              label: filter,
+              active: filter !== "All work",
+              count: filter !== "All work" ? 1 : undefined,
+              accessibilityLabel: `Filter assignments: ${filter}`,
+              onPress: () => setFilterOpen(true),
             }}
-          >
-            <View style={{ flex: 1, minWidth: 152 }}>
-              <SearchField
-                value={query}
-                onChange={setQuery}
-                placeholder="Search assignments"
+          />
+          {filter !== "All work" && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <FilterChip
+                label={filter}
+                tone="tinted"
+                removable
+                accessibilityLabel={`Remove filter: ${filter}`}
+                onPress={() => setFilter("All work")}
               />
             </View>
-            <FilterChip
-              label={filter}
-              icon
-              onPress={() => setFilterOpen(true)}
-              selected={filter !== "All work"}
-              accessibilityLabel={`Filter assignments: ${filter}`}
-            />
-          </View>
+          )}
           {!!workspace.error && (
             <ErrorState
               error={workspace.error}
@@ -287,7 +307,7 @@ export function PersonalWorkFeedScreen({
           <FeedSkeleton label="Loading assigned work" />
         ) : (
           <Empty
-            kind="work"
+            kind={query || filter !== "All work" ? "search" : "tasks"}
             title={
               workspace.error || facts.error || issues.length
                 ? "Assignments could not be checked"
@@ -306,6 +326,7 @@ export function PersonalWorkFeedScreen({
               filter !== "All work" || query ? (
                 <Button
                   variant="outline"
+                  icon={<RotateCcw size={15} color={palette.primary} />}
                   onPress={() => {
                     setFilter("All work");
                     setQuery("");

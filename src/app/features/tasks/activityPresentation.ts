@@ -27,10 +27,45 @@ const timestampFormat = new Intl.DateTimeFormat("en-PH", {
   hour: "numeric",
   minute: "2-digit",
 });
+const dateHeadingFormat = new Intl.DateTimeFormat("en-PH", {
+  timeZone: "Asia/Manila",
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+const clockTimeFormat = new Intl.DateTimeFormat("en-PH", {
+  timeZone: "Asia/Manila",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+const dateKeyFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Manila",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const validTime = (time: number) => Number.isFinite(time) && time > 0;
 export const activityTime = (time: number) =>
-  Number.isFinite(time) && time > 0
-    ? timestampFormat.format(time)
-    : "Time unavailable";
+  validTime(time) ? timestampFormat.format(time) : "Time unavailable";
+export const activityDateKey = (time: number) => {
+  if (!validTime(time)) return "unavailable";
+  try {
+    const parts = dateKeyFormat.formatToParts(time);
+    const get = (part: string) => parts.find((p) => p.type === part)?.value;
+    const year = get("year");
+    const month = get("month");
+    const day = get("day");
+    return year && month && day ? `${year}-${month}-${day}` : "unavailable";
+  } catch {
+    return "unavailable";
+  }
+};
+export const activityDateHeading = (time: number) =>
+  validTime(time) ? dateHeadingFormat.format(time) : "Date unavailable";
+export const activityClockTime = (time: number) =>
+  validTime(time) ? clockTimeFormat.format(time) : "Time unavailable";
 
 export function describeWorkEvent(event: WorkEvent, branchId?: string) {
   const verified = (snapshot: WorkTreeSnapshot | undefined) =>

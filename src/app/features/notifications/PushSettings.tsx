@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { AppState, Linking, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import Bell from "lucide-react-native/icons/bell";
+import Settings from "lucide-react-native/icons/settings";
 import {
   Button,
   Card,
@@ -10,13 +12,15 @@ import {
   Notice,
   Row,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
 import { useToast } from "../../components/ui/Toast";
 import { useAction } from "../../shared/useAction";
 import { enablePush, disablePush, pushEnabled } from "../../../platform/push";
 export function PushSettings() {
-  const { profile } = useAuth(),
+  const palette = useTheme(),
+    { profile } = useAuth(),
     { toast } = useToast(),
     actor = profile!.id,
     facts = useFacts("push:" + actor, () => pushEnabled(actor)),
@@ -39,6 +43,7 @@ export function PushSettings() {
         <Button
           busy={action.busy}
           disabled={!ready}
+          icon={<Bell size={15} color={palette.onPrimary} />}
           onPress={() =>
             void action.run(async () => {
               if (!ready) return;
@@ -55,7 +60,11 @@ export function PushSettings() {
         >
           {facts.data ? "Turn off push alerts" : "Turn on push alerts"}
         </Button>
-        <Button variant="outline" onPress={() => void Linking.openSettings()}>
+        <Button
+          variant="outline"
+          icon={<Settings size={15} color={palette.primary} />}
+          onPress={() => void Linking.openSettings()}
+        >
           Device settings
         </Button>
       </Row>

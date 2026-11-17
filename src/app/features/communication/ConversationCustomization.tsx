@@ -1,4 +1,11 @@
 import { useRef, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import ImageIcon from "lucide-react-native/icons/image";
+import Pencil from "lucide-react-native/icons/pencil";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Trash2 from "lucide-react-native/icons/trash";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import { View } from "react-native";
 import { Button, ErrorState, Field } from "../../components/ui";
 import { Text } from "../../components/ui/Typography";
@@ -30,6 +37,7 @@ export function EditChatGroup({
   onChanged: () => Promise<void>;
 }) {
   const { toast } = useToast();
+  const palette = useTheme();
   const action = useAction();
   const assertAccess = useAccountActionAccess();
   const [open, setOpen] = useState(false);
@@ -103,7 +111,11 @@ export function EditChatGroup({
     });
   if (!open)
     return (
-      <Button variant="outline" onPress={start}>
+      <Button
+        variant="outline"
+        icon={<Pencil size={16} color={palette.primary} />}
+        onPress={start}
+      >
         Edit group chat
       </Button>
     );
@@ -120,6 +132,7 @@ export function EditChatGroup({
       <Button
         variant="ghost"
         disabled={action.busy}
+        icon={<RotateCcw size={16} color={palette.primary} />}
         onPress={() => setName("")}
       >
         Use default name
@@ -127,6 +140,7 @@ export function EditChatGroup({
       <Button
         variant="outline"
         disabled={action.busy}
+        icon={<ImageIcon size={16} color={palette.primary} />}
         onPress={() =>
           void action.run(async () => {
             const [file] = await chooseFiles(chatImageTypes);
@@ -143,6 +157,7 @@ export function EditChatGroup({
         <Button
           variant="ghost"
           disabled={action.busy}
+          icon={<RotateCcw size={16} color={palette.primary} />}
           onPress={() => {
             discardUpload();
             setPhoto(undefined);
@@ -153,10 +168,19 @@ export function EditChatGroup({
         </Button>
       )}
       {!!action.error && <ErrorState error={action.error} />}
-      <Button disabled={action.busy} onPress={save}>
+      <Button
+        disabled={action.busy}
+        icon={<Check size={16} color={palette.onPrimary} />}
+        onPress={save}
+      >
         Save group chat
       </Button>
-      <Button variant="outline" disabled={action.busy} onPress={close}>
+      <Button
+        variant="outline"
+        disabled={action.busy}
+        icon={<X size={16} color={palette.primary} />}
+        onPress={close}
+      >
         Cancel group edit
       </Button>
     </View>
@@ -173,6 +197,7 @@ export function EditChatNickname({
   onChanged: () => Promise<void>;
 }) {
   const { toast } = useToast();
+  const palette = useTheme();
   const action = useAction();
   const [value, setValue] = useState<string>();
   const name = person.name || "Team member";
@@ -196,6 +221,7 @@ export function EditChatNickname({
       {value === undefined ? (
         <Button
           variant="ghost"
+          icon={<Pencil size={16} color={palette.primary} />}
           onPress={() => {
             action.clear();
             setValue(person.nickname ?? "");
@@ -213,13 +239,18 @@ export function EditChatNickname({
             maxLength={40}
           />
           {!!action.error && <ErrorState error={action.error} />}
-          <Button disabled={action.busy} onPress={() => save(value)}>
+          <Button
+            disabled={action.busy}
+            icon={<Check size={16} color={palette.onPrimary} />}
+            onPress={() => save(value)}
+          >
             Save nickname
           </Button>
           {!!person.nickname && (
             <Button
               variant="outline"
               disabled={action.busy}
+              icon={<Trash2 size={16} color={palette.primary} />}
               onPress={() => save("")}
             >
               Clear nickname
@@ -228,6 +259,7 @@ export function EditChatNickname({
           <Button
             variant="ghost"
             disabled={action.busy}
+            icon={<X size={16} color={palette.primary} />}
             onPress={() => setValue(undefined)}
           >
             Cancel nickname edit

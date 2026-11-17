@@ -1,4 +1,8 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Plus from "lucide-react-native/icons/plus";
+import X from "lucide-react-native/icons/x";
+import { useTheme } from "../../components/ui/Appearance";
 import { supabase } from "../../../platform/supabase";
 import { nativeWindow } from "../../../platform/webRuntime";
 import {
@@ -94,6 +98,7 @@ export function ProjectTaskEditor({
   onSaved: () => Promise<unknown>;
 }) {
   const [task] = useState(scope.task);
+  const palette = useTheme();
   const { toast } = useToast();
   const [createdTaskId, setCreatedTaskId] = useState<string>();
   const draftKey = formDraftKey(
@@ -463,6 +468,15 @@ export function ProjectTaskEditor({
       <Button
         busy={action.busy}
         disabled={!createdTaskId && (unconfirmed || !detailsAllowed || !title.trim() || (!task && !group))}
+        icon={
+          createdTaskId ? (
+            <X size={16} color={palette.onPrimary} />
+          ) : task ? (
+            <Check size={16} color={palette.onPrimary} />
+          ) : (
+            <Plus size={16} color={palette.onPrimary} />
+          )
+        }
         onPress={createdTaskId ? close : save}
       >
         {createdTaskId ? "Close task form" : task ? "Save task" : "Add task"}

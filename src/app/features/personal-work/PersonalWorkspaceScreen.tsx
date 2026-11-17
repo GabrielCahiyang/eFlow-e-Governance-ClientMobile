@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Plus from "lucide-react-native/icons/plus";
 import { Pressable } from "../../components/ui/Primitives";
 import {
   Button,
@@ -11,12 +12,14 @@ import {
   SearchField,
   Status,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
 import { useWorkspace, WorkspaceCreateSheet } from "../workspaces";
 import type { Navigate } from "../../shared/routes";
 export function PersonalWorkspaceScreen({ navigate }: { navigate: Navigate }) {
-  const { profile } = useAuth(),
+  const palette = useTheme(),
+    { profile } = useAuth(),
     workspace = useWorkspace(),
     [search, setSearch] = useState(""),
     [creating, setCreating] = useState(false);
@@ -33,7 +36,10 @@ export function PersonalWorkspaceScreen({ navigate }: { navigate: Navigate }) {
 
       actions={
         owner ? (
-          <Button onPress={() => setCreating(true)}>
+          <Button
+            icon={<Plus size={15} color={palette.onPrimary} />}
+            onPress={() => setCreating(true)}
+          >
             Create personal project
           </Button>
         ) : undefined
@@ -77,6 +83,7 @@ export function PersonalWorkspaceScreen({ navigate }: { navigate: Navigate }) {
         ))
       ) : (
         <Empty
+          kind="projects"
           title="No personal projects match"
           description={
             owner

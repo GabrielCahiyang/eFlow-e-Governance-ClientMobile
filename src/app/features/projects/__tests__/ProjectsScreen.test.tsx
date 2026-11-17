@@ -168,3 +168,16 @@ test("directory pages projects after filtering, keeps the full count and opens a
     mockProjects = mockDefaultProjects;
   }
 });
+
+test("empty unfiltered directory renders empty state without a refresh button", async () => {
+  mockProjects = [];
+  try {
+    const view = await render(<ProjectsScreen navigate={jest.fn()} />);
+    expect(view.getByText("No current projects")).toBeOnTheScreen();
+    expect(
+      view.queryByRole("button", { name: "Refresh projects" }),
+    ).toBeNull();
+  } finally {
+    mockProjects = mockDefaultProjects;
+  }
+});

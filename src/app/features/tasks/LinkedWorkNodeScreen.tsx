@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
 import {
   Button,
   EditorialMetadataStrip,
@@ -7,6 +8,7 @@ import {
   Loading,
   Screen,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
@@ -101,6 +103,7 @@ export function LinkedWorkNodeScreen({
   navigate: Navigate;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const actor = profile?.id;
   const resolveStatus = useWorkStatus();
   const [personalReviewOpen, setPersonalReviewOpen] = useState(false);
@@ -327,7 +330,10 @@ export function LinkedWorkNodeScreen({
                 actor,
                 effectiveReadOnly || executionBlocked,
               ) && (
-                <Button onPress={() => setPersonalReviewOpen(true)}>
+                <Button
+                  icon={<ShieldCheck size={16} color={palette.onPrimary} />}
+                  onPress={() => setPersonalReviewOpen(true)}
+                >
                   Review subtask
                 </Button>
               )}
@@ -364,6 +370,7 @@ export function LinkedWorkNodeScreen({
               />
             ) : (
               <Empty
+                kind="complete"
                 title="Review unavailable"
                 description="Sign in to view evidence and work submissions."
               />
@@ -386,6 +393,7 @@ export function LinkedWorkNodeScreen({
         ) : view === "budget" ? (
           branchFunding ?? (
             <Empty
+              kind="budget"
               title="Funding unavailable"
               description="Only office subtasks have task funding controls."
             />
@@ -395,21 +403,13 @@ export function LinkedWorkNodeScreen({
             <ProjectFiles
               projectId={branch.tree.root.project}
               taskId={branch.tree.root.id}
-              onManage={
-                !personal
-                  ? () =>
-                      navigate({
-                        name: "task",
-                        id: branch.tree.root.id,
-                        projectId: branch.tree.root.project,
-                        view: "file_management",
-                        title: "File management",
-                      })
-                  : undefined
-              }
+              contextTitle={itemTitle || branch.node.title}
+              eyebrow="Parent task attachments"
+              scopeNote="Parent task files shown here. Files submitted specifically for this subtask live in Evidence & review."
             />
           ) : (
             <Empty
+              kind="files"
               title="Files unavailable"
               description="No project is linked to this subtask."
             />
@@ -468,13 +468,20 @@ export function LinkedWorkNodeScreen({
               readOnly
             />
           ) : (
-            <Empty title="Funding unavailable" />
+            <Empty kind="budget" title="Funding unavailable" />
           )
         ) : view === "files" ? (
           data.legacyProjectId && rootId ? (
-            <ProjectFiles projectId={data.legacyProjectId} taskId={rootId} />
+            <ProjectFiles
+              projectId={data.legacyProjectId}
+              taskId={rootId}
+              contextTitle={itemTitle || data.legacy.title}
+              eyebrow="Parent task attachments"
+              scopeNote="Parent task files shown here. Files submitted specifically for this subtask live in Evidence & review."
+            />
           ) : (
             <Empty
+              kind="files"
               title="Files unavailable"
               description="No project is linked to this subtask."
             />
@@ -487,6 +494,7 @@ export function LinkedWorkNodeScreen({
           />
         ) : view === "review" ? (
           <Empty
+            kind="tasks"
             title="No review submissions"
             description="Extended work submissions are unavailable for archived subtasks."
           />
@@ -560,22 +568,13 @@ export function LinkedWorkNodeScreen({
                     title: "Files",
                   })
                 }
-                onPressPlanning={() =>
-                  navigate({
-                    name: "task",
-                    id: rootId,
-                    projectId,
-                    nodeId: data.legacy!.id,
-                    view: "planning",
-                    title: "Planning details",
-                  })
-                }
               />
             )}
           </>
         )
       ) : (
         <Empty
+          kind="tasks"
           title="This subtask is no longer available"
           description="The linked task or branch may have changed, or access may have been withdrawn."
         />

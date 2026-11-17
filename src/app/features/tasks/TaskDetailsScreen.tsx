@@ -2,6 +2,9 @@ import {
   ProjectTaskEditor,
   useTaskStructure,
 } from "../projects/ProjectTaskEditor";
+import CircleCheck from "lucide-react-native/icons/circle-check";
+import FileCheck from "lucide-react-native/icons/file-check";
+import FileText from "lucide-react-native/icons/file-text";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
 import { taskCalendarDate } from "./taskDates";
 import { Text } from "../../components/ui/Typography";
@@ -13,10 +16,12 @@ import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
-  EditorialMetadataStrip,
+  DetailGroup,
+  Empty,
   ErrorState,
   Loading,
   Notice,
+  PageHeader,
   Screen,
 } from "../../components/ui";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
@@ -87,13 +92,13 @@ import {
   BentoDependenciesCard,
   BentoEditButton,
   BentoDeleteButton,
+  BentoOverviewHeroCard,
   BentoProjectOnHoldCard,
   BentoScheduleCards,
   priorityLabel,
   BentoAssignedTeamCard,
   BentoSubtasksCard,
   BentoSupportingGrid,
-  CircularProgressRing,
   type DependencyItemData,
   type SubtaskItemData,
 } from "./TaskBentoComponents";
@@ -574,57 +579,71 @@ export function TaskDetailsScreen({
       ? "Task completed"
       : `${completion?.percent ?? 0}% completed`;
 
+  const subpageTitle =
+    !isRootOverview && !nodeId
+      ? view === "activity"
+        ? "Activity"
+        : view === "review"
+          ? "Evidence & review"
+          : view === "budget"
+            ? "Task budget"
+            : view === "files"
+              ? "Task files"
+              : view === "subitems"
+                ? "Subtasks"
+                : undefined
+      : undefined;
+
   return (
-    <Screen compact onRefresh={() => refresh()}>
+    <Screen
+      compact
+      title={subpageTitle}
+      description={subpageTitle ? task.title : undefined}
+      onRefresh={() => refresh()}
+    >
       {isRootOverview ? (
         <>
           {/* 1. Task header */}
           <View style={{ gap: 4, marginBottom: 4 }}>
-            <View
-              style={{
-                flexDirection: fontScale > 1.8 ? "column" : "row",
-                alignItems: fontScale > 1.8 ? "flex-start" : "flex-start",
-                justifyContent: "space-between",
-                gap: 10,
-              }}
-            >
-              <Text
-                accessibilityRole="header"
-                style={{
-                  flex: fontScale > 1.8 ? undefined : 1,
-                  fontSize: 26,
-                  fontWeight: "700",
-                  color: palette.text,
-                  lineHeight: 32,
-                }}
-              >
-                {task.title}
-              </Text>
-              <View testID="task-detail-actions" style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              {canEditTask && (
-                <BentoEditButton
-                  accessibilityLabel="Edit task"
-                  busy={actionsChecking}
-                  disabled={action.busy}
-                  onPress={() => setEditingTask(true)}
-                />
-              )}
-              {canDeleteTask && <BentoDeleteButton accessibilityLabel="Delete task" onPress={deleteTask}
-                busy={action.busy || actionsChecking} />}
-              {actionsChecking && !canEditTask && !canDeleteTask && <SmallProgress label="Checking actions…" />}
-              </View>
-            </View>
-            {!!(task.projectTitle || task.department) && (
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: palette.mutedLabel,
-                  lineHeight: 20,
-                }}
-              >
-                {task.projectTitle || task.department}
-              </Text>
-            )}
+            <PageHeader
+              title={task.title}
+              subtitle={task.projectTitle || task.department || undefined}
+              right={
+                canEditTask || canDeleteTask || actionsChecking ? (
+                  <View
+                    testID="task-detail-actions"
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: 6,
+                      alignItems: "center",
+                    }}
+                  >
+                    {canEditTask && (
+                      <BentoEditButton
+                        accessibilityLabel="Edit task"
+                        busy={actionsChecking}
+                        disabled={action.busy}
+                        onPress={() => setEditingTask(true)}
+                      />
+                    )}
+                    {canDeleteTask && (
+                      <BentoDeleteButton
+                        accessibilityLabel="Delete task"
+                        onPress={deleteTask}
+                        busy={action.busy || actionsChecking}
+                      />
+                    )}
+                    {actionsChecking && !canEditTask && !canDeleteTask && (
+                      <SmallProgress label="Checking actions…" />
+                    )}
+                  </View>
+                ) : (
+                  <View testID="task-detail-actions" />
+                )
+              }
+              style={{ marginBottom: 4 }}
+            />
 
             {/* Work action buttons immediately below project context */}
             {isProjectOnHold ? (
@@ -694,7 +713,7 @@ export function TaskDetailsScreen({
               (!lead ||
                 (task.status === "todo" &&
                   (!canStartToday || !taskDependenciesReady))) && (
-                <Notice>
+                <Notice tone="warning">
                   {!lead
                     ? task.status === "changes_requested"
                       ? "The Task Lead must resume work before you can post progress or submit completion."
@@ -710,58 +729,23 @@ export function TaskDetailsScreen({
               participant &&
               task.status === "in_progress" &&
               (lead ? !taskReadyToComplete : !taskDependenciesReady) && (
-                <Notice>
+                <Notice tone="warning">
                   {!taskDependenciesReady
                     ? "Complete all task prerequisites before marking this task complete."
                     : "Complete all subtasks before marking this task complete."}
                 </Notice>
               )}
 
-            {/* Editorial Status / Priority metadata strip */}
-            <EditorialMetadataStrip
-              variant="card"
-              items={[
-                {
-                  label: "Status",
-                  value: taskStatusPresentation.label,
-                  accent: taskStatusPresentation.color,
-                  status: taskDisplayStatus,
-                },
-                {
-                  label: "Priority",
-                  value: priorityLabel(task.priority),
-                  accent:
-                    task.priority === "high" ? palette.danger : palette.text,
-                },
-              ]}
-              style={{ marginTop: 2, marginBottom: 10 }}
+            {/* Unified Overview Hero Card (Progress + Status + Priority) */}
+            <BentoOverviewHeroCard
+              title="Task completion"
+              subtitle={completionText}
+              percent={completion?.percent ?? 0}
+              statusLabel={taskStatusPresentation.label}
+              statusCode={taskDisplayStatus}
+              priorityLabel={priorityLabel(task.priority)}
+              priorityRaw={task.priority}
             />
-          </View>
-
-          {/* 2. Task completion */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginVertical: 12,
-            }}
-          >
-            <View style={{ gap: 4, flex: 1, paddingRight: 12 }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "700",
-                  color: palette.text,
-                }}
-              >
-                Task completion
-              </Text>
-              <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-                {completionText}
-              </Text>
-            </View>
-            <CircularProgressRing percent={completion?.percent ?? 0} />
           </View>
 
           {/* 3. Schedule bento cards */}
@@ -829,7 +813,7 @@ export function TaskDetailsScreen({
             onPressSubtask={(item) =>
               navigate(workNodeRoute(tree.data!, item.id, item.title))
             }
-          /> : <Notice>{hiddenSubtasksMessage}</Notice>}
+          /> : <Notice tone="neutral">{hiddenSubtasksMessage}</Notice>}
 
           {/* 6. Supporting features 2x2 bento grid */}
           <BentoSupportingGrid
@@ -885,8 +869,14 @@ export function TaskDetailsScreen({
               />
             )}
 
-          {readOnly && <Notice>This work is read-only.</Notice>}
-          {!!task.feedback && <Notice>{task.feedback}</Notice>}
+          {readOnly && <Notice tone="neutral">This work is read-only.</Notice>}
+          {!!task.feedback && (
+            <Notice
+              tone={task.status === "changes_requested" ? "warning" : "info"}
+            >
+              {task.feedback}
+            </Notice>
+          )}
 
           {editingTask && (
             <ProjectTaskEditor
@@ -898,43 +888,63 @@ export function TaskDetailsScreen({
           )}
 
           {!!task.description && (
-            <View
-              style={{
-                backgroundColor: palette.surface,
-                borderWidth: 1,
-                borderColor: palette.border,
-                borderRadius: 14,
-                padding: 14,
-                marginTop: 8,
-              }}
+            <Card
+              title="Description"
+              icon={<FileText size={16} color={palette.primary} />}
             >
               <Text
-                style={{
-                  fontSize: 13,
-                  color: palette.mutedLabel,
-                  marginBottom: 4,
-                  fontWeight: "600",
-                }}
-              >
-                Description
-              </Text>
-              <Text
                 selectable
-                style={{ color: palette.text, fontSize: 14, lineHeight: 20 }}
+                style={{ color: palette.text, fontSize: 14, lineHeight: 21 }}
               >
                 {task.description}
               </Text>
-            </View>
+            </Card>
           )}
 
           {(!!task.definitionOfDone || !!task.acceptanceCriteria?.length) && (
-            <Card title="Definition of done">
+            <Card
+              title="Definition of done"
+              icon={<CircleCheck size={16} color={palette.success} />}
+            >
               {!!task.definitionOfDone && (
-                <Text selectable>{task.definitionOfDone}</Text>
+                <Text
+                  selectable
+                  style={{ color: palette.text, fontSize: 14, lineHeight: 21 }}
+                >
+                  {task.definitionOfDone}
+                </Text>
               )}
-              {task.acceptanceCriteria?.map((criterion, index) => (
-                <Text key={index}>• {criterion}</Text>
-              ))}
+              {!!task.acceptanceCriteria?.length && (
+                <DetailGroup>
+                  {task.acceptanceCriteria.map((criterion, index) => (
+                    <View
+                      key={index}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "flex-start",
+                        gap: 10,
+                      }}
+                    >
+                      <CircleCheck
+                        size={16}
+                        color={palette.success}
+                        style={{ marginTop: 2 }}
+                      />
+                      <Text
+                        selectable
+                        style={{
+                          flex: 1,
+                          color: palette.text,
+                          fontSize: 14,
+                          lineHeight: 20,
+                        }}
+                      >
+                        {criterion}
+                      </Text>
+                    </View>
+                  ))}
+                </DetailGroup>
+              )}
             </Card>
           )}
         </>
@@ -970,33 +980,25 @@ export function TaskDetailsScreen({
         </>
       )}
       {!!(view === "activity") && (
-        <>
-          <Button
-            variant="ghost"
-            style={{ alignSelf: "flex-start" }}
-            onPress={() =>
-              navigate({
-                name: "messages",
-                taskId: id,
-                projectId: task.linkedProjectId,
-                title: "Task conversation",
-              })
-            }
-          >
-            Open task conversation
-          </Button>
-          <TaskActivity
-            taskId={id}
-            canDiscuss={participant && !readOnly}
-            verifyDiscussion={async () => {
-              const { latest, actorId } = await verifyCurrentTask();
-              if (!getTaskTeamMemberIds(latest).includes(actorId))
-                throw new PublicMessageError(
-                  "Current task participation is required.",
-                );
-            }}
-          />
-        </>
+        <TaskActivity
+          taskId={id}
+          canDiscuss={participant && !readOnly}
+          onOpenConversation={() =>
+            navigate({
+              name: "messages",
+              taskId: id,
+              projectId: task.linkedProjectId,
+              title: "Task conversation",
+            })
+          }
+          verifyDiscussion={async () => {
+            const { latest, actorId } = await verifyCurrentTask();
+            if (!getTaskTeamMemberIds(latest).includes(actorId))
+              throw new PublicMessageError(
+                "Current task participation is required.",
+              );
+          }}
+        />
       )}
       {!!(view === "review") && (
         <>
@@ -1007,7 +1009,11 @@ export function TaskDetailsScreen({
             />
           )}
           {!!evidence.data && (
-            <Button variant="outline" onPress={() => setExecution("submit")}>
+            <Button
+              variant="outline"
+              icon={<FileCheck size={16} color={palette.primary} />}
+              onPress={() => setExecution("submit")}
+            >
               Check saved evidence submission
             </Button>
           )}
@@ -1020,21 +1026,21 @@ export function TaskDetailsScreen({
         </>
       )}
       {view === "budget" && funding}
-      {!!(view === "files" && task.linkedProjectId) && (
-        <ProjectFiles
-          projectId={task.linkedProjectId}
-          taskId={id}
-          onManage={() =>
-            navigate({
-              name: "task",
-              id,
-              projectId: task.linkedProjectId,
-              view: "file_management",
-              title: "File management",
-            })
-          }
-        />
-      )}
+      {view === "files" &&
+        (task.linkedProjectId ? (
+          <ProjectFiles
+            projectId={task.linkedProjectId}
+            taskId={id}
+            contextTitle={task.title}
+            eyebrow="Task attachments"
+          />
+        ) : (
+          <Empty
+            kind="files"
+            title="Files unavailable"
+            description="No project is linked to this task."
+          />
+        ))}
       {!!action.error && <ErrorState context="action" error={action.error} />}
       {execution === "submit" && !!profile && (
         <TaskEvidenceSheet

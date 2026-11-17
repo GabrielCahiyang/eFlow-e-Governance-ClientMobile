@@ -1,4 +1,10 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Download from "lucide-react-native/icons/download";
+import Eye from "lucide-react-native/icons/eye";
+import FileText from "lucide-react-native/icons/file-text";
+import Plus from "lucide-react-native/icons/plus";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -17,6 +23,7 @@ import {
   dateLabel,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -45,7 +52,8 @@ export function JournalPanel({
   year: number;
   data: DepartmentBudgetBundle;
 }) {
-  const { profile, can } = useAuth(),
+  const palette = useTheme(),
+    { profile, can } = useAuth(),
     facts = useFacts(`journal:${profile?.id}:${orgId}:${year}`, () =>
       fetchGeneralJournal(orgId, year),
     ),
@@ -83,6 +91,7 @@ export function JournalPanel({
           variant="outline"
           disabled={facts.loading || !!facts.error}
           busy={exportAction.busy}
+          icon={<Download size={15} color={palette.primary} />}
           onPress={() => void output("csv")}
         >
           Export CSV
@@ -91,6 +100,7 @@ export function JournalPanel({
           variant="outline"
           disabled={facts.loading || !!facts.error}
           busy={exportAction.busy}
+          icon={<FileText size={15} color={palette.primary} />}
           onPress={() => void output("pdf")}
         >
           Export PDF
@@ -106,7 +116,10 @@ export function JournalPanel({
         {!!(
           !!can("accounting.post_journal") && data.summary?.status === "locked"
         ) && (
-          <Button onPress={() => setCreate(true)}>
+          <Button
+            icon={<Plus size={15} color={palette.onPrimary} />}
+            onPress={() => setCreate(true)}
+          >
             Post balanced adjustment
           </Button>
         )}
@@ -139,13 +152,17 @@ export function JournalPanel({
               label="Credit"
               value={peso(e.lines.reduce((s, l) => s + l.credit, 0))}
             />
-            <Button variant="outline" onPress={() => setEntry(e)}>
+            <Button
+              variant="outline"
+              icon={<Eye size={15} color={palette.primary} />}
+              onPress={() => setEntry(e)}
+            >
               View full entry
             </Button>
           </Card>
         ))
       ) : (
-        <Empty title="No journal entries" />
+        <Empty kind="budget" title="No journal entries" />
       )}
       <Sheet
         open={!!entry}
@@ -218,7 +235,8 @@ function JournalAdjustment({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const { profile } = useAuth(),
+  const palette = useTheme(),
+    { profile } = useAuth(),
     accounts = useFacts("journal-account-catalog", fetchAccountingAccounts),
     command = useFinancialCommand(profile?.id || "", `journal:${budgetId}`),
     [validation, setValidation] = useState("");
@@ -304,7 +322,11 @@ function JournalAdjustment({
       onClose={close}
       busy={command.busy}
       footer={
-        <Button busy={command.busy} onPress={() => void save()}>
+        <Button
+          busy={command.busy}
+          icon={<Check size={15} color={palette.onPrimary} />}
+          onPress={() => void save()}
+        >
           Review and post adjustment
         </Button>
       }
@@ -360,6 +382,7 @@ function JournalAdjustment({
               <Button
                 variant="ghost"
                 disabled={command.busy}
+                icon={<X size={15} color={palette.primary} />}
                 onPress={() =>
                   updateDraft((old) => ({
                     ...old,
@@ -378,6 +401,7 @@ function JournalAdjustment({
       <Button
         variant="outline"
         disabled={command.busy}
+        icon={<Plus size={15} color={palette.primary} />}
         onPress={() =>
           updateDraft((old) => ({
             ...old,

@@ -1,6 +1,9 @@
 import { expect, jest, test } from "@jest/globals";
 import { accountingHomeQueue } from "../homeFinance";
-import { officeFinancialSummary } from "../../budget/officeFinancialSummary";
+import {
+  officeBudgetPosition,
+  officeFinancialSummary,
+} from "../../budget/officeFinancialSummary";
 
 const mockQueries: { table: string; calls: unknown[][] }[] = [];
 let mockSummary: unknown;
@@ -125,4 +128,34 @@ test("scheduled Office Budget releases are shown separately from the unchanged t
       settled: 0,
     });
   }
+});
+
+test("officeBudgetPosition reads daily release controls and preserves missing values as undefined", async () => {
+  mockSummary = {
+    id: "budget",
+    orgId: "office",
+    fiscalYear: 2026,
+    approvedAmount: 250000,
+    budgetReleasedAmount: 125000,
+    heldAmount: 125000,
+    committedAmount: 100000,
+    spentAmount: 1040,
+    availableAmount: 148960,
+    pettyCashLimit: 15000,
+    releasedToday: 0,
+    scheduledToday: null,
+    pettyCashAvailable: 15000,
+  };
+  expect(await officeBudgetPosition("office", 2026)).toEqual({
+    approved: 250000,
+    released: 125000,
+    pending: 125000,
+    settled: 1040,
+    available: 148960,
+    committed: 100000,
+    dailyLimit: 15000,
+    releasedToday: 0,
+    scheduledToday: undefined,
+    dailyRemaining: 15000,
+  });
 });

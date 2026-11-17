@@ -4,11 +4,14 @@ import {KeyboardAvoidingView,Platform,StyleSheet} from "react-native";
 import {ScrollView,View} from '../../components/ui/Primitives';
 import { useIsFocused } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Volume2 from "lucide-react-native/icons/volume-2";
-import Send from "lucide-react-native/icons/send";
-import Mic from "lucide-react-native/icons/mic";
 import AudioLines from "lucide-react-native/icons/audio-lines";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import MessageSquare from "lucide-react-native/icons/message-square";
+import Mic from "lucide-react-native/icons/mic";
+import Send from "lucide-react-native/icons/send";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Volume2 from "lucide-react-native/icons/volume-2";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -152,6 +155,7 @@ export function HelpScreen({ navigate }: { navigate: Navigate }) {
               <Button
                 key={question}
                 variant="outline"
+                icon={<MessageSquare size={16} color={palette.primary} />}
                 onPress={() => setDraft(question)}
               >
                 {question}
@@ -192,6 +196,7 @@ export function HelpScreen({ navigate }: { navigate: Navigate }) {
                     {!!(source.taskId || source.projectId) && (
                       <Button
                         variant="ghost"
+                        icon={<ExternalLink size={16} color={palette.primary} />}
                         onPress={() =>
                           navigate(
                             source.taskId
@@ -231,7 +236,11 @@ export function HelpScreen({ navigate }: { navigate: Navigate }) {
               : HELP_STAGES[conversation.stage]}
           </Text>
           {!!conversation.busy && (
-            <Button variant="ghost" onPress={conversation.stop}>
+            <Button
+              variant="ghost"
+              icon={<X size={16} color={palette.primary} />}
+              onPress={conversation.stop}
+            >
               {conversation.stage === "thinking"
                 ? "Cancel answer"
                 : "Stop voice"}

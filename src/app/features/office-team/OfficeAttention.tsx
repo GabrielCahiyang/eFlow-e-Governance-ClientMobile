@@ -47,7 +47,7 @@ export function OfficeAttention({
       ) : !facts.data ? (
         <Loading label="Loading Office attention" layout="navigation" />
       ) : !facts.data.length ? (
-        <Empty compact kind="work" title="No Office tasks need attention" />
+        <Empty compact kind="complete" title="No Office tasks need attention" />
       ) : (
         facts.data.map((task) => (
           <NavigationRow

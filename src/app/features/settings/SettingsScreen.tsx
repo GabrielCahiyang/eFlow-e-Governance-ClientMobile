@@ -1,4 +1,6 @@
 import { useState } from "react";
+import KeyRound from "lucide-react-native/icons/key-round";
+import Mail from "lucide-react-native/icons/mail";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import type { Navigate } from "../../shared/routes";
 import {
@@ -15,7 +17,7 @@ import { useToast } from "../../components/ui/Toast";
 import { confirmAction } from "../../shared/confirm";
 import { updateEmailPreference } from "../../../core/web/app/services/userSettingsService";
 import { PasswordSheet } from "./PasswordSheet";
-import { useAppearance } from "../../components/ui/Appearance";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { Choice } from "../../components/ui";
 import { PushSettings } from "../notifications";
 export function SettingsScreen({
@@ -26,6 +28,7 @@ export function SettingsScreen({
   navigate: Navigate;
 }) {
   const appearance = useAppearance();
+  const palette = useTheme();
   const { toast } = useToast();
   const { profile, refresh } = useAuth(),
     [password, setPassword] = useState(false),
@@ -65,8 +68,24 @@ export function SettingsScreen({
     { id: "security", title: "Security" },
     { id: "appearance", title: "Appearance" },
   ] as const;
+  const pageTitle =
+    tab === "notifications"
+      ? "Notification alerts"
+      : tab === "security"
+        ? "Password & security"
+        : tab === "appearance"
+          ? "Appearance"
+          : "Account & settings";
+  const pageSubtitle =
+    tab === "notifications"
+      ? "Push delivery & email digest preferences"
+      : tab === "security"
+        ? "Verify current password & update login"
+        : tab === "appearance"
+          ? "Color theme preferences"
+          : "Profile, notifications & security";
   return (
-    <Screen compact>
+    <Screen compact title={pageTitle} description={pageSubtitle}>
       {!tab || !sections.some((section) => section.id === tab) ? (
         sections.map(({ id, title }) => (
           <NavigationRow
@@ -104,7 +123,12 @@ export function SettingsScreen({
           ) : tab === "security" ? (
             <Card title="Change your password">
               <Notice>Have your current password ready.</Notice>
-              <Button onPress={() => setPassword(true)}>Change password</Button>
+              <Button
+                icon={<KeyRound size={15} color={palette.onPrimary} />}
+                onPress={() => setPassword(true)}
+              >
+                Change password
+              </Button>
             </Card>
           ) : (
             <>
@@ -118,7 +142,11 @@ export function SettingsScreen({
                   Receive email when work is assigned, updated or needs review.
                   In-app notifications remain available either way.
                 </Notice>
-                <Button busy={action.busy} onPress={() => void changeEmail()}>
+                <Button
+                  busy={action.busy}
+                  icon={<Mail size={15} color={palette.onPrimary} />}
+                  onPress={() => void changeEmail()}
+                >
                   {enabled ? "Turn off task emails" : "Turn on task emails"}
                 </Button>
               </Card>

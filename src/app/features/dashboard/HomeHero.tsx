@@ -117,7 +117,7 @@ export function HomeHero({
         <HomeHeader navigate={navigate} onDark subtitle={subtitle} />
         {children}
         {actions.length > 0 && (
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
             {actions.map(({ key, label, Icon, onPress }) => (
               <Pressable
                 key={key}
@@ -128,25 +128,46 @@ export function HomeHero({
                   flex: 1,
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 8,
-                  minHeight: 48,
-                  paddingHorizontal: 12,
-                  borderRadius: 16,
+                  gap: 7,
+                  minHeight: 46,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  borderRadius: 18,
                   borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.22)",
+                  borderColor: "rgba(255,255,255,0.24)",
                   backgroundColor: pressed
                     ? "rgba(255,255,255,0.22)"
-                    : "rgba(255,255,255,0.12)",
+                    : "rgba(255,255,255,0.13)",
                 })}
               >
-                <Icon size={18} color="#ffffff" />
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 13,
+                    backgroundColor: "rgba(255,255,255,0.18)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon size={14} color="#ffffff" />
+                </View>
                 <Text
                   numberOfLines={1}
-                  style={{ flex: 1, color: "#ffffff", fontSize: 14, fontWeight: "700" }}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    color: "#ffffff",
+                    fontSize: 13,
+                    fontWeight: "700",
+                  }}
                 >
                   {label}
                 </Text>
-                <ChevronRight size={16} color="rgba(255,255,255,0.8)" />
+                <ChevronRight size={15} color="rgba(255,255,255,0.86)" />
               </Pressable>
             ))}
           </View>
@@ -194,7 +215,7 @@ function HeroRings() {
   );
 }
 
-/** White rounded section that slides over the bottom of the hero. */
+/** Rounded content sheet that slides over the bottom of the hero. */
 export function HomeBody({
   children,
   gap = 12,
@@ -212,11 +233,16 @@ export function HomeBody({
         marginTop: -24,
         marginBottom: -24,
         paddingHorizontal: edge,
-        paddingTop: 20,
+        paddingTop: 18,
         paddingBottom: 32,
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
-        backgroundColor: palette.surface,
+        backgroundColor: palette.background,
+        shadowColor: palette.primaryDark,
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: -6 },
+        elevation: 4,
         gap,
       }}
     >
@@ -235,7 +261,6 @@ type Stat = {
     | "awaiting";
   label: string;
   value: number;
-  onPress?: () => void;
   accessibilityLabel: string;
 };
 
@@ -255,13 +280,10 @@ export function HomeHeroStats({ stats }: { stats: Stat[] }) {
       {stats.map((stat) => {
         const Icon = statIcons[stat.key];
         return (
-          <Pressable
+          <View
             key={stat.key}
-            accessibilityRole={stat.onPress ? "button" : undefined}
             accessibilityLabel={stat.accessibilityLabel}
-            disabled={!stat.onPress}
-            onPress={stat.onPress}
-            style={({ pressed }) => ({
+            style={{
               flex: 1,
               minHeight: 120,
               padding: 12,
@@ -269,10 +291,8 @@ export function HomeHeroStats({ stats }: { stats: Stat[] }) {
               borderRadius: 20,
               borderWidth: 1,
               borderColor: "rgba(255,255,255,0.22)",
-              backgroundColor: pressed
-                ? "rgba(255,255,255,0.22)"
-                : "rgba(255,255,255,0.12)",
-            })}
+              backgroundColor: "rgba(255,255,255,0.12)",
+            }}
           >
             <View
               style={{
@@ -303,9 +323,76 @@ export function HomeHeroStats({ stats }: { stats: Stat[] }) {
             >
               {stat.label}
             </Text>
-          </Pressable>
+          </View>
         );
       })}
+    </View>
+  );
+}
+
+export type HeroMetric = {
+  key: string;
+  label: string;
+  value: string;
+  accessibilityLabel: string;
+};
+
+/** Two-column label and value tiles inside the Home hero. */
+export function HomeHeroMetrics({
+  items,
+  loadingLabel,
+}: {
+  items: HeroMetric[];
+  loadingLabel?: string;
+}) {
+  return (
+    <View
+      accessibilityLabel={loadingLabel}
+      style={{ flexDirection: "row", gap: 10, marginTop: 12 }}
+    >
+      {items.map((item) => (
+        <View
+          key={item.key}
+          accessibilityLabel={item.accessibilityLabel}
+          style={{
+            flex: 1,
+            minHeight: 72,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            justifyContent: "space-between",
+            gap: 6,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.22)",
+            backgroundColor: "rgba(255,255,255,0.12)",
+          }}
+        >
+          <Text
+            numberOfLines={2}
+            style={{
+              color: "rgba(255,255,255,0.8)",
+              fontSize: 12,
+              lineHeight: 15,
+              fontWeight: "600",
+            }}
+          >
+            {item.label}
+          </Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={{
+              color: "#ffffff",
+              fontSize: 18,
+              lineHeight: 22,
+              fontWeight: "800",
+            }}
+          >
+            {item.value}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }

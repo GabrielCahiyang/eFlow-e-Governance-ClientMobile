@@ -1,5 +1,9 @@
 import { Platform } from "react-native";
+import Camera from "lucide-react-native/icons/camera";
+import Upload from "lucide-react-native/icons/upload";
+import X from "lucide-react-native/icons/x";
 import { Button, LabelValue, Notice, Row } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { chooseFiles } from "../../../platform/files";
 import {
@@ -28,6 +32,7 @@ export function EvidencePicker({
   disabled?: boolean;
   maxCount?: number;
 }) {
+  const palette = useTheme();
   const pick = (load: () => Promise<EvidenceFile[]>) =>
     run(async () => {
       const selected = await load();
@@ -50,6 +55,7 @@ export function EvidencePicker({
       <Row>
         <Button
           variant="outline"
+          icon={<Upload size={15} color={palette.primary} />}
           disabled={disabled}
           onPress={() => pick(() => chooseFiles("*/*", maxCount > 1))}
         >
@@ -58,6 +64,7 @@ export function EvidencePicker({
         {Platform.OS !== "web" && (
           <Button
             variant="outline"
+            icon={<Camera size={15} color={palette.primary} />}
             disabled={disabled}
             onPress={() => pick(captureEvidencePhoto)}
           >
@@ -73,6 +80,7 @@ export function EvidencePicker({
           />
           <Button
             variant="ghost"
+            icon={<X size={15} color={palette.primary} />}
             disabled={disabled}
             accessibilityLabel={`Remove ${file.name}`}
             onPress={() =>

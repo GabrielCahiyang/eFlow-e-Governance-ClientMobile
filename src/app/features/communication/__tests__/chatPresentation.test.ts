@@ -4,6 +4,7 @@ import {
   conversationGroup,
   filterConversations,
   initials,
+  listStamp,
   pinnedConversation,
   reactionSummary,
   separatorLabel,
@@ -44,6 +45,19 @@ test("conversation kinds map to People, Groups and Office filters", () => {
     filterConversations(channels, "groups", "HELLO").map((c) => c.id),
   ).toEqual(["2"]);
   expect(filterConversations(channels, "office", "andres")).toEqual([]);
+  expect(
+    filterConversations(
+      [
+        { id: "u1", name: "Unread DM", kind: "direct", unread: true },
+        { id: "u2", name: "Archived Unread", kind: "project", unread: true, archived: true },
+        { id: "r1", name: "Read DM", kind: "direct", unread: false },
+      ],
+      "unread",
+      "",
+    ).map((c) => c.id),
+  ).toEqual(["u1"]);
+  expect(listStamp("2026-11-09T09:15:00", now)).toMatch(/9:15/);
+  expect(listStamp("2026-11-01T09:15:00", now)).toMatch(/Nov/);
 });
 
 test("runs group by sender, time gap and day without altering messages", () => {

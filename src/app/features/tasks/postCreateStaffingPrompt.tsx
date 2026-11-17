@@ -1,5 +1,8 @@
 import { View } from "react-native";
+import Users from "lucide-react-native/icons/users";
+import X from "lucide-react-native/icons/x";
 import { Button, Notice, Sheet } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { isProjectLeadSubtaskPlanningBlocked, taskStaffingCapability } from "./workPermissions";
 import {
   selectNodeWorkCapability,
@@ -156,6 +159,7 @@ export function PostCreateStaffingPromptSheet({
   onChoosePeople: () => void;
   onClose: () => void;
 }) {
+  const palette = useTheme();
   const isTask = kind === "task";
   return (
     <Sheet
@@ -169,10 +173,19 @@ export function PostCreateStaffingPromptSheet({
       onClose={onClose}
       footer={
         <View style={{ gap: 10 }}>
-          <Button style={{ width: "100%" }} onPress={onChoosePeople}>
+          <Button
+            icon={<Users size={16} color={palette.onPrimary} />}
+            style={{ width: "100%" }}
+            onPress={onChoosePeople}
+          >
             Choose people
           </Button>
-          <Button variant="outline" style={{ width: "100%" }} onPress={onClose}>
+          <Button
+            variant="outline"
+            icon={<X size={16} color={palette.primary} />}
+            style={{ width: "100%" }}
+            onPress={onClose}
+          >
             Leave unassigned
           </Button>
         </View>

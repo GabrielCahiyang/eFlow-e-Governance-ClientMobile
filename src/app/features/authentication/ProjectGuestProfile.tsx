@@ -1,4 +1,7 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Upload from "lucide-react-native/icons/upload";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -27,6 +30,7 @@ export function ProjectGuestProfile({
   onDone: () => void;
 }) {
   const { user } = useAuth();
+  const palette = useTheme();
   const action = useAction();
   const profile = useFacts(
     "guest-profile:" + user?.id,
@@ -84,6 +88,7 @@ export function ProjectGuestProfile({
           variant="outline"
           busy={action.busy}
           disabled={!user}
+          icon={<Upload size={16} color={palette.primary} />}
           onPress={() =>
             void action.run(async () => {
               const [file] = await chooseFiles("application/pdf");
@@ -105,6 +110,7 @@ export function ProjectGuestProfile({
         <Button
           busy={action.busy}
           disabled={!user || (edited && (profile.loading || !!profile.error))}
+          icon={<Check size={16} color={palette.onPrimary} />}
           onPress={() =>
             void action.run(async () => {
               if (edited)

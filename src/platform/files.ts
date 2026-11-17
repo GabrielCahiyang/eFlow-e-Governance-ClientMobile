@@ -1,6 +1,6 @@
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 
 export interface PickedFile {
   uri: string;
@@ -8,6 +8,27 @@ export interface PickedFile {
   type: string;
   size: number;
   arrayBuffer: () => Promise<ArrayBuffer>;
+}
+
+/** Open a file whose URL is fetched after the user taps its link. */
+export async function openFileUrl(resolveUrl: () => Promise<string>) {
+  if (Platform.OS !== "web") {
+    await Linking.openURL(await resolveUrl());
+    return true;
+  }
+
+  // A signed URL can arrive after the browser's user activation has expired.
+  const tab = window.open("about:blank", "_blank");
+  if (!tab) return false;
+  try {
+    tab.opener = null;
+    const url = await resolveUrl();
+    if (!tab.closed) tab.location.replace(url);
+    return true;
+  } catch (error) {
+    tab.close();
+    throw error;
+  }
 }
 
 const extensionMimeTypes: Record<string, string> = {

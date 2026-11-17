@@ -4,7 +4,13 @@ import type {
   WorkNode,
   WorkTreeSnapshot,
 } from "../../../../core/web/app/features/nested-work/types";
-import { activityTime, describeWorkEvent } from "../activityPresentation";
+import {
+  activityClockTime,
+  activityDateHeading,
+  activityDateKey,
+  activityTime,
+  describeWorkEvent,
+} from "../activityPresentation";
 
 const node = {
   id: "subtask",
@@ -89,4 +95,17 @@ test("prerequisite labels retain historical titles and never substitute current 
   const result = describeWorkEvent(event("edit", [{ ...node, dependency_ids: [] } as WorkNode],
     [{ ...node, dependency_ids: ["prior", "unavailable"] } as WorkNode, prerequisite]));
   expect(result.fields).toContainEqual({ label: "Prerequisites", value: "None → Recorded prerequisite, Historical prerequisite unavailable" });
+});
+
+test("date and clock helpers group by Asia/Manila calendar day and handle missing times safely", () => {
+  // 2026-11-14T20:45:00Z is Nov 15, 2026, 4:45 AM in Asia/Manila.
+  const manilaMorning = Date.parse("2026-11-14T20:45:00Z");
+  expect(activityDateKey(manilaMorning)).toBe("2026-11-15");
+  expect(activityDateHeading(manilaMorning)).toMatch(/Nov 15, 2026/);
+  expect(activityClockTime(manilaMorning)).toMatch(/4:45\s*AM/i);
+
+  expect(activityDateKey(0)).toBe("unavailable");
+  expect(activityDateKey(Number.NaN)).toBe("unavailable");
+  expect(activityDateHeading(0)).toBe("Date unavailable");
+  expect(activityClockTime(-1)).toBe("Time unavailable");
 });

@@ -1,8 +1,12 @@
 import { useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Wallet from "lucide-react-native/icons/wallet";
 import {
   Button,
   Card,
   Choice,
+  DetailGroup,
   ErrorState,
   Field,
   LabelValue,
@@ -10,6 +14,7 @@ import {
   Sheet,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { draftStore } from "../../../platform/draftStore";
 import { useAuth } from "../authentication";
 import { useAction } from "../../shared/useAction";
@@ -57,6 +62,7 @@ export function WorkAllocationCard({
   taskFinished = false,
   taskSchedule,
   readOnly,
+  nested = false,
   onSaved,
 }: {
   task: string;
@@ -64,10 +70,12 @@ export function WorkAllocationCard({
   taskFinished?: boolean;
   taskSchedule?: { start?: string; end?: string };
   readOnly: boolean;
+  nested?: boolean;
   onSaved: () => Promise<void>;
 }) {
   const actor = useAuth().profile?.id || "";
   const { toast } = useToast();
+  const palette = useTheme();
   const key = JSON.stringify([actor, task, projectId, taskFinished]);
   const scope = "work-allocation:" + task + ":";
   const returnScope = "work-allocation-return:" + task + ":";
@@ -300,21 +308,37 @@ export function WorkAllocationCard({
     `${line.source || line.name || "Project account"}${line.fiscalYear ? ` · FY ${line.fiscalYear}` : ""}${line.quarter ? ` Q${line.quarter}` : ""}`;
 
   return (
-    <Card title="Allocate from the project">
-      {lines.map((line) => (
-        <LabelValue
-          key={line.id}
-          label={lineLabel(line)}
-          value={`${peso(line.amount ?? line.available)}${line.available > 0 ? ` (${peso(line.available)} unused)` : ""}`}
-        />
-      ))}
+    <Card
+      flat={nested}
+      title="Allocate from the project"
+      icon={
+        nested ? undefined : <Wallet size={16} color={palette.primary} />
+      }
+    >
+      {lines.length > 0 && (
+        <DetailGroup>
+          {lines.map((line) => (
+            <LabelValue
+              key={line.id}
+              label={lineLabel(line)}
+              value={`${peso(line.amount ?? line.available)}${line.available > 0 ? ` (${peso(line.available)} unused)` : ""}`}
+            />
+          ))}
+        </DetailGroup>
+      )}
       {retry ? (
-        <Button variant="outline" busy={action.busy} onPress={submit}>
+        <Button
+          variant="outline"
+          busy={action.busy}
+          icon={<Check size={15} color={palette.primary} />}
+          onPress={submit}
+        >
           Save allocation
         </Button>
       ) : !taskFinished && ready && sources.length ? (
         <Button
           variant="outline"
+          icon={<Wallet size={15} color={palette.primary} />}
           onPress={() => {
             action.clear();
             setOpen(true);
@@ -323,19 +347,25 @@ export function WorkAllocationCard({
           Allocate Task funding
         </Button>
       ) : !canReturn && !returnRetry ? (
-        <Notice>
+        <Notice tone={readOnly || taskFinished ? "neutral" : "warning"}>
           {readOnly || taskFinished
             ? "Funding allocation is read-only."
             : "No eligible funding account is available."}
         </Notice>
       ) : null}
       {returnRetry ? (
-        <Button variant="outline" busy={action.busy} onPress={submitReturn}>
+        <Button
+          variant="outline"
+          busy={action.busy}
+          icon={<RotateCcw size={15} color={palette.primary} />}
+          onPress={submitReturn}
+        >
           Confirm return
         </Button>
       ) : canReturn ? (
         <Button
           variant="outline"
+          icon={<RotateCcw size={15} color={palette.primary} />}
           onPress={() => {
             action.clear();
             setReturnOpen(true);
@@ -344,7 +374,7 @@ export function WorkAllocationCard({
           Return unused funding
         </Button>
       ) : null}
-      {!!action.notice && <Notice>{action.notice}</Notice>}
+      {!!action.notice && <Notice tone="neutral">{action.notice}</Notice>}
       {!open && !returnOpen && !!action.error && (
         <ErrorState error={action.error} context="action" />
       )}
@@ -408,6 +438,7 @@ export function WorkAllocationCard({
           />
           <Button
             busy={action.busy}
+            icon={<Check size={15} color={palette.onPrimary} />}
             disabled={
               !retry && (!ready || !chosen || !amount.trim() || !reason.trim())
             }
@@ -464,6 +495,7 @@ export function WorkAllocationCard({
           />
           <Button
             busy={action.busy}
+            icon={<RotateCcw size={15} color={palette.onPrimary} />}
             disabled={
               !returnRetry &&
               (!canReturn || !chosenReturn || !returnReason.trim())

@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import ArrowRight from "lucide-react-native/icons/arrow-right";
+import Bookmark from "lucide-react-native/icons/bookmark";
+import Check from "lucide-react-native/icons/check";
+import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Trash2 from "lucide-react-native/icons/trash";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Choice,
@@ -78,6 +87,7 @@ export function ProjectSetupSheet({
   onDone: (id: string) => void;
 }) {
   const { profile } = useAuth();
+  const palette = useTheme();
   const { toast } = useToast();
   const action = useAction();
   const people = useFacts("setup-people:" + orgId, fetchAllProfiles, !!orgId);
@@ -285,13 +295,18 @@ export function ProjectSetupSheet({
   const footer = !waiting && !locked && (
     <Row>
       {step > 0 && (
-        <Button variant="outline" onPress={() => void openStep(step - 1)}>
+        <Button
+          variant="outline"
+          icon={<ArrowLeft size={16} color={palette.primary} />}
+          onPress={() => void openStep(step - 1)}
+        >
           Previous step
         </Button>
       )}
       <Button
         variant="outline"
         busy={action.busy}
+        icon={<Bookmark size={16} color={palette.primary} />}
         onPress={() =>
           void action.run(async () => {
             await persist();
@@ -306,6 +321,7 @@ export function ProjectSetupSheet({
       {step < 4 ? (
         <Button
           busy={action.busy}
+          icon={<ArrowRight size={16} color={palette.onPrimary} />}
           onPress={() =>
             void action.run(async () => {
               validate(step);
@@ -317,7 +333,11 @@ export function ProjectSetupSheet({
           Next step
         </Button>
       ) : (
-        <Button busy={action.busy} onPress={() => void finish()}>
+        <Button
+          busy={action.busy}
+          icon={<Check size={16} color={palette.onPrimary} />}
+          onPress={() => void finish()}
+        >
           Finish setup
         </Button>
       )}
@@ -333,7 +353,11 @@ export function ProjectSetupSheet({
       onClose={close}
     >
       {waiting ? (
-        <Button busy={action.busy} onPress={() => void hydrate()}>
+        <Button
+          busy={action.busy}
+          icon={<RefreshCw size={16} color={palette.onPrimary} />}
+          onPress={() => void hydrate()}
+        >
           Load project setup
         </Button>
       ) : (
@@ -460,6 +484,7 @@ export function ProjectSetupSheet({
                         {!locked && (
                           <Button
                             variant="ghost"
+                            icon={<Trash2 size={16} color={palette.primary} />}
                             onPress={() =>
                               updateFormDraft((old) => ({
                                 ...old,
@@ -478,6 +503,7 @@ export function ProjectSetupSheet({
                     {!locked && rows.length < sources.length && (
                       <Button
                         variant="outline"
+                        icon={<Plus size={16} color={palette.primary} />}
                         onPress={() =>
                           updateFormDraft((old) => ({
                             ...old,
@@ -494,7 +520,17 @@ export function ProjectSetupSheet({
                       editable={!locked}
                       onChangeText={(next) => updateFormDraft({ reason: next })}
                     />
-                    <Button busy={action.busy} onPress={() => void authorize()}>
+                    <Button
+                      busy={action.busy}
+                      icon={
+                        locked ? (
+                          <RefreshCw size={16} color={palette.onPrimary} />
+                        ) : (
+                          <ShieldCheck size={16} color={palette.onPrimary} />
+                        )
+                      }
+                      onPress={() => void authorize()}
+                    >
                       {locked ? "Retry funding" : "Authorize funding"}
                     </Button>
                   </>

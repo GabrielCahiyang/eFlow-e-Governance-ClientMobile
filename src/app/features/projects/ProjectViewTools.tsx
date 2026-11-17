@@ -1,4 +1,10 @@
 import { useState } from "react";
+import Bookmark from "lucide-react-native/icons/bookmark";
+import Check from "lucide-react-native/icons/check";
+import Download from "lucide-react-native/icons/download";
+import FolderOpen from "lucide-react-native/icons/folder-open";
+import Trash2 from "lucide-react-native/icons/trash";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Card,
@@ -39,6 +45,7 @@ export function ProjectViewTools({
   onApply: (view: SavedProjectView) => void;
 }) {
   const { profile } = useAuth(),
+    palette = useTheme(),
     actor = profile!.id,
     facts = useFacts("saved-views:" + actor + ":" + project, async () => {
       const value = await draftStore.get<SavedProjectView[]>(
@@ -107,6 +114,7 @@ export function ProjectViewTools({
       <Row>
         <Button
           variant="outline"
+          icon={<Bookmark size={16} color={palette.primary} />}
           onPress={() => {
             action.clear();
             setOpen(true);
@@ -117,6 +125,7 @@ export function ProjectViewTools({
         <Button
           variant="outline"
           busy={action.busy}
+          icon={<Download size={16} color={palette.primary} />}
           onPress={() => void exportRows("csv")}
         >
           Export CSV
@@ -124,6 +133,7 @@ export function ProjectViewTools({
         <Button
           variant="outline"
           busy={action.busy}
+          icon={<Download size={16} color={palette.primary} />}
           onPress={() => void exportRows("pdf")}
         >
           Export PDF
@@ -149,6 +159,7 @@ export function ProjectViewTools({
           <Card key={view.id} title={view.name}>
             <Row>
               <Button
+                icon={<FolderOpen size={16} color={palette.onPrimary} />}
                 onPress={() => {
                   onApply(view);
                   setOpen(false);
@@ -158,6 +169,7 @@ export function ProjectViewTools({
               </Button>
               <Button
                 variant="danger"
+                icon={<Trash2 size={16} color={palette.onDanger} />}
                 onPress={() =>
                   void action.run(async () => {
                     await draftStore.set(
@@ -182,6 +194,7 @@ export function ProjectViewTools({
         <Button
           busy={action.busy}
           disabled={facts.loading || !!facts.error}
+          icon={<Check size={16} color={palette.onPrimary} />}
           onPress={() => void save()}
         >
           Save current view

@@ -12,9 +12,12 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from "react-native-reanimated";
+import Eye from "lucide-react-native/icons/eye";
+import EyeOff from "lucide-react-native/icons/eye-off";
 import Mic from "lucide-react-native/icons/mic";
 import MicOff from "lucide-react-native/icons/mic-off";
 import MessageSquare from "lucide-react-native/icons/message-square";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   ErrorState,
@@ -144,16 +147,25 @@ export function LiveSheet({
             ) : (
               <Button
                 busy={voice.starting}
+                icon={<Mic size={18} color={palette.onPrimary} />}
                 onPress={() => void voice.start("live")}
               >
                 Start conversation
               </Button>
             )}
-            <Button variant="outline" onPress={onClose}>
+            <Button
+              variant="outline"
+              icon={<X size={18} color={palette.primary} />}
+              onPress={onClose}
+            >
               End conversation
             </Button>
             {!!(stage !== "idle") && (
-              <Button variant="outline" onPress={voice.interrupt}>
+              <Button
+                variant="outline"
+                icon={<X size={18} color={palette.primary} />}
+                onPress={voice.interrupt}
+              >
                 Interrupt answer
               </Button>
             )}
@@ -196,7 +208,17 @@ export function LiveSheet({
       <Text style={s.small}>{voice.signal.label || "Microphone is off"}</Text>
       {!!voice.signal.warning && <Notice>{voice.signal.warning}</Notice>}
       {!!(voice.error || error) && <ErrorState error={voice.error || error} />}
-      <Button variant="ghost" onPress={() => setTranscript((value) => !value)}>
+      <Button
+        variant="ghost"
+        icon={
+          transcript ? (
+            <EyeOff size={16} color={palette.primary} />
+          ) : (
+            <Eye size={16} color={palette.primary} />
+          )
+        }
+        onPress={() => setTranscript((value) => !value)}
+      >
         {transcript ? "Hide transcript" : "Show transcript"}
       </Button>
       {transcript &&

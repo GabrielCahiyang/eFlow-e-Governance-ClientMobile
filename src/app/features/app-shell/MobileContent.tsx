@@ -12,7 +12,7 @@ import { ActionInbox } from "../notifications";
 import { ChatScreen, AnnouncementsScreen } from "../communication";
 import { ProfileScreen } from "../profile";
 import { SettingsScreen } from "../settings";
-import { AccountingHome, OverviewScreen } from "../dashboard";
+import { OverviewScreen } from "../dashboard";
 import { OfficeBudgetScreen, FinancialReviewsScreen } from "../budget";
 import { OfficePettyCash } from "../office-petty-cash";
 import {
@@ -29,7 +29,7 @@ export function MobileContent({
   current: AppRoute;
   navigate: Navigate;
 }) {
-  const { profile, can } = useAuth(),
+  const { profile, organization, can } = useAuth(),
     workspace = useWorkspace();
   const hasLeadingWork = false;
   let content;
@@ -69,27 +69,54 @@ export function MobileContent({
   else if (current.name === "messages")
     content = <ChatScreen navigate={navigate} route={current} />;
   else if (current.name === "announcements") content = <AnnouncementsScreen />;
-  else if (current.name === "financial_reviews")
-    content =
-      (current.recordType === "office_petty_cash" ||
-        (current.recordType === "office_petty_cash_staffing" &&
-          profile?.role === "head")) &&
+  else if (current.name === "financial_reviews") {
+    const isPettyCash =
+      current.recordType === "office_petty_cash" ||
+      (current.recordType === "office_petty_cash_staffing" &&
+        profile?.role === "head");
+    content = isPettyCash ? (
       profile?.org_id &&
       (!current.financialOfficeId ||
         current.financialOfficeId === profile.org_id) ? (
-        <Screen title="Office petty cash">
+        <Screen
+          compact
+          title="Office petty cash"
+          description={
+            organization?.name
+              ? `${organization.name} · Office fund`
+              : "Office fund & receipts"
+          }
+        >
           <OfficePettyCash
             office={profile.org_id}
             requestId={current.recordId}
           />
         </Screen>
       ) : (
-        <FinancialReviewsScreen
-          key={current.recordId || current.id}
-          recordId={current.recordId || current.id}
-          recordType={current.recordType}
-        />
-      );
+        <Screen
+          compact
+          title="Office petty cash"
+          description={
+            organization?.name
+              ? `${organization.name} · Office fund`
+              : "Office fund & receipts"
+          }
+        >
+          <Empty
+            kind="finance"
+            title="Office petty cash unavailable"
+            description="Assign an authorized Office to view or manage Office petty cash."
+          />
+        </Screen>
+      )
+    ) : (
+      <FinancialReviewsScreen
+        key={current.recordId || current.id}
+        recordId={current.recordId || current.id}
+        recordType={current.recordType}
+      />
+    );
+  }
   else if (officeFinanceRoutes.includes(current.name)) {
     const view = accountingView(
       current.view ??
@@ -98,8 +125,6 @@ export function MobileContent({
     content =
       view === "reviews" ? (
         <FinancialReviewsScreen recordId={current.recordId || current.id} />
-      ) : view === "overview" && profile?.role === "accounting_staff" ? (
-        <AccountingHome navigate={navigate} />
       ) : view ? (
         <OfficeBudgetScreen
           key={current.name + ":" + view}
@@ -112,7 +137,7 @@ export function MobileContent({
         />
       ) : (
         <Screen title="Office finance">
-          <Empty title="This financial view is available in eFlow Web" />
+          <Empty kind="budget" title="This financial view is available in eFlow Web" />
         </Screen>
       );
   } else if (

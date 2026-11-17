@@ -9,6 +9,8 @@ import {
   Notice,
   Sheet,
 } from "../../components/ui";
+import Check from "lucide-react-native/icons/check";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
 import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
@@ -41,6 +43,7 @@ export function TaskScheduleSheet({
     { toast } = useToast(),
     action = useAction();
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const palette = useTheme();
   const [formDraft, updateFormDraft, clearFormDraft] = useRetainedDraft(
     formDraftKey(profile?.id, "task-schedule:" + task.id),
     true,
@@ -183,6 +186,7 @@ export function TaskScheduleSheet({
         <Button
           busy={action.busy}
           disabled={unconfirmed || !allowed || !editReady || !editState.data?.details || tasks.loading || !!tasks.error}
+          icon={<Check size={16} color={palette.onPrimary} />}
           onPress={() => void save()}
         >
           Save task plan

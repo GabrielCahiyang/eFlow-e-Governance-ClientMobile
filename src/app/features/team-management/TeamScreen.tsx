@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import Pencil from "lucide-react-native/icons/pencil";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import { useTheme } from "../../components/ui/Appearance";
 import { ContributionPanel } from "./ContributionPanel";
 import {
   Button,
@@ -30,6 +34,7 @@ export function TeamScreen({
   navigate: Navigate;
 }) {
   const { profile, can } = useAuth(),
+    palette = useTheme(),
     analytics = useOfficeAnalytics(kind === "performance"),
     [view, setView] = useState(
       kind === "supervision"
@@ -97,6 +102,7 @@ export function TeamScreen({
         kind === "supervision" ? (
           <Button
             variant="outline"
+            icon={<ShieldCheck size={16} color={palette.primary} />}
             onPress={() => navigate({ name: "identity" })}
           >
             Identity & access
@@ -161,7 +167,11 @@ export function TeamScreen({
                 (item) =>
                   attentionKind === "all" || item.kind === attentionKind,
               ).length ? (
-                <Empty title="No attention items in this filter" />
+                <Empty
+                  compact
+                  kind="complete"
+                  title="No attention items in this filter"
+                />
               ) : (
                 data.attention
                   .filter(
@@ -175,6 +185,7 @@ export function TeamScreen({
                       <LabelValue label="Severity" value={item.severity} />
                       <Button
                         variant="outline"
+                        icon={<ExternalLink size={16} color={palette.primary} />}
                         onPress={() =>
                           navigate({
                             name: "task",
@@ -245,7 +256,7 @@ export function TeamScreen({
                 }))}
               />
               {!filtered.length ? (
-                <Empty title="No matching people" />
+                <Empty compact kind="search" title="No matching people" />
               ) : person && metric ? (
                 <>
                   <Card title={person.name}>
@@ -307,6 +318,7 @@ export function TeamScreen({
                           />
                           <Button
                             disabled={!can("navigation.team_intelligence")}
+                            icon={<Pencil size={16} color={palette.onPrimary} />}
                             onPress={() => setCoaching(true)}
                           >
                             Edit coaching context
@@ -323,7 +335,7 @@ export function TeamScreen({
                   />
                 </>
               ) : (
-                <Empty title="Choose a team member" />
+                <Empty compact kind="people" title="Choose a team member" />
               )}
             </>
           )}

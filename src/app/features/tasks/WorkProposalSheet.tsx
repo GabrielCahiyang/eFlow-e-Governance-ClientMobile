@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Upload from "lucide-react-native/icons/upload";
+import Wallet from "lucide-react-native/icons/wallet";
 import {
   Button,
   Card,
@@ -11,6 +16,7 @@ import {
   Sheet,
   dateLabel,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import {
   saveSharedWork,
@@ -65,6 +71,7 @@ export function WorkProposalReview({
   onOpenCash?: (recordId: string) => void;
   onSaved: () => Promise<void>;
 }) {
+  const palette = useTheme();
   const facts = useFacts(`work-proposals:${actor}:${root}:${node ?? ""}`, () =>
     fetchWorkProposals(root, node),
   );
@@ -250,6 +257,7 @@ export function WorkProposalReview({
       {!!pending && !readOnly && !selected && (
         <Button
           variant="outline"
+          icon={<RefreshCw size={15} color={palette.primary} />}
           onPress={() =>
             setDecision({
               id: String(pending.args.p_proposal),
@@ -279,7 +287,7 @@ export function WorkProposalReview({
         !facts.loading &&
         !facts.error &&
         !items.some((item) => item.id === proposalId) && (
-          <Notice>
+          <Notice tone="warning">
             This submission is no longer available in your review history.
           </Notice>
         )}
@@ -296,7 +304,15 @@ export function WorkProposalReview({
             {name(item.author_id, "Work contributor")} ·{" "}
             {dateLabel(item.submitted_at)}
           </Text>
-          <Notice>
+          <Notice
+            tone={
+              item.state === "approved"
+                ? "success"
+                : item.state === "changes_requested"
+                  ? "warning"
+                  : "review"
+            }
+          >
             {item.state === "approved"
               ? "Accepted"
               : item.state === "changes_requested"
@@ -337,9 +353,12 @@ export function WorkProposalReview({
               <>
                 {cashBlocked(item) && (
                   <>
-                    <Notice>Completion is waiting for cash settlement.</Notice>
+                    <Notice tone="warning">
+                      Completion is waiting for cash settlement.
+                    </Notice>
                     <Button
                       variant="outline"
+                      icon={<RefreshCw size={15} color={palette.primary} />}
                       disabled={cash.loading}
                       onPress={() => void cash.refresh()}
                     >
@@ -350,6 +369,7 @@ export function WorkProposalReview({
                 {cashBlocked(item) && onOpenCash && cashRecordId && (
                   <Button
                     variant="outline"
+                    icon={<Wallet size={15} color={palette.primary} />}
                     onPress={() => onOpenCash(cashRecordId)}
                   >
                     View cash request
@@ -357,7 +377,7 @@ export function WorkProposalReview({
                 )}
                 {cashUnavailable(item) && !cashBlocked(item) && (
                   <>
-                    <Notice>
+                    <Notice tone={cash.loading ? "info" : "warning"}>
                       {cash.loading
                         ? "Checking cash settlement"
                         : "Cash settlement could not be verified."}
@@ -365,6 +385,7 @@ export function WorkProposalReview({
                     {!cash.loading && (
                       <Button
                         variant="outline"
+                        icon={<RefreshCw size={15} color={palette.primary} />}
                         onPress={() => void cash.refresh()}
                       >
                         Check again
@@ -373,6 +394,7 @@ export function WorkProposalReview({
                   </>
                 )}
                 <Button
+                  icon={<Check size={15} color={palette.onPrimary} />}
                   disabled={
                     !!pending ||
                     recovery.loading ||
@@ -390,6 +412,7 @@ export function WorkProposalReview({
                 </Button>
                 <Button
                   variant="outline"
+                  icon={<RotateCcw size={15} color={palette.primary} />}
                   disabled={
                     !!pending ||
                     recovery.loading ||
@@ -412,7 +435,11 @@ export function WorkProposalReview({
             (item.kind === "progress"
               ? facts.data?.canProposeProgress
               : facts.data?.canProposeCompletion) && (
-              <Button variant="outline" onPress={() => setResubmission(item)}>
+              <Button
+                variant="outline"
+                icon={<RotateCcw size={15} color={palette.primary} />}
+                onPress={() => setResubmission(item)}
+              >
                 Resubmit work
               </Button>
             )}
@@ -433,6 +460,13 @@ export function WorkProposalReview({
           footer={
             <Button
               busy={action.busy}
+              icon={
+                selected.approve ? (
+                  <Check size={15} color={palette.onPrimary} />
+                ) : (
+                  <RotateCcw size={15} color={palette.onPrimary} />
+                )
+              }
               disabled={recovery.loading || !!recovery.error}
               onPress={submit}
             >
@@ -497,6 +531,7 @@ export function WorkProposalSheet({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const palette = useTheme();
   const scope = `work-proposal:${root}:${node ?? "task"}:${kind}`;
   const isProgress = kind === "progress";
   const activeBlocker = isProgress ? initialBlocker?.trim() || "" : "";
@@ -673,6 +708,7 @@ export function WorkProposalSheet({
       footer={
         <Button
           busy={action.busy}
+          icon={<Upload size={15} color={palette.onPrimary} />}
           disabled={saved.loading || !!saved.error}
           onPress={submit}
         >
@@ -690,6 +726,7 @@ export function WorkProposalSheet({
       {!!request?.files && !saved.loading && (
         <Button
           variant="outline"
+          icon={<RotateCcw size={15} color={palette.primary} />}
           disabled={action.busy}
           onPress={() =>
             void action.run(async () => {

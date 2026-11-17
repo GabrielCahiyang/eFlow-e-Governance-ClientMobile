@@ -2,16 +2,23 @@ import { parseMessage } from "../../../core/web/app/features/chat-calls/services
 import type { Channel, Message } from "./services";
 
 export type ConversationFilter =
-  "all" | "people" | "groups" | "office" | "archive";
+  | "all"
+  | "unread"
+  | "people"
+  | "groups"
+  | "office"
+  | "archive";
 export const conversationFilters: {
   value: ConversationFilter;
   label: string;
+  description?: string;
 }[] = [
-  { value: "all", label: "All" },
-  { value: "people", label: "People" },
-  { value: "groups", label: "Groups" },
-  { value: "office", label: "Office" },
-  { value: "archive", label: "Archived" },
+  { value: "all", label: "All", description: "All active conversations" },
+  { value: "unread", label: "Unread", description: "Unread conversations only" },
+  { value: "people", label: "People", description: "Direct messages with colleagues" },
+  { value: "groups", label: "Groups", description: "Project and task chats" },
+  { value: "office", label: "Office", description: "Office-wide conversations" },
+  { value: "archive", label: "Archived", description: "Completed projects and tasks" },
 ];
 
 export const quickReactions = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -28,7 +35,7 @@ export function initials(name?: string | null) {
 
 export function conversationGroup(
   kind: string,
-): Exclude<ConversationFilter, "all" | "archive"> {
+): Exclude<ConversationFilter, "all" | "unread" | "archive"> {
   return kind === "direct" ? "people" : kind === "org" ? "office" : "groups";
 }
 
@@ -42,8 +49,10 @@ export function filterConversations(
     (item) =>
       (filter === "archive"
         ? item.archived
-        : !item.archived &&
-          (filter === "all" || conversationGroup(item.kind) === filter)) &&
+        : filter === "unread"
+          ? !item.archived && !!item.unread
+          : !item.archived &&
+            (filter === "all" || conversationGroup(item.kind) === filter)) &&
       (!needle ||
         [
           item.name,

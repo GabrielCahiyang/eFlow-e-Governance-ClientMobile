@@ -1,6 +1,18 @@
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { useEffect, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronUp from "lucide-react-native/icons/chevron-up";
+import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
+import FolderOpen from "lucide-react-native/icons/folder-open";
+import Pencil from "lucide-react-native/icons/pencil";
+import Play from "lucide-react-native/icons/play";
+import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Users from "lucide-react-native/icons/users";
+import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
@@ -15,6 +27,7 @@ import {
   Status,
   Tabs,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { Text } from "../../components/ui/Typography";
 import { useAuth } from "../authentication";
@@ -44,6 +57,7 @@ export function PersonalProjectScreen({
   initialTaskId?: string;
 }) {
   const resolveStatus = useWorkStatus();
+  const palette = useTheme();
   const { profile } = useAuth(),
     workspace = useWorkspace(),
     facts = useFacts("personal-project:" + profile?.id + ":" + id, () =>
@@ -88,13 +102,6 @@ export function PersonalProjectScreen({
   const availablePeople = (data?.members || []).filter(
     (member) => member.state === "active" && member.eligible,
   );
-  const manageFiles = () =>
-    navigate({
-      name: "personal_project",
-      id,
-      view: "file_management",
-      title: "File management",
-    });
   const name = (id: string | null) =>
     data?.members.find((member) => member.user_id === id)?.name || "Unassigned";
   const task = initialTaskId
@@ -163,6 +170,7 @@ export function PersonalProjectScreen({
       actions={
         owner && active && !initialTaskId ? (
           <Button
+            icon={<Plus size={15} color={palette.onPrimary} />}
             disabled={blocked || !availablePeople.length}
             onPress={() => setEditor({ mode: "create" })}
           >
@@ -211,15 +219,27 @@ export function PersonalProjectScreen({
           )}
           {!!action.pending && (
             <Card title="Saved request needs verification">
-              <Button busy={action.busy} onPress={() => void action.retry()}>
+              <Button
+                busy={action.busy}
+                icon={<RefreshCw size={15} color={palette.onPrimary} />}
+                onPress={() => void action.retry()}
+              >
                 Check previous changes
               </Button>
               {!!action.canDiscard && (
-                <Button variant="outline" onPress={() => void action.discard()}>
+                <Button
+                  variant="outline"
+                  icon={<X size={15} color={palette.primary} />}
+                  onPress={() => void action.discard()}
+                >
                   Discard rejected request
                 </Button>
               )}
-              <Button variant="outline" onPress={() => void facts.refresh()}>
+              <Button
+                variant="outline"
+                icon={<RefreshCw size={15} color={palette.primary} />}
+                onPress={() => void facts.refresh()}
+              >
                 Refresh current work
               </Button>
             </Card>
@@ -240,24 +260,31 @@ export function PersonalProjectScreen({
                 </>
               )}
               {browseTasks && !data.tasks.length && (
-                <Empty kind="work" title="No personal tasks yet" />
+                <Empty kind="tasks" title="No personal tasks yet" />
               )}
               {browseTasks &&
                 !!needle &&
                 !!data.tasks.length &&
                 !matchingTasks.length && (
                   <Empty
-                    kind="work"
+                    kind="search"
                     title="No personal tasks match"
                     action={
-                      <Button variant="outline" onPress={() => setSearch("")}>
+                      <Button
+                        variant="outline"
+                        icon={<RotateCcw size={15} color={palette.primary} />}
+                        onPress={() => setSearch("")}
+                      >
                         Clear search
                       </Button>
                     }
                   />
                 )}
               {initialTaskId && !task && (
-                <Empty title="This personal task is no longer available" />
+                <Empty
+                  kind="tasks"
+                  title="This personal task is no longer available"
+                />
               )}
               {task && (
                 <Card key={task.id} title={task.title}>
@@ -292,6 +319,7 @@ export function PersonalProjectScreen({
                       {task.lead_id === profile?.id && task.status === "todo" && (
                         <Button
                           variant="outline"
+                          icon={<Play size={15} color={palette.primary} />}
                           disabled={blocked}
                           busy={action.busy}
                           onPress={() => void (async () => {
@@ -309,6 +337,7 @@ export function PersonalProjectScreen({
                         <>
                           <Button
                             variant="outline"
+                            icon={<Pencil size={15} color={palette.primary} />}
                             disabled={blocked}
                             onPress={() =>
                               setEditor({ mode: "progress", task })
@@ -317,6 +346,7 @@ export function PersonalProjectScreen({
                             Record progress
                           </Button>
                           <Button
+                            icon={<Check size={15} color={palette.onPrimary} />}
                             disabled={blocked}
                             onPress={() => setEditor({ mode: "submit", task })}
                           >
@@ -332,6 +362,12 @@ export function PersonalProjectScreen({
                         task.status === "submitted"
                       ) && (
                         <Button
+                          icon={
+                            <ClipboardCheck
+                              size={15}
+                              color={palette.onPrimary}
+                            />
+                          }
                           disabled={blocked}
                           onPress={() => setEditor({ mode: "review", task })}
                         >
@@ -341,6 +377,7 @@ export function PersonalProjectScreen({
                       {!!(owner && task.status !== "done") && (
                         <Button
                           variant="outline"
+                          icon={<Users size={15} color={palette.primary} />}
                           disabled={blocked}
                           onPress={() => setEditor({ mode: "staff", task })}
                         >
@@ -352,6 +389,7 @@ export function PersonalProjectScreen({
                   <Row>
                     <Button
                       variant="ghost"
+                      icon={<FolderOpen size={15} color={palette.primary} />}
                       onPress={() =>
                         setFileTask(fileTask === task.id ? undefined : task.id)
                       }
@@ -360,6 +398,13 @@ export function PersonalProjectScreen({
                     </Button>
                     <Button
                       variant="ghost"
+                      icon={
+                        expanded.has(task.id) ? (
+                          <ChevronUp size={15} color={palette.primary} />
+                        ) : (
+                          <ChevronDown size={15} color={palette.primary} />
+                        )
+                      }
                       onPress={() =>
                         setExpanded((previous) => {
                           const next = new Set(previous);
@@ -377,7 +422,7 @@ export function PersonalProjectScreen({
                     <ProjectFiles
                       projectId={id}
                       taskId={task.id}
-                      onManage={manageFiles}
+                      embedded
                     />
                   )}
                   {!!expanded.has(task.id) && (
@@ -405,7 +450,11 @@ export function PersonalProjectScreen({
             </>
           )}
           {!!(view === "files") && (
-            <ProjectFiles projectId={id} onManage={manageFiles} />
+            <ProjectFiles
+              projectId={id}
+              contextTitle={data.project.title}
+              eyebrow="Project attachments"
+            />
           )}
           {view === "activity" && (
             <ProjectActivity ids={[id, ...data.tasks.map((t) => t.id)]} />

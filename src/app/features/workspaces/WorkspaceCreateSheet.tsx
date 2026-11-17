@@ -10,6 +10,9 @@ import {
   writeFormDraft,
 } from "../../shared/formDraftMemory";
 import { useEffect, useRef, useState } from "react";
+import ExternalLink from "lucide-react-native/icons/external-link";
+import Plus from "lucide-react-native/icons/plus";
+import { useTheme } from "../../components/ui/Appearance";
 import {
   Button,
   Field,
@@ -43,6 +46,7 @@ export function WorkspaceCreateSheet({
   onClose: () => void;
   onCreated: (id: string) => Promise<void>;
 }) {
+  const palette = useTheme();
   const [loading, setLoading] = useState(true),
     [title, setTitle] = useState(""),
     [error, setError] = useState(""),
@@ -184,6 +188,13 @@ export function WorkspaceCreateSheet({
         <Button
           busy={busy}
           disabled={loading || !ready.current || !title.trim()}
+          icon={
+            pending?.created ? (
+              <ExternalLink size={16} color={palette.onPrimary} />
+            ) : (
+              <Plus size={16} color={palette.onPrimary} />
+            )
+          }
           onPress={() => void save()}
         >
           {pending?.created

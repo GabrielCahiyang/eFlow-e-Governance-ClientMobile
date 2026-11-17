@@ -1,20 +1,31 @@
 import { useState } from "react";
+import { StyleSheet } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
-import { View } from "../../components/ui/Primitives";
+import ChartColumn from "lucide-react-native/icons/chart-column";
+import CircleCheck from "lucide-react-native/icons/circle-check";
+import Download from "lucide-react-native/icons/download";
+import Layers from "lucide-react-native/icons/layers";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Users from "lucide-react-native/icons/users";
+import { ScrollView, View } from "../../components/ui/Primitives";
 import {
+  AllocationBar,
   Button,
   Card,
   Choice,
+  DetailGroup,
   ErrorState,
   LabelValue,
   Loading,
+  MetricPair,
   Notice,
-  Row,
   Screen,
   SearchField,
   Sheet,
 } from "../../components/ui";
+import { FilterChip } from "../../components/ui/FilterChip";
 import { Text } from "../../components/ui/Typography";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAuth } from "../authentication";
 import { useOfficeAnalytics } from "../analytics";
 import { useTaskFacts, myNativeTasks } from "../tasks";
@@ -30,15 +41,30 @@ import type {
   DepartmentReportKind,
   DepartmentReportRow,
 } from "../../../core/web/app/features/reports/types";
-import { generateManagementBrief } from "../../../core/web/app/features/reports/services/managementBriefService";
 import { exportNativeReport } from "./exportReport";
 import { ReportRows } from "./ReportRows";
 import { useWorkspace } from "../workspaces";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
 import { workDay } from "../../../core/web/app/shared/workCalendar";
-import { backendConfig } from "../../../platform/config";
-import { webHandoffUrl } from "../../../platform/webHandoff";
 import { reportRecordRoute } from "./reportRecordRoute";
+
+const REPORT_PILL_LABELS: Record<DepartmentReportKind, string> = {
+  operations: "Operations",
+  projects: "Projects",
+  contributions: "Contributions",
+  reviews: "Reviews",
+  evidence: "Evidence",
+  risks: "Risks",
+  lifecycle: "Lifecycle",
+};
+
+const PERIOD_OPTIONS = [
+  { value: "0", short: "All dates", label: "All time" },
+  { value: "7", short: "Last 7d", label: "Last 7 days" },
+  { value: "30", short: "Last 30d", label: "Last 30 days" },
+  { value: "90", short: "Last 90d", label: "Last 90 days" },
+] as const;
+
 export function ReportsScreen({
   navigate,
   initialView,
@@ -49,13 +75,16 @@ export function ReportsScreen({
   const { profile, organization, can } = useAuth();
   const { selected, loading, error } = useWorkspace();
   const office = selected?.workspace;
+
   if (profile?.role !== "head") return <PersonalReports navigate={navigate} />;
+
   if (!office && loading && !error)
     return (
       <Screen title="Office Analytics">
         <Loading label="Verifying Office access" layout="verification" />
       </Screen>
     );
+
   if (
     error ||
     office?.kind !== "office" ||
@@ -69,6 +98,7 @@ export function ReportsScreen({
         <ErrorState error="Select your appointed Office workspace to view Office reports." />
       </Screen>
     );
+
   return (
     <OfficeReports
       key={office.id + ":" + initialView}
@@ -79,17 +109,18 @@ export function ReportsScreen({
     />
   );
 }
+
 function OfficeReports({
   navigate,
   initialView,
   office,
-  workspaceId,
 }: {
   navigate: Navigate;
   initialView?: string;
   office: string;
   workspaceId: string;
 }) {
+  const palette = useTheme();
   const focused = useIsFocused();
   const firstKind =
     DEPARTMENT_REPORTS.find((report) => report.id === initialView)?.id ??
@@ -97,7 +128,7 @@ function OfficeReports({
   const [includeHistory, setIncludeHistory] = useState(
     () => !["operations", "projects"].includes(firstKind),
   );
-  const { organization, can } = useAuth(),
+  const { organization } = useAuth(),
     analytics = useOfficeAnalytics(true, office, focused, includeHistory),
     action = useAction();
   const [kind, setKind] = useState<DepartmentReportKind>(firstKind),
@@ -106,8 +137,9 @@ function OfficeReports({
     [project, setProject] = useState("all"),
     [status, setStatus] = useState("all"),
     [period, setPeriod] = useState("0"),
-    [brief, setBrief] = useState(""),
-    [briefOpen, setBriefOpen] = useState(false);
+    [filterOpen, setFilterOpen] = useState(false),
+    [exportNotice, setExportNotice] = useState<string>();
+
   const data = analytics.data,
     definition = DEPARTMENT_REPORTS.find((report) => report.id === kind)!;
   const all = data
@@ -132,61 +164,199 @@ function OfficeReports({
           8 * 3600000
         : undefined,
   });
+
+  const peopleCount = new Set(
+    rows.map((row) => row.personId).filter(Boolean),
+  ).size;
+  const projectsCount = new Set(
+    rows.map((row) => row.projectId).filter(Boolean),
+  ).size;
+  const activeFilters =
+    Number(person !== "all") +
+    Number(project !== "all") +
+    Number(status !== "all") +
+    Number(period !== "0");
+  const hasResettableFilters = activeFilters > 0 || query.trim().length > 0;
+
+  const resetFilters = () => {
+    setQuery("");
+    setPerson("all");
+    setProject("all");
+    setStatus("all");
+    setPeriod("0");
+  };
+
   const scope = `${organization?.name || "Assigned Office"} · Authorized Office scope · ${period === "0" ? "All time" : `Last ${period} days`} · Person: ${person === "all" ? "All" : data?.employees.find((p) => p.id === person)?.name || person} · Project: ${project === "all" ? "All" : data?.projects.find((p) => p.id === project)?.title || project} · Status: ${status} · Search: ${query || "None"}`;
+  const noticeTone =
+    kind === "reviews"
+      ? "review"
+      : kind === "risks"
+        ? "warning"
+        : kind === "contributions" || kind === "lifecycle"
+          ? "neutral"
+          : "info";
+
   return (
     <Screen
       title="Office Analytics"
       description={`${organization?.name || "Assigned Office"} · ${period === "0" ? "All dates" : `Last ${period} calendar days`} · Philippine time`}
       onRefresh={() => analytics.refresh()}
-
-      actions={
-        <ExportActions
-          disabled={!rows.length || !!analytics.error || action.busy}
-          run={(format) =>
-            void action.run(() =>
-              exportNativeReport(format, rows, definition.title, scope),
-            )
-          }
-        />
-      }
     >
-      <Choice
-        label="Report"
-        value={kind}
-        searchable={false}
-        onChange={(value) => {
-          setKind(value);
-          if (!["operations", "projects"].includes(value))
-            setIncludeHistory(true);
-          setStatus("all");
-          setBrief("");
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.chipRow}
+      >
+        {DEPARTMENT_REPORTS.map((report) => (
+          <FilterChip
+            key={report.id}
+            label={REPORT_PILL_LABELS[report.id]}
+            accessibilityLabel={report.title}
+            selected={kind === report.id}
+            onPress={() => {
+              setKind(report.id);
+              if (!["operations", "projects"].includes(report.id))
+                setIncludeHistory(true);
+              setStatus("all");
+            }}
+          />
+        ))}
+      </ScrollView>
+
+      <SearchField
+        value={query}
+        onChange={setQuery}
+        placeholder="Search report records…"
+        filterTrigger={{
+          label: "Filters",
+          active: filterOpen || activeFilters > 0,
+          count: activeFilters,
+          accessibilityLabel: activeFilters
+            ? `Filters, ${activeFilters} active`
+            : "Filters",
+          onPress: () => setFilterOpen(true),
         }}
-        options={DEPARTMENT_REPORTS.map((report) => ({
-          value: report.id,
-          label: report.title,
-          description: report.description,
-        }))}
       />
-      <Text>{definition.description}</Text>
-      <Notice>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.chipRow}
+      >
+        {PERIOD_OPTIONS.map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.short}
+            accessibilityLabel={`Period: ${opt.label}`}
+            selected={period === opt.value}
+            onPress={() => setPeriod(opt.value)}
+          />
+        ))}
+        {hasResettableFilters && (
+          <FilterChip
+            label="Reset"
+            tone="tinted"
+            removable
+            accessibilityLabel="Reset report filters"
+            onPress={resetFilters}
+          />
+        )}
+      </ScrollView>
+
+      <Notice tone={noticeTone}>
         {kind === "reviews"
           ? "Review waiting time runs from submission to decision, or to now for pending attempts. It is separate from work execution time."
           : kind === "contributions"
             ? "Lead and contributor roles describe recorded assignments. A submission identifies its author, and approval is a separate event."
             : "Current overdue work uses the recorded due date. Historical timeliness and early completion are unavailable when the deadline in force at the time cannot be verified."}
       </Notice>
-      {can("navigation.projects") && (
-        <Button variant="outline" onPress={() => navigate({ name: "budget" })}>
-          View Office budget and settled expenditure
-        </Button>
+
+      {analytics.error ? (
+        <ErrorState
+          error={analytics.error}
+          retry={() => void analytics.refresh()}
+        />
+      ) : analytics.loading && !data ? (
+        <Loading label="Loading Office analytics" layout="reports" />
+      ) : (
+        <>
+          <Card
+            title={definition.title}
+            icon={<ChartColumn size={16} color={palette.primary} />}
+            badge={period === "0" ? "All time" : `${period}d`}
+            badgeTone={
+              kind === "risks"
+                ? "warning"
+                : kind === "reviews"
+                  ? "review"
+                  : "neutral"
+            }
+          >
+            <Text style={[s.cardSubtitle, { color: palette.muted }]}>
+              {definition.description}
+            </Text>
+            <MetricPair
+              items={[
+                {
+                  label: "Visible records",
+                  value: String(rows.length),
+                  icon: <Layers size={18} color={palette.primary} />,
+                },
+                {
+                  label: "People",
+                  value: String(peopleCount),
+                  tone: "info",
+                  icon: <Users size={18} color={palette.blue} />,
+                },
+              ]}
+            />
+            <DetailGroup>
+              <LabelValue label="Projects" value={String(projectsCount)} />
+              {activeFilters > 0 && (
+                <LabelValue
+                  label="Active filters"
+                  value={`${activeFilters} applied`}
+                  tone="info"
+                />
+              )}
+            </DetailGroup>
+            <ExportActions
+              compact
+              disabled={!rows.length || action.busy}
+              run={(format) => {
+                setExportNotice(undefined);
+                void action.run(async () => {
+                  setExportNotice(
+                    await exportNativeReport(format, rows, definition.title, scope, "save"),
+                  );
+                });
+              }}
+            />
+            {exportNotice && (
+              <Notice tone="success" title="Open your report">
+                {exportNotice}
+              </Notice>
+            )}
+            {!!action.error && <ErrorState context="action" error={action.error} />}
+          </Card>
+
+          <ReportRows
+            key={JSON.stringify([kind, query, person, project, status, period])}
+            rows={rows}
+            navigate={navigate}
+            destination={(row) =>
+              reportRecordRoute(row, data?.facts, data?.attention)
+            }
+          />
+        </>
       )}
-      <SearchField
-        value={query}
-        onChange={setQuery}
-        placeholder="Search report records…"
-      />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-        <View style={{ flexGrow: 1, flexBasis: 180, minWidth: 160 }}>
+
+      <Sheet
+        open={filterOpen}
+        title="Filter records"
+        onClose={() => setFilterOpen(false)}
+      >
+        <View style={s.sheetStack}>
           <Choice
             label="Person"
             value={person}
@@ -199,8 +369,6 @@ function OfficeReports({
               })),
             ]}
           />
-        </View>
-        <View style={{ flexGrow: 1, flexBasis: 180, minWidth: 160 }}>
           <Choice
             label="Project"
             value={project}
@@ -213,8 +381,6 @@ function OfficeReports({
               })),
             ]}
           />
-        </View>
-        <View style={{ flexGrow: 1, flexBasis: 180, minWidth: 160 }}>
           <Choice
             label="Status"
             value={status}
@@ -227,105 +393,45 @@ function OfficeReports({
                 .map((value) => ({ value, label: value })),
             ]}
           />
-        </View>
-        <View style={{ flexGrow: 1, flexBasis: 180, minWidth: 160 }}>
           <Period value={period} onChange={setPeriod} />
-        </View>
-      </View>
-      {analytics.error ? (
-        <ErrorState
-          error={analytics.error}
-          retry={() => void analytics.refresh()}
-        />
-      ) : analytics.loading && !data ? (
-        <Loading />
-      ) : (
-        <>
-          <Card title={definition.title}>
-            <LabelValue label="Visible records" value={String(rows.length)} />
-            <LabelValue
-              label="People"
-              value={String(
-                new Set(rows.map((row) => row.personId).filter(Boolean)).size,
-              )}
-            />
-            <LabelValue
-              label="Projects"
-              value={String(
-                new Set(rows.map((row) => row.projectId).filter(Boolean)).size,
-              )}
-            />
-          </Card>
-          <Row>
+          {hasResettableFilters && (
             <Button
               variant="outline"
-              disabled={!rows.length || action.busy}
+              icon={<RotateCcw size={16} color={palette.primary} />}
               onPress={() => {
-                setBriefOpen(true);
-                setBrief("");
-                void action.run(async () => {
-                  setBrief(
-                    await generateManagementBrief(definition.title, rows),
-                  );
-                });
+                resetFilters();
+                setFilterOpen(false);
               }}
             >
-              Generate management brief
+              Reset all filters
             </Button>
-          </Row>
-          <ReportRows
-            key={JSON.stringify([kind, query, person, project, status, period])}
-            rows={rows}
-            navigate={navigate}
-            destination={(row) =>
-              reportRecordRoute(row, data?.facts, data?.attention)
-            }
-          />
-        </>
-      )}
-      {!!(!!action.error && !briefOpen) && (
-        <ErrorState context="action" error={action.error} />
-      )}
-      <Sheet
-        open={briefOpen}
-        title="Management brief"
-        onClose={() => {
-          if (!action.busy) {
-            action.clear();
-            setBriefOpen(false);
-          }
-        }}
-        busy={action.busy}
-      >
-        <Notice>
-          AI can make mistakes. Verify recommendations against the source
-          records.
-        </Notice>
-        {action.busy ? (
-          <Loading />
-        ) : action.error ? (
-          <ErrorState context="action" error={action.error} />
-        ) : (
-          <Text selectable style={{ lineHeight: 24 }}>
-            {brief}
-          </Text>
-        )}
+          )}
+        </View>
       </Sheet>
+
     </Screen>
   );
 }
+
 function PersonalReports({ navigate }: { navigate: Navigate }) {
+  const palette = useTheme();
   const { profile } = useAuth(),
     facts = useTaskFacts("work-report"),
     action = useAction(),
     [status, setStatus] = useState("all"),
     [period, setPeriod] = useState("30");
+
   const since = Number(period) > 0 ? Date.now() - Number(period) * 86400000 : 0;
   const mine = myNativeTasks(facts.data || [], profile?.id || "").filter(
     (task) =>
       (status === "all" || task.status === status) &&
       (!since || task.createdAt >= since || task.updatedAt >= since),
   );
+  const completedCount = mine.filter((t) => t.status === "completed").length;
+  const completionRate = mine.length
+    ? Math.round((completedCount / mine.length) * 100)
+    : 0;
+
   const rows: DepartmentReportRow[] = mine.map((task) => {
     const due = taskCalendarDate(task.deadline || task.dueDate);
     return {
@@ -348,55 +454,92 @@ function PersonalReports({ navigate }: { navigate: Navigate }) {
       taskId: task.id,
     };
   });
+
   const title = `My work report — ${profile?.full_name || "Me"}`,
     scope = `Personal report · Status: ${status} · ${period === "0" ? "All time" : `Last ${period} days`}`;
+
   return (
     <Screen
       title="My Work Report"
       description="A personal summary of authorized tasks and progress."
       onRefresh={() => facts.refresh()}
-
-      actions={
-        <ExportActions
-          disabled={!rows.length || !!facts.error || action.busy}
-          run={(format) =>
-            void action.run(() =>
-              exportNativeReport(format, rows, title, scope),
-            )
-          }
-        />
-      }
     >
-      <Choice
-        label="Work report status"
-        value={status}
-        searchable={false}
-        onChange={setStatus}
-        options={[
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.chipRow}
+      >
+        {[
           { value: "all", label: "All statuses" },
           { value: "in_progress", label: "In progress" },
           { value: "for_review", label: "In review" },
           { value: "completed", label: "Completed" },
-        ]}
-      />
-      <Period value={period} onChange={setPeriod} />
+        ].map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.label}
+            selected={status === opt.value}
+            onPress={() => setStatus(opt.value)}
+          />
+        ))}
+      </ScrollView>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.chipRow}
+      >
+        {PERIOD_OPTIONS.map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.short}
+            accessibilityLabel={`Period: ${opt.label}`}
+            selected={period === opt.value}
+            onPress={() => setPeriod(opt.value)}
+          />
+        ))}
+      </ScrollView>
+
       {facts.error ? (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       ) : facts.loading && !facts.data ? (
-        <Loading />
+        <Loading label="Loading work report" layout="reports" />
       ) : (
         <>
-          <Card title="Work summary">
-            <LabelValue label="Tasks" value={String(rows.length)} />
-            <LabelValue
-              label="Completed"
-              value={String(
-                mine.filter((t) => t.status === "completed").length,
-              )}
+          <Card
+            title="Work summary"
+            icon={<ChartColumn size={16} color={palette.primary} />}
+            badge={period === "0" ? "All time" : `${period}d`}
+          >
+            <MetricPair
+              items={[
+                {
+                  label: "Tasks",
+                  value: String(rows.length),
+                  icon: <Layers size={18} color={palette.primary} />,
+                },
+                {
+                  label: "Completed",
+                  value: String(completedCount),
+                  tone: "success",
+                  icon: <CircleCheck size={18} color={palette.success} />,
+                },
+              ]}
             />
-            <LabelValue
+            <AllocationBar
               label="Completion rate"
-              value={`${rows.length ? Math.round((mine.filter((t) => t.status === "completed").length / rows.length) * 100) : 0}%`}
+              summary={`${completionRate}% · ${completedCount} of ${rows.length}`}
+              percent={completionRate}
+              tone="success"
+            />
+            <ExportActions
+              compact
+              disabled={!rows.length || !!facts.error || action.busy}
+              run={(format) =>
+                void action.run(() =>
+                  exportNativeReport(format, rows, title, scope),
+                )
+              }
             />
           </Card>
           <ReportRows rows={rows} navigate={navigate} />
@@ -406,6 +549,7 @@ function PersonalReports({ navigate }: { navigate: Navigate }) {
     </Screen>
   );
 }
+
 function Period({
   value,
   onChange,
@@ -419,30 +563,65 @@ function Period({
       value={value}
       searchable={false}
       onChange={onChange}
-      options={[
-        { value: "7", label: "Last 7 days" },
-        { value: "30", label: "Last 30 days" },
-        { value: "90", label: "Last 90 days" },
-        { value: "0", label: "All time" },
-      ]}
+      options={PERIOD_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label: opt.label,
+      }))}
     />
   );
 }
+
 function ExportActions({
   disabled,
+  compact = false,
   run,
 }: {
   disabled: boolean;
+  compact?: boolean;
   run: (format: "csv" | "pdf") => void;
 }) {
+  const palette = useTheme();
+  const iconSize = compact ? 12 : 16;
   return (
-    <Row>
-      <Button variant="outline" disabled={disabled} onPress={() => run("csv")}>
+    <View style={s.exportRow}>
+      <Button
+        variant="outline"
+        compact={compact}
+        disabled={disabled}
+        icon={<Download size={iconSize} color={palette.primary} />}
+        onPress={() => run("csv")}
+      >
         Export CSV
       </Button>
-      <Button variant="outline" disabled={disabled} onPress={() => run("pdf")}>
+      <Button
+        variant="outline"
+        compact={compact}
+        disabled={disabled}
+        icon={<Download size={iconSize} color={palette.primary} />}
+        onPress={() => run("pdf")}
+      >
         Export PDF
       </Button>
-    </Row>
+    </View>
   );
 }
+
+const s = StyleSheet.create({
+  chipRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingVertical: 2,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  exportRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  sheetStack: {
+    gap: 14,
+  },
+});

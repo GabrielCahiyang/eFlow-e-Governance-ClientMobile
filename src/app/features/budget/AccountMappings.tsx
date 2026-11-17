@@ -1,3 +1,4 @@
+import Check from "lucide-react-native/icons/check";
 import {
   Button,
   Card,
@@ -6,6 +7,7 @@ import {
   Loading,
   Notice,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useState } from "react";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
@@ -21,7 +23,8 @@ export function AccountMappings({
   data: DepartmentBudgetBundle;
   onSaved: () => Promise<void>;
 }) {
-  const { profile, can } = useAuth(),
+  const palette = useTheme(),
+    { profile, can } = useAuth(),
     accounts = useFacts("expense-account-catalog", fetchAccountingAccounts),
     [changes, setChanges] = useState<Record<string, string>>({}),
     command = useFinancialCommand(profile?.id || "", "account-mapping");
@@ -59,6 +62,7 @@ export function AccountMappings({
             {!!(!!changes[section.id] && can("accounting.post_journal")) && (
               <Button
                 busy={command.busy}
+                icon={<Check size={15} color={palette.onPrimary} />}
                 onPress={() =>
                   void command.run(
                     `${section.id}:${changes[section.id]}:${data.sectionsVersion}`,

@@ -1,4 +1,8 @@
 import { useRef, useState } from "react";
+import Check from "lucide-react-native/icons/check";
+import Plus from "lucide-react-native/icons/plus";
+import Upload from "lucide-react-native/icons/upload";
+import X from "lucide-react-native/icons/x";
 import { recordedPeso } from "../../components/ui/theme";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { File as NativeFile } from "expo-file-system";
@@ -15,6 +19,7 @@ import {
   Sheet,
   peso,
 } from "../../components/ui";
+import { useTheme } from "../../components/ui/Appearance";
 import { useAccountActionAccess } from "../../shared/AccountActionAccess";
 import { useFacts } from "../../shared/useFacts";
 import { liquidationInputError } from "../../../core/web/app/features/budget/validation/financialValidation";
@@ -62,7 +67,8 @@ export function LiquidationSheet({
   readOnly: boolean;
   onSaved: () => Promise<void>;
 }) {
-  const { profile } = useAuth(),
+  const palette = useTheme(),
+    { profile } = useAuth(),
     { toast } = useToast(),
     action = useAction();
   const assertAccess = useAccountActionAccess();
@@ -296,6 +302,13 @@ export function LiquidationSheet({
           />
           <Button
             busy={action.busy}
+            icon={
+              confirmed ? (
+                <X size={15} color={palette.onPrimary} />
+              ) : (
+                <Check size={15} color={palette.onPrimary} />
+              )
+            }
             disabled={
               !confirmed &&
               (readOnly ||
@@ -429,6 +442,7 @@ export function LiquidationSheet({
                     <Button
                       variant="ghost"
                       disabled={!editable}
+                      icon={<X size={15} color={palette.primary} />}
                       onPress={() => {
                         const items = receipt.items!.filter(
                           (i) => i.id !== item.id,
@@ -469,6 +483,7 @@ export function LiquidationSheet({
                 <Button
                   variant="outline"
                   disabled={!editable}
+                  icon={<Plus size={15} color={palette.primary} />}
                   onPress={() =>
                     change(receipt.id, {
                       items: [
@@ -512,6 +527,7 @@ export function LiquidationSheet({
               <Button
                 variant="outline"
                 disabled={!editable}
+                icon={<Upload size={15} color={palette.primary} />}
                 onPress={() =>
                   void action.run(async () => {
                     const [file] = await chooseFiles([
@@ -531,6 +547,7 @@ export function LiquidationSheet({
               <Button
                 variant="ghost"
                 disabled={!editable || receipts.length === 1}
+                icon={<X size={15} color={palette.primary} />}
                 onPress={() => {
                   updateDraft((old) => ({
                     ...old,
@@ -546,6 +563,7 @@ export function LiquidationSheet({
           <Button
             variant="outline"
             disabled={!editable}
+            icon={<Plus size={15} color={palette.primary} />}
             onPress={() => {
               const receipt = blank();
               updateDraft((old) => ({

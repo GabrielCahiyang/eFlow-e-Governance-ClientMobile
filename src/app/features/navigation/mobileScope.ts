@@ -24,6 +24,7 @@ export const tabLabels: Record<PrimaryTab, string> = {
   work: "My Work",
   inbox: "Inbox",
   accounting: "Accounting",
+  petty_cash: "Petty cash",
   projects: "Projects",
   more: "More",
 };
@@ -33,15 +34,22 @@ export const tabRoots: Record<PrimaryTab, RouteName> = {
   work: "personal_work",
   inbox: "inbox",
   accounting: "accounting_overview",
+  petty_cash: "financial_reviews",
   projects: "projects",
   more: "profile",
 };
 export const defaultTab = (): PrimaryTab => "home";
-/** Root route of a tab's stack (Reviews is the Inbox decisions view). */
+/** Root route of a tab's stack (Reviews is Inbox decisions; Petty cash is Office petty cash). */
 export const tabRootRoute = (tab: PrimaryTab): AppRoute =>
   tab === "reviews"
     ? { name: "inbox", view: "decisions", title: "Reviews" }
-    : { name: tabRoots[tab] };
+    : tab === "petty_cash"
+      ? {
+          name: "financial_reviews",
+          recordType: "office_petty_cash",
+          title: "Office petty cash",
+        }
+      : { name: tabRoots[tab] };
 export const webOnly: Partial<Record<RouteName, string>> = {
   identity: "Head Office identity and access",
   intelligence: "Team intelligence",
@@ -118,6 +126,10 @@ export function resolveMobileRoute(
   }
   if (route.name === "accounting_budgets" && !route.view)
     route.name = "accounting_overview";
+  const isPettyCashRoute =
+    route.name === "financial_reviews" &&
+    (route.recordType === "office_petty_cash" ||
+      (route.recordType === "office_petty_cash_staffing" && role === "head"));
   let tab: PrimaryTab =
     input.originTab ||
     origin ||
@@ -128,9 +140,7 @@ export function resolveMobileRoute(
       : route.name === "task"
         ? "work"
         : route.name === "overview"
-          ? role === "accounting_staff"
-            ? "accounting"
-            : "home"
+          ? "home"
           : [
                 "personal_work",
                 "subtasks",
@@ -141,14 +151,21 @@ export function resolveMobileRoute(
             ? "work"
             : route.name === "inbox" && route.view === "decisions"
               ? "reviews"
-              : route.name === "inbox" || route.name === "financial_reviews"
-                ? "inbox"
-              : route.name.startsWith("accounting_")
-                ? "accounting"
-                : "more");
+              : isPettyCashRoute
+                ? "more"
+                : route.name === "inbox" || route.name === "financial_reviews"
+                  ? "inbox"
+                  : route.name.startsWith("accounting_")
+                    ? role === "accounting_staff"
+                      ? "accounting"
+                      : "more"
+                    : "more");
   if (!primaryTabs(role).includes(tab))
     tab =
-      tab === "projects" && role === "accounting_staff" ? "more" : defaultTab();
+      (tab === "projects" || tab === "accounting" || tab === "petty_cash") &&
+      role === "accounting_staff"
+        ? "more"
+        : defaultTab();
   const title =
     webOnly[route.name] ||
     route.title ||
