@@ -1,6 +1,8 @@
 import {
   cloneElement,
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -16,6 +18,7 @@ import {
 import LottieView from "lottie-react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  type SharedValue,
   useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -51,6 +54,13 @@ export const RefreshSectionList = Animated.createAnimatedComponent(
 export const RefreshFlatList = Animated.createAnimatedComponent(
   FlatList,
 ) as unknown as typeof FlatList;
+
+/**
+ * Vertical scroll offset (0 at the top) of the nearest pull-to-refresh
+ * screen, for headers that react to scrolling.
+ */
+const ScrollOffsetContext = createContext<SharedValue<number> | null>(null);
+export const useScrollOffset = () => useContext(ScrollOffsetContext);
 
 export function FolderPullArea({
   pull: { refresh, refreshing },
@@ -157,6 +167,7 @@ export function FolderPullArea({
   );
 
   return (
+    <ScrollOffsetContext.Provider value={scrollY}>
     <GestureDetector gesture={pan} touchAction="pan-y">
       <View style={styles.viewport}>
         <Animated.View pointerEvents="none" style={[styles.slot, slotStyle]}>
@@ -173,6 +184,7 @@ export function FolderPullArea({
         </Animated.View>
       </View>
     </GestureDetector>
+    </ScrollOffsetContext.Provider>
   );
 }
 

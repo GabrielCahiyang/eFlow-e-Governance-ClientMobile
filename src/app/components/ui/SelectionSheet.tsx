@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { AccessibilityInfo, ScrollView, View } from "react-native";
+import { AccessibilityInfo, Platform, ScrollView, View } from "react-native";
 import { Host, BottomSheet, RNHostView } from "@expo/ui";
 import { useAppearance, useTheme } from "./Appearance";
 import { Text } from "./Typography";
@@ -37,7 +37,11 @@ export function SelectionSheet({
     <Host
       colorScheme={isDark ? "dark" : "light"}
       seedColor={palette.primary}
-      pointerEvents="none"
+      // Native sheets present in their own window, so the host must let
+      // touches through. On web the sheet renders inside the host; "none"
+      // would make every option unclickable, so only the host box ignores
+      // pointer events there.
+      pointerEvents={Platform.OS === "web" ? "box-none" : "none"}
       style={{ position: "absolute" }}
     >
       <BottomSheet

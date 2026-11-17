@@ -14,10 +14,13 @@ export const primaryTabs = (role: string): PrimaryTab[] =>
   !isMobileRole(role)
     ? []
     : role === "accounting_staff"
-      ? ["home", "work", "accounting", "inbox", "more"]
-      : ["home", "work", "projects", "inbox", "more"];
+      ? ["home", "reviews", "work", "accounting", "inbox", "more"]
+      : ["home", "reviews", "work", "projects", "inbox", "more"];
+/** Tabs that keep a navigation stack but are reached from elsewhere, not the bar. */
+export const hiddenBarTabs: readonly PrimaryTab[] = ["inbox"];
 export const tabLabels: Record<PrimaryTab, string> = {
   home: "Home",
+  reviews: "Reviews",
   work: "My Work",
   inbox: "Inbox",
   accounting: "Accounting",
@@ -26,6 +29,7 @@ export const tabLabels: Record<PrimaryTab, string> = {
 };
 export const tabRoots: Record<PrimaryTab, RouteName> = {
   home: "overview",
+  reviews: "inbox",
   work: "personal_work",
   inbox: "inbox",
   accounting: "accounting_overview",
@@ -33,6 +37,11 @@ export const tabRoots: Record<PrimaryTab, RouteName> = {
   more: "profile",
 };
 export const defaultTab = (): PrimaryTab => "home";
+/** Root route of a tab's stack (Reviews is the Inbox decisions view). */
+export const tabRootRoute = (tab: PrimaryTab): AppRoute =>
+  tab === "reviews"
+    ? { name: "inbox", view: "decisions", title: "Reviews" }
+    : { name: tabRoots[tab] };
 export const webOnly: Partial<Record<RouteName, string>> = {
   identity: "Head Office identity and access",
   intelligence: "Team intelligence",
@@ -130,8 +139,10 @@ export function resolveMobileRoute(
                 "tasks",
               ].includes(route.name)
             ? "work"
-            : route.name === "inbox" || route.name === "financial_reviews"
-              ? "inbox"
+            : route.name === "inbox" && route.view === "decisions"
+              ? "reviews"
+              : route.name === "inbox" || route.name === "financial_reviews"
+                ? "inbox"
               : route.name.startsWith("accounting_")
                 ? "accounting"
                 : "more");

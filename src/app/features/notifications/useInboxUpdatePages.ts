@@ -3,11 +3,14 @@ import { authoritativeReadEpoch } from "../../shared/displayCache";
 import { readWithTimeout } from "../../shared/readTimeout";
 import { useFacts } from "../../shared/useFacts";
 import { fetchInboxUpdatePage, type InboxUpdatePage } from "./inboxUpdates";
+import type { InboxFilters } from "./inboxUpdates";
 
 type History = InboxUpdatePage & {
   head: InboxUpdatePage;
   epoch: number;
   actor: string;
+  /** Filter the loaded pages belong to; history never crosses filters. */
+  scope: string;
 };
 const cursorKey = (page?: InboxUpdatePage) => page?.next?.id;
 
@@ -16,12 +19,14 @@ function rebase(
   head: InboxUpdatePage | undefined,
   epoch: number,
   actor: string,
+  scope: string,
 ) {
   if (
     !history ||
     !head?.next ||
     history.epoch !== epoch ||
-    history.actor !== actor
+    history.actor !== actor ||
+    history.scope !== scope
   )
     return;
   if (history.head === head) return history;
@@ -40,10 +45,23 @@ export function useInboxUpdatePages(
   actor: string,
   unread: boolean,
   enabled: boolean,
+  filters: InboxFilters = {},
 ) {
+  const category = filters.category ?? "all";
+  const search = filters.search ?? "";
+  const readOnly = !unread && !!filters.readOnly;
+  const scope = JSON.stringify([unread, readOnly, category, search]);
   const first = useFacts(
-    `inbox-update-page:${actor}:${unread}`,
-    () => fetchInboxUpdatePage(actor, unread),
+    `inbox-update-page:${actor}:${unread}` +
+      (category === "all" && !search && !readOnly
+        ? ""
+        : `:${readOnly ? "read" : ""}:${category}:${search}`),
+    () =>
+      fetchInboxUpdatePage(actor, unread, undefined, undefined, {
+        category,
+        search,
+        ...(readOnly && { readOnly }),
+      }),
     !!actor && enabled,
     { actor, select: (page) => page },
   );
@@ -54,10 +72,10 @@ export function useInboxUpdatePages(
     loading: boolean;
     error?: Error;
   }>();
-  const tail = rebase(history, first.data, epoch, actor);
+  const tail = rebase(history, first.data, epoch, actor, scope);
   const page = tail ?? first.data;
-  const current = useRef({ actor, enabled, head: first.data, page });
-  current.current = { actor, enabled, head: first.data, page };
+  const current = useRef({ actor, enabled, scope, head: first.data, page });
+  current.current = { actor, enabled, scope, head: first.data, page };
   const request = useRef<{
     cursor: string;
     controller: AbortController;
@@ -65,8 +83,10 @@ export function useInboxUpdatePages(
   }>(undefined);
 
   useEffect(() => {
-    setHistory((previous) => rebase(previous, first.data, epoch, actor));
-  }, [first.data, epoch, actor]);
+    setHistory((previous) =>
+      rebase(previous, first.data, epoch, actor, scope),
+    );
+  }, [first.data, epoch, actor, scope]);
 
   function discardHistory() {
     request.current?.controller.abort();
@@ -81,11 +101,16 @@ export function useInboxUpdatePages(
       request.current?.controller.abort();
       request.current = undefined;
     };
-  }, [actor, enabled, epoch, cursorKey(page)]);
+  }, [actor, enabled, scope, epoch, cursorKey(page)]);
 
   async function loadMore(retry = false) {
     const before = current.current.page?.next;
-    if (!current.current.enabled || current.current.actor !== actor || !before)
+    if (
+      !current.current.enabled ||
+      current.current.actor !== actor ||
+      current.current.scope !== scope ||
+      !before
+    )
       return;
     if (
       request.current?.cursor === before.id &&
@@ -102,10 +127,17 @@ export function useInboxUpdatePages(
     const stillCurrent = () =>
       request.current === loading &&
       epoch === authoritativeReadEpoch() &&
+      current.current.scope === scope &&
       cursorKey(current.current.page) === before.id;
     try {
       const older = await readWithTimeout(() =>
-        fetchInboxUpdatePage(actor, unread, before, loading.controller.signal),
+        fetchInboxUpdatePage(
+          actor,
+          unread,
+          before,
+          loading.controller.signal,
+          { category, search, ...(readOnly && { readOnly }) },
+        ),
       );
       const { head, page: visible } = current.current;
       if (!stillCurrent() || !head || !visible) return;
@@ -115,6 +147,7 @@ export function useInboxUpdatePages(
         head,
         epoch,
         actor,
+        scope,
         items: [
           ...visible.items,
           ...older.items.filter((item) => !existing.has(item.id)),

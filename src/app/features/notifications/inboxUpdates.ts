@@ -3,6 +3,18 @@ import {
   rowToNotif,
   type Notification,
 } from "../../../core/web/app/services/notificationService";
+import {
+  applyInboxCategory,
+  inboxSearchFilter,
+  type InboxCategory,
+} from "./inboxCategories";
+
+export type InboxFilters = {
+  category?: InboxCategory;
+  search?: string;
+  /** Only updates already read. Ignored when `unread` is requested. */
+  readOnly?: boolean;
+};
 
 export type InboxNotification = Notification & {
   conversationId?: string;
@@ -25,17 +37,25 @@ export function readInboxNotification(
 
 type Cursor = { createdAt: string; id: string };
 export type InboxUpdatePage = { items: InboxNotification[]; next?: Cursor };
-const pageSize = 50;
+// Small first page; older updates load only when the user taps "View more".
+export const inboxPageSize = 20;
+const pageSize = inboxPageSize;
 
 export async function fetchInboxUpdatePage(
   actor: string,
   unread: boolean,
   before?: Cursor,
   signal?: AbortSignal,
+  filters: InboxFilters = {},
 ): Promise<InboxUpdatePage> {
   if (!actor) return { items: [] };
   const query = supabase.from("notifications").select("*").eq("user_id", actor);
   if (unread) query.eq("read", false);
+  else if (filters.readOnly) query.eq("read", true);
+  // Filter on the server so each 50-row page is complete for the view.
+  applyInboxCategory(query, filters.category ?? "all");
+  const search = inboxSearchFilter(filters.search ?? "");
+  if (search) query.or(search);
   if (signal) query.abortSignal(signal);
   if (before) {
     query.or(
@@ -63,4 +83,23 @@ export async function fetchInboxUpdatePage(
   )
     throw new Error("Could not continue loading updates.");
   return { items, next: { createdAt, id } };
+}
+
+/**
+ * Mark every unread update of the actor read. Same recipient-scoped write as
+ * eFlow Web, but the result is confirmed: a failed or unverified write is
+ * reported instead of being shown as success.
+ */
+export async function markAllInboxUpdatesRead(actor: string): Promise<number> {
+  if (!actor) throw new Error("A signed-in recipient is required.");
+  const { data, error } = await supabase
+    .from("notifications")
+    .update({ read: true })
+    .eq("user_id", actor)
+    .eq("read", false)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!Array.isArray(data))
+    throw new Error("Could not confirm that your updates were marked read.");
+  return data.length;
 }

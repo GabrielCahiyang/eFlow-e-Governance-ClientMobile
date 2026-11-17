@@ -3,6 +3,8 @@ import type { PrimaryTab } from "../../shared/routes";
 
 // Solid companions to the outline navigation icons, with transparent details.
 const glyphs: Record<PrimaryTab, string> = {
+  reviews:
+    "M9 2h6a1 1 0 0 1 1 1v1h2.5A1.5 1.5 0 0 1 20 5.5v15a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20.5v-15A1.5 1.5 0 0 1 5.5 4H8V3a1 1 0 0 1 1-1zm6.3 8.3-4.3 4.3-2.3-2.3-1.4 1.4 3.7 3.7 5.7-5.7z",
   home: "M2.5 10a2.5 2.5 0 0 1 .9-1.9l7-5.9a2.5 2.5 0 0 1 3.2 0l7 5.9a2.5 2.5 0 0 1 .9 1.9v9a2.5 2.5 0 0 1-2.5 2.5H5A2.5 2.5 0 0 1 2.5 19zM12 12.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
   work: "M7 2a1 1 0 0 1 1 1v2h8V3a1 1 0 1 1 2 0v2h1a2.5 2.5 0 0 1 2.5 2.5v12A2.5 2.5 0 0 1 19 22H5a2.5 2.5 0 0 1-2.5-2.5v-12A2.5 2.5 0 0 1 5 5h1V3a1 1 0 0 1 1-1zm2 10.5-1.4 1.4 3.2 3.2 5.7-5.7-1.4-1.4-4.3 4.3z",
   projects:

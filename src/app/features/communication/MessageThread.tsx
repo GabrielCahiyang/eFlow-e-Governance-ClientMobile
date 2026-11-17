@@ -893,7 +893,7 @@ export function Composer({
             style={{
               fontSize: 15,
               color: palette.text,
-              fontFamily: "Figtree_400Regular",
+              fontFamily: "HostGrotesk_400Regular",
               paddingVertical: 10,
               maxHeight: 128,
             }}

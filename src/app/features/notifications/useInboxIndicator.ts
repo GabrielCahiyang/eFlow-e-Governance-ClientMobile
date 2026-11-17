@@ -6,23 +6,24 @@ import { createLiveRefreshController } from "../../shared/liveUpdates";
 import { createPostgresChannel } from "../../shared/postgresChannel";
 import { useToast } from "../../components/ui/Toast";
 import { useFacts } from "../../shared/useFacts";
+import {
+  fetchInboxUnreadCounts,
+  type InboxCountsState,
+} from "./useInboxCounts";
 
 export const inboxReadEvent = "eflow:inbox-read";
 
-export function useInboxIndicator(actor?: string) {
+/**
+ * The single live source of unread Inbox counts: one small query, refreshed
+ * by realtime (bursts coalesced) and by local read events.
+ */
+export function useInboxIndicator(
+  actor?: string,
+): InboxCountsState & { unread: number } {
   const { toast } = useToast();
-  const { data, error, refresh } = useFacts(
-    "mobile-inbox-unread:" + actor,
-    async () => {
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("id")
-        .eq("user_id", actor!)
-        .eq("read", false)
-        .limit(1);
-      if (error) throw error;
-      return data.length > 0;
-    },
+  const { data, error, refresh, refreshIfStale } = useFacts(
+    "mobile-inbox-unread-counts:" + actor,
+    () => fetchInboxUnreadCounts(actor!),
     !!actor,
   );
   useEffect(() => {
@@ -30,6 +31,9 @@ export function useInboxIndicator(actor?: string) {
     const sync = () => void refresh();
     const live = createLiveRefreshController({
       onRefresh: sync,
+      // Several notifications often arrive together; count once per burst.
+      debounceMs: 500,
+      maxWaitMs: 3_000,
       hasRealtime: true,
     });
     const channel = createPostgresChannel("mobile-inbox-indicator:" + actor)
@@ -58,7 +62,7 @@ export function useInboxIndicator(actor?: string) {
               type: "info",
               icon: "bell",
             });
-          sync();
+          live.schedule();
         },
       )
       .subscribe(live.onChannelStatus);
@@ -69,5 +73,10 @@ export function useInboxIndicator(actor?: string) {
       void supabase.removeChannel(channel);
     };
   }, [actor, refresh, toast]);
-  return !!actor && !error && data === true;
+  return {
+    data: actor && !error ? data : undefined,
+    refresh,
+    refreshIfStale,
+    unread: actor && !error ? (data?.all ?? 0) : 0,
+  };
 }

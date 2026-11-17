@@ -41,7 +41,13 @@ export type RouteName =
   | "activation"
   | "personal_project";
 export type PrimaryTab =
-  "home" | "work" | "inbox" | "accounting" | "projects" | "more";
+  | "home"
+  | "reviews"
+  | "work"
+  | "inbox"
+  | "accounting"
+  | "projects"
+  | "more";
 export interface AppRoute {
   name: RouteName;
   id?: string;

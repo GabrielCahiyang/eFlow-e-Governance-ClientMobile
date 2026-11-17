@@ -1,16 +1,15 @@
 import AlertCircle from "lucide-react-native/icons/circle-alert";
 import ArrowRight from "lucide-react-native/icons/arrow-right";
-import ArrowUpRight from "lucide-react-native/icons/arrow-up-right";
 import Banknote from "lucide-react-native/icons/banknote";
 import Bell from "lucide-react-native/icons/bell";
 import Calendar from "lucide-react-native/icons/calendar";
-import ChartBar from "lucide-react-native/icons/chart-bar";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
+import ChartColumn from "lucide-react-native/icons/chart-column";
+import PiggyBank from "lucide-react-native/icons/piggy-bank";
 import CircleCheck from "lucide-react-native/icons/circle-check-big";
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
-import Clock from "lucide-react-native/icons/clock";
 import { useEffect } from "react";
-import { Pressable, View, useWindowDimensions } from "react-native";
+import { Pressable, View } from "react-native";
 import {
   Button,
   EditorialMetadataStrip,
@@ -20,7 +19,7 @@ import {
 } from "../../components/ui";
 import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
-import { radius, space } from "../../components/ui/theme";
+import { space } from "../../components/ui/theme";
 import { completionPercent } from "../../shared/completion";
 import { useFacts } from "../../shared/useFacts";
 import type { AppRoute, Navigate } from "../../shared/routes";
@@ -34,12 +33,19 @@ import { workDestination } from "../personal-work/workDestination";
 import { canUserReviewTask } from "../../../core/web/app/features/reviews/selectors";
 import { isAppointedOfficeHead } from "../../../core/web/app/shared/officeAuthority";
 import { getCurrentFiscalYear } from "../../../core/web/app/features/budget/constants";
-import { HomeLink, HomeMessage, HomeSection } from "./HomeSections";
+import {
+  HomeCard,
+  HomeMessage,
+  HomeRow,
+  HomeSection,
+} from "./HomeSections";
 import { AccountingHome } from "./AccountingHome";
 import { CircularProgressRing } from "../tasks/TaskBentoComponents";
 import { currentOfficeProjects, memberHome, officeHomeWork } from "./homeWork";
 import { assignedFinanceReviews, headCashDecisions } from "./homeFinance";
 import { fetchInboxUpdatePage } from "../notifications/inboxUpdates";
+import { HomeBody, HomeHero, HomeHeroStats } from "./HomeHero";
+import { HeadTodayCard } from "./HeadTodayCard";
 import { inboxUpdateRoute } from "../notifications/inboxDestinations";
 import type { Notification } from "../../../core/web/app/services/notificationService";
 
@@ -232,46 +238,84 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
   };
   const palette = useTheme();
   return (
-    <Screen compact onRefresh={refresh} style={{ gap: 0 }}>
+    <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
+      <HomeHero
+        navigate={navigate}
+        subtitle={scope?.workspace.name}
+        actions={[
+          ...(scope && showAnalytics
+            ? [
+                {
+                  key: "analytics",
+                  label: "Office Analytics",
+                  Icon: ChartColumn,
+                  onPress: () => navigate({ name: "reports" }),
+                },
+              ]
+            : []),
+          ...(scope && showProjects
+            ? [
+                {
+                  key: "budget",
+                  label: "Office Budget",
+                  Icon: PiggyBank,
+                  onPress: () => navigate({ name: "budget" }),
+                },
+              ]
+            : []),
+        ]}
+      >
+        {!!scope && (
+          <HomeHeroStats
+            stats={[
+              {
+                key: "projects",
+                label: "Current projects",
+                value: currentProjects.length,
+                onPress: showProjects
+                  ? () => navigate({ name: "projects" })
+                  : undefined,
+                accessibilityLabel: `${currentProjects.length} current project${currentProjects.length === 1 ? "" : "s"}`,
+              },
+              {
+                key: "decisions",
+                label: "Decisions",
+                value: attention.length,
+                accessibilityLabel: `${attention.length} decision${attention.length === 1 ? "" : "s"} awaiting your action`,
+              },
+              {
+                key: "risk",
+                label: "At risk",
+                value: signals.overdueOrBlocked,
+                onPress: showAnalytics
+                  ? () => navigate({ name: "reports", view: "risks" })
+                  : undefined,
+                accessibilityLabel: `${signals.overdueOrBlocked} work item${signals.overdueOrBlocked === 1 ? "" : "s"} at risk`,
+              },
+            ]}
+          />
+        )}
+      </HomeHero>
+      <HomeBody gap={0}>
       {workspace.error ? (
         <ErrorState error={workspace.error} retry={() => void refresh()} />
       ) : !scope && workspace.loading ? (
         <Loading label="Loading Office overview" layout="summary" />
       ) : !scope ? (
-        <HomeMessage>
-          Switch to an Office workspace to see Office work.
-        </HomeMessage>
+        <HomeMessage>Office work isn't available right now.</HomeMessage>
       ) : (
         <>
-          <OfficeCommandOverview
-            officeName={scope.workspace.name}
-            projectCount={currentProjects.length}
+          <HeadTodayCard
             attentionCount={attention.length}
-            atRiskCount={signals.overdueOrBlocked}
-            onPressRisks={
-              showAnalytics
-                ? () => navigate({ name: "reports", view: "risks" })
-                : undefined
-            }
-          />
-
-          <HeadBentoCard
-            title="Needs Your Decision"
-            badge={attention.length ? String(attention.length) : undefined}
-            badgeTone={
-              attention.some((row) => classifyAttentionRow(row).kind === "action")
-                ? "danger"
-                : "default"
-            }
-          >
-            {attention.map((row, index) => (
-              <HeadAttentionCardItem
+            decisions={attention.map((row, index) => (
+              <DecisionCard
                 key={row.key}
                 row={row}
                 isFirst={index === 0}
                 navigate={navigate}
               />
             ))}
+          >
             {!attention.length &&
               (waiting ? (
                 <Loading
@@ -320,101 +364,72 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                 retry={() => void refresh()}
               />
             )}
-          </HeadBentoCard>
+          </HeadTodayCard>
 
           {showProjects && (
-            <>
-              {signals.riskItems && signals.riskItems.length > 0 && (
-                <HeadBentoCard
-                  title="Office Risks"
-                  badge={String(signals.overdueOrBlocked)}
-                  onAction={
-                    showAnalytics
-                      ? () => navigate({ name: "reports", view: "risks" })
-                      : undefined
-                  }
-                  actionAccessibilityLabel="See all office risks in Office Analytics"
-                >
-                  {signals.riskItems.slice(0, 3).map((item, index) => (
-                    <HeadRiskCardItem
-                      key={item.key}
-                      item={item}
+            <HomeSection
+              title="Current Projects"
+              badge={projects.length ? String(projects.length) : undefined}
+              onAction={() => navigate({ name: "projects" })}
+              actionAccessibilityLabel="See all projects"
+            >
+              {!projects.length ? (
+                <HomeCard>
+                  <View style={{ paddingHorizontal: 14, paddingVertical: 14 }}>
+                    <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
+                      No current Office projects.
+                    </Text>
+                  </View>
+                </HomeCard>
+              ) : (
+                <HomeCard>
+                  {projects.map((project, index) => (
+                    <ProjectProgressRow
+                      key={project.id}
                       isFirst={index === 0}
-                      navigate={navigate}
+                      title={project.title}
+                      totals={
+                        progress.error
+                          ? undefined
+                          : progress.data?.get(project.id)
+                      }
+                      loading={progress.loading && !progress.data}
+                      risk={signals.risk.get(project.id)}
+                      onPress={() =>
+                        navigate({
+                          name: "project",
+                          id: project.id,
+                          workspaceId: scope.workspace.id,
+                        })
+                      }
                     />
                   ))}
-                </HeadBentoCard>
+                  {(progress.error ||
+                    (progress.data &&
+                      projects.some(
+                        (project) => !progress.data!.get(project.id),
+                      ))) && (
+                    <Button
+                      variant="ghost"
+                      onPress={() => void progress.refresh()}
+                    >
+                      Retry project progress
+                    </Button>
+                  )}
+                </HomeCard>
               )}
-
-              <HeadBentoCard
-                title="Current Projects"
-                badge={projects.length ? String(projects.length) : undefined}
-                onAction={() => navigate({ name: "projects" })}
-                actionAccessibilityLabel="See all projects"
-              >
-                {!projects.length && (
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: palette.mutedLabel,
-                      paddingVertical: 8,
-                    }}
-                  >
-                    No current Office projects.
-                  </Text>
-                )}
-                {projects.map((project, index) => (
-                  <ProjectProgressRow
-                    key={project.id}
-                    isFirst={index === 0}
-                    title={project.title}
-                    totals={
-                      progress.error
-                        ? undefined
-                        : progress.data?.get(project.id)
-                    }
-                    loading={progress.loading && !progress.data}
-                    risk={signals.risk.get(project.id)}
-                    onPress={() =>
-                      navigate({
-                        name: "project",
-                        id: project.id,
-                        workspaceId: scope.workspace.id,
-                      })
-                    }
-                  />
-                ))}
-                {(progress.error ||
-                  (progress.data &&
-                    projects.some(
-                      (project) => !progress.data!.get(project.id),
-                    ))) && (
-                  <Button
-                    variant="ghost"
-                    onPress={() => void progress.refresh()}
-                  >
-                    Retry project progress
-                  </Button>
-                )}
-              </HeadBentoCard>
-            </>
+            </HomeSection>
           )}
 
-          {(showAnalytics || showProjects) && (
-            <HeadSupportingGrid
-              showAnalytics={showAnalytics}
-              showBudget={showProjects}
-              navigate={navigate}
-            />
-          )}
         </>
       )}
+      </HomeBody>
     </Screen>
   );
 }
 
 function MemberHome({ navigate }: { navigate: Navigate }) {
-  const { profile, can } = useAuth();
+  const { profile, organization, can } = useAuth();
   const workspace = useWorkspace();
   const feed = useMobileWorkFeed();
   const scope = workspace.error ? undefined : workspace.selected?.workspace;
@@ -459,14 +474,46 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
   const recentUpdates = (updates.data?.items ?? []).slice(0, 3);
 
   return (
-    <Screen compact onRefresh={refresh}>
+    <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
+      <HomeHero navigate={navigate} subtitle={organization?.name}>
+        {data && scope && (
+          <HomeHeroStats
+            stats={[
+              {
+                key: "overdue",
+                label: "Overdue",
+                value: data.overdue,
+                onPress: () =>
+                  navigate({ name: "personal_work", view: "overdue" }),
+                accessibilityLabel: `${data.overdue} overdue work item${data.overdue === 1 ? "" : "s"}`,
+              },
+              {
+                key: "today",
+                label: "Due today",
+                value: data.today,
+                onPress: () => navigate({ name: "personal_work", view: "today" }),
+                accessibilityLabel: `${data.today} work item${data.today === 1 ? "" : "s"} due today`,
+              },
+              {
+                key: "awaiting",
+                label: "Awaiting review",
+                value: data.awaiting,
+                onPress: () =>
+                  navigate({ name: "personal_work", view: "awaiting" }),
+                accessibilityLabel: `${data.awaiting} work item${data.awaiting === 1 ? "" : "s"} awaiting review`,
+              },
+            ]}
+          />
+        )}
+      </HomeHero>
+      <HomeBody>
       {workspace.error ? (
         <ErrorState error={workspace.error} retry={() => void refresh()} />
       ) : !scope ? (
         workspace.loading ? (
           <Loading label="Loading your workspace" layout="summary" />
         ) : (
-          <HomeMessage>Choose a workspace to see your assignments.</HomeMessage>
+          <HomeMessage>Your assignments aren't available right now.</HomeMessage>
         )
       ) : !showWork ? (
         <HomeMessage>
@@ -474,21 +521,8 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
         </HomeMessage>
       ) : (
         <>
-          {/* Personal Work Overview */}
-          {data && !incomplete && (
-            <MemberWorkOverview
-              name={profile?.full_name?.split(" ")[0] || "Member"}
-              workspaceName={scope.name}
-              overdue={data.overdue}
-              today={data.today}
-              awaiting={data.awaiting}
-              navigate={navigate}
-            />
-          )}
-
-          {/* Section B — Needs Your Action */}
           <HomeSection
-            title="Needs Your Action"
+            title="Needs your action"
             badge={
               data?.priorities.length
                 ? String(data.priorities.length)
@@ -497,13 +531,18 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
             onAction={() => navigate({ name: "personal_work" })}
             actionAccessibilityLabel="See all assigned work"
           >
-            {data?.priorities.map((item) => (
-              <MemberActionCardItem
-                key={item.key}
-                item={item}
-                navigate={navigate}
-              />
-            ))}
+            {!!data?.priorities.length && (
+              <HomeCard>
+                {data.priorities.map((item, index) => (
+                  <MemberActionCardItem
+                    key={item.key}
+                    item={item}
+                    isFirst={index === 0}
+                    navigate={navigate}
+                  />
+                ))}
+              </HomeCard>
+            )}
             {!data && feed.loading && (
               <Loading
                 label="Loading your priorities"
@@ -524,38 +563,30 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
             ) : null}
           </HomeSection>
 
-          {/* Section C — Coming Up */}
-          {data && !incomplete && (
+          {data && !incomplete && !!data.comingUp.length && (
             <HomeSection
-              title="Coming Up"
-              badge={
-                data.comingUp.length
-                  ? String(data.comingUp.length)
-                  : undefined
-              }
+              title="Coming up"
+              badge={String(data.comingUp.length)}
               onAction={() =>
                 navigate({ name: "personal_work", view: "deadlines" })
               }
               actionAccessibilityLabel="See all upcoming schedule"
             >
-              {data.comingUp.map((item) => (
-                <MemberComingUpItem
-                  key={item.key}
-                  item={item}
-                  navigate={navigate}
-                />
-              ))}
-              {!data.comingUp.length && (
-                <HomeMessage>
-                  No upcoming deadlines in the next 7 days.
-                </HomeMessage>
-              )}
+              <HomeCard>
+                {data.comingUp.map((item, index) => (
+                  <MemberComingUpItem
+                    key={item.key}
+                    item={item}
+                    isFirst={index === 0}
+                    navigate={navigate}
+                  />
+                ))}
+              </HomeCard>
             </HomeSection>
           )}
 
-          {/* Section D — Latest Updates */}
           <HomeSection
-            title="Latest Updates"
+            title="Latest updates"
             badge={
               recentUpdates.length
                 ? String(recentUpdates.length)
@@ -571,13 +602,18 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
                 rows={2}
               />
             )}
-            {recentUpdates.map((item) => (
-              <MemberUpdateItem
-                key={item.id}
-                item={item}
-                navigate={navigate}
-              />
-            ))}
+            {!!recentUpdates.length && (
+              <HomeCard>
+                {recentUpdates.map((item, index) => (
+                  <MemberUpdateItem
+                    key={item.id}
+                    item={item}
+                    isFirst={index === 0}
+                    navigate={navigate}
+                  />
+                ))}
+              </HomeCard>
+            )}
             {updates.error ? (
               <HomeMessage>
                 Recent updates are currently unavailable.
@@ -590,239 +626,37 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
             )}
           </HomeSection>
 
-          {/* Section E — Waiting on Others (hidden when empty) */}
           {!!data?.waiting.length && (
             <HomeSection
-              title="Waiting on Others"
+              title="Waiting on others"
               badge={String(data.waiting.length)}
               onAction={() =>
                 navigate({ name: "personal_work", view: "awaiting" })
               }
               actionAccessibilityLabel="See all waiting work"
             >
-              {data.waiting.map((item) => (
-                <MemberWaitingItemCard
-                  key={item.key}
-                  item={item}
-                  navigate={navigate}
-                />
-              ))}
+              <HomeCard>
+                {data.waiting.map((item, index) => (
+                  <MemberWaitingItemCard
+                    key={item.key}
+                    item={item}
+                    isFirst={index === 0}
+                    navigate={navigate}
+                  />
+                ))}
+              </HomeCard>
             </HomeSection>
           )}
         </>
       )}
+      </HomeBody>
     </Screen>
-  );
-}
-
-function MemberSummaryTiles({
-  overdue,
-  today,
-  awaiting,
-  navigate,
-}: {
-  overdue: number;
-  today: number;
-  awaiting: number;
-  navigate: Navigate;
-}) {
-  const palette = useTheme();
-
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        gap: space.sm,
-      }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${overdue} Overdue, Action required`}
-        accessibilityHint="Navigates to overdue work in My Work"
-        onPress={() => navigate({ name: "personal_work", view: "overdue" })}
-        style={({ pressed }) => ({
-          flex: 1,
-          borderRadius: radius.surface,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: overdue > 0 ? palette.danger : palette.border,
-          padding: space.sm,
-          gap: 2,
-          opacity: pressed ? 0.75 : 1,
-        })}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 2,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "600",
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-              color: overdue > 0 ? palette.danger : palette.mutedLabel,
-            }}
-            numberOfLines={1}
-          >
-            Overdue
-          </Text>
-          <AlertCircle
-            size={14}
-            color={overdue > 0 ? palette.danger : palette.mutedLabel}
-          />
-        </View>
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: "800",
-            color: overdue > 0 ? palette.danger : palette.text,
-          }}
-        >
-          {overdue}
-        </Text>
-        <Text
-          style={{
-            fontSize: 11,
-            color: palette.mutedLabel,
-          }}
-          numberOfLines={1}
-        >
-          Action required
-        </Text>
-      </Pressable>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${today} Due Today, Due by end of day`}
-        accessibilityHint="Navigates to today's work in My Work"
-        onPress={() => navigate({ name: "personal_work", view: "today" })}
-        style={({ pressed }) => ({
-          flex: 1,
-          borderRadius: radius.surface,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: today > 0 ? palette.warning : palette.border,
-          padding: space.sm,
-          gap: 2,
-          opacity: pressed ? 0.75 : 1,
-        })}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 2,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "600",
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-              color: today > 0 ? palette.warning : palette.mutedLabel,
-            }}
-            numberOfLines={1}
-          >
-            Due Today
-          </Text>
-          <Clock
-            size={14}
-            color={today > 0 ? palette.warning : palette.mutedLabel}
-          />
-        </View>
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: "800",
-            color: today > 0 ? palette.warning : palette.text,
-          }}
-        >
-          {today}
-        </Text>
-        <Text
-          style={{
-            fontSize: 11,
-            color: palette.mutedLabel,
-          }}
-          numberOfLines={1}
-        >
-          Due today
-        </Text>
-      </Pressable>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${awaiting} Awaiting Review, Under review`}
-        accessibilityHint="Navigates to awaiting review work in My Work"
-        onPress={() => navigate({ name: "personal_work", view: "awaiting" })}
-        style={({ pressed }) => ({
-          flex: 1,
-          borderRadius: radius.surface,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: awaiting > 0 ? palette.review : palette.border,
-          padding: space.sm,
-          gap: 2,
-          opacity: pressed ? 0.75 : 1,
-        })}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 2,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "600",
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-              color: awaiting > 0 ? palette.review : palette.mutedLabel,
-            }}
-            numberOfLines={1}
-          >
-            Awaiting
-          </Text>
-          <ClipboardCheck
-            size={14}
-            color={awaiting > 0 ? palette.review : palette.mutedLabel}
-          />
-        </View>
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: "800",
-            color: awaiting > 0 ? palette.review : palette.text,
-          }}
-        >
-          {awaiting}
-        </Text>
-        <Text
-          style={{
-            fontSize: 11,
-            color: palette.mutedLabel,
-          }}
-          numberOfLines={1}
-        >
-          Under review
-        </Text>
-      </Pressable>
-    </View>
   );
 }
 
 function MemberActionCardItem({
   item,
+  isFirst = false,
   navigate,
 }: {
   item: {
@@ -843,6 +677,7 @@ function MemberActionCardItem({
     blocker?: string | null;
     route: AppRoute;
   };
+  isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
@@ -892,38 +727,26 @@ function MemberActionCardItem({
               : "To do";
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <HomeRow
+      isFirst={isFirst}
       accessibilityLabel={`${item.title}, ${statusText}, ${item.relation}`}
       accessibilityHint={item.actionLabel}
       onPress={() => navigate(item.route)}
-      style={({ pressed }) => ({
-        borderRadius: radius.surface,
-        backgroundColor: palette.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        padding: space.md,
-        gap: space.sm,
-        opacity: pressed ? 0.8 : 1,
-      })}
     >
-      <EditorialMetadataStrip
-        variant="flush"
-        items={[
-          {
-            label: "Status",
-            value: statusText,
-            accent: statusColor,
-          },
-          {
-            label: "Role",
-            value: item.relation || (item.isLead ? "Lead" : "Contributor"),
-            accent: item.isLead ? (palette.primaryDark ?? palette.primary) : palette.text,
-          },
-        ]}
-      />
-
-      <View style={{ gap: 4 }}>
+      <View style={{ flex: 1, gap: 6 }}>
+        <EditorialMetadataStrip
+          variant="flush"
+          items={[
+            { label: "Status", value: statusText, accent: statusColor },
+            {
+              label: "Role",
+              value: item.relation || (item.isLead ? "Lead" : "Contributor"),
+              accent: item.isLead
+                ? (palette.primaryDark ?? palette.primary)
+                : palette.text,
+            },
+          ]}
+        />
         <Text
           style={{
             fontSize: 15,
@@ -934,13 +757,7 @@ function MemberActionCardItem({
         >
           {item.title}
         </Text>
-        <Text
-          style={{
-            fontSize: 13,
-            color: palette.mutedLabel,
-          }}
-          numberOfLines={1}
-        >
+        <Text style={{ fontSize: 13, color: palette.mutedLabel }} numberOfLines={1}>
           {[
             item.projectTitle || item.workspaceName,
             item.dueLabel ? `Due ${item.dueLabel}` : undefined,
@@ -950,33 +767,19 @@ function MemberActionCardItem({
         </Text>
         {item.blocker ? (
           <Text
-            style={{
-              fontSize: 12,
-              color: palette.warning,
-              marginTop: 2,
-            }}
+            style={{ fontSize: 12, color: palette.warning }}
             numberOfLines={2}
           >
             Blocker: {item.blocker}
           </Text>
         ) : null}
       </View>
-
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingTop: space.xs,
-          borderTopWidth: 1,
-          borderTopColor: palette.border,
-        }}
-      >
+      <View style={{ alignItems: "flex-end", gap: 4 }}>
         <Text
           style={{
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: "600",
-            color: item.actionable ? palette.primary : palette.text,
+            color: item.actionable ? palette.primary : palette.mutedLabel,
           }}
         >
           {item.actionLabel}
@@ -986,12 +789,13 @@ function MemberActionCardItem({
           color={item.actionable ? palette.primary : palette.mutedLabel}
         />
       </View>
-    </Pressable>
+    </HomeRow>
   );
 }
 
 function MemberComingUpItem({
   item,
+  isFirst = false,
   navigate,
 }: {
   item: {
@@ -1005,6 +809,7 @@ function MemberComingUpItem({
     daysUntil: number;
     route: AppRoute;
   };
+  isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
@@ -1016,21 +821,10 @@ function MemberComingUpItem({
         : `In ${item.daysUntil} days`;
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <HomeRow
+      isFirst={isFirst}
       accessibilityLabel={`${item.title}, Due ${daysText}`}
       onPress={() => navigate(item.route)}
-      style={({ pressed }) => ({
-        borderRadius: radius.surface,
-        backgroundColor: palette.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        padding: space.md,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: space.md,
-        opacity: pressed ? 0.75 : 1,
-      })}
     >
       <View
         style={{
@@ -1089,15 +883,17 @@ function MemberComingUpItem({
         </Text>
       </View>
       <ChevronRight size={18} color={palette.mutedLabel} />
-    </Pressable>
+    </HomeRow>
   );
 }
 
 function MemberUpdateItem({
   item,
+  isFirst = false,
   navigate,
 }: {
   item: Notification;
+  isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
@@ -1126,21 +922,10 @@ function MemberUpdateItem({
   };
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <HomeRow
+      isFirst={isFirst}
       accessibilityLabel={`${item.title}: ${item.message}`}
       onPress={() => navigate(route)}
-      style={({ pressed }) => ({
-        borderRadius: radius.surface,
-        backgroundColor: palette.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        padding: space.md,
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: space.md,
-        opacity: pressed ? 0.75 : 1,
-      })}
     >
       <View
         style={{
@@ -1213,12 +998,13 @@ function MemberUpdateItem({
           }}
         />
       )}
-    </Pressable>
+    </HomeRow>
   );
 }
 
 function MemberWaitingItemCard({
   item,
+  isFirst = false,
   navigate,
 }: {
   item: {
@@ -1231,27 +1017,17 @@ function MemberWaitingItemCard({
     reason: string;
     route: AppRoute;
   };
+  isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
   const isAwaiting = ["for_review", "submitted"].includes(item.status);
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <HomeRow
+      isFirst={isFirst}
       accessibilityLabel={`${item.title}, ${item.reason}`}
       onPress={() => navigate(item.route)}
-      style={({ pressed }) => ({
-        borderRadius: radius.surface,
-        backgroundColor: palette.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        padding: space.md,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: space.md,
-        opacity: pressed ? 0.75 : 1,
-      })}
     >
       <View
         style={{
@@ -1300,677 +1076,7 @@ function MemberWaitingItemCard({
         </Text>
       </View>
       <ChevronRight size={18} color={palette.mutedLabel} />
-    </Pressable>
-  );
-}
-
-function OfficeCommandOverview({
-  officeName,
-  projectCount,
-  attentionCount,
-  atRiskCount,
-  onPressRisks,
-}: {
-  officeName: string;
-  projectCount: number;
-  attentionCount: number;
-  atRiskCount: number;
-  onPressRisks?: () => void;
-}) {
-  const palette = useTheme();
-  const { fontScale } = useWindowDimensions();
-
-  return (
-    <View style={{ gap: 10, marginBottom: 12 }}>
-      <View
-        style={{
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: palette.border,
-          borderRadius: 14,
-          padding: 16,
-          gap: 10,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "700",
-              letterSpacing: 0.6,
-              textTransform: "uppercase",
-              color: palette.primary,
-            }}
-          >
-            Office Command Overview
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: palette.mutedLabel,
-              fontWeight: "500",
-            }}
-          >
-            {officeName} · {projectCount}{" "}
-            {projectCount === 1 ? "project" : "projects"}
-          </Text>
-        </View>
-
-        <View style={{ gap: 4 }}>
-          <Text
-            accessibilityRole="header"
-            style={{
-              fontSize: 20,
-              fontWeight: "700",
-              color: palette.text,
-              lineHeight: 26,
-              letterSpacing: -0.2,
-            }}
-          >
-            {attentionCount > 0
-              ? `${attentionCount} ${attentionCount === 1 ? "decision awaiting" : "decisions awaiting"} your action`
-              : "All decisions up to date"}
-          </Text>
-          <Text
-            style={{
-              fontSize: 13,
-              color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
-              fontWeight: atRiskCount > 0 ? "600" : "400",
-            }}
-          >
-            {atRiskCount > 0
-              ? `${atRiskCount} work ${atRiskCount === 1 ? "item" : "items"} at risk`
-              : "All office work on schedule"}
-          </Text>
-        </View>
-      </View>
-
-      <View
-        style={{
-          flexDirection: fontScale > 1.8 ? "column" : "row",
-          gap: 10,
-        }}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: palette.surface,
-            borderWidth: 1,
-            borderColor: palette.border,
-            borderRadius: 14,
-            padding: 14,
-            gap: 6,
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <ClipboardCheck
-              size={14}
-              color={attentionCount > 0 ? palette.primary : palette.mutedLabel}
-            />
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "600",
-                color: palette.mutedLabel,
-              }}
-            >
-              Decisions
-            </Text>
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-              gap: 6,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "700",
-                color: attentionCount > 0 ? palette.primary : palette.text,
-              }}
-            >
-              {attentionCount}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: 12,
-                color: palette.mutedLabel,
-                fontWeight: "500",
-              }}
-            >
-              {attentionCount > 0 ? "Awaiting action" : "Up to date"}
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${atRiskCount} work ${atRiskCount === 1 ? "item" : "items"} at risk`}
-          onPress={onPressRisks}
-          disabled={!onPressRisks}
-          style={({ pressed }) => ({
-            flex: 1,
-            backgroundColor:
-              pressed && onPressRisks
-                ? palette.dangerSoft
-                : atRiskCount > 0
-                  ? palette.dangerSoft
-                  : palette.surface,
-            borderWidth: 1,
-            borderColor: atRiskCount > 0 ? palette.danger : palette.border,
-            borderRadius: 14,
-            padding: 14,
-            gap: 6,
-          })}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 6,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <AlertCircle
-                size={14}
-                color={atRiskCount > 0 ? palette.danger : palette.mutedLabel}
-              />
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
-                }}
-              >
-                At Risk
-              </Text>
-            </View>
-            {onPressRisks && (
-              <ArrowUpRight
-                size={14}
-                color={atRiskCount > 0 ? palette.danger : palette.mutedLabel}
-              />
-            )}
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-              gap: 6,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "700",
-                color: atRiskCount > 0 ? palette.danger : palette.text,
-              }}
-            >
-              {atRiskCount}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: 12,
-                color: atRiskCount > 0 ? palette.danger : palette.mutedLabel,
-                fontWeight: "500",
-              }}
-            >
-              {atRiskCount > 0 ? "Needs review" : "On schedule"}
-            </Text>
-          </View>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function HeadBentoCard({
-  title,
-  badge,
-  badgeTone = "default",
-  onAction,
-  actionLabel = "See all",
-  actionAccessibilityLabel,
-  children,
-}: {
-  title: string;
-  badge?: string | number;
-  badgeTone?: "default" | "danger";
-  onAction?: () => void;
-  actionLabel?: string;
-  actionAccessibilityLabel?: string;
-  children: React.ReactNode;
-}) {
-  const palette = useTheme();
-  const badgeBg =
-    badgeTone === "danger" ? palette.dangerSoft : palette.primarySoft;
-  const badgeFg = badgeTone === "danger" ? palette.danger : palette.primary;
-  return (
-    <View
-      style={{
-        backgroundColor: palette.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        borderRadius: 14,
-        padding: 16,
-        gap: 6,
-        marginBottom: 12,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          marginBottom: 2,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
-          <Text
-            accessibilityRole="header"
-            style={{
-              fontSize: 16,
-              fontWeight: "700",
-              color: palette.text,
-            }}
-          >
-            {title}
-          </Text>
-          {badge !== undefined && (
-            <View
-              style={{
-                backgroundColor: badgeBg,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: 999,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "700",
-                  color: badgeFg,
-                }}
-              >
-                {badge}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {onAction && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={actionAccessibilityLabel || `${actionLabel} ${title}`}
-            onPress={onAction}
-            hitSlop={6}
-            style={({ pressed }) => ({
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 3,
-              minHeight: 36,
-              paddingHorizontal: 6,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: palette.primary,
-              }}
-            >
-              {actionLabel}
-            </Text>
-            <ChevronRight size={15} color={palette.primary} strokeWidth={2.4} />
-          </Pressable>
-        )}
-      </View>
-
-      <View>{children}</View>
-    </View>
-  );
-}
-
-function HeadRiskCardItem({
-  item,
-  isFirst = false,
-  navigate,
-}: {
-  item: {
-    key: string;
-    id: string;
-    title: string;
-    projectTitle: string;
-    status: string;
-    reason: string;
-    route: AppRoute;
-  };
-  isFirst?: boolean;
-  navigate: Navigate;
-}) {
-  const palette = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${item.title}, ${item.reason}`}
-      onPress={() => navigate(item.route)}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 11,
-        gap: 10,
-        borderTopWidth: isFirst ? 0 : 0.5,
-        borderColor: palette.border,
-        opacity: pressed ? 0.7 : 1,
-      })}
-    >
-      <View
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          backgroundColor: palette.dangerSoft,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <AlertCircle size={17} color={palette.danger} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text
-          style={{
-            fontSize: 11,
-            fontWeight: "700",
-            color: palette.danger,
-            textTransform: "uppercase",
-            letterSpacing: 0.4,
-          }}
-        >
-          {item.reason}
-        </Text>
-        <Text
-          style={{
-            fontWeight: "600",
-            fontSize: 15,
-            color: palette.text,
-          }}
-          numberOfLines={2}
-        >
-          {item.title}
-        </Text>
-        <Text
-          style={{
-            fontSize: 13,
-            color: palette.mutedLabel,
-          }}
-          numberOfLines={1}
-        >
-          {item.projectTitle}
-        </Text>
-      </View>
-      <ChevronRight size={16} color={palette.mutedLabel} />
-    </Pressable>
-  );
-}
-
-function MemberWorkOverview({
-  name,
-  workspaceName,
-  overdue,
-  today,
-  awaiting,
-  navigate,
-}: {
-  name: string;
-  workspaceName: string;
-  overdue: number;
-  today: number;
-  awaiting: number;
-  navigate: Navigate;
-}) {
-  const palette = useTheme();
-  return (
-    <View
-      style={{
-        borderRadius: radius.surface,
-        borderWidth: 1,
-        borderColor: palette.border,
-        backgroundColor: palette.surface,
-        padding: space.md,
-        gap: space.sm,
-        marginBottom: space.sm,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: overdue > 0 ? palette.danger : palette.primary,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "700",
-              letterSpacing: 0.8,
-              textTransform: "uppercase",
-              color: palette.primary,
-            }}
-          >
-            Personal Work Overview
-          </Text>
-        </View>
-        <Text
-          style={{
-            fontSize: 12,
-            color: palette.mutedLabel,
-            fontWeight: "500",
-          }}
-        >
-          {workspaceName}
-        </Text>
-      </View>
-
-      <View style={{ gap: 2 }}>
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: "800",
-            color: palette.text,
-            letterSpacing: -0.2,
-          }}
-        >
-          Good day, {name}
-        </Text>
-        <Text
-          style={{
-            fontSize: 13,
-            color: palette.mutedLabel,
-          }}
-        >
-          {overdue > 0 || today > 0 || awaiting > 0
-            ? `${overdue} overdue · ${today} due today · ${awaiting} awaiting review`
-            : "All assigned work is up to date"}
-        </Text>
-      </View>
-
-      <View
-        style={{
-          flexDirection: "row",
-          gap: space.xs,
-          paddingTop: space.xs,
-          borderTopWidth: 1,
-          borderTopColor: palette.border,
-        }}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${overdue} Overdue, Action required`}
-          onPress={() => navigate({ name: "personal_work", view: "overdue" })}
-          style={({ pressed }) => ({
-            flex: 1,
-            borderRadius: radius.surface,
-            backgroundColor: pressed ? palette.primarySoft : palette.background,
-            borderWidth: 1,
-            borderColor: overdue > 0 ? palette.danger : palette.border,
-            padding: space.sm,
-            gap: 2,
-          })}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: overdue > 0 ? palette.danger : palette.mutedLabel,
-                textTransform: "uppercase",
-              }}
-            >
-              Overdue
-            </Text>
-            <AlertCircle
-              size={12}
-              color={overdue > 0 ? palette.danger : palette.mutedLabel}
-            />
-          </View>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "800",
-              color: overdue > 0 ? palette.danger : palette.text,
-            }}
-          >
-            {overdue}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${today} Due Today, Due by end of day`}
-          onPress={() => navigate({ name: "personal_work", view: "today" })}
-          style={({ pressed }) => ({
-            flex: 1,
-            borderRadius: radius.surface,
-            backgroundColor: pressed ? palette.primarySoft : palette.background,
-            borderWidth: 1,
-            borderColor: today > 0 ? palette.warning : palette.border,
-            padding: space.sm,
-            gap: 2,
-          })}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: today > 0 ? palette.warning : palette.mutedLabel,
-                textTransform: "uppercase",
-              }}
-            >
-              Due Today
-            </Text>
-            <Clock
-              size={12}
-              color={today > 0 ? palette.warning : palette.mutedLabel}
-            />
-          </View>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "800",
-              color: today > 0 ? palette.warning : palette.text,
-            }}
-          >
-            {today}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${awaiting} Awaiting, Submitted work`}
-          onPress={() => navigate({ name: "personal_work", view: "awaiting" })}
-          style={({ pressed }) => ({
-            flex: 1,
-            borderRadius: radius.surface,
-            backgroundColor: pressed ? palette.primarySoft : palette.background,
-            borderWidth: 1,
-            borderColor: awaiting > 0 ? palette.review : palette.border,
-            padding: space.sm,
-            gap: 2,
-          })}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: awaiting > 0 ? palette.review : palette.mutedLabel,
-                textTransform: "uppercase",
-              }}
-            >
-              Awaiting
-            </Text>
-            <ClipboardCheck
-              size={12}
-              color={awaiting > 0 ? palette.review : palette.mutedLabel}
-            />
-          </View>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "800",
-              color: awaiting > 0 ? palette.review : palette.text,
-            }}
-          >
-            {awaiting}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
+    </HomeRow>
   );
 }
 
@@ -2002,208 +1108,77 @@ function classifyAttentionRow(row: { key: string; description: string }) {
   };
 }
 
-function HeadAttentionCardItem({
+/** One decision as a compact swipeable card on the Head's Home. */
+function DecisionCard({
   row,
   isFirst = false,
   navigate,
 }: {
-  row: {
-    key: string;
-    title: string;
-    description: string;
-    route: AppRoute;
-  };
+  row: { key: string; title: string; description: string; route: AppRoute };
   isFirst?: boolean;
   navigate: Navigate;
 }) {
   const palette = useTheme();
   const { kind, categoryLabel } = classifyAttentionRow(row);
-
-  const iconColor =
+  const fg =
     kind === "review"
       ? palette.review
       : kind === "cash"
         ? palette.warning
         : palette.danger;
-
-  const iconBg =
+  const bg =
     kind === "review"
       ? palette.reviewSoft
       : kind === "cash"
         ? palette.warningSoft
         : palette.dangerSoft;
-
-  const IconComponent =
-    kind === "review"
-      ? ClipboardCheck
-      : kind === "cash"
-        ? Banknote
-        : AlertCircle;
-
-  const cleanDescription = row.description.replace(/^Action required\s*·\s*/i, "");
-
+  const Icon =
+    kind === "review" ? ClipboardCheck : kind === "cash" ? Banknote : AlertCircle;
+  const detail = row.description.replace(/^Action required\s*·\s*/i, "");
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={row.title}
-      accessibilityHint={row.description}
+    <HomeRow
+      isFirst={isFirst}
+      accessibilityLabel={`${categoryLabel}. ${row.title}`}
+      accessibilityHint={detail}
       onPress={() => navigate(row.route)}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 11,
-        borderTopWidth: isFirst ? 0 : 0.5,
-        borderColor: palette.border,
-        gap: 12,
-        opacity: pressed ? 0.7 : 1,
-      })}
     >
-      <View style={{ flex: 1, gap: 4 }}>
-        <View
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: bg,
+        }}
+      >
+        <Icon size={17} color={fg} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text
+          numberOfLines={1}
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            alignSelf: "flex-start",
-            gap: 5,
-            backgroundColor: iconBg,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: "800",
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            color: fg,
           }}
         >
-          <IconComponent size={12} color={iconColor} />
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "700",
-              color: iconColor,
-              textTransform: "uppercase",
-              letterSpacing: 0.4,
-            }}
-          >
-            {categoryLabel}
-          </Text>
-        </View>
+          {categoryLabel}
+        </Text>
         <Text
-          style={{
-            fontWeight: "600",
-            fontSize: 15,
-            color: palette.text,
-          }}
-          numberOfLines={2}
+          numberOfLines={1}
+          style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
         >
           {row.title}
         </Text>
-        <Text
-          style={{
-            fontSize: 13,
-            color: palette.mutedLabel,
-            lineHeight: 18,
-          }}
-          numberOfLines={2}
-        >
-          {cleanDescription}
+        <Text numberOfLines={1} style={{ fontSize: 13, color: palette.mutedLabel }}>
+          {detail}
         </Text>
       </View>
       <ChevronRight size={16} color={palette.mutedLabel} />
-    </Pressable>
-  );
-}
-
-function HeadSupportingGrid({
-  showAnalytics,
-  showBudget,
-  navigate,
-}: {
-  showAnalytics: boolean;
-  showBudget: boolean;
-  navigate: Navigate;
-}) {
-  const palette = useTheme();
-  const { fontScale } = useWindowDimensions();
-
-  const cardStyle = {
-    flex: 1,
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    padding: 14,
-    gap: 10,
-  };
-
-  return (
-    <View
-      style={{
-        flexDirection: fontScale > 1.8 ? "column" : "row",
-        gap: 10,
-        marginBottom: 12,
-      }}
-    >
-      {showAnalytics && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Office Analytics"
-          accessibilityHint="Delivery, workload, reviews and financial reporting"
-          onPress={() => navigate({ name: "reports" })}
-          style={({ pressed }) => [cardStyle, { opacity: pressed ? 0.8 : 1 }]}
-        >
-          <ChartBar size={20} color={palette.primary} />
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-end",
-              justifyContent: "space-between",
-              gap: 6,
-            }}
-          >
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text
-                style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-              >
-                Office Analytics
-              </Text>
-              <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-                Delivery & reports
-              </Text>
-            </View>
-            <ChevronRight size={16} color={palette.mutedLabel} />
-          </View>
-        </Pressable>
-      )}
-
-      {showBudget && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Office Budget"
-          accessibilityHint="Appropriations, allocations and settled expenses"
-          onPress={() => navigate({ name: "budget" })}
-          style={({ pressed }) => [cardStyle, { opacity: pressed ? 0.8 : 1 }]}
-        >
-          <Banknote size={20} color={palette.text} />
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-end",
-              justifyContent: "space-between",
-              gap: 6,
-            }}
-          >
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text
-                style={{ fontSize: 15, fontWeight: "700", color: palette.text }}
-              >
-                Office Budget
-              </Text>
-              <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-                Funding & spending
-              </Text>
-            </View>
-            <ChevronRight size={16} color={palette.mutedLabel} />
-          </View>
-        </Pressable>
-      )}
-    </View>
+    </HomeRow>
   );
 }
 
@@ -2248,11 +1223,13 @@ function ProjectProgressRow({
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 11,
+        minHeight: 56,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
         borderTopWidth: isFirst ? 0 : 0.5,
         borderColor: palette.border,
+        backgroundColor: pressed ? palette.primarySoft : "transparent",
         gap: 12,
-        opacity: pressed ? 0.7 : 1,
       })}
     >
       <View style={{ flex: 1, gap: 3 }}>

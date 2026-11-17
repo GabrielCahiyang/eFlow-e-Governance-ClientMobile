@@ -42,6 +42,7 @@ export function Screen<T = never>({
   compact = false,
   footer,
   list,
+  edgeToEdge = false,
 }: {
   title?: string;
   description?: string;
@@ -51,6 +52,8 @@ export function Screen<T = never>({
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
   footer?: ReactNode;
+  /** Content draws under the status bar and handles the top inset itself. */
+  edgeToEdge?: boolean;
   list?: Pick<
     FlatListProps<T>,
     | "data"
@@ -64,7 +67,9 @@ export function Screen<T = never>({
   const pull = usePullRefresh(onRefresh);
   const ContentScroll = onRefresh ? RefreshScreenScroll : ScrollView;
   const scrollProps = {
-    contentInsetAdjustmentBehavior: "automatic" as const,
+    contentInsetAdjustmentBehavior: edgeToEdge
+      ? ("never" as const)
+      : ("automatic" as const),
     style: { flex: 1, backgroundColor: palette.background },
     keyboardShouldPersistTaps: "handled" as const,
     contentContainerStyle: [

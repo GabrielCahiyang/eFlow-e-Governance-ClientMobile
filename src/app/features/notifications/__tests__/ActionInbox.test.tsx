@@ -11,7 +11,8 @@ import {
   markRecentNotificationRead,
   type Notification,
 } from "../../../../core/web/app/services/notificationService";
-import { fetchInboxUpdatePage } from "../inboxUpdates";
+import { fetchInboxUpdatePage, markAllInboxUpdatesRead } from "../inboxUpdates";
+import { confirmAction } from "../../../shared/confirm";
 import { getAssignedIndependentReviews } from "../../../../core/web/app/features/budget/services/independentReviewService";
 import type { Task } from "../../../../core/web/app/features/tasks/taskTypes";
 import type { SectionListProps } from "react-native";
@@ -56,7 +57,43 @@ jest.mock("../../personal-work/WorkFeedProvider", () => ({
 jest.mock("../../../../core/web/app/services/notificationService", () => ({
   markRecentNotificationRead: jest.fn(),
 }));
-jest.mock("../inboxUpdates", () => ({ fetchInboxUpdatePage: jest.fn() }));
+jest.mock("../inboxUpdates", () => ({
+  fetchInboxUpdatePage: jest.fn(),
+  markAllInboxUpdatesRead: jest.fn(),
+}));
+jest.mock("../../../shared/confirm", () => ({ confirmAction: jest.fn() }));
+jest.mock("../useInboxCounts", () => ({
+  useInboxCounts: () => ({
+    data: { all: 3, work: 2, messages: 0, finance: 1, collaboration: 0 },
+    refresh: async () => {},
+    refreshIfStale: async () => {},
+  }),
+}));
+// The native bottom sheet ignores presses under test; render plain options.
+jest.mock("../../../components/ui/SelectionSheet", () => ({
+  SelectionSheet: ({
+    open,
+    options,
+    onSelect,
+  }: React.ComponentProps<
+    typeof import("../../../components/ui/SelectionSheet").SelectionSheet
+  >) => {
+    const { Pressable, Text } = require("react-native");
+    return open
+      ? options.map((option) => (
+          <Pressable
+            key={option.id}
+            accessibilityRole="radio"
+            accessibilityLabel={option.title}
+            onPress={() => onSelect(option.id)}
+          >
+            <Text>{option.title}</Text>
+          </Pressable>
+        ))
+      : null;
+  },
+}));
+
 jest.mock(
   "../../../../core/web/app/features/budget/services/independentReviewService",
   () => ({
@@ -129,6 +166,8 @@ test("notifications skip review sources and change read state only after a confi
     .mockRejectedValue(new Error("Refresh unavailable"));
   jest
     .mocked(markRecentNotificationRead)
+    .mockReset()
+    .mockRejectedValueOnce(new Error("Read denied"))
     .mockRejectedValueOnce(new Error("Read denied"))
     .mockResolvedValueOnce(undefined);
   const navigate = jest.fn();
@@ -139,7 +178,11 @@ test("notifications skip review sources and change read state only after a confi
   expect(
     screen.queryByRole("button", { name: "Assigned decisions" }),
   ).toBeNull();
-  await fireEvent.press(screen.getByRole("button", { name: "View subtask" }));
+  // Tapping the card opens the exact record and marks it read in the
+  // background; a failed background write stays silent and keeps the dot.
+  const card = screen.getByRole("button", { name: /Permit assignment/ });
+  expect(card.props.accessibilityHint).toBe("View subtask");
+  await fireEvent.press(card);
   expect(navigate).toHaveBeenCalledWith(
     expect.objectContaining({
       id: "root",
@@ -147,16 +190,23 @@ test("notifications skip review sources and change read state only after a confi
       nodeId: "node",
     }),
   );
-  await fireEvent.press(screen.getByRole("button", { name: "Mark read" }));
+  await waitFor(() =>
+    expect(markRecentNotificationRead).toHaveBeenCalledTimes(1),
+  );
+  expect(
+    screen.queryByText("We couldn't load this information. Please try again."),
+  ).toBeNull();
+  expect(screen.getByRole("button", { name: "Mark as read" })).toBeEnabled();
+  await fireEvent.press(screen.getByRole("button", { name: "Mark as read" }));
   await waitFor(() =>
     expect(
       screen.getByText("We couldn't load this information. Please try again."),
     ).toBeOnTheScreen(),
   );
-  expect(screen.getByRole("button", { name: "Mark read" })).toBeEnabled();
-  await fireEvent.press(screen.getByRole("button", { name: "Mark read" }));
+  expect(screen.getByRole("button", { name: "Mark as read" })).toBeEnabled();
+  await fireEvent.press(screen.getByRole("button", { name: "Mark as read" }));
   await waitFor(() =>
-    expect(screen.queryByRole("button", { name: "Mark read" })).toBeNull(),
+    expect(screen.queryByRole("button", { name: "Mark as read" })).toBeNull(),
   );
   expect(screen.getByText("Permit assignment")).toBeOnTheScreen();
   expect(markRecentNotificationRead).toHaveBeenLastCalledWith(
@@ -234,11 +284,9 @@ test("older updates append on scroll, retry without duplicates, and survive a re
   expect(await screen.findByText("First update")).toBeOnTheScreen();
   expect(read).toHaveBeenCalledTimes(1);
   read.mockRejectedValueOnce(new Error("Offline"));
-  const reachEnd = mockEnd.mock.lastCall![0]!;
-  await act(async () => {
-    reachEnd({ distanceFromEnd: 0 });
-    reachEnd({ distanceFromEnd: 0 });
-  });
+  // Older updates load only on request, never automatically on scroll.
+  expect(mockEnd.mock.lastCall?.[0]).toBeUndefined();
+  await fireEvent.press(screen.getByRole("button", { name: "View more" }));
   expect(read).toHaveBeenCalledTimes(2);
   expect(screen.getByText("First update")).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole("button", { name: "Retry" }));
@@ -247,20 +295,318 @@ test("older updates append on scroll, retry without duplicates, and survive a re
   expect(read.mock.calls[2]?.[2]).toEqual(cursor);
 
   await fireEvent.press(
-    screen.getAllByRole("button", { name: "Mark read" })[1],
+    screen.getAllByRole("button", { name: "Mark as read" })[1],
   );
   await waitFor(() =>
-    expect(screen.getAllByRole("button", { name: "Mark read" })).toHaveLength(
+    expect(screen.getAllByRole("button", { name: "Mark as read" })).toHaveLength(
       1,
     ),
   );
   expect(screen.getByText("Older update")).toBeOnTheScreen();
   await fireEvent.press(
-    screen.getByRole("button", { name: "Unread notifications" }),
+    screen.getByRole("button", { name: "Show: All updates" }),
   );
+  await fireEvent.press(screen.getByRole("radio", { name: "Unread" }));
   expect(
     await screen.findByText("Unread update from history"),
   ).toBeOnTheScreen();
   expect(screen.queryByText("Older update")).toBeNull();
-  expect(read).toHaveBeenLastCalledWith("actor", true);
+  expect(read).toHaveBeenLastCalledWith(
+    "actor",
+    true,
+    undefined,
+    undefined,
+    { category: "all", search: "" },
+  );
+});
+
+test("type chips load server-filtered pages and combine with Unread", async () => {
+  jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+  const item = (id: string, title: string, type: string): Notification => ({
+    id,
+    title,
+    message: "",
+    type: type as Notification["type"],
+    read: false,
+    createdAt: 1,
+  });
+  jest.mocked(fetchInboxUpdatePage).mockReset();
+  jest
+    .mocked(fetchInboxUpdatePage)
+    .mockImplementation(async (_actor, unread, _before, _signal, filters) =>
+      unread
+        ? { items: [] }
+        : filters?.category === "finance"
+          ? { items: [item("cash", "Cash approved", "petty_cash_decision")] }
+          : {
+              items: [
+                item("work", "Permit assignment", "assignment"),
+                item("cash", "Cash approved", "petty_cash_decision"),
+              ],
+            },
+    );
+  await render(<ActionInbox navigate={jest.fn()} />);
+  expect(await screen.findByText("Permit assignment")).toBeOnTheScreen();
+  expect(screen.getByRole("header", { name: "All updates" })).toBeOnTheScreen();
+
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Finance notifications, 1 unread" }),
+  );
+  expect(await screen.findByText("Finance updates")).toBeOnTheScreen();
+  expect(screen.getByText("Cash approved")).toBeOnTheScreen();
+  expect(screen.queryByText("Permit assignment")).toBeNull();
+  expect(fetchInboxUpdatePage).toHaveBeenCalledWith(
+    "actor",
+    false,
+    undefined,
+    undefined,
+    { category: "finance", search: "" },
+  );
+
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Show: All updates" }),
+  );
+  await fireEvent.press(screen.getByRole("radio", { name: "Unread" }));
+  expect(
+    await screen.findByText("No unread finance updates"),
+  ).toBeOnTheScreen();
+  expect(fetchInboxUpdatePage).toHaveBeenCalledWith(
+    "actor",
+    true,
+    undefined,
+    undefined,
+    { category: "finance", search: "" },
+  );
+
+  // Returning to the defaults shows the unfiltered feed again.
+  await fireEvent.press(
+    screen.getByRole("button", { name: "All notification types, 3 unread" }),
+  );
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Show: Unread" }),
+  );
+  await fireEvent.press(screen.getByRole("radio", { name: "All updates" }));
+  expect(await screen.findByText("Permit assignment")).toBeOnTheScreen();
+
+  // "Read" asks the server for read updates only.
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Show: All updates" }),
+  );
+  await fireEvent.press(screen.getByRole("radio", { name: "Read" }));
+  // The fixture only has unread rows, so even a stray unread row is kept out.
+  expect(await screen.findByText("No read updates")).toBeOnTheScreen();
+  expect(screen.queryByText("Permit assignment")).toBeNull();
+  expect(fetchInboxUpdatePage).toHaveBeenCalledWith(
+    "actor",
+    false,
+    undefined,
+    undefined,
+    { category: "all", search: "", readOnly: true },
+  );
+});
+
+test("review type chips narrow assigned reviews without changing their destinations", async () => {
+  mockTasks = [
+    {
+      id: "assigned",
+      linkedProjectId: "project",
+      title: "Independent decision",
+      status: "for_review",
+      reviewerId: "actor",
+      latestSubmission: { submitterId: "worker" },
+    } as Task,
+  ];
+  jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+  jest.mocked(fetchInboxUpdatePage).mockResolvedValue({ items: [] });
+  jest.mocked(fetchAssignedSubtaskReviews).mockResolvedValueOnce([
+    {
+      id: "proposal",
+      root_id: "root",
+      node_id: "node",
+      task_title: "Task title",
+      subtask_title: "Submit receipts",
+      kind: "completion",
+      submitted_at: "2026-11-14",
+      cash_blocked: false,
+    },
+  ]);
+  const navigate = jest.fn();
+  try {
+    await render(<ActionInbox navigate={navigate} initialView="decisions" />);
+    expect(await screen.findByText("Submit receipts")).toBeOnTheScreen();
+    expect(screen.getByText("Independent decision")).toBeOnTheScreen();
+
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Subtasks reviews" }),
+    );
+    expect(screen.getByText("Submit receipts")).toBeOnTheScreen();
+    expect(screen.queryByText("Independent decision")).toBeNull();
+
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Financial reviews" }),
+    );
+    expect(
+      screen.getByText("No financial reviews assigned to you"),
+    ).toBeOnTheScreen();
+    // Chips stay available so the reviewer can switch back.
+    await fireEvent.press(screen.getByRole("button", { name: "Tasks reviews" }));
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Independent decision" }),
+    );
+    expect(navigate).toHaveBeenCalledWith({
+      name: "task",
+      id: "assigned",
+      projectId: "project",
+      view: "review",
+    });
+  } finally {
+    mockTasks = [];
+  }
+});
+
+test("older pages loaded under one filter never leak into another filter's list", async () => {
+  jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+  const update = (id: string, title: string, type = "assignment"): Notification => ({
+    id,
+    title,
+    message: "",
+    type: type as Notification["type"],
+    read: false,
+    createdAt: 1,
+  });
+  const shared = update("shared", "Shared boundary", "petty_cash_decision");
+  const older = update("older", "Older work update");
+  const cursor = { createdAt: "2026-11-09T13:30:00+00:00", id: shared.id };
+  jest.mocked(fetchInboxUpdatePage).mockReset();
+  jest
+    .mocked(fetchInboxUpdatePage)
+    .mockImplementation(async (_actor, _unread, before, _signal, filters) =>
+      filters?.category === "finance"
+        ? // Same boundary row as the Work view's first page.
+          { items: [shared], next: cursor }
+        : before
+          ? { items: [older] }
+          : { items: [shared], next: cursor },
+    );
+  await render(<ActionInbox navigate={jest.fn()} />);
+  expect(await screen.findByText("Shared boundary")).toBeOnTheScreen();
+  // Visit Finance first so its page is cached and returns instantly later.
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Finance notifications, 1 unread" }),
+  );
+  expect(await screen.findByText("Finance updates")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Work notifications, 2 unread" }),
+  );
+  expect(await screen.findByText("Work updates")).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("button", { name: "View more" }));
+  expect(await screen.findByText("Older work update")).toBeOnTheScreen();
+
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Finance notifications, 1 unread" }),
+  );
+  expect(await screen.findByText("Finance updates")).toBeOnTheScreen();
+  expect(screen.getByText("Shared boundary")).toBeOnTheScreen();
+  expect(screen.queryByText("Older work update")).toBeNull();
+});
+
+test("search waits for typing to pause, filters on the server, and can be cleared", async () => {
+  jest.useFakeTimers();
+  try {
+    jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+    jest.mocked(fetchInboxUpdatePage).mockReset();
+    jest
+      .mocked(fetchInboxUpdatePage)
+      .mockImplementation(async (_actor, _unread, _before, _signal, filters) =>
+        filters?.search
+          ? { items: [] }
+          : {
+              items: [
+                {
+                  id: "u1",
+                  title: "Permit assignment",
+                  message: "",
+                  type: "assignment",
+                  read: true,
+                  createdAt: 1,
+                },
+              ],
+            },
+      );
+    await render(<ActionInbox navigate={jest.fn()} />);
+    expect(await screen.findByText("Permit assignment")).toBeOnTheScreen();
+    const field = screen.getByLabelText("Search updates");
+    await fireEvent.changeText(field, "zoning (draft)");
+    // No request until typing pauses.
+    expect(
+      jest.mocked(fetchInboxUpdatePage).mock.calls.some((call) => !!call[4]?.search),
+    ).toBe(false);
+    await act(async () => jest.advanceTimersByTime(300));
+    expect(await screen.findByText("No matching updates")).toBeOnTheScreen();
+    expect(fetchInboxUpdatePage).toHaveBeenCalledWith(
+      "actor",
+      false,
+      undefined,
+      undefined,
+      { category: "all", search: "zoning draft" },
+    );
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Clear search and filters" }),
+    );
+    expect(await screen.findByText("Permit assignment")).toBeOnTheScreen();
+    expect(field.props.value).toBe("");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("mark all read asks first, confirms the server write, and reports failures", async () => {
+  jest.mocked(getAssignedIndependentReviews).mockResolvedValue([]);
+  jest.mocked(fetchInboxUpdatePage).mockReset();
+  let read = false;
+  jest.mocked(fetchInboxUpdatePage).mockImplementation(async () => ({
+    items: [
+      {
+        id: "u1",
+        title: "Permit assignment",
+        message: "",
+        type: "assignment",
+        read,
+        createdAt: 1,
+      },
+    ],
+  }));
+  jest
+    .mocked(confirmAction)
+    .mockResolvedValueOnce(false)
+    .mockResolvedValue(true);
+  jest
+    .mocked(markAllInboxUpdatesRead)
+    .mockReset()
+    .mockRejectedValueOnce(new Error("Write denied"))
+    .mockImplementationOnce(async () => {
+      read = true;
+      return 1;
+    });
+  await render(<ActionInbox navigate={jest.fn()} />);
+  expect(await screen.findByText("Permit assignment")).toBeOnTheScreen();
+
+  // Declining the confirmation writes nothing.
+  await fireEvent.press(screen.getByRole("button", { name: "Mark all read" }));
+  expect(markAllInboxUpdatesRead).not.toHaveBeenCalled();
+
+  // A failed write is reported and the update stays unread.
+  await fireEvent.press(screen.getByRole("button", { name: "Mark all read" }));
+  await waitFor(() =>
+    expect(
+      screen.getByText("We couldn't load this information. Please try again."),
+    ).toBeOnTheScreen(),
+  );
+  expect(screen.getByRole("button", { name: "Mark as read" })).toBeOnTheScreen();
+
+  await fireEvent.press(screen.getByRole("button", { name: "Mark all read" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Mark as read" })).toBeNull(),
+  );
+  expect(markAllInboxUpdatesRead).toHaveBeenLastCalledWith("actor");
 });

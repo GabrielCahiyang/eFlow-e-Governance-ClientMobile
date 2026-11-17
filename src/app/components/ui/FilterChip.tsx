@@ -9,12 +9,15 @@ export function FilterChip({
   selected = false,
   icon = false,
   accessibilityLabel,
+  count,
 }: {
   label: string;
   onPress: () => void;
   selected?: boolean;
   icon?: boolean;
   accessibilityLabel?: string;
+  /** Optional badge, e.g. unread items in this filter. Hidden when 0. */
+  count?: number;
 }) {
   const palette = useTheme();
   return (
@@ -56,6 +59,29 @@ export function FilterChip({
         >
           {label}
         </Text>
+        {!!count && count > 0 && (
+          <View
+            style={{
+              minWidth: 20,
+              height: 20,
+              borderRadius: 10,
+              paddingHorizontal: 6,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: palette.primary,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: palette.onPrimary,
+              }}
+            >
+              {count > 99 ? "99+" : count}
+            </Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );

@@ -110,9 +110,9 @@ test("AccountingHome renders officer hero, action cards, pipeline strip, outstan
   const navigate = jest.fn();
   const view = await render(<AccountingHome navigate={navigate} />);
 
-  // No bulky header container
+  // No bulky header container; Office context stays in the hero subtitle.
   expect(view.queryByText("Financial Work")).toBeNull();
-  expect(view.queryByText("City Accounting Office")).toBeNull();
+  expect(view.getByText("City Accounting Office")).toBeOnTheScreen();
   expect(view.queryByText("Accounting Staff · Maria Santos")).toBeNull();
 
   // Action Required Cards
