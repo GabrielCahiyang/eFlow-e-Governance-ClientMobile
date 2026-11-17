@@ -138,3 +138,21 @@ test("the Inbox shows an accessible indicator only while there are unread update
   await view.rerender(<NativeBottomNavigation role="member" selected="work" onSelect={jest.fn()} />);
   expect(view.queryByTestId("inbox-unread-indicator")).toBeNull();
 });
+
+test("the Inbox tab shows the unread count, capped at 99+, and hides it at zero", async () => {
+  const view = await render(
+    <NativeBottomNavigation role="member" selected="work" onSelect={jest.fn()} inboxUnread={7} />,
+  );
+  expect(view.getByTestId("inbox-unread-count")).toHaveTextContent("7");
+  expect(view.getByRole("tab", { name: "Inbox" }).props.accessibilityHint).toBe(
+    "7 unread updates",
+  );
+  await view.rerender(
+    <NativeBottomNavigation role="member" selected="work" onSelect={jest.fn()} inboxUnread={100} />,
+  );
+  expect(view.getByTestId("inbox-unread-count")).toHaveTextContent("99+");
+  await view.rerender(
+    <NativeBottomNavigation role="member" selected="work" onSelect={jest.fn()} inboxUnread={0} />,
+  );
+  expect(view.queryByTestId("inbox-unread-indicator")).toBeNull();
+});

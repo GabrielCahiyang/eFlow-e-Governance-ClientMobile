@@ -1,11 +1,88 @@
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { NavigationRow } from "../../components/ui/NavigationRow";
 import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
 import { space, type } from "../../components/ui/theme";
 import type { AppRoute, Navigate } from "../../shared/routes";
+
+/** One radius and one surface for every grouped list on Home. */
+const homeCardRadius = 14;
+
+export function HomeCard({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const palette = useTheme();
+  return (
+    <View
+      style={[
+        {
+          borderRadius: homeCardRadius,
+          borderWidth: 1,
+          borderColor: palette.border,
+          backgroundColor: palette.surface,
+          overflow: "hidden",
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+/**
+ * A full-width tappable row inside HomeCard. Rows share one separator and one
+ * padding rhythm so Home reads as a column of lists, not a wall of cards.
+ */
+export function HomeRow({
+  children,
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
+  isFirst = false,
+}: {
+  children: ReactNode;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  isFirst?: boolean;
+}) {
+  const palette = useTheme();
+  return (
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: space.md,
+        minHeight: 56,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderTopWidth: isFirst ? 0 : StyleSheet.hairlineWidth,
+        borderTopColor: palette.border,
+        backgroundColor: pressed && onPress ? palette.primarySoft : "transparent",
+      })}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 export function HomeSection({
   title,

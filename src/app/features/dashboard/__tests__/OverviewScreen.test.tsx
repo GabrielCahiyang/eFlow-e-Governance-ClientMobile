@@ -122,7 +122,7 @@ test("Head Home displays exactly three Office projects with consistent totals an
   expect(view.queryByText("Archived work")).toBeNull();
   expect(view.queryByText("Personal shortcut")).toBeNull();
   expect(view.queryByText("Favorites")).toBeNull();
-  expect(view.getByText("Office Command Overview")).toBeOnTheScreen();
+  expect(view.getByText("Needs your decision")).toBeOnTheScreen();
   expect(view.getByText(/Planning Office/)).toBeOnTheScreen();
   expect(view.queryByText("Appointed Office Head")).toBeNull();
   expect(
@@ -194,7 +194,9 @@ test("Head Home displays attention cards with category labels for pending review
       view.queryByText("Action required · Review work · District permits"),
     ).toBeNull();
     await fireEvent.press(
-      view.getByRole("button", { name: "Commercial Permit Inspection" }),
+      view.getByRole("button", {
+        name: "Review required. Commercial Permit Inspection",
+      }),
     );
     expect(navigate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -239,9 +241,8 @@ test("Head Home deduplicates the leading Action required prefix while preserving
     const view = await render(<OverviewScreen navigate={navigate} />);
     expect(
       await view.findAllByText("Clearance bottleneck"),
-    ).toHaveLength(2);
-    expect(view.getByText("Office Risks")).toBeOnTheScreen();
-    expect(view.getByText("Blocked · Waiting on clearance")).toBeOnTheScreen();
+    ).toHaveLength(1);
+    expect(view.queryByText("Office Risks")).toBeNull();
     expect(view.getByText("Action required")).toBeOnTheScreen();
     expect(
       StyleSheet.flatten(view.getByText("Action required").props.style).color,
@@ -305,27 +306,27 @@ test("Member Home displays personalized command center with contributor visibili
   ];
   try {
     const view = await render(<OverviewScreen navigate={navigate} />);
-    // Section A: Personal Work Overview
-    expect(view.getByText("Personal Work Overview")).toBeOnTheScreen();
+    // Hero summary carries the personal work counts; no duplicate overview card.
+    expect(view.queryByText("Personal Work Overview")).toBeNull();
     expect(view.getByText("Planning Office")).toBeOnTheScreen();
     expect(view.getByText("Overdue")).toBeOnTheScreen();
-    expect(view.getByText("Due Today")).toBeOnTheScreen();
-    expect(view.getByText("Awaiting")).toBeOnTheScreen();
+    expect(view.getByText("Due today")).toBeOnTheScreen();
+    expect(view.getByText("Awaiting review")).toBeOnTheScreen();
 
-    // Section B: Needs Your Action - both lead and contributor visible
-    expect(view.getByText("Needs Your Action")).toBeOnTheScreen();
+    // Section B: Needs your action - both lead and contributor visible
+    expect(view.getByText("Needs your action")).toBeOnTheScreen();
     expect(view.getByText("Road survey")).toBeOnTheScreen();
     expect(view.getByText("Review requested changes")).toBeOnTheScreen();
 
     expect(view.getByText("Verify inventory")).toBeOnTheScreen();
     expect(view.getByText("Open assigned task")).toBeOnTheScreen();
 
-    // Section D: Latest Updates
-    expect(view.getByText("Latest Updates")).toBeOnTheScreen();
+    // Section D: Latest updates
+    expect(view.getByText("Latest updates")).toBeOnTheScreen();
     expect(view.getByText("New subtask assigned")).toBeOnTheScreen();
 
-    // Section E: Waiting on Others
-    expect(view.getByText("Waiting on Others")).toBeOnTheScreen();
+    // Section E: Waiting on others
+    expect(view.getByText("Waiting on others")).toBeOnTheScreen();
     expect(view.getByText("Check permits")).toBeOnTheScreen();
     expect(view.getByText("Awaiting independent review")).toBeOnTheScreen();
 
@@ -336,13 +337,13 @@ test("Member Home displays personalized command center with contributor visibili
       view: "overdue",
     });
 
-    await fireEvent.press(view.getByText("Due Today"));
+    await fireEvent.press(view.getByText("Due today"));
     expect(navigate).toHaveBeenCalledWith({
       name: "personal_work",
       view: "today",
     });
 
-    await fireEvent.press(view.getByText("Awaiting"));
+    await fireEvent.press(view.getByText("Awaiting review"));
     expect(navigate).toHaveBeenCalledWith({
       name: "personal_work",
       view: "awaiting",
@@ -385,9 +386,9 @@ test("Member Home hides Waiting on Others when no items are pending review or bl
   ];
   try {
     const view = await render(<OverviewScreen navigate={jest.fn()} />);
-    expect(view.getByText("Needs Your Action")).toBeOnTheScreen();
+    expect(view.getByText("Needs your action")).toBeOnTheScreen();
     expect(view.getByText("Active task")).toBeOnTheScreen();
-    expect(view.queryByText("Waiting on Others")).toBeNull();
+    expect(view.queryByText("Waiting on others")).toBeNull();
   } finally {
     mockWorkRows = [];
   }

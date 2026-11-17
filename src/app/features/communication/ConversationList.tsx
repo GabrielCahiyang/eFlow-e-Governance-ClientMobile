@@ -81,7 +81,7 @@ export function ConversationList({
                 minHeight: 44,
                 fontSize: 15,
                 color: palette.text,
-                fontFamily: "Figtree_400Regular",
+                fontFamily: "HostGrotesk_400Regular",
               }}
             />
             {!!query && (

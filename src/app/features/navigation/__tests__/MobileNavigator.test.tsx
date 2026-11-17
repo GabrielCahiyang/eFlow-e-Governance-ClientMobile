@@ -41,7 +41,14 @@ jest.mock("../../authentication", () => ({
   }),
 }));
 jest.mock("../../workspaces", () => ({ useWorkspace: () => mockWorkspace }));
-jest.mock("../../notifications", () => ({ usePushInbox: () => {}, useInboxIndicator: () => false }));
+jest.mock("../../notifications", () => ({
+  usePushInbox: () => {},
+  useInboxIndicator: () => ({
+    unread: 0,
+    refresh: async () => {},
+    refreshIfStale: async () => {},
+  }),
+}));
 jest.mock("../../communication", () => ({
   useConversationDirectory: () => ({ data: [] }),
 }));

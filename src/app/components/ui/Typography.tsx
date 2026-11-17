@@ -9,13 +9,13 @@ import {
   type TextStyle,
 } from "react-native";
 const families: Record<string, string> = {
-  normal: "Figtree_400Regular",
-  "400": "Figtree_400Regular",
-  "500": "Figtree_500Medium",
-  "600": "Figtree_600SemiBold",
-  bold: "Figtree_700Bold",
-  "700": "Figtree_700Bold",
-  "800": "Figtree_800ExtraBold",
+  normal: "HostGrotesk_400Regular",
+  "400": "HostGrotesk_400Regular",
+  "500": "HostGrotesk_500Medium",
+  "600": "HostGrotesk_600SemiBold",
+  bold: "HostGrotesk_700Bold",
+  "700": "HostGrotesk_700Bold",
+  "800": "HostGrotesk_800ExtraBold",
 };
 function font(
   style: Readonly<Partial<TextStyle>> | null | undefined,
@@ -23,7 +23,7 @@ function font(
   if (style?.fontFamily) return {};
   return {
     fontFamily:
-      families[String(style?.fontWeight || 400)] || "Figtree_400Regular",
+      families[String(style?.fontWeight || 400)] || "HostGrotesk_400Regular",
     fontWeight: "normal",
   };
 }

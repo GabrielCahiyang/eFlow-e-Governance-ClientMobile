@@ -13,21 +13,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import House from "lucide-react-native/icons/house";
 import CalendarCheck2 from "lucide-react-native/icons/calendar-check-2";
 import Bell from "lucide-react-native/icons/bell";
+import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
 import Wallet from "lucide-react-native/icons/wallet";
 import FolderKanban from "lucide-react-native/icons/folder-kanban";
 import More from "lucide-react-native/icons/circle-ellipsis";
 import { useTheme } from "../../components/ui/Appearance";
+import { Text } from "../../components/ui/Typography";
 import {
   motionDuration,
   motionEase,
   useMotionPreferences,
 } from "../../shared/motion";
 import type { PrimaryTab } from "../../shared/routes";
-import { primaryTabs, tabLabels } from "./mobileScope";
+import { hiddenBarTabs, primaryTabs, tabLabels } from "./mobileScope";
 import { SelectedTabIcon } from "./SelectedTabIcon";
 
 const icons = {
   home: House,
+  reviews: ClipboardCheck,
   work: CalendarCheck2,
   inbox: Bell,
   accounting: Wallet,
@@ -50,21 +53,27 @@ const bellRing: CSSAnimationKeyframes = {
 };
 const tabHeight = 52;
 
+type IconType = typeof House;
+/** A destination pinned from the More sheet into its own bar slot. */
+export type PinnedTab = { label: string; Icon: IconType };
+
 function TabGlyph({
   tab,
   index,
   selection,
   pressed,
   play,
+  icon,
 }: {
   tab: PrimaryTab;
   index: number;
   selection: SharedValue<number>;
   pressed: boolean;
   play: boolean;
+  icon?: IconType;
 }) {
   const palette = useTheme();
-  const Icon = icons[tab];
+  const Icon = icon ?? icons[tab];
   const outline = useAnimatedStyle(() => ({
     opacity: selection.get() === index ? 0 : 1,
   }));
@@ -92,7 +101,11 @@ function TabGlyph({
           },
         ]}
       >
-        <SelectedTabIcon tab={tab} color={palette.primary} />
+        {icon ? (
+          <Icon size={22} color={palette.primary} strokeWidth={2.4} />
+        ) : (
+          <SelectedTabIcon tab={tab} color={palette.primary} />
+        )}
       </Animated.View>
     </>
   );
@@ -103,25 +116,67 @@ export function NativeBottomNavigation({
   selected,
   onSelect,
   inboxUnread = false,
+  pinned,
+  onMore,
+  moreOpen = false,
 }: {
   role: string;
   selected: PrimaryTab;
-  inboxUnread?: boolean;
+  /** Destination shown in the slot before More; it lives in the More stack. */
+  pinned?: PinnedTab;
+  /** Opens the More sheet. Without it, More selects the More tab. */
+  onMore?: () => void;
+  moreOpen?: boolean;
+  /** Unread Inbox updates; `true` shows a dot when the count is unknown. */
+  inboxUnread?: boolean | number;
   onSelect: (tab: PrimaryTab) => void;
 }) {
   const palette = useTheme(),
     inset = useSafeAreaInsets(),
     tabs = primaryTabs(role);
+  type BarItem = {
+    key: string;
+    tab: PrimaryTab;
+    label: string;
+    Icon?: IconType;
+    sheet?: boolean;
+  };
+  const items: BarItem[] = tabs.length
+    ? [
+        ...tabs
+          .filter((tab) => tab !== "more" && !hiddenBarTabs.includes(tab))
+          .map((tab) => ({ key: tab, tab, label: tabLabels[tab] })),
+        ...(pinned
+          ? [
+              {
+                key: "pinned",
+                tab: "more" as const,
+                label: pinned.label,
+                Icon: pinned.Icon,
+              },
+            ]
+          : []),
+        { key: "more-sheet", tab: "more", label: tabLabels.more, sheet: true },
+      ]
+    : [];
   const { reduced, active: foreground } = useMotionPreferences();
   const animate = !reduced && foreground;
-  const [hoveredTab, setHoveredTab] = useState<PrimaryTab>();
+  const [hoveredTab, setHoveredTab] = useState<string>();
   const [trackWidth, setTrackWidth] = useState(0);
   const [motionTab, setMotionTab] = useState<PrimaryTab>();
   const previousSelection = useRef(selected);
-  const selectedIndex = tabs.indexOf(selected);
+  const pinnedIndex = items.findIndex(
+    (item) => !item.sheet && item.tab === selected,
+  );
+  const selectedIndex =
+    pinnedIndex >= 0
+      ? pinnedIndex
+      : selected === "more"
+        ? items.length - 1
+        : -1;
   const selection = useSharedValue(selectedIndex);
   const discPosition = useSharedValue(selectedIndex);
-  const slot = trackWidth / Math.max(1, tabs.length);
+  const slot = trackWidth / Math.max(1, items.length);
   const size = Math.min(tabHeight, Math.max(0, slot - 4));
   // Layout updates the disc's size and pixel position without starting a tab transition.
   const indicatorMotion = useAnimatedStyle(() => ({
@@ -192,21 +247,34 @@ export function NativeBottomNavigation({
               ]}
             />
           )}
-          {tabs.map((tab, index) => {
-            const active = selected === tab;
+          {items.map((item, index) => {
+            const tab = item.tab;
+            const active = index === selectedIndex;
             return (
               <Pressable
-                key={tab}
-                accessibilityRole="tab"
-                accessibilityLabel={tabLabels[tab]}
-                accessibilityHint={tab === "inbox" && inboxUnread ? "Unread updates" : undefined}
+                key={item.key}
+                accessibilityRole={item.sheet && onMore ? "button" : "tab"}
+                accessibilityLabel={item.label}
+                accessibilityHint={
+                  tab === "inbox" && inboxUnread
+                    ? typeof inboxUnread === "number"
+                      ? `${inboxUnread >= 100 ? "99+" : inboxUnread} unread update${inboxUnread === 1 ? "" : "s"}`
+                      : "Unread updates"
+                    : undefined
+                }
                 aria-selected={active}
-                accessibilityState={{ selected: active }}
-                onPress={() => onSelect(tab)}
-                onHoverIn={() => setHoveredTab(tab)}
+                accessibilityState={
+                  item.sheet && onMore
+                    ? { selected: active, expanded: moreOpen }
+                    : { selected: active }
+                }
+                onPress={() =>
+                  item.sheet && onMore ? onMore() : onSelect(tab)
+                }
+                onHoverIn={() => setHoveredTab(item.key)}
                 onHoverOut={() =>
                   setHoveredTab((previous) =>
-                    previous === tab ? undefined : previous,
+                    previous === item.key ? undefined : previous,
                   )
                 }
                 style={styles.tab}
@@ -214,13 +282,13 @@ export function NativeBottomNavigation({
                 {({ pressed }) => (
                   <View style={styles.iconSlot}>
                     <Animated.View
-                      testID={`tab-preview-${tab}`}
+                      testID={`tab-preview-${item.key}`}
                       pointerEvents="none"
                       style={[
                         styles.preview,
                         {
                           backgroundColor: palette.primarySoft,
-                          opacity: !active && hoveredTab === tab ? 0.55 : 0,
+                          opacity: !active && hoveredTab === item.key ? 0.55 : 0,
                         },
                         animate && {
                           transitionProperty: "opacity",
@@ -248,25 +316,57 @@ export function NativeBottomNavigation({
                         selection={selection}
                         pressed={pressed}
                         play={animate && active && motionTab === tab}
+                        icon={item.Icon}
                       />
                     </Animated.View>
-                    {tab === "inbox" && inboxUnread && (
+                    {tab === "inbox" && !!inboxUnread && (
                       <View
                         testID="inbox-unread-indicator"
                         importantForAccessibility="no"
                         pointerEvents="none"
-                        style={{
-                          position: "absolute",
-                          top: 8,
-                          right: 8,
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
-                          backgroundColor: palette.danger,
-                          borderColor: palette.surface,
-                          borderWidth: 1,
-                        }}
-                      />
+                        style={
+                          typeof inboxUnread === "number"
+                            ? {
+                                position: "absolute",
+                                top: 4,
+                                right: 2,
+                                minWidth: 18,
+                                height: 18,
+                                borderRadius: 9,
+                                paddingHorizontal: 4,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: palette.danger,
+                                borderColor: palette.surface,
+                                borderWidth: 1,
+                              }
+                            : {
+                                position: "absolute",
+                                top: 8,
+                                right: 8,
+                                width: 10,
+                                height: 10,
+                                borderRadius: 5,
+                                backgroundColor: palette.danger,
+                                borderColor: palette.surface,
+                                borderWidth: 1,
+                              }
+                        }
+                      >
+                        {typeof inboxUnread === "number" && (
+                          <Text
+                            testID="inbox-unread-count"
+                            style={{
+                              color: palette.onDanger,
+                              fontSize: 10,
+                              fontWeight: "700",
+                              lineHeight: 12,
+                            }}
+                          >
+                            {inboxUnread >= 100 ? "99+" : inboxUnread}
+                          </Text>
+                        )}
+                      </View>
                     )}
                   </View>
                 )}

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { View } from "react-native";
 import MessageCircle from "lucide-react-native/icons/message-circle";
 import Wallet from "lucide-react-native/icons/wallet";
-import Megaphone from "lucide-react-native/icons/megaphone";
 import Settings from "lucide-react-native/icons/settings";
 import LogOut from "lucide-react-native/icons/log-out";
 import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
@@ -15,7 +14,6 @@ import { useAuth } from "../authentication";
 import { useConversationDirectory } from "../communication";
 import type { Navigate, AppRoute } from "../../shared/routes";
 import { canOpenNativeSection } from "./nativeNavigation";
-import { useWorkspaceNavigation } from "../workspaces/WorkspaceNavigation";
 
 export function MoreScreen({ navigate }: { navigate: Navigate }) {
   const { profile, can, signOut } = useAuth(),
@@ -23,7 +21,6 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
     [error, setError] = useState<Error>(),
     [busy, setBusy] = useState(false);
   const chats = useConversationDirectory(profile?.id || "");
-  const { openFavorites } = useWorkspaceNavigation();
   const unreadMessages =
     !chats.error && chats.data?.some((chat) => chat.unread && !chat.archived);
 
@@ -38,7 +35,7 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
       ? [
           {
             title: "Projects",
-            subtitle: "Browse projects in this workspace",
+            subtitle: "Browse your Office projects",
             route: { name: "projects" as const },
             Icon: Folder,
             group: "Work" as const,
@@ -57,13 +54,6 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
       subtitle: "Team and direct conversations",
       route: { name: "messages" },
       Icon: MessageCircle,
-      group: "Communication",
-    },
-    {
-      title: "Announcements",
-      subtitle: "Official notices and Office broadcasts",
-      route: { name: "announcements" },
-      Icon: Megaphone,
       group: "Communication",
     },
     ...(profile?.org_id
@@ -143,12 +133,6 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
                 />
               );
             })}
-            {group === "Account" && (
-              <NavigationRow
-                title="Workspace favorites"
-                onPress={openFavorites}
-              />
-            )}
           </View>
         ) : null;
       })}
