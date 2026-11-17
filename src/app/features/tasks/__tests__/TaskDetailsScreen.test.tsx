@@ -3,6 +3,7 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { TaskDetailsScreen } from "../TaskDetailsScreen";
 import { getPhilippineCalendarDate } from "../../../../core/web/app/shared/calendarDates";
 jest.mock("../WorkProposalSheet", () => ({ WorkProposalReview: () => null, WorkProposalSheet: () => null }));
+jest.mock("../../budget/WorkFinancialClearancePanel", () => ({ WorkFinancialClearancePanel: () => null }));
 
 let mockStructureAccess: "head" | "delegated" | null = "head";
 let mockStructureLoading = false;
@@ -410,7 +411,7 @@ describe("TaskDetailsScreen with on-hold projects", () => {
     }
   });
 
-  test("explains why Start work is restricted for future start dates, incomplete prerequisites, and non-lead contributors, and subscribes to progress update tables", async () => {
+  test("allows future planned starts, blocks incomplete prerequisites and contributor starts, and subscribes to progress updates", async () => {
     const prevStartDate = mockTaskRow.start_date;
     const prevAssignedTo = mockTaskRow.assigned_to;
     try {
@@ -448,7 +449,7 @@ describe("TaskDetailsScreen with on-hold projects", () => {
       );
       await prereqView.unmount();
 
-      // Future start date notice
+      // Planned date is advisory; dependencies and authority still gate starting.
       mockTaskRow.dependency_ids = [];
       mockDependencyRows = [];
       mockTaskRow.start_date = "2099-01-01";
@@ -456,7 +457,7 @@ describe("TaskDetailsScreen with on-hold projects", () => {
         <TaskDetailsScreen id="task-1" projectId="proj-1" navigate={jest.fn()} />,
       );
       expect(
-        await futureView.findByText("Start work is available on or after the planned start date."),
+        await futureView.findByRole("button", { name: "Start work" }),
       ).toBeOnTheScreen();
       await futureView.unmount();
 

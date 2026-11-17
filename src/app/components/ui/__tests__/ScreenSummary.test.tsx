@@ -1,6 +1,6 @@
 import { expect, jest, test } from "@jest/globals";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { render, waitFor } from "@testing-library/react-native";
+import { act, render, waitFor } from "@testing-library/react-native";
 import * as ReactNative from "react-native";
 import { StyleSheet, View } from "react-native";
 import { AppearanceProvider } from "../Appearance";
@@ -12,9 +12,11 @@ import {
   LabelValue,
   MetricPair,
   Notice,
+  Screen,
   Status,
   type NoticeTone,
 } from "../index";
+import { beginOperation } from "../../../shared/operationActivity";
 import { ViewLoadingState } from "../loading/ViewLoadingState";
 import { colors, darkColors, withOpacity } from "../theme";
 
@@ -368,4 +370,22 @@ test("Status pill and ErrorState use uniform borders without crescent borderLeft
   expect(errorStyle.borderWidth).toBe(1);
   expect(errorStyle.borderRadius).toBe(18);
   expect(errorStyle.borderLeftWidth).toBeUndefined();
+});
+
+test("Screen shows OperationStatus as a floating bottom pill rather than above the page header", async () => {
+  const end = beginOperation("update");
+  try {
+    const view = await render(
+      <Screen title="Office Analytics">
+        <View />
+      </Screen>,
+    );
+    const floating = view.getByTestId("operation-status-floating");
+    expect(floating).toHaveStyle({ position: "absolute" });
+    expect(view.getByText("Updating…")).toBeOnTheScreen();
+  } finally {
+    act(() => {
+      end();
+    });
+  }
 });

@@ -13,6 +13,10 @@ import { submitPettyCashLiquidation } from "../../../../core/web/app/features/bu
 import { draftStore } from "../../../../platform/draftStore";
 import { chooseFiles, asServiceFile } from "../../../../platform/files";
 import { LiquidationSheet } from "../LiquidationSheet";
+import { fetchReceiptSubmissionClearance } from "../workFinancialClearance";
+jest.mock("../workFinancialClearance", () => ({
+  fetchReceiptSubmissionClearance: jest.fn(async (id: string) => ({version:1,requestId:id,workAccepted:true,canSubmit:true})),
+}));
 
 jest.mock("../../authentication", () => ({
   useAuth: () => ({ profile: { id: "actor" } }),
@@ -53,7 +57,7 @@ test("receipt editor preserves other receipts and never freezes an invalid packa
     />,
   );
   await waitFor(() =>
-    expect(screen.getByLabelText("Vendor")).toBeOnTheScreen(),
+    expect(screen.getByLabelText("Vendor")).toBeEnabled(),
   );
   await fireEvent.changeText(screen.getByLabelText("Vendor"), "First shop");
   await fireEvent.press(
@@ -104,7 +108,7 @@ test("an unconfirmed receipt package keeps the original key for retry", async ()
       readOnly={false}
     />,
   );
-  await screen.findByLabelText("Vendor");
+  await waitFor(() => expect(screen.getByLabelText("Vendor")).toBeEnabled());
   for (const [label, value] of [
     ["Vendor", "Example shop"],
     ["Expense description", "Supplies"],
@@ -114,7 +118,7 @@ test("an unconfirmed receipt package keeps the original key for retry", async ()
     await fireEvent.changeText(screen.getByLabelText(label), value);
   }
   await fireEvent.press(
-    screen.getByRole("button", { name: "Attach receipt image or PDF" }),
+    screen.getByRole("button", { name: "Attach receipt image or PDF (required)" }),
   );
   await fireEvent.press(
     screen.getByRole("button", { name: "Submit receipts for review" }),
@@ -130,4 +134,14 @@ test("an unconfirmed receipt package keeps the original key for retry", async ()
   const attempts = jest.mocked(submitPettyCashLiquidation).mock.calls;
   expect(attempts[0][0].idempotencyKey).toBe(attempts[1][0].idempotencyKey);
   expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+test("financial receipts stay locked before work acceptance, while required attachment copy remains clear", async () => {
+  jest.mocked(fetchReceiptSubmissionClearance).mockResolvedValueOnce({version:1,requestId:"locked-request",workAccepted:false,canSubmit:false});
+  const view = await render(<LiquidationSheet request={{id:"locked-request",requestNumber:5,releasedAmount:50} as PettyCashRequest}
+    bundle={{allocationLines:[]} as unknown as DepartmentBudgetBundle} onClose={jest.fn()} onSaved={async()=>{}} readOnly={false}/>);
+  expect(await screen.findByText("Receipts become available after the work is accepted.")).toBeOnTheScreen();
+  expect(screen.getByRole("button",{name:"Attach receipt image or PDF (required)"})).toBeDisabled();
+  expect(screen.getByRole("button",{name:"Submit receipts for review"})).toBeDisabled();
+  await view.unmount();
 });

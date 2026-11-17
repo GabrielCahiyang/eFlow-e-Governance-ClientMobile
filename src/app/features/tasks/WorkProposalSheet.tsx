@@ -43,6 +43,7 @@ import {
   type ProposalRequest,
   type WorkProposal,
 } from "./workProposals";
+import { assertWorkAcceptanceAvailable } from "../budget";
 
 export function WorkProposalReview({
   actor,
@@ -174,13 +175,7 @@ export function WorkProposalReview({
               "This submission is no longer assigned to you.",
             );
           if (selected.approve && needsCashCheck(current)) {
-            const cashStatus = (await fetchAssignedSubtaskReviews()).find(
-              (entry) => entry.id === current.id,
-            );
-            if (!cashStatus || cashStatus.cash_blocked)
-              throw new PublicMessageError(
-                "Cash settlement must be verified before approving this work.",
-              );
+            await assertWorkAcceptanceAvailable(root, node);
           }
         } else if (!pending || !current)
           throw new PublicMessageError(
@@ -354,7 +349,7 @@ export function WorkProposalReview({
                 {cashBlocked(item) && (
                   <>
                     <Notice tone="warning">
-                      Completion is waiting for cash settlement.
+                      Work can be accepted now. Required receipts and settlement still block final completion.
                     </Notice>
                     <Button
                       variant="outline"
@@ -400,7 +395,6 @@ export function WorkProposalReview({
                     recovery.loading ||
                     !!recovery.error ||
                     facts.loading ||
-                    !!cashBlocked(item) ||
                     cashUnavailable(item)
                   }
                   onPress={() => {

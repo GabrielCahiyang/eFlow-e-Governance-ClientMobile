@@ -526,6 +526,7 @@ export function ActionInbox({
       contentContainerStyle={{
         flexGrow: 1,
         padding: space.lg,
+        paddingBottom: space.lg + (navHeader?.bottomInset ?? 0),
         gap: space.sm,
       }}
       stickySectionHeadersEnabled={false}

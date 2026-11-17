@@ -10,6 +10,7 @@ export function useCashRequestUpdates(
   reload: () => Promise<unknown>,
   subtaskId?: string,
   includeAllocations = false,
+  includeWork = false,
 ) {
   useEffect(() => {
     if (!enabled) return;
@@ -43,15 +44,20 @@ export function useCashRequestUpdates(
         refresh,
       );
     }
+    if (includeWork) {
+      channel.on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `id=eq.${taskId}` }, refresh);
+    }
     channel.subscribe(live.onChannelStatus);
     const changed = (event: { detail?: { taskId?: string } }) => {
       if (!event.detail?.taskId || event.detail.taskId === taskId) refresh();
     };
     nativeWindow.addEventListener("eflow:finance-updated", changed);
+    if (includeWork) nativeWindow.addEventListener("eflow:work-updated", changed);
     return () => {
       live.dispose();
       nativeWindow.removeEventListener("eflow:finance-updated", changed);
+      if (includeWork) nativeWindow.removeEventListener("eflow:work-updated", changed);
       void supabase.removeChannel(channel);
     };
-  }, [taskId, subtaskId, enabled, reload, includeAllocations]);
+  }, [taskId, subtaskId, enabled, reload, includeAllocations, includeWork]);
 }

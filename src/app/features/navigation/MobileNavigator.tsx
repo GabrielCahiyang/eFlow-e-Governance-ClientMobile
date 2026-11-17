@@ -70,6 +70,22 @@ const noWorkspaceChooser = {
   workspaceChooserOpen: false,
 };
 
+type TabRouteParams = {
+  name?: string;
+  id?: string;
+  taskId?: string;
+  projectId?: string;
+};
+
+/** Focused chat conversations hide the floating tab bar so the composer owns the bottom edge. */
+function hidesTabBar(routeName?: string, params?: TabRouteParams): boolean {
+  return (
+    routeName === "Destination" &&
+    params?.name === "messages" &&
+    Boolean(params.id || params.taskId || params.projectId)
+  );
+}
+
 /** Order authorized workspaces by how likely they hold the route's record. */
 function workspaceCandidates(route: AppRoute, workspaces: Workspace[]) {
   const rank = (item: Workspace) =>
@@ -171,24 +187,10 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
               lazy: true,
             }}
             tabBar={({ state, navigation: tabs }) => {
-              // An open conversation is a focused task: hide the tab bar so
-              // the composer owns the bottom edge (Messenger/WhatsApp style).
               const stack = state.routes[state.index].state;
               const top = stack?.routes[stack.index ?? stack.routes.length - 1];
-              const params = top?.params as
-                | {
-                    name?: string;
-                    id?: string;
-                    taskId?: string;
-                    projectId?: string;
-                  }
-                | undefined;
-              if (
-                top?.name === "Destination" &&
-                params?.name === "messages" &&
-                (params.id || params.taskId || params.projectId)
-              )
-                return null;
+              const params = top?.params as TabRouteParams | undefined;
+              if (hidesTabBar(top?.name, params)) return null;
               return (
                 <NativeBottomNavigation
                   role={role}
@@ -371,6 +373,9 @@ function MobileRoute({
     backHint:
       route.name === "Root" ? "Returns to Home" : "Returns to previous screen",
     topInset: inset.top,
+    bottomInset: hidesTabBar(route.name, destination.route)
+      ? 0
+      : Math.max(12, inset.bottom) + 84,
     routeTitle: destination.title,
   };
   const needsWorkspace = [

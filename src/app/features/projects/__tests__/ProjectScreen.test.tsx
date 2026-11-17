@@ -93,6 +93,9 @@ test("an archived project loads its historical rows, supports manual refresh, an
   expect(
     screen.getByRole("header", { name: "Group: Field work" }),
   ).toBeOnTheScreen();
+  expect(screen.getByText("QA Owner")).toBeOnTheScreen();
+  expect(screen.getByRole("tab", { name: "Cards view" })).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("tab", { name: "Table view" }));
   expect(screen.getByRole("header", { name: "Status" })).toBeOnTheScreen();
   expect(screen.getByRole("header", { name: "Start date" })).toBeOnTheScreen();
   expect(screen.getByRole("header", { name: "Budget" })).toBeOnTheScreen();
@@ -101,6 +104,10 @@ test("an archived project loads its historical rows, supports manual refresh, an
   ).toBeOnTheScreen();
   expect(screen.queryByRole("header", { name: "Office" })).toBeNull();
   expect(screen.getByText("QA Owner")).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("tab", { name: "Cards view" }));
+  const activeRow = await screen.findByRole("button", {
+    name: historicalTask.title,
+  });
 
   const scroll = screen.container.queryAll(
     (node) => !!node.props.onAccessibilityAction,
@@ -121,7 +128,7 @@ test("an archived project loads its historical rows, supports manual refresh, an
   expect(
     screen.getByRole("progressbar", { name: "Refreshing" }),
   ).toBeOnTheScreen();
-  expect(row).toBeOnTheScreen();
+  expect(activeRow).toBeOnTheScreen();
   await act(async () => finish({ tasks: [historicalTask] }));
   await waitFor(() => expect(screen.queryByLabelText("Refreshing")).toBeNull());
 

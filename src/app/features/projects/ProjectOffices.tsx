@@ -1,7 +1,9 @@
 import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
+import { StyleSheet, View } from "react-native";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
+import Building from "lucide-react-native/icons/building";
 import Check from "lucide-react-native/icons/check";
 import Mail from "lucide-react-native/icons/mail";
 import Plus from "lucide-react-native/icons/plus";
@@ -11,6 +13,7 @@ import {
   Button,
   Card,
   Choice,
+  DetailGroup,
   ErrorState,
   Field,
   LabelValue,
@@ -19,7 +22,7 @@ import {
   Row,
   Sheet,
   Status,
-  colors,
+  withOpacity,
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
@@ -41,6 +44,7 @@ import {
 } from "../../../core/web/app/features/project-offices/services/officeIdentityService";
 import { fetchAllOrgs } from "../../../core/web/lib/supabaseService";
 import type { Project } from "../../../core/web/app/features/projects/services/types";
+
 export function ProjectOffices({
   project,
   canManage,
@@ -76,7 +80,8 @@ export function ProjectOffices({
       email: "",
       officeId: "",
       access: "collaborating" as "collaborating" | "observer",
-    }), { restoreOnOpen: false },
+    }),
+    { restoreOnOpen: false },
   );
   const { name, email, officeId, access } = draft;
   const closed = ["completed", "archived"].includes(project.status);
@@ -143,24 +148,30 @@ export function ProjectOffices({
                   facts.data?.orgs.find((o) => o.id === office.office_id)
                     ?.name || "Office"
                 }
+                icon={<Building size={16} color={palette.primary} />}
+                action={
+                  <Status value={office.invitation_status} variant="pill" />
+                }
+                style={{ gap: 12 }}
               >
-                <LabelValue
-                  label="Relationship"
-                  value={office.relationship_type}
-                />
-                <LabelValue
-                  label="Contact"
-                  value={office.contact_email || "Not provided"}
-                />
-                <Status value={office.invitation_status} />
-                <LabelValue
-                  label="Selected members"
-                  value={
-                    facts.data!.participation.members.filter(
-                      (m) => m.project_office_id === office.id,
-                    ).length
-                  }
-                />
+                <DetailGroup>
+                  <LabelValue
+                    label="Relationship"
+                    value={office.relationship_type}
+                  />
+                  <LabelValue
+                    label="Contact"
+                    value={office.contact_email || "Not provided"}
+                  />
+                  <LabelValue
+                    label="Selected members"
+                    value={
+                      facts.data!.participation.members.filter(
+                        (m) => m.project_office_id === office.id,
+                      ).length
+                    }
+                  />
+                </DetailGroup>
                 {!!(
                   canManage &&
                   !closed &&
@@ -200,20 +211,42 @@ export function ProjectOffices({
             {facts.data.identities
               .filter((i) => !i.provenance?.removed)
               .map((identity) => (
-                <Card key={identity.id} title={identity.display_name}>
+                <Card
+                  key={identity.id}
+                  title={identity.display_name}
+                  icon={<Building size={16} color={palette.mutedLabel} />}
+                  action={
+                    <Status value={identity.contact_status} variant="pill" />
+                  }
+                  style={{ gap: 12 }}
+                >
                   {!identity.contact_email && (
-                    <Row>
-                      <AlertCircle size={18} color={colors.warning} />
-                      <Text style={{ color: colors.warning }}>
+                    <View
+                      style={[
+                        styles.warningBanner,
+                        {
+                          backgroundColor: palette.warningSoft,
+                          borderColor: withOpacity(palette.warning, 0.28),
+                        },
+                      ]}
+                    >
+                      <AlertCircle size={16} color={palette.warning} />
+                      <Text
+                        style={[
+                          styles.warningText,
+                          { color: palette.warning },
+                        ]}
+                      >
                         Needs a project contact
                       </Text>
-                    </Row>
+                    </View>
                   )}
-                  <LabelValue
-                    label="Contact"
-                    value={identity.contact_email || "Not provided"}
-                  />
-                  <Status value={identity.contact_status} />
+                  <DetailGroup>
+                    <LabelValue
+                      label="Contact"
+                      value={identity.contact_email || "Not provided"}
+                    />
+                  </DetailGroup>
                   {!!(canManage && !closed) && (
                     <Button
                       variant="outline"
@@ -317,3 +350,20 @@ export function ProjectOffices({
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+});

@@ -1,20 +1,26 @@
 import { useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import Check from "lucide-react-native/icons/check";
 import Plus from "lucide-react-native/icons/plus";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Wallet from "lucide-react-native/icons/wallet";
 import X from "lucide-react-native/icons/x";
 import {
   Button,
   Card,
   Choice,
+  DetailGroup,
   ErrorState,
   Field,
   LabelValue,
   Loading,
+  MetricPair,
   Notice,
   peso,
+  withOpacity,
 } from "../../components/ui";
-import { useTheme } from "../../components/ui/Appearance";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
+import { Text } from "../../components/ui/Typography";
 import { useAction } from "../../shared/useAction";
 import { useToast } from "../../components/ui/Toast";
 import { PublicMessageError } from "../../shared/userMessages";
@@ -75,6 +81,7 @@ export function ProjectTaskAccounts({
   onSaved: () => Promise<void>;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   const { profile } = useAuth();
   const facts = useFacts(
     "project-task-accounts:" + profile?.id + ":" + projectId,
@@ -108,6 +115,9 @@ export function ProjectTaskAccounts({
   const existing = total(lines.map((l) => l.amount));
   const adding = total(rows.map((r) => amountValue(r.amount)));
   const locked = action.busy || retry;
+  const insetSurface = isDark
+    ? withOpacity(palette.background, 0.72)
+    : "#f7f9fd";
   const update = (index: number, value: Partial<Entry>) =>
     setRows((old) =>
       old.map((row, i) => (i === index ? { ...row, ...value } : row)),
@@ -193,22 +203,84 @@ export function ProjectTaskAccounts({
     await onSaved().catch(() => {});
   }
   return (
-    <Card title="Project budget accounts">
+    <Card
+      title="Project budget accounts"
+      icon={<Wallet size={16} color={palette.primary} />}
+      badge={
+        data
+          ? `${lines.length} ${lines.length === 1 ? "line" : "lines"}`
+          : undefined
+      }
+      style={{ gap: 12 }}
+    >
       {facts.loading && !data && <Loading />}
       {!!facts.error && (
         <ErrorState error={facts.error} retry={() => void facts.refresh()} />
       )}
       {!!data && (
         <>
-          <LabelValue
-            label="Project funds left"
-            value={peso(data.unallocated)}
+          <MetricPair
+            items={[
+              {
+                key: "left",
+                label: "Project funds left",
+                value: peso(data.unallocated),
+                tone: data.unallocated > 0 ? "info" : "neutral",
+                icon: <Wallet size={16} color={palette.blue} />,
+              },
+              {
+                key: "allocated",
+                label: "Already allocated",
+                value: peso(existing),
+                tone: existing > 0 ? "success" : "neutral",
+                icon: <Check size={16} color={palette.success} />,
+              },
+            ]}
           />
-          <LabelValue label="Already allocated" value={peso(existing)} />
+
           {lines.map((line) => (
-            <Card key={line.id} title={line.source}>
-              <LabelValue label="Allocated" value={peso(line.amount)} />
-              <LabelValue label="Unused balance" value={peso(line.available)} />
+            <View
+              key={line.id}
+              style={[
+                styles.insetBox,
+                {
+                  backgroundColor: insetSurface,
+                  borderColor: palette.border,
+                },
+              ]}
+            >
+              <View style={styles.insetHeader}>
+                <Text style={[styles.insetTitle, { color: palette.text }]}>
+                  {line.source}
+                </Text>
+                {!!line.fiscalYear && (
+                  <View
+                    style={[
+                      styles.fyChip,
+                      {
+                        backgroundColor: palette.primarySoft,
+                        borderColor: withOpacity(palette.primary, 0.24),
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.fyChipText,
+                        { color: palette.primaryDark },
+                      ]}
+                    >
+                      FY {line.fiscalYear}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <DetailGroup>
+                <LabelValue label="Allocated" value={peso(line.amount)} />
+                <LabelValue
+                  label="Unused balance"
+                  value={peso(line.available)}
+                />
+              </DetailGroup>
               {editable && line.available > 0 && !locked && (
                 <Button
                   variant="outline"
@@ -224,11 +296,20 @@ export function ProjectTaskAccounts({
                     : "Return unused funding"}
                 </Button>
               )}
-            </Card>
+            </View>
           ))}
+
           {returning && (
-            <>
-              <Notice>
+            <View
+              style={[
+                styles.insetBox,
+                {
+                  backgroundColor: insetSurface,
+                  borderColor: palette.border,
+                },
+              ]}
+            >
+              <Notice tone="warning">
                 Return unused funding to the project from {returning.source}.
               </Notice>
               <Field
@@ -250,8 +331,9 @@ export function ProjectTaskAccounts({
                   Keep allocation
                 </Button>
               )}
-            </>
+            </View>
           )}
+
           {!returning &&
             editable &&
             data.ready &&
@@ -259,7 +341,23 @@ export function ProjectTaskAccounts({
             sources.length > 0 && (
               <>
                 {rows.map((row, index) => (
-                  <Card key={index} title={"Account " + (index + 1)}>
+                  <View
+                    key={index}
+                    style={[
+                      styles.insetBox,
+                      {
+                        backgroundColor: insetSurface,
+                        borderColor: palette.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.insetHeader}>
+                      <Text
+                        style={[styles.insetTitle, { color: palette.text }]}
+                      >
+                        Account {index + 1}
+                      </Text>
+                    </View>
                     <Choice
                       label="Funding account"
                       value={row.sourceId}
@@ -302,7 +400,7 @@ export function ProjectTaskAccounts({
                         Remove account
                       </Button>
                     )}
-                  </Card>
+                  </View>
                 ))}
                 {!locked && rows.length < sources.length && (
                   <Button
@@ -313,11 +411,13 @@ export function ProjectTaskAccounts({
                     Add another account
                   </Button>
                 )}
-                <LabelValue label="Adding now" value={peso(adding)} />
-                <LabelValue
-                  label="New task total"
-                  value={peso(total([existing, adding]))}
-                />
+                <DetailGroup>
+                  <LabelValue label="Adding now" value={peso(adding)} />
+                  <LabelValue
+                    label="New task total"
+                    value={peso(total([existing, adding]))}
+                  />
+                </DetailGroup>
               </>
             )}
           {!returning && !sources.length && (
@@ -356,9 +456,42 @@ export function ProjectTaskAccounts({
             </>
           )}
           {!!action.notice && <Notice>{action.notice}</Notice>}
-          {!!action.error && <ErrorState context="action" error={action.error} />}
+          {!!action.error && (
+            <ErrorState context="action" error={action.error} />
+          )}
         </>
       )}
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  insetBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  insetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  insetTitle: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "700",
+  },
+  fyChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  fyChipText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+});

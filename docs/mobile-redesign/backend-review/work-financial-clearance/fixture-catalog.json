@@ -1,0 +1,275 @@
+{
+  "enums": [
+    {
+      "name": "factor_type",
+      "schema": "auth",
+      "values": [
+        "totp",
+        "webauthn",
+        "phone",
+        "recovery_code"
+      ]
+    },
+    {
+      "name": "factor_status",
+      "schema": "auth",
+      "values": [
+        "unverified",
+        "verified"
+      ]
+    },
+    {
+      "name": "aal_level",
+      "schema": "auth",
+      "values": [
+        "aal1",
+        "aal2",
+        "aal3"
+      ]
+    },
+    {
+      "name": "code_challenge_method",
+      "schema": "auth",
+      "values": [
+        "s256",
+        "plain"
+      ]
+    },
+    {
+      "name": "one_time_token_type",
+      "schema": "auth",
+      "values": [
+        "confirmation_token",
+        "reauthentication_token",
+        "recovery_token",
+        "email_change_token_new",
+        "email_change_token_current",
+        "phone_change_token"
+      ]
+    },
+    {
+      "name": "oauth_registration_type",
+      "schema": "auth",
+      "values": [
+        "dynamic",
+        "manual"
+      ]
+    },
+    {
+      "name": "oauth_authorization_status",
+      "schema": "auth",
+      "values": [
+        "pending",
+        "approved",
+        "denied",
+        "expired"
+      ]
+    },
+    {
+      "name": "oauth_response_type",
+      "schema": "auth",
+      "values": [
+        "code"
+      ]
+    },
+    {
+      "name": "oauth_client_type",
+      "schema": "auth",
+      "values": [
+        "public",
+        "confidential"
+      ]
+    },
+    {
+      "name": "buckettype",
+      "schema": "storage",
+      "values": [
+        "STANDARD",
+        "ANALYTICS",
+        "VECTOR"
+      ]
+    },
+    {
+      "name": "action",
+      "schema": "realtime",
+      "values": [
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "ERROR"
+      ]
+    },
+    {
+      "name": "equality_op",
+      "schema": "realtime",
+      "values": [
+        "eq",
+        "neq",
+        "lt",
+        "lte",
+        "gt",
+        "gte",
+        "in",
+        "like",
+        "ilike",
+        "is",
+        "match",
+        "imatch",
+        "isdistinct"
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "table": "petty_cash_liquidations",
+      "schema": "public",
+      "columns": "id uuid,request_id uuid,version integer,declared_spent numeric(16,2),returned_amount numeric(16,2),note text,status text,submitted_by uuid,submitted_at timestamp with time zone,decided_by uuid,decision_reason text,decided_at timestamp with time zone,leader_decided_by uuid,leader_decision_reason text,leader_decided_at timestamp with time zone,department_decided_by uuid,department_decision_reason text,department_decided_at timestamp with time zone,idempotency_key uuid,liquidation_number text,refund_receipt_number text,refund_date date,itemized_payload jsonb"
+    },
+    {
+      "table": "task_status_history",
+      "schema": "public",
+      "columns": "id uuid,task_id uuid,from_status text,to_status text,actor_id uuid,actor_name text,note text,created_at timestamp with time zone"
+    },
+    {
+      "table": "budget_ledger_entries",
+      "schema": "public",
+      "columns": "id uuid,fiscal_budget_id uuid,org_id uuid,commitment_id uuid,allocation_id uuid,petty_cash_request_id uuid,entry_type text,amount numeric(16,2),description text,actor_id uuid,metadata jsonb,created_at timestamp with time zone,task_id uuid,subtask_id uuid,allocation_line_id uuid,actor_role text,previous_state text,new_state text,reason text,correlation_key uuid"
+    },
+    {
+      "table": "organizations",
+      "schema": "public",
+      "columns": "id uuid,name text,slug text,parent_id uuid,path ltree,org_type text,description text,head_user_id uuid,is_active boolean,created_at timestamp with time zone,updated_at timestamp with time zone,assistant_head_user_id uuid"
+    },
+    {
+      "table": "projects",
+      "schema": "public",
+      "columns": "id uuid,org_id uuid,title text,description text,owner_id uuid,status text,priority text,start_date date,target_date date,archived_at timestamp with time zone,created_by uuid,created_at timestamp with time zone,updated_at timestamp with time zone,proposal_id text,proposal_title text,program_id text,program_title text,source_type text,source_file_name text,source_collaboration_draft_id uuid,source_collaboration_revision_id uuid,publication_state text,published_at timestamp with time zone,published_by uuid,scope text,project_lead_id uuid,funding_not_required boolean,setup_completed_at timestamp with time zone,completed_at timestamp with time zone,archive_reminded_at timestamp with time zone,archive_blocked_at timestamp with time zone"
+    },
+    {
+      "table": "work_budget_allocations",
+      "schema": "public",
+      "columns": "id uuid,commitment_id uuid,task_id uuid,subtask_id uuid,amount numeric(16,2),status text,reason text,requested_by uuid,decided_by uuid,decision_reason text,requested_at timestamp with time zone,decided_at timestamp with time zone,updated_at timestamp with time zone,parent_allocation_line_id uuid"
+    },
+    {
+      "table": "personal_tasks",
+      "schema": "public",
+      "columns": "id uuid,project_id uuid,title text,lead_id uuid,reviewer_id uuid,status text,progress integer,note text,review_note text,submitted_by uuid,revision integer,created_at timestamp with time zone"
+    },
+    {
+      "table": "task_submissions",
+      "schema": "public",
+      "columns": "id uuid,task_id uuid,version integer,submitter_id uuid,submitter_name text,note text,status text,decided_by uuid,decided_by_name text,decision_feedback text,decided_at timestamp with time zone,submitted_at timestamp with time zone,created_at timestamp with time zone"
+    },
+    {
+      "table": "petty_cash_requests",
+      "schema": "public",
+      "columns": "id uuid,request_number bigint,fiscal_budget_id uuid,commitment_id uuid,allocation_id uuid,org_id uuid,task_id uuid,subtask_id uuid,requester_id uuid,purpose text,requested_amount numeric(16,2),needed_by date,status text,approved_amount numeric(16,2),approved_by uuid,approval_reason text,decided_at timestamp with time zone,actual_spent numeric(16,2),returned_amount numeric(16,2),settled_by uuid,settled_at timestamp with time zone,created_at timestamp with time zone,updated_at timestamp with time zone,task_leader_id uuid,cash_recipient_id uuid,leader_decided_by uuid,leader_decision_reason text,leader_decided_at timestamp with time zone,department_decision_reason text,scheduled_amount numeric(16,2),released_amount numeric(16,2),liquidation_due_at timestamp with time zone,allocation_line_id uuid,reservation_expires_at timestamp with time zone,idempotency_key uuid,funding_org_id uuid,requester_org_id uuid,pcv_number bigint,pcv_date date,funding_lines_payload jsonb,pcv_legacy boolean"
+    },
+    {
+      "table": "profiles",
+      "schema": "public",
+      "columns": "id uuid,full_name text,email text,employee_id text,org_id uuid,role text,skills jsonb,workload integer,burnout_level text,is_active boolean,created_at timestamp with time zone,updated_at timestamp with time zone,email_notifications_enabled boolean,avatar_path text,custom_role_key text"
+    },
+    {
+      "table": "audit_events",
+      "schema": "public",
+      "columns": "id uuid,actor_id uuid,actor_name text,entity_type text,entity_id text,action text,reason text,before_data jsonb,after_data jsonb,metadata jsonb,org_id uuid,created_at timestamp with time zone"
+    },
+    {
+      "table": "personal_projects",
+      "schema": "public",
+      "columns": "id uuid,workspace_id uuid,title text,description text,workflow_mode text,status text,created_by uuid,created_at timestamp with time zone,revision integer"
+    },
+    {
+      "table": "notifications",
+      "schema": "public",
+      "columns": "id uuid,user_id uuid,type text,title text,message text,task_id uuid,task_title text,actor_id uuid,actor_name text,status_from text,status_to text,reason text,read boolean,created_at timestamp with time zone,project_id uuid,proposal_id text,org_id uuid,entity_type text,financial_record_id uuid,financial_record_type text,work_node_id uuid,conversation_id uuid,conversation_message_id uuid"
+    },
+    {
+      "table": "personal_subtasks",
+      "schema": "public",
+      "columns": "id uuid,task_id uuid,parent_subtask_id uuid,lead_id uuid,title text,assigned_to_ids uuid[],sibling_order integer,due_date date,is_standalone boolean,status text,percent_complete integer,note text,reviewer_id uuid,submitted_by uuid,created_at timestamp with time zone,start_date date,started_at timestamp with time zone"
+    },
+    {
+      "table": "mutations",
+      "schema": "eflow_r7",
+      "columns": "tx bigint,actor uuid,root_id uuid"
+    },
+    {
+      "table": "tasks",
+      "schema": "public",
+      "columns": "id uuid,title text,description text,status text,priority text,assigned_to uuid,assignee_name text,team_id text,team_name text,team_member_ids uuid[],team_member_names text[],org_id uuid,department text,deadline text,due_date text,tags text[],feedback text,rejection_note text,rejected_at timestamp with time zone,reopen_reason text,reopened_at timestamp with time zone,reopened_by_id uuid,reopened_by_name text,recommended_employee_ids uuid[],recommendation_reasoning text,recommendation_source text,recommendation_lead_id uuid,burnout_warning boolean,proposal_id text,proposal_title text,program_id text,program_title text,project_id text,project_title text,activity_id text,activity_title text,activity_schedule text,hierarchy_path text,import_batch_id text,audit_hash text,barangay text,estimated_hours double precision,budget_impact double precision,created_by uuid,created_at timestamp with time zone,updated_at timestamp with time zone,deleted_at timestamp with time zone,subtask_count integer,subtask_completed_count integer,latest_submission jsonb,linked_project_id uuid,milestone_id uuid,percent_complete integer,archived_at timestamp with time zone,last_activity_at timestamp with time zone,reviewer_id uuid,backup_reviewer_id uuid,acceptance_criteria jsonb,definition_of_done text,dependency_ids uuid[],cancellation_reason text,cancelled_at timestamp with time zone,cancelled_by uuid,review_route_mode text,source_collaboration_draft_id uuid,source_collaboration_revision_id uuid,governance_organization_id uuid,governance_approval_mode text,group_id uuid,workspace_position integer,start_date date,proposed_office_identity_id uuid,custom_status_id text"
+    },
+    {
+      "table": "subtasks",
+      "schema": "public",
+      "columns": "id uuid,task_id uuid,title text,is_completed boolean,completed_by uuid,completed_at timestamp with time zone,assigned_to uuid,\"position\" integer,source text,created_by uuid,created_at timestamp with time zone,updated_at timestamp with time zone,assigned_to_ids uuid[],status text,percent_complete integer,reviewer_id uuid,latest_submission_id uuid,is_standalone boolean,due_date date,due_date_change_reason text,due_date_changed_at timestamp with time zone,due_date_changed_by uuid,parent_subtask_id uuid,lead_id uuid,sibling_order integer,custom_status_id text,start_date date,started_at timestamp with time zone,priority text,dependency_ids uuid[]"
+    },
+    {
+      "table": "department_fiscal_budgets",
+      "schema": "public",
+      "columns": "id uuid,org_id uuid,fiscal_year integer,status text,approved_amount numeric(16,2),petty_cash_limit numeric(16,2),petty_cash_request_limit numeric(16,2),underutilization_threshold numeric(5,2),notes text,created_by uuid,locked_by uuid,locked_at timestamp with time zone,closed_by uuid,closed_at timestamp with time zone,created_at timestamp with time zone,updated_at timestamp with time zone,daily_petty_cash_release_limit numeric(16,2),per_receipt_limit numeric(16,2),liquidation_due_days integer,allow_receipt_limit_override boolean,sections_version integer"
+    },
+    {
+      "table": "petty_cash_receipt_items",
+      "schema": "public",
+      "columns": "id uuid,receipt_id uuid,allocation_line_id uuid,quantity numeric(16,3),unit text,particular text,purpose text,amount numeric(16,2),\"position\" integer,account_name text,account_label text,created_at timestamp with time zone"
+    },
+    {
+      "table": "petty_cash_request_lines",
+      "schema": "public",
+      "columns": "request_id uuid,allocation_line_id uuid,amount numeric(16,2)"
+    },
+    {
+      "table": "budget_commitments",
+      "schema": "public",
+      "columns": "id uuid,fiscal_budget_id uuid,proposal_draft_id uuid,proposal_revision_id uuid,title text,amount numeric(16,2),status text,created_by uuid,released_by uuid,released_at timestamp with time zone,release_reason text,created_at timestamp with time zone,updated_at timestamp with time zone,funding_kind text,authorization_key uuid,authorization_payload jsonb"
+    },
+    {
+      "table": "petty_cash_receipts",
+      "schema": "public",
+      "columns": "id uuid,liquidation_id uuid,vendor text,receipt_number text,receipt_date date,description text,amount numeric(16,2),file_name text,file_path text,mime_type text,file_size bigint,created_by uuid,created_at timestamp with time zone,override_reason text"
+    },
+    {
+      "table": "petty_cash_releases",
+      "schema": "public",
+      "columns": "id uuid,request_id uuid,org_id uuid,scheduled_date date,amount numeric(16,2),status text,recipient_id uuid,released_by uuid,released_at timestamp with time zone,created_by uuid,created_at timestamp with time zone,acknowledged_by uuid,acknowledged_at timestamp with time zone,voucher_number text,release_method text,cheque_number text"
+    },
+    {
+      "table": "activation",
+      "schema": "eflow_m7",
+      "columns": "tx bigint,root uuid"
+    },
+    {
+      "table": "work_proposals",
+      "schema": "eflow_m7",
+      "columns": "id uuid,root_id uuid,node_id uuid,author_id uuid,reviewer_id uuid,kind text,submitted_as_lead boolean,terms jsonb,baseline jsonb,supersedes uuid,state text,submitted_at timestamp with time zone,decided_at timestamp with time zone,decision_note text,decision_request uuid"
+    },
+    {
+      "table": "task_activities",
+      "schema": "public",
+      "columns": "id uuid,task_id uuid,actor_id uuid,actor_name text,type text,content text,metadata jsonb,created_at timestamp with time zone"
+    },
+    {
+      "table": "work_budget_allocation_lines",
+      "schema": "public",
+      "columns": "id uuid,allocation_id uuid,draft_task_key text,expense_class text,category text,particular text,quantity numeric(16,2),unit text,unit_cost numeric(16,2),amount numeric(16,2),fund_source text,\"position\" integer,created_at timestamp with time zone,budget_partition_id uuid,project_funding_id uuid"
+    },
+    {
+      "table": "applying_work_proposal",
+      "schema": "eflow_m7",
+      "columns": "tx bigint,proposal_id uuid"
+    },
+    {
+      "table": "receipts",
+      "schema": "eflow_r7",
+      "columns": "actor_id uuid,request_id uuid,root_id uuid,payload jsonb,result jsonb"
+    },
+    {
+      "table": "tree_state",
+      "schema": "eflow_r7",
+      "columns": "root_id uuid,revision integer"
+    }
+  ]
+}

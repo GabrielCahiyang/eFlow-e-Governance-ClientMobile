@@ -177,11 +177,13 @@ export function Status({
       >
         <Icon aria-hidden size={12.5} color={tone.foreground} />
         <Text
+          textBreakStrategy="simple"
           style={{
             fontSize: 11.5,
             lineHeight: 16,
             fontWeight: "700",
             color: tone.foreground,
+            includeFontPadding: false,
           }}
         >
           {label}

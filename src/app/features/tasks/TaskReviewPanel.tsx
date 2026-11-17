@@ -1,25 +1,28 @@
 import { statusLabel } from "../../shared/statusLabels";
 import { useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import Check from "lucide-react-native/icons/check";
+import ClipboardCheck from "lucide-react-native/icons/clipboard-check";
 import History from "lucide-react-native/icons/rotate-ccw-clock";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { EvidenceAttachment } from "./EvidenceAttachment";
 import {
   Button,
   Card,
-  EditorialMetadataStrip,
+  DetailGroup,
   Empty,
   ErrorState,
   Field,
   LabelValue,
   Loading,
   Notice,
-  Row,
   Status,
   dateLabel,
+  withOpacity,
 } from "../../components/ui";
-import { useTheme } from "../../components/ui/Appearance";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useFacts } from "../../shared/useFacts";
 import { useAction } from "../../shared/useAction";
@@ -30,6 +33,7 @@ import { useAuth } from "../authentication";
 import {
   fetchTaskApprovalCashBlockers,
   useCashRequestUpdates,
+  assertWorkAcceptanceAvailable,
 } from "../budget";
 import {
   fetchTaskSubmissions,
@@ -55,6 +59,7 @@ export function TaskReviewPanel({
   readOnly: boolean;
 }) {
   const palette = useTheme();
+  const { isDark } = useAppearance();
   const { profile } = useAuth();
   const [selectedId, setSelectedId] = useState(initialSubmissionId);
   const [feedback, setFeedback] = useState("");
@@ -105,8 +110,7 @@ export function TaskReviewPanel({
       )
         return;
       await assertEvidenceActor(profile.id);
-      if (approve && (await fetchTaskApprovalCashBlockers(task.id)).length)
-        throw new PublicMessageError("Settle all outstanding task cash before approval.");
+      if (approve) await assertWorkAcceptanceAvailable(task.id);
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
@@ -151,16 +155,36 @@ export function TaskReviewPanel({
         );
       }
       setFeedback("");
-      toast(approve ? "Task approved." : "Changes requested.", "success");
+      toast(approve ? "Work accepted. Any outstanding financial clearance remains required." : "Changes requested.", "success");
       nativeWindow.dispatchEvent({ type: "eflow:work-updated" });
       await onSaved();
       await submissions.refresh();
     }, "Review decision confirmed.");
 
+  const insetSurface = isDark
+    ? withOpacity(palette.background, 0.72)
+    : "#f7f9fd";
+  const selectedStatus = selected
+    ? selected.status === "pending"
+      ? "for_review"
+      : selected.status
+    : undefined;
+
   return (
     <>
-      <Card title="Evidence and review">
-        <Status value={task.status} work customId={task.customStatusId} />
+      <Card
+        title="Evidence and review"
+        icon={<ClipboardCheck size={16} color={palette.primary} />}
+        action={
+          <Status
+            value={task.status}
+            work
+            customId={task.customStatusId}
+            variant="pill"
+          />
+        }
+        style={{ gap: 12 }}
+      >
         {submissions.loading && !submissions.data ? (
           <Loading label="Loading evidence" layout="summary" rows={3} />
         ) : submissions.error ? (
@@ -179,43 +203,93 @@ export function TaskReviewPanel({
           />
         ) : (
           <>
-            <EditorialMetadataStrip
-              variant="card"
-              items={[
+            <View
+              style={[
+                styles.versionBanner,
                 {
-                  label: "Review Status",
-                  value: statusLabel(
-                    selected.status === "pending"
-                      ? "for_review"
-                      : selected.status,
-                  ),
-                  status:
-                    selected.status === "pending"
-                      ? "for_review"
-                      : selected.status,
-                },
-                {
-                  label: "Version",
-                  value: `v${selected.version}`,
+                  backgroundColor: insetSurface,
+                  borderColor: palette.border,
                 },
               ]}
-              style={{ marginVertical: 6 }}
-            />
-            <LabelValue label="Submitted by" value={selected.submitterName} />
-            <LabelValue
-              label="Submitted"
-              value={dateLabel(selected.submittedAt)}
-            />
-            <Text selectable>{selected.note}</Text>
-            {!!selected.decidedByName && (
-              <LabelValue label="Decided by" value={selected.decidedByName} />
-            )}
-            {!!selected.decidedAt && (
+            >
+              <View style={{ gap: 2 }}>
+                <Text
+                  style={[styles.sectionCaption, { color: palette.mutedLabel }]}
+                >
+                  Review status
+                </Text>
+                {!!selectedStatus && (
+                  <Status
+                    value={selectedStatus}
+                    label={statusLabel(selectedStatus)}
+                    variant="pill"
+                  />
+                )}
+              </View>
+              <View
+                style={[
+                  styles.versionBadge,
+                  {
+                    backgroundColor: palette.primarySoft,
+                    borderColor: withOpacity(palette.primary, 0.24),
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.versionBadgeText,
+                    { color: palette.primaryDark },
+                  ]}
+                >
+                  v{selected.version}
+                </Text>
+              </View>
+            </View>
+
+            <DetailGroup>
               <LabelValue
-                label="Decision date"
-                value={dateLabel(selected.decidedAt)}
+                label="Submitted by"
+                value={selected.submitterName}
               />
+              <LabelValue
+                label="Submitted"
+                value={dateLabel(selected.submittedAt)}
+              />
+              {!!selected.decidedByName && (
+                <LabelValue
+                  label="Decided by"
+                  value={selected.decidedByName}
+                />
+              )}
+              {!!selected.decidedAt && (
+                <LabelValue
+                  label="Decision date"
+                  value={dateLabel(selected.decidedAt)}
+                />
+              )}
+            </DetailGroup>
+
+            {!!selected.note && (
+              <View
+                style={[
+                  styles.noteBox,
+                  {
+                    backgroundColor: insetSurface,
+                    borderColor: palette.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.sectionCaption, { color: palette.mutedLabel }]}
+                >
+                  Submission note
+                </Text>
+                <Text selectable style={{ color: palette.text, lineHeight: 20 }}>
+                  {selected.note}
+                </Text>
+              </View>
             )}
+
             {!!selected.decisionFeedback && (
               <Notice
                 tone={
@@ -232,29 +306,43 @@ export function TaskReviewPanel({
                   An independent reviewer must decide your submission.
                 </Notice>
               )}
-            {attachments.error ? (
-              <ErrorState
-                error={attachments.error}
-                retry={() => void attachments.refresh()}
-              />
-            ) : attachments.loading && !attachments.data ? (
-              <Loading label="Loading evidence files" layout="files" />
-            ) : attachments.data?.length ? (
-              attachments.data.map((file) => (
-                <EvidenceAttachment
-                  key={file.id}
-                  path={file.filePath}
-                  name={file.fileName}
+
+            <View style={{ gap: 8 }}>
+              <Text
+                style={[styles.sectionCaption, { color: palette.mutedLabel }]}
+              >
+                Attached evidence
+              </Text>
+              {attachments.error ? (
+                <ErrorState
+                  error={attachments.error}
+                  retry={() => void attachments.refresh()}
                 />
-              ))
-            ) : (
-              <Empty compact kind="files" title="No files attached" />
-            )}
+              ) : attachments.loading && !attachments.data ? (
+                <Loading label="Loading evidence files" layout="files" />
+              ) : attachments.data?.length ? (
+                attachments.data.map((file) => (
+                  <EvidenceAttachment
+                    key={file.id}
+                    path={file.filePath}
+                    name={file.fileName}
+                  />
+                ))
+              ) : (
+                <Empty compact kind="files" title="No files attached" />
+              )}
+            </View>
           </>
         )}
       </Card>
       {mayReview && (
-        <Card title="Independent decision">
+        <Card
+          title="Independent decision"
+          icon={<ShieldCheck size={16} color={palette.primary} />}
+          badge={selected ? `v${selected.version}` : undefined}
+          badgeTone="review"
+          style={{ gap: 12 }}
+        >
           {clearance.error ? (
             <ErrorState
               error={clearance.error}
@@ -264,7 +352,7 @@ export function TaskReviewPanel({
             <Loading label="Checking cash clearance" layout="verification" />
           ) : clearance.data?.length ? (
             <Notice tone="warning">
-              Outstanding task cash blocks approval.
+                Accepting the work unlocks required receipts. Outstanding cash still blocks final completion.
             </Notice>
           ) : null}
           <Field
@@ -283,7 +371,6 @@ export function TaskReviewPanel({
               (clearance.loading && !clearance.data) ||
               !!clearance.error ||
               !clearance.data ||
-              clearance.data.length > 0 ||
               (attachments.loading && !attachments.data) ||
               !!attachments.error
             }
@@ -326,24 +413,126 @@ export function TaskReviewPanel({
         </Button>
       )}
       {!!submissions.data && submissions.data.length > 1 && (
-        <Card title="Submission history">
-          {submissions.data.map((item) => (
-            <Button
-              variant="ghost"
-              key={item.id}
-              icon={<History size={15} color={palette.primary} />}
-              disabled={action.busy || item.id === selected?.id}
-              onPress={() => {
-                setSelectedId(item.id);
-                setFeedback("");
-                action.clear();
-              }}
-            >
-              {`Submission ${item.version} · ${statusLabel(item.status)}`}
-            </Button>
-          ))}
+        <Card
+          title="Submission history"
+          icon={<History size={16} color={palette.primary} />}
+          badge={`${submissions.data.length} versions`}
+          style={{ gap: 8 }}
+        >
+          {submissions.data.map((item) => {
+            const activeItem = item.id === selected?.id;
+            const itemStatus =
+              item.status === "pending" ? "for_review" : item.status;
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Submission ${item.version} · ${statusLabel(item.status)}`}
+                accessibilityState={{
+                  disabled: action.busy || activeItem,
+                  selected: activeItem,
+                }}
+                disabled={action.busy || activeItem}
+                onPress={() => {
+                  setSelectedId(item.id);
+                  setFeedback("");
+                  action.clear();
+                }}
+                style={({ pressed }) => [
+                  styles.historyRow,
+                  {
+                    backgroundColor: activeItem
+                      ? palette.primarySoft
+                      : pressed
+                        ? palette.primarySoft
+                        : insetSurface,
+                    borderColor: activeItem
+                      ? withOpacity(palette.primary, 0.32)
+                      : palette.border,
+                  },
+                ]}
+              >
+                <View style={styles.historyLead}>
+                  <History
+                    size={15}
+                    color={activeItem ? palette.primary : palette.mutedLabel}
+                  />
+                  <Text
+                    style={[
+                      styles.historyTitle,
+                      {
+                        color: activeItem ? palette.primaryDark : palette.text,
+                      },
+                    ]}
+                  >
+                    Submission {item.version}
+                  </Text>
+                </View>
+                <Status
+                  value={itemStatus}
+                  label={statusLabel(item.status)}
+                  variant="pill"
+                />
+              </Pressable>
+            );
+          })}
         </Card>
       )}
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  versionBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+  },
+  sectionCaption: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  versionBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  versionBadgeText: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  noteBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 6,
+  },
+  historyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  historyLead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 1,
+  },
+  historyTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+  },
+});

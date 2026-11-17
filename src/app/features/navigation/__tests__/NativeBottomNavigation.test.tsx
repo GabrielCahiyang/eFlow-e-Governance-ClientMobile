@@ -46,7 +46,7 @@ test("Admin has no operational mobile navigation even with an apparent selected 
   expect(screen.queryAllByRole("tab")).toHaveLength(0);
 });
 
-test("the tab bar occupies its own space above the system gesture area", async () => {
+test("the floating tab bar overlays the bottom edge above the system gesture area without a backdrop container", async () => {
   const { SafeAreaProvider } = jest.requireMock<
     typeof import("react-native-safe-area-context")
   >("react-native-safe-area-context");
@@ -61,8 +61,14 @@ test("the tab bar occupies its own space above the system gesture area", async (
     </SafeAreaProvider>,
   );
   const bar = screen.getByTestId("native-bottom-navigation");
-  expect(bar).toHaveStyle({ flexShrink: 0, paddingBottom: 34 });
-  expect(bar).not.toHaveStyle({ position: "absolute" });
+  expect(bar).toHaveStyle({
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingBottom: 34,
+  });
+  expect(StyleSheet.flatten(bar.props.style).backgroundColor).toBeUndefined();
 });
 
 test("first layout and later renders position the disc on the selected non-Home tab", async () => {

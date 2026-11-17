@@ -1,0 +1,68 @@
+{
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Work-Financial-Clearance-v58-arm64-x86_64.apk",
+  "versionCode": 58,
+  "debuggable": false,
+  "launchActivity": "com.eflow.mobile.MainActivity",
+  "developmentLauncherPackaged": false,
+  "embeddedBundleBytes": 6392748,
+  "startupSourcesMatched": [
+    "src/app/features/app-shell/AppRoot.tsx",
+    "src/app/features/authentication/LoginScreen.tsx",
+    "src/platform/bootstrap.ts",
+    "src/platform/webRuntime.ts",
+    "src/platform/config.ts",
+    "src/app/features/authentication/mobileSignIn.ts"
+  ],
+  "sha256": "f382d3e5df20e4b936aa598df04c58ad81c4e044a84396f199c8c09cca4f2d81",
+  "bytes": 100387505,
+  "changedSources": [
+    {
+      "file": "src/app/features/budget/workFinancialClearance.ts",
+      "sha256": "a456964a9a7be1c8822b9fb801474f48f0d25de117a6f4796c8eedc408e95563"
+    },
+    {
+      "file": "src/app/features/budget/WorkFinancialClearancePanel.tsx",
+      "sha256": "682af2945cd8bfc2e654962c529786aae4415791b2cc416240afb9e920cc4214"
+    },
+    {
+      "file": "src/app/features/budget/CashReturnPanel.tsx",
+      "sha256": "f0d00100c543198dd8275014f219f2e5daf2f89bc25023e2cd001e605c4e2bf5"
+    },
+    {
+      "file": "src/app/features/budget/LiquidationSheet.tsx",
+      "sha256": "057759fddf89d8c244c0875c3a0628588b2587e542b7890096a7885280648ac6"
+    },
+    {
+      "file": "src/app/features/budget/SettlementPanel.tsx",
+      "sha256": "4e794d55a1d7f016689b91d11d02d7d73b08afae862bfc091d4326c15529d6ab"
+    },
+    {
+      "file": "src/app/features/budget/useCashRequestUpdates.ts",
+      "sha256": "832f7c8a4404a4e6e56ab9714d2022a0ca2d28a635e4ffb260ebd18c506c6e00"
+    },
+    {
+      "file": "src/app/features/tasks/TaskDetailsScreen.tsx",
+      "sha256": "3110a30caaaf6f85ba043216ee471b182c017bf84456ef0c496935c05878c4fc"
+    },
+    {
+      "file": "src/app/features/tasks/TaskReviewPanel.tsx",
+      "sha256": "1fe62f0ba757483473f77d7cbb9987dc6a7524c15bfc12664ed28e79f1524f74"
+    },
+    {
+      "file": "src/app/features/tasks/WorkTreePanel.tsx",
+      "sha256": "bedb22e95fc1e4d08a4634670b536c41b5fbdc42d13eb4991a1fd9237903c750"
+    },
+    {
+      "file": "src/app/features/tasks/WorkProposalSheet.tsx",
+      "sha256": "064b76081b65eb18cb97c069c7e818837209c08fe88f36ef809728441e17bcc4"
+    },
+    {
+      "file": "src/app/features/tasks/SubtaskCompletionSheet.tsx",
+      "sha256": "9dc986b94d4b2fda184e81fa6468c1a84b5ea781c75ad9cfd14df2f414ab12ba"
+    },
+    {
+      "file": "src/app/shared/domainErrorMessages.ts",
+      "sha256": "319a5ccd375c9427d1ce6112cf7ffad8e18044cb2001b761f3a8d10ef52d342e"
+    }
+  ]
+}

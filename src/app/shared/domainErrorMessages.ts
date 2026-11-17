@@ -1,4 +1,22 @@
 const exactMessages: Record<string, string> = {
+  "complete every task prerequisite before starting work":
+    "Complete every task prerequisite before starting work.",
+  "the work must be accepted before financial receipts can be submitted":
+    "Receipts become available after the work is accepted.",
+  "attach an uploaded financial receipt owned by this cash recipient":
+    "Attach a financial receipt file for every claimed expense using the cash recipient's account.",
+  "accounting must acknowledge the exact cash return and an independent office head must approve it before settlement":
+    "Accounting must acknowledge the cash received, then the Office Head must approve the return before settlement.",
+  "current independent return authority required":
+    "You are not currently authorized to acknowledge or approve this cash return. Refresh the receipt package.",
+  "accepted work and confirmed financial clearance are required":
+    "Work acceptance and confirmed financial clearance are required before completion.",
+  "verify the exact return amount, package version and reference":
+    "Verify the exact returned amount and reference against the latest receipt package.",
+  "return command terms changed":
+    "This saved return action no longer matches the record. Check its current status before submitting a correction.",
+  "unused subtask funding cannot be restored: its original parent funding source is missing":
+    "The original funding source is unavailable. Contact your Office Head before settling this cash.",
   "the subtask starts before a prerequisite is due. adjust the schedule first":
     "Prerequisite linking needs a backend update. Contact your Office Head.",
   "start date, prerequisites and structure cannot change after work has started":

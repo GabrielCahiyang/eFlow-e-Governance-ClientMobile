@@ -1372,6 +1372,7 @@ function ProjectProgressRow({
           <View
             style={{
               alignSelf: "flex-start",
+              maxWidth: "100%",
               flexDirection: "row",
               alignItems: "center",
               gap: 4,
@@ -1385,7 +1386,17 @@ function ProjectProgressRow({
             }}
           >
             <AlertCircle size={11.5} color={palette.warning} />
-            <Text style={{ fontSize: 11, fontWeight: "700", color: palette.warning }}>
+            <Text
+              textBreakStrategy="simple"
+              style={{
+                fontSize: 11,
+                lineHeight: 15,
+                fontWeight: "700",
+                color: palette.warning,
+                flexShrink: 1,
+                includeFontPadding: false,
+              }}
+            >
               {[...risk].join(" · ")}
             </Text>
           </View>

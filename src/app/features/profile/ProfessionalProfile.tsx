@@ -1,23 +1,25 @@
 import { useState } from "react";
+import { Linking, StyleSheet, View } from "react-native";
+import Briefcase from "lucide-react-native/icons/briefcase";
 import Check from "lucide-react-native/icons/check";
 import Eye from "lucide-react-native/icons/eye";
 import FileText from "lucide-react-native/icons/file-text";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Upload from "lucide-react-native/icons/upload";
-import { useTheme } from "../../components/ui/Appearance";
-import { Linking } from "react-native";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
+import { Text } from "../../components/ui/Typography";
 import {
   Button,
   Card,
   Empty,
   ErrorState,
   Field,
-  LabelValue,
   Loading,
   Notice,
   Row,
   Status,
+  withOpacity,
 } from "../../components/ui";
 import { useAuth } from "../authentication";
 import { useFacts } from "../../shared/useFacts";
@@ -63,10 +65,17 @@ const empty: ProfessionalValues = {
   specializations: [],
   competency_summary: "",
 };
+
+const formatFieldLabel = (field: string) => {
+  const spaced = field.replaceAll("_", " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+};
+
 export function ProfessionalProfile({ userId }: { userId: string }) {
   const { profile } = useAuth(),
     { toast } = useToast(),
     palette = useTheme(),
+    { isDark } = useAppearance(),
     own = profile?.id === userId,
     facts = useFacts(`professional:${profile?.id}:${userId}`, () =>
       readProfessionalRecord<{ profile: ProfessionalProfileRecord | null }>(
@@ -81,6 +90,10 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
     action = useAction(),
     [draft, setDraft] = useState<ProfessionalValues>();
   const values = draft || facts.data?.profile || empty,
+    confirmed = Boolean(facts.data?.profile?.confirmed_by_user),
+    insetSurface = isDark
+      ? withOpacity(palette.background, 0.72)
+      : "#f7f9fd",
     save = () =>
       action.run(async () => {
         await updateProfessionalProfile(values);
@@ -88,9 +101,23 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
         toast("Professional profile saved.", "success");
         await facts.refresh();
       }, "Professional profile saved. Confirm it before AI staffing uses it.");
+
   return (
     <>
-      <Card title="Professional profile">
+      <Card
+        title="Professional profile"
+        icon={<Briefcase size={16} color={palette.primary} />}
+        action={
+          facts.data ? (
+            <Status
+              value={confirmed ? "approved" : "pending"}
+              label={confirmed ? "Confirmed" : "Needs confirmation"}
+              variant="pill"
+            />
+          ) : undefined
+        }
+        style={{ gap: 12 }}
+      >
         {facts.error ? (
           <ErrorState
             error={facts.error}
@@ -102,13 +129,6 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
           <Loading label="Loading professional profile" layout="form" />
         ) : (
           <>
-            <Status
-              value={
-                facts.data?.profile?.confirmed_by_user
-                  ? "Confirmed"
-                  : "Needs confirmation"
-              }
-            />
             <Notice>
               Staffing suggestions use confirmed profile details. Check imported
               information before confirming.
@@ -116,7 +136,7 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
             {professionalFields.map((field) => (
               <Field
                 key={field}
-                label={field.replaceAll("_", " ")}
+                label={formatFieldLabel(field)}
                 value={values[field].join("\n")}
                 onChangeText={(text) =>
                   setDraft({
@@ -188,7 +208,16 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
           documents.error &&
           userErrorMessage(facts.error) === userErrorMessage(documents.error)
         ) && (
-          <Card title="Personal Data Sheet (PDS)">
+          <Card
+            title="Personal Data Sheet (PDS)"
+            icon={<FileText size={16} color={palette.primary} />}
+            badge={
+              documents.data?.documents.length
+                ? `${documents.data.documents.length}`
+                : undefined
+            }
+            style={{ gap: 12 }}
+          >
             <Notice>
               Upload a PDF up to 10 MB. Review the extracted details before
               saving them to your professional profile.
@@ -227,59 +256,92 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
                 title="No Personal Data Sheets uploaded"
               />
             ) : (
-              documents.data?.documents.map((document) => (
-                <Card key={document.id} title={document.original_filename}>
-                  <Status value={document.processing_status} />
-                  {!!document.processing_error && (
-                    <Notice>{document.processing_error}</Notice>
-                  )}
-                  <Row>
-                    <Button
-                      variant="outline"
-                      icon={<FileText size={16} color={palette.primary} />}
-                      onPress={() =>
-                        void action.run(async () => {
-                          await Linking.openURL(
-                            (await getPdsDownload(document.id)).url,
-                          );
-                        })
-                      }
-                    >
-                      Open PDF
-                    </Button>
-                    {!!(document.processing_status === "failed") && (
+              <View style={styles.docList}>
+                {documents.data?.documents.map((document) => (
+                  <View
+                    key={document.id}
+                    style={[
+                      styles.docCard,
+                      {
+                        backgroundColor: insetSurface,
+                        borderColor: palette.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.docHeader}>
+                      <View
+                        style={[
+                          styles.docIcon,
+                          { backgroundColor: palette.primarySoft },
+                        ]}
+                      >
+                        <FileText size={15} color={palette.primary} />
+                      </View>
+                      <View style={styles.docCopy}>
+                        <Text
+                          style={[styles.docTitle, { color: palette.text }]}
+                        >
+                          {document.original_filename}
+                        </Text>
+                        <Status
+                          value={document.processing_status}
+                          variant="pill"
+                        />
+                      </View>
+                    </View>
+                    {!!document.processing_error && (
+                      <Notice tone="warning">
+                        {document.processing_error}
+                      </Notice>
+                    )}
+                    <Row>
                       <Button
                         variant="outline"
-                        busy={action.busy}
-                        icon={<RefreshCw size={16} color={palette.primary} />}
+                        icon={<FileText size={16} color={palette.primary} />}
                         onPress={() =>
                           void action.run(async () => {
-                            await retryPds(document.id);
-                            await documents.refresh();
+                            await Linking.openURL(
+                              (await getPdsDownload(document.id)).url,
+                            );
                           })
                         }
                       >
-                        Retry extraction
+                        Open PDF
                       </Button>
-                    )}
-                    {!!(document.processing_status === "completed") && (
-                      <Button
-                        variant="outline"
-                        busy={action.busy}
-                        icon={<Eye size={16} color={palette.primary} />}
-                        onPress={() =>
-                          void action.run(async () => {
-                            const result = await getPdsDraft(document.id);
-                            setDraft(result.draft);
-                          })
-                        }
-                      >
-                        Review extracted profile
-                      </Button>
-                    )}
-                  </Row>
-                </Card>
-              ))
+                      {!!(document.processing_status === "failed") && (
+                        <Button
+                          variant="outline"
+                          busy={action.busy}
+                          icon={<RefreshCw size={16} color={palette.primary} />}
+                          onPress={() =>
+                            void action.run(async () => {
+                              await retryPds(document.id);
+                              await documents.refresh();
+                            })
+                          }
+                        >
+                          Retry extraction
+                        </Button>
+                      )}
+                      {!!(document.processing_status === "completed") && (
+                        <Button
+                          variant="outline"
+                          busy={action.busy}
+                          icon={<Eye size={16} color={palette.primary} />}
+                          onPress={() =>
+                            void action.run(async () => {
+                              const result = await getPdsDraft(document.id);
+                              setDraft(result.draft);
+                            })
+                          }
+                        >
+                          Review extracted profile
+                        </Button>
+                      )}
+                    </Row>
+                  </View>
+                ))}
+              </View>
             )}
           </Card>
         )}
@@ -288,3 +350,39 @@ export function ProfessionalProfile({ userId }: { userId: string }) {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  docList: {
+    gap: 10,
+  },
+  docCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  docHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  docIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  docCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
+    alignItems: "flex-start",
+  },
+  docTitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "700",
+  },
+});

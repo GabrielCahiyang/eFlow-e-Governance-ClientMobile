@@ -3,11 +3,14 @@ import { workDisplayStatus } from "../../shared/statusLabels";
 import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
+import Calendar from "lucide-react-native/icons/calendar";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
+import User from "lucide-react-native/icons/user";
+import Wallet from "lucide-react-native/icons/wallet";
 import { Text } from "../../components/ui/Typography";
-import { useTheme } from "../../components/ui/Appearance";
-import { workStatusTone } from "../../components/ui/Status";
-import { dateLabel, peso } from "../../components/ui/theme";
+import { useAppearance, useTheme } from "../../components/ui/Appearance";
+import { Status } from "../../components/ui/Status";
+import { dateLabel, peso, withOpacity } from "../../components/ui/theme";
 import { taskDateLabel } from "../tasks/taskDates";
 import {
   SkeletonBlock,
@@ -17,7 +20,7 @@ import type { Task } from "../../../core/web/app/features/tasks/taskTypes";
 
 const taskColumns = [
   { label: "Task", width: 178 },
-  { label: "Status", width: 132 },
+  { label: "Status", width: 144 },
   { label: "Owner", width: 148 },
   { label: "Start date", width: 120 },
   { label: "Due date", width: 120 },
@@ -47,6 +50,152 @@ export const projectTableWidths = (viewport: number, fontScale: number) => {
 };
 export const projectTableWidth = (widths: number[]) =>
   widths.reduce((sum, width) => sum + width, rail);
+
+export function ProjectTaskCard({
+  accent,
+  task,
+  blocker,
+  financial,
+  onOpen,
+}: {
+  accent: string;
+  task: Task;
+  blocker?: string | null;
+  financial?: { budget?: number; expense?: number };
+  onOpen?: () => void;
+}) {
+  const palette = useTheme();
+  const { isDark } = useAppearance();
+  const due = task.deadline || task.dueDate;
+  const visualStatus = workDisplayStatus(task.status, blocker);
+  const startText = task.startDate
+    ? dateLabel(task.startDate + "T12:00:00")
+    : undefined;
+  const dueText = taskDateLabel(due);
+  const hasFinance =
+    financial?.budget != null || financial?.expense != null;
+  const insetSurface = isDark
+    ? withOpacity(palette.background, 0.72)
+    : "#f7f9fd";
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={task.title}
+      accessibilityHint={[
+        `Owner: ${task.assigneeName || "Unassigned"}`,
+        dueText !== "—" ? `Due: ${dueText}` : undefined,
+        financial?.budget != null ? `Budget: ${peso(financial.budget)}` : undefined,
+        financial?.expense != null
+          ? `Actual expense: ${peso(financial.expense)}`
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(". ")}
+      onPress={onOpen}
+      style={({ pressed }) => [
+        styles.taskCard,
+        {
+          backgroundColor: pressed ? palette.primarySoft : palette.surface,
+          borderColor: palette.border,
+        },
+        !isDark && styles.taskCardShadow,
+      ]}
+    >
+      <View style={[styles.taskCardRail, { backgroundColor: accent }]} />
+      <View style={styles.taskCardBody}>
+        <View style={styles.taskCardTop}>
+          <Text style={[styles.taskCardTitle, { color: palette.text }]}>
+            {task.title}
+          </Text>
+          <ChevronRight size={16} color={palette.mutedLabel} />
+        </View>
+
+        <View style={styles.taskCardPills}>
+          <Status
+            value={visualStatus}
+            customId={task.customStatusId}
+            variant="pill"
+            work
+          />
+          {!!blocker && (
+            <View
+              style={[
+                styles.blockerChip,
+                {
+                  backgroundColor: palette.warningSoft,
+                  borderColor: withOpacity(palette.warning, 0.24),
+                },
+              ]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[styles.blockerText, { color: palette.warning }]}
+              >
+                Blocker: {blocker}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View
+          style={[
+            styles.taskMetaBox,
+            { backgroundColor: insetSurface, borderColor: palette.border },
+          ]}
+        >
+          <View style={styles.taskMetaRow}>
+            <View style={styles.taskMetaItem}>
+              <User size={13} color={palette.mutedLabel} />
+              <Text
+                numberOfLines={1}
+                style={[styles.taskMetaText, { color: palette.mutedLabel }]}
+              >
+                {task.assigneeName || "Unassigned"}
+              </Text>
+            </View>
+            {(startText || dueText !== "—") && (
+              <View style={styles.taskMetaItem}>
+                <Calendar size={13} color={palette.mutedLabel} />
+                <Text
+                  numberOfLines={1}
+                  style={[styles.taskMetaText, { color: palette.mutedLabel }]}
+                >
+                  {startText && dueText !== "—"
+                    ? `${startText} → ${dueText}`
+                    : dueText !== "—"
+                      ? `Due ${dueText}`
+                      : `Starts ${startText}`}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {hasFinance && (
+            <View style={styles.financeRow}>
+              <View style={styles.taskMetaItem}>
+                <Wallet size={13} color={palette.primary} />
+                <Text
+                  style={[styles.financeText, { color: palette.text }]}
+                >
+                  Budget{" "}
+                  {financial?.budget == null ? "—" : peso(financial.budget)}
+                </Text>
+              </View>
+              <Text style={[styles.financeSep, { color: palette.mutedLabel }]}>
+                ·
+              </Text>
+              <Text style={[styles.financeText, { color: palette.mutedLabel }]}>
+                Spent{" "}
+                {financial?.expense == null ? "—" : peso(financial.expense)}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
 
 export function ProjectTableCells({
   widths,
@@ -92,7 +241,7 @@ export function ProjectTableCells({
       columns={taskColumns.map(({ label }) => label)}
       values={values}
       status={visualStatus}
-      statusColor={status?.color}
+      customStatusId={task?.customStatusId}
       widths={widths}
       accent={accent}
       onOpen={onOpen}
@@ -127,7 +276,6 @@ export function ProjectDirectoryCells({
       titleDetail={compact && project ? detail : undefined}
       values={values}
       status={project?.status}
-      statusColor={status?.color}
       widths={widths}
       accent={palette.primary}
       onOpen={onOpen}
@@ -141,7 +289,7 @@ function WorkTableRow({
   columns,
   values,
   status,
-  statusColor,
+  customStatusId,
   onOpen,
   pinStyle,
   skeleton,
@@ -154,14 +302,13 @@ function WorkTableRow({
   values?: string[];
   titleDetail?: string;
   status?: string;
-  statusColor?: string;
+  customStatusId?: string | null;
   onOpen?: () => void;
   pinStyle?: ComponentProps<typeof Animated.View>["style"];
   skeleton?: boolean;
   header?: boolean;
 }) {
   const palette = useTheme();
-  const tone = status ? workStatusTone(status, palette, statusColor) : undefined;
   const content = values || columns;
   const cell = (value: string, index: number) => (
     <View
@@ -171,12 +318,20 @@ function WorkTableRow({
         {
           width: widths[index],
           borderColor: palette.border,
-          backgroundColor: index === 1 ? tone?.background : undefined,
+          justifyContent: index === 1 && values ? "center" : "flex-start",
         },
       ]}
     >
       {skeleton ? (
         <SkeletonBlock style={{ width: "72%", height: 12 }} />
+      ) : index === 1 && values && status ? (
+        <Status
+          value={status}
+          label={value || undefined}
+          customId={customStatusId}
+          variant="pill"
+          work
+        />
       ) : (
         <>
           <View style={{ flex: 1, gap: 2 }}>
@@ -185,13 +340,9 @@ function WorkTableRow({
               style={{
                 fontSize: values ? 13 : 12,
                 fontWeight:
-                  index === 0 || index === 1 || !values ? "600" : "400",
+                  index === 0 || !values ? "600" : "400",
                 color:
-                  index === 1 && tone
-                    ? tone.foreground
-                    : !values || index > 1
-                      ? palette.mutedLabel
-                      : palette.text,
+                  !values || index > 1 ? palette.mutedLabel : palette.text,
                 textAlign: index === 1 ? "center" : "left",
               }}
             >
@@ -268,45 +419,141 @@ export function ProjectTableLoading({ widths }: { widths: number[] }) {
         <SkeletonBlock style={{ width: "72%", height: 30 }} />
         <View
           style={{
-            padding: 10,
-            gap: 8,
-            borderRadius: 12,
+            padding: 14,
+            gap: 10,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: palette.border,
             backgroundColor: palette.surface,
           }}
         >
-          <SkeletonBlock style={{ width: 82, height: 24 }} />
+          <SkeletonBlock style={{ width: 96, height: 24, borderRadius: 12 }} />
           <SkeletonBlock style={{ width: "65%", height: 16 }} />
-          <SkeletonBlock style={{ height: 6 }} />
+          <SkeletonBlock style={{ height: 8, borderRadius: 4 }} />
         </View>
-        <SkeletonBlock style={{ width: 140, height: 44 }} />
-        <SkeletonBlock style={{ height: 36 }} />
-        <SkeletonBlock style={{ height: 44 }} />
-        <SkeletonBlock style={{ width: 146, height: 18, marginTop: 12 }} />
-        <View style={{ overflow: "hidden" }}>
-          <ProjectTableCells
-            widths={widths}
-            accent={palette.primary}
-            skeleton
-          />
-          {[0, 1, 2].map((index) => (
-            <ProjectTableCells
-              key={index}
-              widths={widths}
-              accent={palette.primary}
-              skeleton
-              header={false}
-            />
-          ))}
-        </View>
+        <SkeletonBlock style={{ width: 140, height: 44, borderRadius: 14 }} />
+        <SkeletonBlock style={{ height: 36, borderRadius: 12 }} />
+        <SkeletonBlock style={{ height: 44, borderRadius: 14 }} />
+        <SkeletonBlock style={{ width: 146, height: 18, marginTop: 8 }} />
+        {[0, 1, 2].map((index) => (
+          <View
+            key={index}
+            style={{
+              padding: 14,
+              gap: 10,
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: palette.border,
+              backgroundColor: palette.surface,
+            }}
+          >
+            <SkeletonBlock style={{ width: "78%", height: 18 }} />
+            <SkeletonBlock style={{ width: 100, height: 22, borderRadius: 11 }} />
+            <SkeletonBlock style={{ width: "58%", height: 14 }} />
+          </View>
+        ))}
       </SkeletonPulse>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  taskCard: {
+    flexDirection: "row",
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 10,
+    overflow: "hidden",
+  },
+  taskCardShadow: {
+    shadowColor: "#00004f",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  taskCardRail: {
+    width: 4,
+  },
+  taskCardBody: {
+    flex: 1,
+    minWidth: 0,
+    padding: 14,
+    gap: 10,
+  },
+  taskCardTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  taskCardTitle: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
+  taskCardPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+  blockerChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: "100%",
+  },
+  blockerText: {
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: "600",
+  },
+  taskMetaBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    gap: 6,
+  },
+  taskMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 10,
+  },
+  taskMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    maxWidth: "100%",
+  },
+  taskMetaText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "500",
+    flexShrink: 1,
+  },
+  financeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 2,
+  },
+  financeText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  financeSep: {
+    fontSize: 12,
+  },
   row: {
     flexDirection: "row",
-    minHeight: 48,
+    minHeight: 50,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   header: {

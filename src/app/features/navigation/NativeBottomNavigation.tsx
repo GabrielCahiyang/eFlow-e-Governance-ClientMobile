@@ -210,24 +210,16 @@ export function NativeBottomNavigation({
       testID="native-bottom-navigation"
       pointerEvents="box-none"
       style={{
-        // Keep the bar in the navigator's layout so every screen ends above it.
-        flexShrink: 0,
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
         alignItems: "center",
-        paddingTop: 16,
+        paddingTop: 8,
         paddingBottom: Math.max(12, inset.bottom),
         paddingHorizontal: 16,
       }}
     >
-      <LinearGradient
-        pointerEvents="none"
-        colors={[
-          "transparent",
-          withOpacity(palette.background, 0.72),
-          withOpacity(palette.background, 0.92),
-        ]}
-        locations={[0, 0.55, 1]}
-        style={StyleSheet.absoluteFill}
-      />
       <View
         style={[
           styles.floatingBar,

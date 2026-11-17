@@ -21,6 +21,7 @@ import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-wor
 import { completionMode } from "./branchInspector";
 import { subtaskDependencies } from "./subtaskDependencies";
 import { uploadEvidenceFile } from "./taskEvidence";
+import { assertWorkAcceptanceAvailable, fetchWorkFinancialClearance } from "../budget";
 
 type Attachment = {
   fileName: string;
@@ -109,23 +110,7 @@ export function SubtaskCompletionSheet({
             "Current access does not permit direct completion of this subtask.",
           );
       }
-      if (typeof supabase.from === "function") {
-        const openCash = await supabase
-          .from("petty_cash_requests")
-          .select("id")
-          .eq("task_id", rootId)
-          .eq("subtask_id", node.id)
-          .not("status", "in", "(settled,rejected,cancelled)")
-          .limit(1);
-        if (openCash.error)
-          throw Object.assign(new Error(openCash.error.message), {
-            code: openCash.error.code,
-          });
-        if ((openCash.data?.length || 0) > 0)
-          throw new PublicMessageError(
-            "Settle all outstanding subtask cash before completing this subtask.",
-          );
-      }
+      await assertWorkAcceptanceAvailable(rootId, node.id);
       if (!attempt) {
         if (note.length > 3000)
           throw new PublicMessageError("Use 3,000 characters or fewer.");
@@ -169,7 +154,8 @@ export function SubtaskCompletionSheet({
           throw Object.assign(new Error(result.error.message), {
             code: result.error.code,
           });
-        if (result.data?.id !== node.id || result.data?.status !== "completed")
+        const clearance = result.data?.status === "completed" ? undefined : await fetchWorkFinancialClearance(rootId, node.id);
+        if (result.data?.id !== node.id || (result.data?.status !== "completed" && !clearance?.workAccepted))
           throw new PublicMessageError(
             "Completion could not be verified. Retry the saved request.",
           );
@@ -185,7 +171,7 @@ export function SubtaskCompletionSheet({
       clearDraft();
       setCommitted(true);
       await draftStore.remove(actorId, scope).catch(() => {});
-      toast("Subtask completed.", "success");
+      toast("Work recorded. Any outstanding financial clearance remains required.", "success");
     }
     try {
       await onSaved(await fetchWorkTree(rootId));
@@ -202,7 +188,7 @@ export function SubtaskCompletionSheet({
       onClose={close}
     >
       <Notice>
-        {node.title}. The parent task still goes through final review.
+        {node.title}. Budgeted work stays incomplete until required receipts, cash returns and settlement are cleared. The parent task still goes through final review.
       </Notice>
       {!frozen && (
         <>

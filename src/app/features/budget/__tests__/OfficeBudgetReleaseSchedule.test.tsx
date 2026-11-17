@@ -87,3 +87,52 @@ test("only due releases with a current Accounting grant can be confirmed", async
   );
   expect(confirmOfficeBudgetRelease).not.toHaveBeenCalled();
 });
+
+test("renders Card v2 badge, Status pills, day filter toggle, and version history", async () => {
+  jest.mocked(fetchBudgetSections).mockResolvedValue({
+    ...snapshot(4, false),
+    budgetVersions: [
+      {
+        version: 4,
+        total: 50000,
+        actorName: "Maria Santos",
+        createdAt: "2026-11-10T00:00:00Z",
+        reason: "Initial allocation",
+        accounts: [{ id: "account", name: "Supplies", amount: 50000 }],
+      },
+    ],
+  } as Awaited<ReturnType<typeof fetchBudgetSections>>);
+
+  await render(
+    <BudgetReleaseHistory
+      actor="accountant"
+      office="office"
+      year={2026}
+      onChanged={async () => {}}
+    />,
+  );
+
+  expect(await screen.findByText("2 releases")).toBeOnTheScreen();
+  expect(screen.getByLabelText("Status: Release due")).toBeOnTheScreen();
+  expect(screen.getByLabelText("Status: Scheduled")).toBeOnTheScreen();
+
+  // Filter to Nov 13 only
+  await fireEvent.press(
+    screen.getByRole("button", { name: "2026-11-13, 1 releases" }),
+  );
+  expect(screen.getByText("1 release")).toBeOnTheScreen();
+  expect(screen.queryByLabelText("Status: Scheduled")).toBeNull();
+
+  // Clear day filter
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Show whole month" }),
+  );
+  expect(screen.getByText("2 releases")).toBeOnTheScreen();
+
+  // Version card and expandable history
+  expect(screen.getByText("Office Budget · V4")).toBeOnTheScreen();
+  await fireEvent.press(
+    screen.getByRole("button", { name: "Show version history" }),
+  );
+  expect(screen.getByText("Version 4")).toBeOnTheScreen();
+});

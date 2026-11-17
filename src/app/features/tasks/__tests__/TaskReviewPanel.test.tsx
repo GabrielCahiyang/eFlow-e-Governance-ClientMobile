@@ -11,6 +11,7 @@ import { verifyTask } from "../../../../core/web/app/features/tasks/services/tas
 import { confirmAction } from "../../../shared/confirm";
 import type { Task } from "../../../../core/web/app/features/tasks/taskTypes";
 import type { ReviewSubmission } from "../../../../core/web/app/features/reviews/types";
+jest.mock("../../budget/workFinancialClearance", () => ({ assertWorkAcceptanceAvailable: jest.fn(async () => {}) }));
 
 let mockActor = "reviewer";
 let mockCurrent: Task;
@@ -196,7 +197,7 @@ test("keeps clearance blocker notice rendered while background finance recheck r
     />,
   );
   expect(
-    await screen.findByText("Outstanding task cash blocks approval."),
+    await screen.findByText("Accepting the work unlocks required receipts. Outstanding cash still blocks final completion."),
   ).toBeOnTheScreen();
 
   let resolveClearance!: (value: unknown[]) => void;
@@ -226,7 +227,7 @@ test("keeps clearance blocker notice rendered while background finance recheck r
   );
 
   expect(
-    screen.getByText("Outstanding task cash blocks approval."),
+    screen.getByText("Accepting the work unlocks required receipts. Outstanding cash still blocks final completion."),
   ).toBeOnTheScreen();
   expect(screen.queryByLabelText("Checking cash clearance")).toBeNull();
 

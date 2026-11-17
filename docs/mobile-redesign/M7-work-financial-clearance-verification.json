@@ -1,0 +1,26 @@
+{
+  "phase": "M7",
+  "hostedTarget": "ixnfphgjyelhckjwjkdv",
+  "hostedApplied": false,
+  "sql": {
+    "path": "artifacts/M7/M7-Work-Financial-Clearance.sql",
+    "sha256": "5f14b84f280f53fe2ccb377536e6e44ed7b5e1e8b5c36b2e84635a013276b4c3",
+    "bytes": 87042
+  },
+  "focusedTests": {
+    "passed": 84,
+    "failed": 0,
+    "suites": 9
+  },
+  "sqlLocalAssertions": {
+    "LF": 56,
+    "CRLF": 56
+  },
+  "androidCompiled": true,
+  "androidInstalled": false,
+  "iOSJavaScriptExported": true,
+  "iOSNativeCompiled": false,
+  "webUIImplemented": false,
+  "personalAcceptance": "pending",
+  "broaderChecks": "Blocked by pre-existing ProjectAuditTrail type error and navigation suite failures"
+}

@@ -9,3 +9,5 @@ export {
   fetchTaskApprovalCashBlockers,
   getActionableSettlementEscalations,
 } from "./staffingEscalation";
+export { WorkFinancialClearancePanel } from "./WorkFinancialClearancePanel";
+export { fetchWorkFinancialClearance, assertWorkAcceptanceAvailable } from "./workFinancialClearance";

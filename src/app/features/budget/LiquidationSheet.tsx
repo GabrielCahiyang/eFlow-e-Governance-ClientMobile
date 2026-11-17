@@ -46,6 +46,7 @@ import type {
   ReceiptItem,
 } from "../../../core/web/app/features/budget/types";
 import type { CashRequestBundle } from "./focusedSubtaskFunding";
+import { fetchReceiptSubmissionClearance } from "./workFinancialClearance";
 type NativeReceipt = Omit<ReceiptDraft, "file"> & { file?: PickedFile };
 type SavedIntent = {
   key: string;
@@ -145,12 +146,14 @@ export function LiquidationSheet({
   const [saved, setSaved] = useState<SavedIntent>();
   const intent = saved ?? recovery.data;
   const [confirmed, setConfirmed] = useState(false);
+  const clearance = useFacts(`receipt-clearance:${profile?.id}:${request.id}`,
+    () => fetchReceiptSubmissionClearance(request.id), !!profile?.id);
   const editable =
     !intent &&
     !action.busy &&
     !recovery.loading &&
     !recovery.error &&
-    !readOnly;
+    !readOnly && !clearance.loading && !clearance.error && clearance.data?.canSubmit === true;
   const currentReadOnly = useRef(readOnly);
   currentReadOnly.current = readOnly;
   const { spent, returned, exceedsRelease } = cashReturnAmounts(
@@ -191,6 +194,8 @@ export function LiquidationSheet({
       )
         throw new PublicMessageError("Refresh to verify your access to this cash request.");
       assertAccess(profile.id);
+      if (!intent && !(await fetchReceiptSubmissionClearance(request.id)).canSubmit)
+        throw new PublicMessageError("Receipts become available after the work is accepted.");
       if (!intent && returned === undefined)
         throw new PublicMessageError(
           "The released amount is unavailable. Refresh the cash request.",
@@ -314,6 +319,7 @@ export function LiquidationSheet({
               (readOnly ||
                 recovery.loading ||
                 !!recovery.error ||
+                (!intent && (clearance.loading || !!clearance.error || !clearance.data?.canSubmit)) ||
                 (!intent && returned === undefined))
             }
             onPress={confirmed ? close : () => void submit()}
@@ -323,6 +329,10 @@ export function LiquidationSheet({
         </>
       }
     >
+      <Notice>Financial receipt attachments are required for claimed expenses. Ordinary work evidence is separate and optional.</Notice>
+      {!!clearance.error && <ErrorState error={clearance.error} retry={() => void clearance.refresh()}/>}
+      {!clearance.loading && !clearance.error && !clearance.data?.workAccepted &&
+        <Notice>Receipts become available after the work is accepted.</Notice>}
       {recovery.loading && (
         <Loading label="Checking for a saved receipt package" layout="form" />
       )}
@@ -542,7 +552,7 @@ export function LiquidationSheet({
               >
                 {receipt.file
                   ? receipt.file.name
-                  : "Attach receipt image or PDF"}
+                  : "Attach receipt image or PDF (required)"}
               </Button>
               <Button
                 variant="ghost"

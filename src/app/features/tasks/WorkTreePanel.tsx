@@ -4,7 +4,8 @@ import { workDisplayStatus } from "../../shared/statusLabels";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
-import { nodeSchedule, plannedStartReached, subtaskDisplayStatus, workScheduleToday } from "./subtaskSchedule";
+import { nodeSchedule, subtaskDisplayStatus } from "./subtaskSchedule";
+import { WorkFinancialClearancePanel } from "../budget";
 import { subtaskDependencies } from "./subtaskDependencies";
 import { hiddenSubtasksMessage, subtasksVisibleForActor } from "./subtaskVisibility";
 import { WorkProposalReview, WorkProposalSheet } from "./WorkProposalSheet";
@@ -284,8 +285,7 @@ export function WorkTreePanel({
     const canStart = subtaskLead && !confirmedStartedAt && recordedStatus === "todo" &&
       !effectiveReadOnly && data.root.open &&
       isCurrentWorkSnapshot(data, context) && notStarted &&
-      data.root.status === "in_progress" && dependenciesReady && !parentWaiting &&
-      plannedStartReached(schedule?.start_date, workScheduleToday(data));
+      data.root.status === "in_progress" && dependenciesReady && !parentWaiting;
     const workSubmissions = actor && (
       <WorkProposalReview key={"proposals:" + node.id} actor={actor} root={data.root.id} node={node.id}
         proposalId={proposalId} people={data.people} readOnly={effectiveReadOnly || executionBlocked}
@@ -418,9 +418,8 @@ export function WorkTreePanel({
                             !latest.root.open || scope.executionBlocked ||
                             latest.root.status !== "in_progress" || current.lead_id !== actor ||
                             latestParentWaiting ||
-                            !latestDeps?.known || latestDeps.pendingCount > 0 || latestDeps.missingCount > 0 ||
-                            !plannedStartReached(current.start_date, workScheduleToday(latest))) {
-                          throw new PublicMessageError("Current work access, prerequisites, or scheduling could not be verified. Refresh this subtask.");
+                            !latestDeps?.known || latestDeps.pendingCount > 0 || latestDeps.missingCount > 0) {
+                          throw new PublicMessageError("Current work access or prerequisites could not be verified. Refresh this subtask.");
                         }
                         const receipt = await sharedWorkRpc<{ id?: string; started_at?: string }>(
                           "m7_start_subtask", { p_root: data.root.id, p_node: node.id },
@@ -513,15 +512,13 @@ export function WorkTreePanel({
           {displayStatus === "todo" && notStarted && !waitingForTask && !isHold && (subtaskLead || contributor) && (
             <Notice tone="warning">
               {subtaskLead
-                ? !schedule?.start_date
-                  ? "Set a planned start date before starting this subtask."
-                  : parentWaiting
+                ? parentWaiting
                     ? "Start the parent subtask first."
                     : !dependencies.known
                       ? "Subtask dependencies could not be verified. Refresh this subtask."
                       : !dependenciesReady
                         ? "This subtask cannot start because its prerequisites are incomplete."
-                        : "Start work is available on or after the planned start date once prerequisites are complete."
+                        : "Start work when you are ready. The planned date remains unchanged."
                 : "The Subtask Lead must start work before you can submit progress or completion."}
             </Notice>
           )}
@@ -560,6 +557,8 @@ export function WorkTreePanel({
           />
         </View>
 
+        {data.root.kind === "office" && <WorkFinancialClearancePanel root={data.root.id} node={node.id}
+          readOnly={effectiveReadOnly || isHold} onSaved={async () => saved(await fetchWorkTree(data.root.id))}/>}
         {!!proposalId && workSubmissions}
         {/* Schedule */}
         <BentoScheduleCards

@@ -94,13 +94,15 @@ export function Screen<T = never>({
         !!navHeader?.topInset && {
           paddingTop: (compact ? 10 : 16) + navHeader.topInset,
         },
+      !!navHeader?.bottomInset && {
+        paddingBottom: (compact ? 16 : 24) + navHeader.bottomInset,
+      },
       { backgroundColor: palette.background },
       style,
     ],
   };
   const header = (
     <>
-      <OperationStatus />
       {!!title && (
         <View style={{ gap: 10 }}>
           <PageHeader title={title} subtitle={description} right={headerRight} />
@@ -131,11 +133,14 @@ export function Screen<T = never>({
   );
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-      {onRefresh ? (
-        <FolderPullArea pull={pull}>{scroll}</FolderPullArea>
-      ) : (
-        scroll
-      )}
+      <View style={{ flex: 1 }}>
+        {onRefresh ? (
+          <FolderPullArea pull={pull}>{scroll}</FolderPullArea>
+        ) : (
+          scroll
+        )}
+        <OperationStatus variant="floating" bottom={footer ? 12 : undefined} />
+      </View>
       {footer}
     </View>
   );

@@ -1,5 +1,9 @@
 # M7 personal QA — final streamlined app
 
+## Work and financial clearance — 18 November 2026
+
+See the [M7 slice checklist, manual SQL, review APK and executed/skipped checks](M7-work-financial-clearance-personal-qa.md). Mobile source and targeted tests are ready; SQL is **not applied**, Web consumer integration and signed-in Android/iOS verification remain pending. This is not personal acceptance or release approval.
+
 **Personal acceptance pending.** This package records M7 verification separately from M0–M6 implementation and past QA. The Android package is signed for local QA.
 
 ## Office Analytics exports and More cleanup — 18 November 2026

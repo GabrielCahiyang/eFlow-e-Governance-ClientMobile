@@ -4,22 +4,25 @@ import {
   RefreshSectionList,
 } from "../../components/ui/FolderRefresh";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
-import { NavigationRow } from "../../components/ui/NavigationRow";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import Calendar from "lucide-react-native/icons/calendar";
+import ListIcon from "lucide-react-native/icons/list";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Star from "lucide-react-native/icons/star";
+import TableIcon from "lucide-react-native/icons/table";
 import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import {
+  AllocationBar,
   Button,
   Card,
+  DetailGroup,
   Empty,
-  EditorialMetadataStrip,
   ErrorState,
   LabelValue,
   Loading,
@@ -27,6 +30,7 @@ import {
   PageHeader,
   Screen,
   SearchField,
+  Status,
   Tabs,
   dateLabel,
   MondayTableRow,
@@ -70,6 +74,7 @@ import { fetchProjectTaskBlockers } from "./projectTaskBlockers";
 import {
   ProjectTableCells,
   ProjectTableLoading,
+  ProjectTaskCard,
   projectTableWidth,
   projectTableWidths,
 } from "./ProjectTableCells";
@@ -122,6 +127,7 @@ export function ProjectScreen({
     !!profile?.id,
   );
   const [view, setView] = useState(initialView || "tasks");
+  const [mainViewMode, setMainViewMode] = useState<"cards" | "table">("cards");
   const [closeout, setCloseout] = useState<"complete" | "archive">();
   const [menu, setMenu] = useState(false);
   const [people, setPeople] = useState(false);
@@ -271,7 +277,7 @@ export function ProjectScreen({
   }));
   useEffect(() => {
     offsetX.set(0);
-  }, [view, id, projectReady, offsetX]);
+  }, [view, mainViewMode, id, projectReady, offsetX]);
   const favorites = useNavigationFavorites(
     profile?.id || "",
     workspace.selected?.workspace.id || "",
@@ -341,8 +347,14 @@ export function ProjectScreen({
     groups,
     workView,
   );
-  const hasTable = main && sections.length > 0;
+  const isTableMode = main && mainViewMode === "table";
+  const hasTable = isTableMode && sections.length > 0;
   const accents = new Map(groups.map((group) => [group.id, group.color]));
+  const completionSummary = completion
+    ? `${completion.completed} of ${completion.required} · ${percent}%`
+    : totals.error
+      ? "Unavailable"
+      : "Loading…";
   const header = (
     <View
       style={{
@@ -386,51 +398,49 @@ export function ProjectScreen({
           </Pressable>
         }
       />
-      <Card style={{ padding: 10, gap: 10 }}>
-        <EditorialMetadataStrip
-          variant="flush"
-          items={[
-            {
-              label: "Status",
-              value: resolveStatus(project.status).label,
-              status: project.status,
-            },
-            {
-              label: "Tasks completed",
-              value: completion
-                ? `${completion.completed} of ${completion.required} · ${percent}%`
-                : totals.error
-                  ? "Unavailable"
-                  : "Loading…",
-            },
-          ]}
-        />
-        {completion && (
-          <View
-            accessibilityRole="progressbar"
-            accessibilityLabel="Project task completion"
-            accessibilityValue={{ min: 0, max: 100, now: percent }}
-            style={{
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: palette.border,
-            }}
-          >
+      <Card style={{ gap: 12 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <Status value={project.status} variant="pill" work />
+          {!!project.targetDate && (
             <View
               style={{
-                width: `${percent}%`,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: palette.primary,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
               }}
-            />
-          </View>
-        )}
-        {!!project.targetDate && (
-          <LabelValue
-            label="Target date"
-            value={dateLabel(project.targetDate)}
+            >
+              <Calendar size={13} color={palette.mutedLabel} />
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: "600",
+                  color: palette.mutedLabel,
+                }}
+              >
+                Target {dateLabel(project.targetDate)}
+              </Text>
+            </View>
+          )}
+        </View>
+        {completion ? (
+          <AllocationBar
+            label="Tasks completed"
+            summary={completionSummary}
+            percent={percent}
+            tone={percent >= 100 ? "success" : "neutral"}
           />
+        ) : (
+          <DetailGroup>
+            <LabelValue label="Tasks completed" value={completionSummary} />
+          </DetailGroup>
         )}
       </Card>
       {closed && (
@@ -470,6 +480,95 @@ export function ProjectScreen({
           placeholder="Search project tasks"
         />
       )}
+      {main && !auxiliary && !!sections.length && (
+        <View style={projectStyles.modeBar}>
+          <Text
+            style={[projectStyles.modeLabel, { color: palette.mutedLabel }]}
+          >
+            TASKS
+          </Text>
+          <View
+            accessibilityRole="tablist"
+            accessibilityLabel="Tasks view mode"
+            style={[
+              projectStyles.segmentWrap,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.border,
+              },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityLabel="Cards view"
+              accessibilityState={{ selected: mainViewMode === "cards" }}
+              onPress={() => setMainViewMode("cards")}
+              style={[
+                projectStyles.segmentBtn,
+                mainViewMode === "cards" && {
+                  backgroundColor: palette.primarySoft,
+                },
+              ]}
+            >
+              <ListIcon
+                size={14}
+                color={
+                  mainViewMode === "cards"
+                    ? palette.primaryDark
+                    : palette.mutedLabel
+                }
+              />
+              <Text
+                style={[
+                  projectStyles.segmentText,
+                  {
+                    color:
+                      mainViewMode === "cards"
+                        ? palette.primaryDark
+                        : palette.mutedLabel,
+                  },
+                ]}
+              >
+                Cards
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityLabel="Table view"
+              accessibilityState={{ selected: mainViewMode === "table" }}
+              onPress={() => setMainViewMode("table")}
+              style={[
+                projectStyles.segmentBtn,
+                mainViewMode === "table" && {
+                  backgroundColor: palette.primarySoft,
+                },
+              ]}
+            >
+              <TableIcon
+                size={14}
+                color={
+                  mainViewMode === "table"
+                    ? palette.primaryDark
+                    : palette.mutedLabel
+                }
+              />
+              <Text
+                style={[
+                  projectStyles.segmentText,
+                  {
+                    color:
+                      mainViewMode === "table"
+                        ? palette.primaryDark
+                        : palette.mutedLabel,
+                  },
+                ]}
+              >
+                Table
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 
@@ -486,7 +585,7 @@ export function ProjectScreen({
       }
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        main ? (
+        isTableMode ? (
           <Animated.View style={[{ width: tableViewport }, pinned]}>
             {header}
             {!!sections.length && (
@@ -504,12 +603,22 @@ export function ProjectScreen({
             )}
           </Animated.View>
         ) : (
-          header
+          <View>
+            {header}
+            {main && !!finance.error && (
+              <ErrorState
+                error="Task budget and expense amounts are unavailable."
+                retry={() => void finance.refresh()}
+              />
+            )}
+          </View>
         )
       }
       ListEmptyComponent={
         main && (!groupFacts.data || groupFacts.error) ? undefined : (
-          <Animated.View style={main && [{ width: tableViewport }, pinned]}>
+          <Animated.View
+            style={isTableMode && [{ width: tableViewport }, pinned]}
+          >
             {searchPending || (pages.loading && !pages.data) ? (
               <Loading
                 label={
@@ -560,7 +669,7 @@ export function ProjectScreen({
                 justifyContent: "center",
                 alignItems: "center",
               },
-              main && [{ width: tableViewport }, pinned],
+              isTableMode && [{ width: tableViewport }, pinned],
             ]}
           >
             {pages.moreError ? (
@@ -584,7 +693,8 @@ export function ProjectScreen({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         paddingVertical: pageGutter,
-        paddingHorizontal: main ? 0 : pageGutter,
+        paddingBottom: pageGutter + (navHeader?.bottomInset ?? 0),
+        paddingHorizontal: isTableMode ? 0 : pageGutter,
       }}
       renderSectionHeader={({ section }) => {
         const accent = (main && accents.get(section.key)) || palette.primary;
@@ -599,7 +709,7 @@ export function ProjectScreen({
                   paddingTop: 16,
                   paddingBottom: 8,
                 },
-                main && [{ width: tableViewport }, pinned],
+                isTableMode && [{ width: tableViewport }, pinned],
               ]}
             >
               <View
@@ -629,18 +739,27 @@ export function ProjectScreen({
                       ? resolveStatus(section.key).label
                       : section.title}
               </Text>
-              <Text
+              <View
                 style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: palette.mutedLabel,
+                  backgroundColor: palette.primarySoft,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 999,
                 }}
               >
-                {section.data.length}
-                {pages.next ? " loaded" : ""}
-              </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color: palette.primary,
+                  }}
+                >
+                  {section.data.length}
+                  {pages.next ? " loaded" : ""}
+                </Text>
+              </View>
             </Animated.View>
-            {main && (
+            {isTableMode && (
               <ProjectTableCells
                 widths={widths}
                 accent={accent}
@@ -659,18 +778,34 @@ export function ProjectScreen({
             title: item.title,
           });
         const blocker = blockers.error ? undefined : blockers.data?.get(item.id);
-        if (main)
+        if (main) {
+          const itemAccent = accents.get(section.key) || palette.primary;
+          const itemFinance = finance.error
+            ? undefined
+            : finance.data?.get(item.id);
+          if (mainViewMode === "cards") {
+            return (
+              <ProjectTaskCard
+                accent={itemAccent}
+                task={item}
+                blocker={blocker}
+                financial={itemFinance}
+                onOpen={open}
+              />
+            );
+          }
           return (
             <ProjectTableCells
               widths={widths}
-              accent={accents.get(section.key) || palette.primary}
+              accent={itemAccent}
               task={item}
               blocker={blocker}
               pinStyle={pinned}
-              financial={finance.error ? undefined : finance.data?.get(item.id)}
+              financial={itemFinance}
               onOpen={open}
             />
           );
+        }
         const due = item.deadline || item.dueDate;
         return (
           <MondayTableRow
@@ -754,7 +889,7 @@ export function ProjectScreen({
         <FolderPullArea
           pull={pull}
           frame={
-            main
+            isTableMode
               ? (scroll) => (
                   <Animated.ScrollView
                     style={{ marginHorizontal: pageGutter }}
@@ -891,3 +1026,37 @@ export function ProjectScreen({
     </View>
   );
 }
+
+const projectStyles = StyleSheet.create({
+  modeBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  modeLabel: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  segmentWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 3,
+    gap: 2,
+  },
+  segmentBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 9,
+  },
+  segmentText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+});

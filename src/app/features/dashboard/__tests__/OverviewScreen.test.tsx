@@ -492,3 +492,46 @@ test("Head Home keeps loaded work and cash decisions visible during stale backgr
     mockFinanceReviewsImpl = async () => [];
   }
 });
+
+test("Head Home Current Projects risk pill uses simple text break strategy so Overdue work does not clip", async () => {
+  mockRole = "head";
+  mockWorkRows = [
+    {
+      id: "overdue-task",
+      rootId: "overdue-task",
+      key: "overdue-task",
+      title: "Road grading",
+      kind: "office-task",
+      status: "in_progress",
+      due: "2020-01-01",
+      mine: true,
+      leading: true,
+      actionable: true,
+      history: false,
+      workspaceId: "workspace",
+      timezone: "Asia/Manila",
+      projectTitle: "Bridge works",
+      projectId: "project-a",
+      relation: "Task Lead",
+      task: {
+        id: "overdue-task",
+        orgId: "office",
+        assigneeId: "actor",
+        status: "in_progress",
+      },
+    } as unknown as WorkRow,
+  ];
+  try {
+    const view = await render(<OverviewScreen navigate={jest.fn()} />);
+    const riskText = await view.findByText("Overdue work");
+    expect(riskText).toBeOnTheScreen();
+    expect(riskText.props.textBreakStrategy).toBe("simple");
+    expect(StyleSheet.flatten(riskText.props.style)).toMatchObject({
+      fontSize: 11,
+      lineHeight: 15,
+      flexShrink: 1,
+    });
+  } finally {
+    mockWorkRows = [];
+  }
+});

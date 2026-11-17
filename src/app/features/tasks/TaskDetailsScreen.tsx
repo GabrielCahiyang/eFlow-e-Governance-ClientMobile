@@ -33,7 +33,8 @@ import { SmallProgress } from "../../components/ui/OperationStatus";
 import { useAuth } from "../authentication";
 import {
   TaskFundingCard,
-  fetchTaskApprovalCashBlockers,
+  WorkFinancialClearancePanel,
+  assertWorkAcceptanceAvailable,
 } from "../budget";
 import { ProjectFiles } from "../projects";
 import type { Navigate } from "../../shared/routes";
@@ -61,11 +62,8 @@ import { WorkEditorSheet } from "./WorkEditorSheet";
 import { hiddenSubtasksMessage, subtasksVisibleForActor } from "./subtaskVisibility";
 import { WorkProposalReview, WorkProposalSheet } from "./WorkProposalSheet";
 import {
-  plannedStartReached,
   subtaskDisplayStatus,
-  workScheduleToday,
 } from "./subtaskSchedule";
-import { getPhilippineCalendarDate } from "../../../core/web/app/shared/calendarDates";
 import { PublicMessageError } from "../../shared/userMessages";
 import { confirmAction } from "../../shared/confirm";
 import { deleteUnstartedTask, taskCanBeDeletedBeforeStart } from "./taskDeletion";
@@ -281,8 +279,6 @@ export function TaskDetailsScreen({
     );
   const { task, projectStatus } = facts.data;
   const mayViewSubtasks = subtasksVisibleForActor({ kind: "office", lead: task.assigneeId || task.recommendationLeadId || null, status: task.status }, profile?.id);
-  const today = (tree.data && workScheduleToday(tree.data)) ?? getPhilippineCalendarDate();
-  const canStartToday = plannedStartReached(task.startDate, today);
   const taskDependenciesReady = facts.data.missingDependencyCount === 0 &&
     facts.data.dependencyItems.every((dependency) => dependency.completed);
   const isProjectOnHold = projectStatus === "on_hold";
@@ -395,11 +391,6 @@ export function TaskDetailsScreen({
         if (error instanceof WorkTreeUnavailable) return undefined;
         throw error;
       });
-      if (mode === "start" && status === "todo") {
-        const workDay = (latestTree && workScheduleToday(latestTree)) ?? getPhilippineCalendarDate();
-        if (!plannedStartReached(latest.startDate, workDay))
-          throw new PublicMessageError("Start work is available on or after the planned start date.");
-      }
       if (
         mode === "submit" &&
         latestTree?.nodes.some((node) => node.task_id === id && node.status !== "completed")
@@ -410,11 +401,7 @@ export function TaskDetailsScreen({
       }
     }
     if (mode === "submit") {
-      const cashBlockers = await fetchTaskApprovalCashBlockers(id);
-      if (cashBlockers.length > 0)
-        throw new PublicMessageError(
-          "Settle all task and subtask cash requests before marking this task complete.",
-        );
+      await assertWorkAcceptanceAvailable(id);
     }
   };
   const savedTree = async (_receipt: WorkTreeSnapshot) => {
@@ -657,7 +644,7 @@ export function TaskDetailsScreen({
                   !executionBlocked &&
                   lead &&
                   ["todo", "changes_requested"].includes(task.status)
-                  && (task.status === "changes_requested" || (canStartToday && taskDependenciesReady))
+                  && (task.status === "changes_requested" || taskDependenciesReady)
                     ? {
                         label:
                           task.status === "todo" ? "Start work" : "Resume work",
@@ -712,19 +699,16 @@ export function TaskDetailsScreen({
               ["todo", "changes_requested"].includes(task.status) &&
               (!lead ||
                 (task.status === "todo" &&
-                  (!canStartToday || !taskDependenciesReady))) && (
+                  !taskDependenciesReady)) && (
                 <Notice tone="warning">
                   {!lead
                     ? task.status === "changes_requested"
                       ? "The Task Lead must resume work before you can post progress or submit completion."
                       : "The Task Lead must start work before you can post progress or submit completion."
-                    : !taskDependenciesReady
-                      ? "This task cannot start because its prerequisites are incomplete."
-                      : !task.startDate
-                        ? "Set a planned start date before starting this task."
-                        : "Start work is available on or after the planned start date."}
+                    : "This task cannot start because its prerequisites are incomplete."}
                 </Notice>
               )}
+            <WorkFinancialClearancePanel root={id} readOnly={readOnly || isProjectOnHold} onSaved={refresh}/>
             {!executionBlocked &&
               participant &&
               task.status === "in_progress" &&

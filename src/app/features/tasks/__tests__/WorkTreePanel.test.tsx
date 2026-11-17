@@ -8,6 +8,7 @@ import { ToastProvider } from "../../../components/ui/Toast";
 import { fetchWorkTree } from "../../../../core/web/app/features/nested-work/services/workTreeService";
 import { sharedWorkRpc } from "../../../shared/sharedWorkRequest";
 import { confirmAction } from "../../../shared/confirm";
+jest.mock("../../budget/WorkFinancialClearancePanel", () => ({ WorkFinancialClearancePanel: () => null }));
 jest.mock("../../../shared/confirm", () => ({ confirmAction: jest.fn(async () => true) }));
 let mockEditorSaved: ((tree: WorkTreeSnapshot) => Promise<void>) | undefined;
 
@@ -936,10 +937,10 @@ test("subtask start dates and prerequisite readiness show specific explanatory n
       navigate={jest.fn()}
     />,
   );
-  expect(futureView.queryByText("Start work")).toBeNull();
+  expect(futureView.getByText("Start work")).toBeOnTheScreen();
   expect(
     futureView.getByText(
-      "Start work is available on or after the planned start date once prerequisites are complete.",
+      "Start work when you are ready. The planned date remains unchanged.",
     ),
   ).toBeOnTheScreen();
   await futureView.unmount();

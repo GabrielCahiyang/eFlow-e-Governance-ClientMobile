@@ -217,6 +217,7 @@ export function PersonalWorkFeedScreen({
       contentContainerStyle={{
         flexGrow: 1,
         padding: space.lg,
+        paddingBottom: space.lg + (navHeader?.bottomInset ?? 0),
         gap: space.xs,
       }}
       stickySectionHeadersEnabled={false}

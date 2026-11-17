@@ -28,10 +28,11 @@ function font(
   };
 }
 export const Text = forwardRef<ComponentRef<typeof NativeText>, TextProps>(
-  function Text({ style, ...props }, ref) {
+  function Text({ style, textBreakStrategy = "simple", ...props }, ref) {
     const { isDark } = useAppearance();
     return (
       <NativeText
+        textBreakStrategy={textBreakStrategy}
         {...props}
         ref={ref}
         style={[

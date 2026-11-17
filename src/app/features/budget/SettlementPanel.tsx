@@ -42,6 +42,8 @@ import {
 } from "../../../core/web/app/features/budget/services/budgetService";
 import { isLiquidationLate } from "../../../core/web/app/features/budget/selectors/cashWorkflowRules";
 import { financialFailureIsUncertain } from "../../../core/web/app/features/budget/financialReceipts";
+import { CashReturnPanel } from "./CashReturnPanel";
+import { fetchCashReturnClearance } from "./workFinancialClearance";
 import type {
   PettyCashLiquidation,
   PettyCashRequest,
@@ -130,6 +132,8 @@ export function SettlementPanel({
         } else if (head && late) {
           await authorizeLateLiquidation(liquidation.id, approve, reason);
         } else {
+          if (approve && liquidation.returnedAmount > 0 && !(await fetchCashReturnClearance(liquidation.id)).approved)
+            throw new PublicMessageError("Accounting must acknowledge the cash received and the Office Head must approve the return before settlement.");
           const current = await getSettlementReview(liquidation.id);
           if (
             !accounting ||
@@ -161,6 +165,8 @@ export function SettlementPanel({
             "Current Head approval and a review note are required.",
           );
         const posts = headAction === "post";
+        if (posts && liquidation.returnedAmount > 0 && !(await fetchCashReturnClearance(liquidation.id)).approved)
+          throw new PublicMessageError("The cash return must be acknowledged and independently approved before settlement.");
         if (
           !(await confirmAction(
             posts
@@ -239,6 +245,9 @@ export function SettlementPanel({
   const saving = action.busy || escalation.busy;
   if (!leader && !pending) return null;
   return (
+    <>
+    <CashReturnPanel rootId={request.taskId} liquidationId={liquidation.id} version={liquidation.version}
+      amount={liquidation.returnedAmount} onSaved={refresh}/>
     <Card
       title="Receipt review and settlement"
       icon={<ShieldCheck size={16} color={palette.primary} />}
@@ -449,5 +458,6 @@ export function SettlementPanel({
         <Text style={{ color: colors.success }}>{action.notice}</Text>
       )}
     </Card>
+    </>
   );
 }

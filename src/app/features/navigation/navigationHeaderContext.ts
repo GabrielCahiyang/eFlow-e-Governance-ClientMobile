@@ -4,6 +4,7 @@ export type NavigationHeaderState = {
   onBack: () => void;
   backHint: string;
   topInset: number;
+  bottomInset?: number;
   routeTitle?: string;
 };
 
