@@ -1,11 +1,9 @@
 import { expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { captureWorkEditorBaseline } from "../../../../core/web/app/features/nested-work/selectors/editorDraft";
 import { rememberWorkCapabilityContext } from "../../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../../core/web/app/features/nested-work/types";
 import { WorkRequestFailure } from "../../../../core/web/app/features/nested-work/types/editor";
 import { draftStore } from "../../../../platform/draftStore";
-import { recoverWorkRequest } from "../workRecovery";
 import { WorkEditorSheet } from "../WorkEditorSheet";
 import { fetchWorkTree, saveWorkTree } from "../../../../core/web/app/features/nested-work/services/workTreeService";
 
@@ -21,12 +19,76 @@ jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
 jest.mock("../../../../platform/draftStore", () => ({
   draftStore: { get: jest.fn(), remove: jest.fn(), set: jest.fn() },
 }));
-jest.mock("../workRecovery", () => ({
-  ...jest.requireActual<object>("../workRecovery"),
-  recoverWorkRequest: jest.fn(),
-}));
 
-test("a confirmed rejection restores saved Subtask details with the specific error", async () => {
+test.each(["progress", "submit"] as const)("%s rechecks exact-node assignment before a legacy editor write", async (command) => {
+  const initial = { revision: 1,
+    root: { id: "assignment-check", kind: "office", project: "project", office: "office", open: true,
+      status: "in_progress", lead: "actor", people: [] },
+    nodes: [{ id: "sub", task_id: "assignment-check", title: "Scoped work", status: "in_progress",
+      lead_id: "subtask-lead", assigned_to_ids: ["actor"], parent_subtask_id: null,
+      percent_complete: 10, capabilities: { execute: { allowed: true, reason_code: null }, submit: { allowed: true, reason_code: null } } }],
+    people: [] } as unknown as WorkTreeSnapshot;
+  const latest = { ...initial, nodes: [{ ...initial.nodes[0], assigned_to_ids: [] }] };
+  rememberWorkCapabilityContext(initial, "actor");
+  rememberWorkCapabilityContext(latest, "actor");
+  jest.mocked(draftStore.get).mockResolvedValue(null);
+  jest.mocked(fetchWorkTree).mockResolvedValue(latest);
+  await render(<WorkEditorSheet data={initial} edit={{ command, node: initial.nodes[0] }}
+    onClose={jest.fn()} onSaved={async () => {}} />);
+  await fireEvent.changeText(await screen.findByLabelText("Work note"), "Keep my draft");
+  await fireEvent.press(screen.getByRole("button", { name: command === "progress" ? "Post update" : "Submit for review" }));
+  await waitFor(() => expect(screen.getByText(/Only the Lead or contributors/)).toBeOnTheScreen());
+  expect(saveWorkTree).not.toHaveBeenCalled();
+  expect(screen.getByDisplayValue("Keep my draft")).toBeOnTheScreen();
+});
+
+test.each(["allowed", "revoked-person", "revoked-capability"])("grouped subtask contributors save only with fresh eligibility and authority: %s", async (scenario) => {
+  const data = {
+    root: { id: `grouped-${scenario}`, kind: "office", office: "office", project: "project", lead: "actor",
+      open: true, people: ["actor", "task-worker"], status: "in_progress" },
+    revision: 1,
+    nodes: [{ id: "grouped-node", task_id: `grouped-${scenario}`, parent_subtask_id: null,
+      title: "Inspect wiring", lead_id: "actor", assigned_to_ids: ["actor"], status: "todo",
+      capabilities: { appoint_lead: { allowed: true, reason_code: null }, manage_contributors: { allowed: true, reason_code: null } } }],
+    people: [
+      { id: "specialist", name: "Aaron Specialist", eligible: true },
+      { id: "task-worker", name: "Zoe Contributor", eligible: true },
+      { id: "actor", name: "Task Lead", eligible: true },
+    ],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(data, "actor");
+  const fresh = JSON.parse(JSON.stringify(data)) as WorkTreeSnapshot;
+  if (scenario === "revoked-person") fresh.people[0].eligible = false;
+  if (scenario === "revoked-capability") fresh.nodes[0].capabilities!.manage_contributors = { allowed: false, reason_code: "branch_denied" };
+  rememberWorkCapabilityContext(fresh, "actor");
+  jest.mocked(draftStore.get).mockResolvedValue(null);
+  jest.mocked(fetchWorkTree).mockResolvedValue(fresh);
+  jest.mocked(saveWorkTree).mockResolvedValue(fresh);
+
+  const view = await render(<WorkEditorSheet data={data} edit={{ command: "staff", node: data.nodes[0] }} onClose={jest.fn()} onSaved={async () => {}} />);
+  await fireEvent.press(await view.findByRole("button", { name: "Contributors" }));
+  expect(view.getAllByRole("checkbox").map((row) => row.props.accessibilityLabel)).toEqual(["Zoe Contributor", "Aaron Specialist"]);
+  expect(view.queryByRole("checkbox", { name: "Task Lead" })).toBeNull();
+  await fireEvent.press(view.getByRole("checkbox", { name: "Aaron Specialist" }));
+  await fireEvent.press(view.getByRole("button", { name: "Confirm contributors" }));
+  expect(saveWorkTree).not.toHaveBeenCalled();
+  await fireEvent.press(view.getByRole("button", { name: "Save team" }));
+  if (scenario === "allowed") {
+    await waitFor(() => expect(saveWorkTree).toHaveBeenCalledWith(data.root.id, expect.objectContaining({
+      command: "staff", payload: expect.objectContaining({ id: "grouped-node", lead: "actor", people: ["specialist", "actor"] }),
+    })));
+    expect(data.root.people).toEqual(["actor", "task-worker"]);
+  } else {
+    const message = scenario === "revoked-person"
+      ? "A selected worker is no longer eligible. Resolve the roster explicitly before saving."
+      : "You do not have permission for this action on this work.";
+    expect((await view.findAllByText(message)).length).toBeGreaterThan(0);
+    expect(saveWorkTree).not.toHaveBeenCalled();
+  }
+  await view.unmount();
+});
+
+test("WorkEditorSheet opens the editor directly without checking or showing saved past actions", async () => {
   const data = {
     root: { status: "in_progress", id: "task", kind: "office", office: "office", project: "project",
       open: true, people: [], capabilities: { create_child: { allowed: true, reason_code: null } } },
@@ -35,54 +97,35 @@ test("a confirmed rejection restores saved Subtask details with the specific err
     people: [],
   } as unknown as WorkTreeSnapshot;
   rememberWorkCapabilityContext(data, "actor");
-  const edit = { command: "create" } as const;
-  const baseline = captureWorkEditorBaseline(data, edit, "actor", "original-node");
   jest.mocked(draftStore.get).mockResolvedValue({
-    baseline,
-    fields: { ...baseline.fields, title: "Prepare venue invitation" },
     request: { id: "original-request", revision: 3, command: "create", payload: {} },
   });
-  jest.mocked(recoverWorkRequest).mockRejectedValue(
-    new WorkRequestFailure("confirmed_failure", "Choose a start date within the parent schedule, or reschedule the parent first"),
-  );
-  await render(<WorkEditorSheet data={data} edit={edit} onClose={jest.fn()} onSaved={async () => {}} />);
-  expect(await screen.findByText(/An earlier save still needs to be confirmed/)).toBeOnTheScreen();
-  await fireEvent.press(screen.getByRole("button", { name: "Add subtask" }));
-  expect(await screen.findByText(/Choose a start date within the parent schedule/)).toBeOnTheScreen();
-  expect(screen.getByDisplayValue("Prepare venue invitation")).toHaveProp("editable", true);
-  expect(draftStore.remove).toHaveBeenCalledWith("actor", "work.task");
+  await render(<WorkEditorSheet data={data} edit={{ command: "create" }} onClose={jest.fn()} onSaved={async () => {}} />);
+  expect(await screen.findByLabelText("Subtask name")).toBeOnTheScreen();
+  expect(screen.queryByText("Check previous changes")).toBeNull();
+  expect(screen.queryByText(/An earlier save still needs to be confirmed/)).toBeNull();
+  expect(draftStore.get).not.toHaveBeenCalled();
 });
 
-test("a confirmed save closes the editor and refreshes the list without a notice", async () => {
+test("failed WorkEditorSheet save does not persist a past action and keeps fields editable", async () => {
   const data = {
-    root: { status: "in_progress",
-      id: "task", kind: "office", office: "office", project: "project",
-      open: true, lead: "task-lead", people: [],
-      scheduling: { version: 1, today: "2026-11-13" },
-      capabilities: { create_child: { allowed: true, reason_code: null } },
-    },
+    root: { status: "in_progress", id: "task-fail", kind: "office", office: "office", project: "project",
+      open: true, people: [], capabilities: { create_child: { allowed: true, reason_code: null } } },
     revision: 3,
     nodes: [],
     people: [],
   } as unknown as WorkTreeSnapshot;
   rememberWorkCapabilityContext(data, "actor");
-  const edit = { command: "create" } as const;
-  const baseline = captureWorkEditorBaseline(data, edit, "actor", "original-node");
-  jest.mocked(draftStore.get).mockResolvedValue({
-    baseline, fields: baseline.fields,
-    request: {
-      id: "original-request", revision: 3, command: "create",
-      payload: { id: "original-node", start: "2026-11-25" },
-    },
-  });
-  jest.mocked(recoverWorkRequest).mockResolvedValue(data);
-  const onClose = jest.fn();
-  const onSaved = jest.fn(async (_receipt: WorkTreeSnapshot) => {});
-  await render(<WorkEditorSheet data={data} edit={edit} onClose={onClose} onSaved={onSaved} />);
-  await fireEvent.press(await screen.findByRole("button", { name: "Add subtask" }));
-  expect(onClose).toHaveBeenCalledTimes(1);
-  expect(onSaved).toHaveBeenCalledWith(data);
-  expect(screen.queryByText("Subtask saved")).toBeNull();
+  jest.mocked(fetchWorkTree).mockResolvedValue(data);
+  jest.mocked(saveWorkTree).mockRejectedValueOnce(
+    new WorkRequestFailure("unknown_result", "Network connection lost"),
+  );
+  await render(<WorkEditorSheet data={data} edit={{ command: "create" }} onClose={jest.fn()} onSaved={async () => {}} />);
+  await fireEvent.changeText(await screen.findByLabelText("Subtask name"), "tae");
+  await fireEvent.press(screen.getByRole("button", { name: "Add subtask" }));
+  expect(await screen.findByText(/We couldn't confirm your changes/)).toBeOnTheScreen();
+  expect(draftStore.set).not.toHaveBeenCalled();
+  expect(screen.getByDisplayValue("tae")).toHaveProp("editable", true);
 });
 
 test.each(["create", "edit"] as const)("Office Subtask %s saves the selected priority with the work request", async (command) => {
@@ -630,8 +673,8 @@ test("WorkEditorSheet keeps Search options on Appointed Lead with fewer than six
       },
     ],
     people: [
-      { id: "actor", name: "Andres Manili" },
-      { id: "worker-1", name: "Cheryl Gallo" },
+      { id: "actor", name: "Andres Manili", eligible: true },
+      { id: "worker-1", name: "Cheryl Gallo", eligible: true },
     ],
   } as unknown as WorkTreeSnapshot;
   rememberWorkCapabilityContext(data, "actor");

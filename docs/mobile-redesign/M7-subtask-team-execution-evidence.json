@@ -1,0 +1,120 @@
+{
+  "date": "2026-11-18",
+  "timezone": "Asia/Singapore",
+  "phase": "M7",
+  "slice": "Exact subtask team execution",
+  "mobileBase": "3af48f8175005518356b6adfc186a512acf9457f",
+  "reviewedWebHead": "4436863b5d93b2553d66a83df2bf9d970784df4f",
+  "webWorkingTree": "Dirty implementation reviewed; not deployed by this task",
+  "canonicalSourceHashes": [
+    {
+      "file": "src/app/features/nested-work/selectors/participation.ts",
+      "sha256": "4c9c0f4c116d4f54c712c4160595ec685e1cc7591f74600bce6d2be4e9eda699"
+    },
+    {
+      "file": "src/app/features/nested-work/selectors/capabilities.ts",
+      "sha256": "321832d65f04fb51da169fc947e5fcac7970d2f56454f1246d42495aebb29d58"
+    },
+    {
+      "file": "supabase/migrations/20261118152250_restrict_subtask_execution_to_assigned_team.sql",
+      "sha256": "f7e31bdc61339cec0238b621bace6c461b94322aaa6b1b843e93db8797b1310f"
+    }
+  ],
+  "focusedTests": {
+    "suitesPassed": 8,
+    "testsPassed": 89,
+    "testsFailed": 0,
+    "success": true,
+    "raw": "artifacts/M7/subtask-team-tests.json"
+  },
+  "typeScript": "PASS: npx tsc --noEmit --pretty false",
+  "metro": "PASS: 9 checks",
+  "whitespace": "PASS: scoped git diff --check",
+  "fullSuite": "SKIPPED: focused slice with passing affected suites",
+  "androidJsExport": "SKIPPED: no release build; focused source slice",
+  "iosJsExport": "SKIPPED: no release build; focused source slice",
+  "credentialAudit": "SKIPPED: no new production bundle",
+  "apk": "NOT BUILT: explicit-build hold recorded in phase-progress.md; existing APKs exclude this fix",
+  "androidCompilationInstallationWorkflows": "NOT RUN: no new authorized APK or signed-in fixture workflow",
+  "iosCompilationWorkflows": "NOT RUN: Windows host; Apple build environment and approved actors needed",
+  "nativeThemesReducedMotionAccessibilityFontScalingKeyboard": "NOT RUN separately on Android/iOS",
+  "hostedChanges": "NONE",
+  "backendDependency": "Web migration prepared locally, not applied per supplied handoff; hosted state not queried",
+  "personalAcceptance": "PENDING",
+  "developmentSlice": "COMPLETE",
+  "releaseReady": false,
+  "sourceFiles": [
+    {
+      "file": "src/app/features/tasks/workPermissions.ts",
+      "sha256": "57341dce6f2141b5fa15507f6a20397efce7acb5e64976f384685e6f3c61c3cc"
+    },
+    {
+      "file": "src/app/features/tasks/branchInspector.ts",
+      "sha256": "64cc34defa096eda85100f4ab2ab50cee00cb6d50e7ab760df061d84cbf23bd0"
+    },
+    {
+      "file": "src/app/features/tasks/WorkTreePanel.tsx",
+      "sha256": "efa883f034b8b74d5e65cc17e5db14637f8a0307af972702f14fec6ea6a51394"
+    },
+    {
+      "file": "src/app/features/tasks/LinkedWorkNodeScreen.tsx",
+      "sha256": "eaf2171cf2b807d9f9373d2b8e4b2995629cc24faf89d2d2497c9dddece3706c"
+    },
+    {
+      "file": "src/app/features/tasks/OfficeSubitemUpdateSheet.tsx",
+      "sha256": "25b80c17304f43123077d08d9f9c9ad56ce26a8adf69bddf4b22a32f11d85eb7"
+    },
+    {
+      "file": "src/app/features/tasks/WorkEditorSheet.tsx",
+      "sha256": "3959b5d4fa2b5e7de5946c8be4f1226a3ac6fdd570c163d7325de6094ef8611d"
+    },
+    {
+      "file": "src/app/features/tasks/WorkProposalSheet.tsx",
+      "sha256": "1eb2416bfa26b78ecd92e1c922beac2837e7c8b28dfe736ee45931fbb5ded3c5"
+    },
+    {
+      "file": "src/app/features/tasks/SubtaskCompletionSheet.tsx",
+      "sha256": "e4b8a7a83f58637ee6d7f441390691f4901e8874062cfeeacd955669a149f875"
+    },
+    {
+      "file": "src/core/web/app/features/nested-work/selectors/participation.ts",
+      "sha256": "4c9c0f4c116d4f54c712c4160595ec685e1cc7591f74600bce6d2be4e9eda699"
+    },
+    {
+      "file": "docs/WEB_CORE_MANIFEST.json",
+      "sha256": "a5a57d1d942b7301dbbe2f7bf4d99417fb865a004d4999f7677b66fec4586d25"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/workPermissions.test.ts",
+      "sha256": "2db404b2332f5f6b6f402415fb7858d19f0c083d724de4cf0880a7363a04acb0"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/branchInspector.test.ts",
+      "sha256": "7e11f64063377e9a830478e56c23ecdde963f3805ee3bc84ba2295e58e0da74a"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/WorkTreePanel.test.tsx",
+      "sha256": "db669a194ee612942469868a134cd5f30a8e9cc43525466ca43add072d069436"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/LinkedWorkNodeScreen.test.tsx",
+      "sha256": "992cf5164083c4796cac8b2fc0fcaa57ad21d04c785fa5fef7f094cd24a685c1"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/OfficeSubitemUpdateSheet.test.tsx",
+      "sha256": "431f04799c178caef5414e4faff6442ca8f9e808eb120ac1afe69b4468f12bfc"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/WorkEditorRecovery.test.tsx",
+      "sha256": "b2f0ab9fe6be72f07ff05c783c466aa4a2f2c3e93e2aed2cccaa8aab308a70c3"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/WorkProposalSheet.test.tsx",
+      "sha256": "4634a1161c99b92438ad534b497ca67cc6efc1e57239d788070ce82b21ec4fae"
+    },
+    {
+      "file": "src/app/features/tasks/__tests__/SubtaskCompletionSheet.test.tsx",
+      "sha256": "f8e75ee1a69726f7c55e78f0f4177ee94af5c162812266209f7668c01366f7fa"
+    }
+  ]
+}

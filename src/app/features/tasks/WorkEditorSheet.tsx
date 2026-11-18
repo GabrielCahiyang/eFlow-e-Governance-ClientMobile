@@ -36,11 +36,7 @@ import {
   writeFormDraft,
 } from "../../shared/formDraftMemory";
 import { useAuth } from "../authentication";
-import {
-  isNativeWorkRecovery,
-  recoverWorkRequest,
-  workRecoveryCanDiscard,
-} from "./workRecovery";
+import { workRecoveryCanDiscard } from "./workRecovery";
 import {
   captureWorkEditorBaseline,
   freezeWorkEditorRequest,
@@ -71,11 +67,10 @@ import {
   type WorkEdit,
   type WorkEditorFields,
 } from "../../../core/web/app/features/nested-work/types/editor";
-import { draftStore } from "../../../platform/draftStore";
 import { personalReviewAllowed } from "./branchInspector";
 import {
   isProjectLeadSubtaskPlanningBlocked,
-  isSubtaskLeadOrContributor,
+  isSubtaskExecutionParticipant,
   taskStaffingCapability,
 } from "./workPermissions";
 import {
@@ -87,8 +82,8 @@ import { fetchTaskById } from "../../../core/web/app/features/tasks/services/tas
 import { fetchProject } from "../projects/services";
 import { PublicMessageError } from "../../shared/userMessages";
 import { useFacts } from "../../shared/useFacts";
-import { workEditorReceiptRetryAllowed } from "../../../core/web/app/features/nested-work/selectors/editorDraft";
 import { workPriorityOptions } from "./workPriorityOptions";
+import { subtaskPeopleOptions } from "./subtaskPeopleOptions";
 import { hiddenSubtasksMessage, subtasksVisibleForActor } from "./subtaskVisibility";
 import { detailEditError, readDetailEditState } from "./workDetailEditing";
 import {
@@ -214,18 +209,13 @@ export function workEditorSuccessMessage(
 export function WorkEditorSheet(
   props: Omit<
     Parameters<typeof WorkEditorForm>[0],
-    "rejectedCreate" | "onPostCreateHandoff"
+    "onPostCreateHandoff"
   > & {
     skipRecovery?: boolean;
     promptPostCreateStaffing?: boolean;
   },
 ) {
-  const { profile } = useAuth(),
-    { toast } = useToast(),
-    { data, readOnly = false } = props,
-    palette = useTheme(),
-    action = useAction();
-  const [recoveredDone, setRecoveredDone] = useState(false);
+  const { data } = props;
   const [handoff, setHandoff] = useState<{
     stage: "prompt" | "staff";
     target: Extract<PostCreateStaffingTarget, { kind: "subtask" }>;
@@ -234,31 +224,6 @@ export function WorkEditorSheet(
   useEffect(() => {
     setHandoff(undefined);
   }, [scopeKey]);
-  const [rejectedCreate, setRejectedCreate] = useState<{
-    fields: NativeEditorFields;
-    error: unknown;
-    start?: string;
-  }>();
-  const context = {
-    actorId: profile?.id || null,
-    rootId: data.root.id,
-    projectId: data.root.project,
-    officeId: data.root.office,
-    kind: data.root.kind,
-    revision: data.revision,
-    readOnly,
-  };
-  const retained = useFacts(
-    `work-recovery:${profile?.id}:${data.root.id}`,
-    async () => {
-      const saved = await draftStore.get<unknown>(
-        profile!.id,
-        "work." + data.root.id,
-      );
-      return isNativeWorkRecovery(saved, context) ? saved : null;
-    },
-    !!profile && !props.skipRecovery && !handoff,
-  );
   const needsDates = ["create", "edit"].includes(props.edit.command) &&
     data.root.kind === "office" && !data.root.scheduleBounds && !!workScheduleToday(data);
   const taskDates = useFacts("work-editor-schedule:" + data.root.id, async () => {
@@ -283,7 +248,7 @@ export function WorkEditorSheet(
       taskStart: typeof task.start_date === "string" ? task.start_date : undefined,
       taskDue: data.root.due ?? undefined,
     };
-  }, needsDates && !handoff && (!retained.data || !!rejectedCreate));
+  }, needsDates && !handoff);
 
   const content = handoff ? (
     handoff.stage === "prompt" ? (
@@ -307,154 +272,7 @@ export function WorkEditorSheet(
         onSaved={props.onSaved}
       />
     )
-  ) : !props.skipRecovery && !rejectedCreate && retained.loading ? (
-      <Sheet open title="Checking saved work changes" onClose={props.onClose}>
-        <Loading
-          layout="verification"
-          label="Checking the original work request…"
-        />
-      </Sheet>
-  ) : !props.skipRecovery && !rejectedCreate && retained.error ? (
-      <Sheet
-        open
-        title="Saved work changes unavailable"
-        onClose={props.onClose}
-      >
-        <ErrorState
-          error={retained.error}
-          retry={() => void retained.refresh()}
-        />
-      </Sheet>
-  ) : !props.skipRecovery && !rejectedCreate && retained.data ? (() => {
-    const saved = retained.data;
-    const canCheck = workEditorReceiptRetryAllowed(data, context);
-    const rejected = workRecoveryCanDiscard(action.error);
-    return (
-      <Sheet
-        actionError={action.error}
-        open
-        title="Check previous changes"
-        description={saved.fields.title || undefined}
-        onClose={props.onClose}
-        busy={action.busy}
-        footer={
-          <>
-            <Button
-              busy={action.busy}
-              disabled={!recoveredDone && (!canCheck || rejected)}
-              icon={
-                recoveredDone ? (
-                  <X size={16} color={palette.onPrimary} />
-                ) : (
-                  <RefreshCw size={16} color={palette.onPrimary} />
-                )
-              }
-              onPress={() => {
-                if (recoveredDone) {
-                  props.onClose();
-                  return;
-                }
-                void action.run(async () => {
-                  let receipt: WorkTreeSnapshot;
-                  try {
-                    receipt = await recoverWorkRequest(
-                      data.root.id,
-                      saved.request,
-                      profile!.id,
-                    );
-                  } catch (error) {
-                    if (
-                      saved.request.command !== "create" ||
-                      props.edit.command !== "create" ||
-                      (props.edit.parent ?? "") !== saved.fields.parent ||
-                      !workRecoveryCanDiscard(error)
-                    ) throw error;
-                    await draftStore.remove(profile!.id, "work." + data.root.id);
-                    const start = saved.request.payload.start;
-                    setRejectedCreate({
-                      fields: {
-                        ...saved.fields,
-                        priority: workPriorityOptions.find((option) =>
-                          option.value === saved.request.payload.priority)?.value,
-                      },
-                      error,
-                      start: typeof start === "string" ? start : undefined,
-                    });
-                    return;
-                  }
-                  await draftStore.remove(profile!.id, "work." + data.root.id);
-                  if (saved.request.command === "create") {
-                    const followUp = await applyCreatedDependencies(
-                      receipt,
-                      saved.baseline.createdId,
-                      saved.fields.dependencies,
-                      profile!.id,
-                    );
-                    receipt = followUp.receipt;
-                    if (followUp.warning) {
-                      setRecoveredDone(true);
-                      await Promise.allSettled([props.onSaved(receipt)]);
-                      throw new PublicMessageError(followUp.warning);
-                    }
-                  }
-                  toast(
-                    workEditorSuccessMessage(
-                      saved.request.command,
-                      saved.request.command === "review"
-                        ? typeof saved.request.payload.progress === "number"
-                          ? saved.request.payload.progress
-                          : Number(saved.fields.progress) || 0
-                        : undefined,
-                    ),
-                    "success",
-                  );
-                  props.onClose();
-                  await props.onSaved(receipt);
-                });
-              }}
-            >
-              {recoveredDone ? "Close work form" : workEditorActionLabel(saved.request.command)}
-            </Button>
-            {rejected && (
-              <Button
-                variant="outline"
-                disabled={action.busy}
-                icon={<Trash2 size={16} color={palette.primary} />}
-                onPress={() =>
-                  void action.run(async () => {
-                    if (
-                      !(await confirmAction(
-                        "Discard rejected work request?",
-                        "These changes were not saved. Discard this attempt and review the current work before trying again.",
-                        "Discard rejected request",
-                      ))
-                    )
-                      return;
-                    await draftStore.remove(
-                      profile!.id,
-                      "work." + data.root.id,
-                    );
-                    await retained.refresh();
-                    action.clear();
-                  })
-                }
-              >
-                Discard rejected request
-              </Button>
-            )}
-          </>
-        }
-      >
-        {!action.error && (
-          <Text>
-            {canCheck
-              ? "An earlier save still needs to be confirmed. Use the button below to check its result."
-              : "Refresh the task or reopen it with an account that can make this change."}
-          </Text>
-        )}
-      </Sheet>
-    );
-  })() : needsDates && !taskDates.data ? (
+  ) : needsDates && !taskDates.data ? (
       <Sheet open title="Parent task schedule" onClose={props.onClose}>
         {taskDates.error
           ? <ErrorState error={taskDates.error} retry={() => void taskDates.refresh()} />
@@ -464,7 +282,6 @@ export function WorkEditorSheet(
     <WorkEditorForm
       {...props}
       dateBounds={data.root.scheduleBounds ?? taskDates.data}
-      rejectedCreate={rejectedCreate}
       onPostCreateHandoff={
         props.promptPostCreateStaffing
           ? (target) => setHandoff({ stage: "prompt", target })
@@ -474,7 +291,7 @@ export function WorkEditorSheet(
   );
 
   return (
-    <SheetModalHost open onClose={props.onClose} busy={action.busy}>
+    <SheetModalHost open onClose={props.onClose}>
       {content}
     </SheetModalHost>
   );
@@ -489,7 +306,6 @@ function WorkEditorForm({
   readOnly = false,
   projectStatus,
   projectLeadId,
-  rejectedCreate,
   dateBounds,
 }: {
   data: WorkTreeSnapshot;
@@ -501,7 +317,6 @@ function WorkEditorForm({
   readOnly?: boolean;
   projectStatus?: string;
   projectLeadId?: string;
-  rejectedCreate?: { fields: NativeEditorFields; error: unknown; start?: string };
   dateBounds?: WorkTreeSnapshot["root"]["scheduleBounds"];
 }) {
   const { profile } = useAuth();
@@ -540,13 +355,6 @@ function WorkEditorForm({
       (edit.node?.id || edit.parent || (edit.root ? "root" : "new")),
   );
   const [fields, setFields] = useState<NativeEditorFields>(() => {
-    if (rejectedCreate)
-      return {
-        ...rejectedCreate.fields,
-        start: rejectedCreate.start ?? rejectedCreate.fields.start,
-      };
-    // Ordinary edits start from the current snapshot. Explicit request recovery
-    // above remains separate and preserves original submitted terms.
     const savedDraft = edit.command === "create" ? readFormDraft<NativeEditorFields>(draftKey) : undefined;
     if (savedDraft) return savedDraft;
     return {
@@ -572,10 +380,8 @@ function WorkEditorForm({
   const invalidRange = !!(dateLimits?.earliest && dateLimits.latest && dateLimits.earliest > dateLimits.latest);
   const changedStart =
     (sharedDates || !!today) && edit.command === "edit" && start !== originalStart;
-  const request = useRef<WorkRequest | undefined>(undefined),
-    { toast } = useToast(),
+  const { toast } = useToast(),
     action = useAction();
-  const [rejectedError, setRejectedError] = useState(rejectedCreate?.error);
   const context = {
     actorId: profile?.id || null,
     rootId: data.root.id,
@@ -665,7 +471,7 @@ function WorkEditorForm({
     key: K,
     value: NativeEditorFields[K],
   ) => {
-    if (action.busy || request.current) return;
+    if (action.busy) return;
     action.clear();
     setFields((old) => {
       const next = { ...old, [key]: value };
@@ -675,11 +481,8 @@ function WorkEditorForm({
   };
   const save = () =>
     action.run(async () => {
-      setRejectedError(undefined);
       if (committed) return;
       if (!profile) throw new PublicMessageError("Sign in again.");
-      const wasPending = !!request.current;
-      if (!request.current) {
         if (edit.command === "review") {
           if (!fields.note.trim())
             throw new PublicMessageError("Enter the reason for your decision.");
@@ -726,7 +529,7 @@ function WorkEditorForm({
         if (
           ["progress", "submit"].includes(edit.command) &&
           (!latestNode ||
-            !isSubtaskLeadOrContributor(latest, latestNode, profile.id))
+            !isSubtaskExecutionParticipant(latest, latestNode, profile.id))
         ) {
           throw new PublicMessageError(
             "Only the Lead or contributors of this task or subtask can update or complete this work.",
@@ -934,32 +737,17 @@ function WorkEditorForm({
             return;
           next = { ...next, impactFingerprint: impact.fingerprint };
         }
-        request.current = next;
-        await draftStore.set(profile.id, "work." + data.root.id, {
-          request: next,
-          fields: requestFields,
-          baseline,
-        });
-      }
       let receipt: WorkTreeSnapshot;
       try {
-        receipt = wasPending
-          ? await recoverWorkRequest(data.root.id, request.current, profile.id)
-          : await saveWorkTree(data.root.id, request.current);
+        receipt = await saveWorkTree(data.root.id, next);
       } catch (error) {
-        if (edit.command === "create" && workRecoveryCanDiscard(error)) {
-          await draftStore.remove(profile.id, "work." + data.root.id);
-          request.current = undefined;
-        }
         if (edit.command === "edit" && workRecoveryCanDiscard(error)) {
           const latest = await fetchWorkTree(data.root.id);
           if (latest.revision !== baseline.revision) setNewer(latest);
         }
         throw error;
       }
-      await draftStore.remove(profile.id, "work." + data.root.id);
       clearFormDraft(draftKey);
-      request.current = undefined;
       if (edit.command === "create") {
         const followUp = await applyCreatedDependencies(
           receipt,
@@ -1043,9 +831,6 @@ function WorkEditorForm({
         ))
       )
         return;
-      if (request.current)
-        await draftStore.remove(profile.id, "work." + data.root.id);
-      request.current = undefined;
       const merged = {
         ...nextBaseline.fields,
         title:
@@ -1081,7 +866,7 @@ function WorkEditorForm({
   };
   return (
     <Sheet
-      actionError={action.error ?? rejectedError}
+      actionError={action.error}
       open
       title={
         edit.root
@@ -1095,7 +880,7 @@ function WorkEditorForm({
         <Button
           style={{ width: "100%" }}
           busy={action.busy}
-          disabled={(taskStaffingDenied || (edit.command === "edit" && !capability.allowed)) && !request.current && !committed}
+          disabled={(taskStaffingDenied || (edit.command === "edit" && !capability.allowed)) && !committed}
           variant={edit.command === "delete" && !committed ? "danger" : "primary"}
           icon={(() => {
             const color =
@@ -1126,7 +911,7 @@ function WorkEditorForm({
             required
             value={fields.title}
             onChangeText={(v) => update("title", v)}
-            editable={!request.current && !action.busy && capability.allowed}
+            editable={!action.busy && capability.allowed}
           />
           {data.root.kind === "office" && <Notice>Subtasks use the parent Task’s group.</Notice>}
           {startedEdit && <Notice>Work has started. Authorized name and priority corrections remain available. Start date, prerequisites and structure are locked.</Notice>}
@@ -1137,7 +922,7 @@ function WorkEditorForm({
               searchable={false}
               options={workPriorityOptions}
               onChange={(value) => update("priority", value)}
-              disabled={!!request.current || action.busy || !capability.allowed}
+              disabled={action.busy || !capability.allowed}
             />
           )}
           {invalidRange && (
@@ -1151,7 +936,6 @@ function WorkEditorForm({
               max={startMax && dateLimits?.earliest && startMax < dateLimits.earliest ? dateLimits.latest : startMax}
               onChange={(value) => update("start", value)}
               disabled={
-                !!request.current ||
                 action.busy ||
                 invalidRange ||
                 !!startedEdit ||
@@ -1167,12 +951,12 @@ function WorkEditorForm({
             min={dueMin}
             max={dateLimits?.latest}
             onChange={(v) => update("due", v)}
-            disabled={!!request.current || action.busy || invalidRange || (edit.command === "edit" && (editPolicy ? !editPolicy.due : !!startedEdit)) || !!(dueMin && dateLimits?.latest && dueMin > dateLimits.latest)}
+            disabled={action.busy || invalidRange || (edit.command === "edit" && (editPolicy ? !editPolicy.due : !!startedEdit)) || !!(dueMin && dateLimits?.latest && dueMin > dateLimits.latest)}
           />
           {scheduleChanged && data.root.kind === "office" &&
             <Field label="Reason for the schedule change" required multiline maxLength={1000}
               value={fields.note} onChangeText={(value) => update("note", value)}
-              editable={!request.current && !action.busy} />}
+              editable={!action.busy} />}
           <Choice
             label="Prerequisite subtasks"
             multiple
@@ -1181,7 +965,7 @@ function WorkEditorForm({
             placeholder="No prerequisites selected"
             error={livePrerequisiteError}
             onChange={(value) => update("dependencies", value)}
-            disabled={!!request.current || action.busy || !!startedEdit || !capability.allowed || !canEditDependencies}
+            disabled={action.busy || !!startedEdit || !capability.allowed || !canEditDependencies}
           />
           {data.root.kind !== "office" ? (
             <Notice>Prerequisite selection is only available on project tasks.</Notice>
@@ -1212,12 +996,15 @@ function WorkEditorForm({
             confirmationLabel="Confirm Lead"
             value={fields.lead}
             onChange={(v) => update("lead", v)}
-            disabled={!!request.current || action.busy || !staffCapabilities?.appointment.allowed}
-            options={data.people.map((p) => ({
-              value: p.id,
-              label: p.name,
-              disabled: p.eligible === false,
-            }))}
+            disabled={action.busy || !staffCapabilities?.appointment.allowed}
+            options={!edit.root
+              ? subtaskPeopleOptions(data, node, [fields.lead, ...fields.people])
+              : data.people.map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                  // Fail closed: unknown eligibility is not selectable (matches staffingDraftError).
+                  disabled: p.eligible !== true && p.id !== fields.lead,
+                }))}
           />
           <Choice
             label="Contributors"
@@ -1226,12 +1013,14 @@ function WorkEditorForm({
             value={displayedWorkContributorIds(fields.lead || null, fields.people)}
             multiple
             onChange={(v) => update("people", compatibilityWorkWorkerIds(fields.lead || null, v))}
-            disabled={!!request.current || action.busy || !staffCapabilities?.contributors.allowed}
-            options={data.people.filter((p) => p.id !== fields.lead).map((p) => ({
-              value: p.id,
-              label: p.name,
-              disabled: p.eligible === false,
-            }))}
+            disabled={action.busy || !staffCapabilities?.contributors.allowed}
+            options={!edit.root
+              ? subtaskPeopleOptions(data, node, fields.people, fields.lead)
+              : data.people.filter((p) => p.id !== fields.lead).map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                  disabled: p.eligible !== true && !fields.people.includes(p.id),
+                }))}
           />
         </>
       )}
@@ -1240,7 +1029,7 @@ function WorkEditorForm({
           label="Move under"
           value={fields.parent}
           onChange={(v) => update("parent", v)}
-          disabled={!!request.current || action.busy}
+          disabled={action.busy}
           options={[
             { value: "", label: "Task root" },
             ...(node ? reparentChoices(data.nodes, node) : []).map((n) => ({
@@ -1258,7 +1047,7 @@ function WorkEditorForm({
             </Text>
             <Button
               variant="outline"
-              disabled={index === 0 || !!request.current}
+              disabled={index === 0}
               onPress={() => {
                 const ids = [...fields.order];
                 [ids[index - 1], ids[index]] = [ids[index], ids[index - 1]];
@@ -1270,7 +1059,7 @@ function WorkEditorForm({
             </Button>
             <Button
               variant="outline"
-              disabled={index === fields.order.length - 1 || !!request.current}
+              disabled={index === fields.order.length - 1}
               onPress={() => {
                 const ids = [...fields.order];
                 [ids[index], ids[index + 1]] = [ids[index + 1], ids[index]];
@@ -1289,7 +1078,7 @@ function WorkEditorForm({
           keyboardType="number-pad"
           value={String(fields.progress)}
           onChangeText={(v) => update("progress", Number(v))}
-          editable={!request.current}
+          editable={!action.busy}
         />
       )}
       {!!(edit.command === "review") && (
@@ -1303,7 +1092,7 @@ function WorkEditorForm({
             { value: "approve", label: "Approve completed work" },
             { value: "changes", label: "Request changes" },
           ]}
-          disabled={!!request.current}
+          disabled={action.busy}
         />
       )}
       {!!["progress", "submit", "review"].includes(edit.command) && (
@@ -1313,7 +1102,7 @@ function WorkEditorForm({
           value={fields.note}
           onChangeText={(v) => update("note", v)}
           multiline
-          editable={!request.current}
+          editable={!action.busy}
         />
       )}
       {!!(edit.command === "delete") && (

@@ -10,6 +10,9 @@ import { clearAllFormDrafts } from "../../../shared/formDraftMemory";
 import { saveSharedWork } from "../../../shared/sharedWorkRequest";
 import { draftStore } from "../../../../platform/draftStore";
 import { confirmAction } from "../../../shared/confirm";
+import { fetchWorkTree } from "../../../../core/web/app/features/nested-work/services/workTreeService";
+import { rememberWorkCapabilityContext } from "../../../../core/web/app/features/nested-work/selectors/capabilities";
+import type { WorkTreeSnapshot } from "../../../../core/web/app/features/nested-work/types";
 import {
   canResubmit,
   fetchWorkProposals,
@@ -23,6 +26,7 @@ jest.mock("../workProposals", () => ({
   fetchWorkProposals: jest.fn(),
   sendWorkProposal: jest.fn(),
 }));
+jest.mock("../../../../core/web/app/features/nested-work/services/workTreeService", () => ({ fetchWorkTree: jest.fn() }));
 
 jest.mock("../../../shared/sharedWorkRequest", () => ({
   saveSharedWork: jest.fn(),
@@ -86,6 +90,89 @@ beforeEach(() => {
   clearAllFormDrafts();
   jest.clearAllMocks();
   jest.mocked(draftStore.get).mockResolvedValue(undefined);
+});
+
+test.each(["progress", "completion"] as const)("Office %s proposals reject revoked exact-node membership before sending", async (kind) => {
+  const latest = { revision: 1,
+    root: { id: "task-1", kind: "office", project: "project", office: "office", lead: "member-1", open: true },
+    nodes: [{ id: "sub-1", task_id: "task-1", lead_id: "sub-lead", assigned_to_ids: [],
+      capabilities: { execute: { allowed: true, reason_code: null }, submit: { allowed: true, reason_code: null } } }],
+  } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(latest, "member-1");
+  jest.mocked(fetchWorkTree).mockResolvedValue(latest);
+  jest.mocked(fetchWorkProposals).mockResolvedValue({ items: [], canProposeProgress: true, canProposeCompletion: true });
+  await render(<WorkProposalSheet actor="member-1" root="task-1" node="sub-1" kind={kind}
+    officeSubtask onClose={jest.fn()} onSaved={async () => {}} />);
+  await fireEvent.changeText(await screen.findByLabelText(kind === "progress" ? "Work note" : "Completion note"), "Keep this evidence note");
+  await fireEvent.press(screen.getByRole("button", { name: kind === "progress" ? "Submit progress for review" : "Submit for review" }));
+  await waitFor(() => expect(screen.getByText(/Current assignment and work access/)).toBeOnTheScreen());
+  expect(sendWorkProposal).not.toHaveBeenCalled();
+  expect(screen.getByDisplayValue("Keep this evidence note")).toBeOnTheScreen();
+
+  // Explicit assignment still requires a current authoritative capability.
+  latest.nodes[0].assigned_to_ids = ["member-1"];
+  latest.nodes[0].capabilities = {};
+  await fireEvent.press(screen.getByRole("button", { name: kind === "progress" ? "Submit progress for review" : "Submit for review" }));
+  await waitFor(() => expect(fetchWorkTree).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.getByRole("button", { name: kind === "progress" ? "Submit progress for review" : "Submit for review" })).toBeEnabled());
+  expect(sendWorkProposal).not.toHaveBeenCalled();
+
+  latest.nodes[0].capabilities = { execute: { allowed: true, reason_code: null }, submit: { allowed: true, reason_code: null } };
+  await fireEvent.press(screen.getByRole("button", { name: kind === "progress" ? "Submit progress for review" : "Submit for review" }));
+  await waitFor(() => expect(sendWorkProposal).toHaveBeenCalledTimes(1));
+  expect(sendWorkProposal).toHaveBeenCalledWith("member-1", "task-1", "sub-1", expect.any(String),
+    expect.objectContaining({ args: expect.objectContaining({ p_node: "sub-1", p_kind: kind }) }), false);
+});
+
+const contributorCompletionTree = (leadId: string, assigned: string[]) => ({ revision: 1,
+  root: { id: "task-1", kind: "office", project: "project", office: "office", lead: "task-lead", open: true },
+  nodes: [{ id: "sub-1", task_id: "task-1", lead_id: leadId, assigned_to_ids: assigned,
+    status: "in_progress", started_at: "2026-11-18T00:00:00Z", percent_complete: 90,
+    capabilities: {
+      execute: { allowed: true, reason_code: null },
+      submit: { allowed: false, reason_code: "branch_denied" },
+    } }],
+}) as unknown as WorkTreeSnapshot;
+
+test("an assigned Subtask Contributor denied direct submit (branch_denied) still sends a completion proposal", async () => {
+  const latest = contributorCompletionTree("sub-lead", ["member-1"]);
+  rememberWorkCapabilityContext(latest, "member-1");
+  jest.mocked(fetchWorkTree).mockResolvedValue(latest);
+  jest.mocked(fetchWorkProposals).mockResolvedValue({ items: [], canProposeProgress: true, canProposeCompletion: true });
+  jest.mocked(sendWorkProposal).mockResolvedValue(undefined);
+  await render(<WorkProposalSheet actor="member-1" root="task-1" node="sub-1" kind="completion"
+    officeSubtask onClose={jest.fn()} onSaved={async () => {}} />);
+  await fireEvent.changeText(await screen.findByLabelText("Completion note"), "Finished the scoped work");
+  await fireEvent.press(screen.getByRole("button", { name: "Submit for review" }));
+  await waitFor(() => expect(sendWorkProposal).toHaveBeenCalledTimes(1));
+  expect(sendWorkProposal).toHaveBeenCalledWith("member-1", "task-1", "sub-1", expect.any(String),
+    expect.objectContaining({ args: expect.objectContaining({ p_node: "sub-1", p_kind: "completion" }) }), false);
+});
+
+test("an assigned Subtask Contributor is still blocked when the fresh m7 context denies completion", async () => {
+  const latest = contributorCompletionTree("sub-lead", ["member-1"]);
+  rememberWorkCapabilityContext(latest, "member-1");
+  jest.mocked(fetchWorkTree).mockResolvedValue(latest);
+  jest.mocked(fetchWorkProposals).mockResolvedValue({ items: [], canProposeProgress: true, canProposeCompletion: false });
+  await render(<WorkProposalSheet actor="member-1" root="task-1" node="sub-1" kind="completion"
+    officeSubtask onClose={jest.fn()} onSaved={async () => {}} />);
+  await fireEvent.changeText(await screen.findByLabelText("Completion note"), "Finished the scoped work");
+  await fireEvent.press(screen.getByRole("button", { name: "Submit for review" }));
+  await waitFor(() => expect(screen.getByText(/no longer have permission/)).toBeOnTheScreen());
+  expect(sendWorkProposal).not.toHaveBeenCalled();
+});
+
+test("an appointed Subtask Lead still requires direct submit capability for a completion proposal", async () => {
+  const latest = contributorCompletionTree("member-1", []);
+  rememberWorkCapabilityContext(latest, "member-1");
+  jest.mocked(fetchWorkTree).mockResolvedValue(latest);
+  jest.mocked(fetchWorkProposals).mockResolvedValue({ items: [], canProposeProgress: true, canProposeCompletion: true });
+  await render(<WorkProposalSheet actor="member-1" root="task-1" node="sub-1" kind="completion"
+    officeSubtask onClose={jest.fn()} onSaved={async () => {}} />);
+  await fireEvent.changeText(await screen.findByLabelText("Completion note"), "Finished the scoped work");
+  await fireEvent.press(screen.getByRole("button", { name: "Submit for review" }));
+  await waitFor(() => expect(screen.getByText(/Current assignment and work access/)).toBeOnTheScreen());
+  expect(sendWorkProposal).not.toHaveBeenCalled();
 });
 
 test.each([

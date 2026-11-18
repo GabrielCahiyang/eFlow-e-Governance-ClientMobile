@@ -172,7 +172,7 @@ export function LoginScreen() {
                 style={[s.brandDivider, { backgroundColor: palette.border }]}
               />
               <Text style={[s.brandOrg, { color: palette.muted }]}>
-                LGU Ormoc City
+                LEDIPO
               </Text>
             </View>
 
@@ -197,8 +197,8 @@ export function LoginScreen() {
                 </Text>
                 <Text style={[s.subhead, { color: palette.muted }]}>
                   {recovery
-                    ? "Use your official LGU account email."
-                    : "Use your official LGU account."}
+                    ? "Use your official LEDIPO account email."
+                    : "Use your official LEDIPO account."}
                 </Text>
               </MotionView>
 

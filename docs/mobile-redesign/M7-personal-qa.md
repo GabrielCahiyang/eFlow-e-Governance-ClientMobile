@@ -1,5 +1,21 @@
 # M7 personal QA — final streamlined app
 
+## Direct subtask evidence after uncertain saves — 19 November 2026
+
+**Development slice complete; personal acceptance PENDING.** Direct updates retain uploaded evidence after unknown RPC outcomes; only structured, operation-specific confirmed rejections clean up the new unused upload and permit correction. New uploads use the source-contract `progress` path. Unknown drafts, picked evidence and attempted-write locks survive sheet reopen/resume in existing actor-scoped session memory. Saved-versus-refresh-failed feedback and current authority checks remain intact. Contributor proposal recovery is unchanged.
+
+**PASS:** 98 tests in six targeted suites; TypeScript; nine Metro checks; durable adaptation verification; scoped whitespace checks. [Changed files, exact commands/results, source/storage contract, remaining legacy risks and per-role Android/iOS checklist](M7-subtask-attachment-integrity.md).
+
+**APK HOLD:** no new APK built, Android compiled/installed/workflow-verified, or iOS compiled/installed/workflow-verified. Both native JS exports, release audit and full Jest were skipped for this focused source slice. Hosted file acceptance and native theme/accessibility/font scaling/reduced motion/keyboard acceptance remain pending. Approved accounts/fixtures and a build containing this fix are required; no server-confirmed role was exercised. The handoff's two applied migrations are user-confirmed, not independently verified here; no SQL or hosted state changed. No phase is accepted or advanced.
+
+## Exact subtask team execution — 18 November 2026
+
+Office subtask work updates, blockers and new completion submissions now require the exact subtask's appointed Lead or assigned contributors, plus current server capabilities. An unassigned Task Lead keeps eligible review authority; an explicitly assigned Task Lead acting as a contributor follows contributor review. Start remains limited to the appointed Subtask Lead. Personal-work and Funding authority retain their existing contracts.
+
+**Development slice complete:** 89 tests across eight affected suites, TypeScript, nine Metro checks and scoped whitespace checks passed. [Implementation, backend dependency, executed/skipped checks and per-role Android/iOS checklist](M7-subtask-team-execution.md). **Hosted follow-up, 19 November 2026 at 00:21 SGT:** all three function restrictions are installed, with additional contributor-review guards and an enabled history trigger. The migration timestamp is absent from the ledger; active definitions were checked directly. [Read-only evidence](M7-subtask-team-hosted-readonly-verification.json). No hosted mutation occurred.
+
+No APK was rebuilt under the recorded explicit-build hold; existing APKs do not include this fix. Native exports, Android/iOS compile/install/workflows and native theme/accessibility/motion/font/keyboard verification were not executed for this slice. M7 remains **unaccepted**.
+
 ## Work and financial clearance — 18 November 2026
 
 See the [M7 slice checklist, manual SQL, review APK and executed/skipped checks](M7-work-financial-clearance-personal-qa.md). Mobile source and targeted tests are ready; SQL is **not applied**, Web consumer integration and signed-in Android/iOS verification remain pending. This is not personal acceptance or release approval.
@@ -1022,3 +1038,33 @@ No approved dedicated actor was used and no server-confirmed role result is clai
 | Each supported actor on both platforms | Confirm originating tab, exact branch and Back; drafts through recheck; missing-definition error and recovery. Verify light/dark themes, 150%/200% font scaling, TalkBack/VoiceOver, reduced motion and keyboard behavior. Administrative role editing and Admin sign-in remain unavailable on Mobile. | NOT TESTED on native devices for this build |
 
 Android install/authenticated workflows were not executed. iOS native compilation/install/workflows were not executed on this Windows host; a Mac/Xcode and approved device/simulator are required. Native exports and automated rendering are not native-device verification or full release readiness.
+
+## M7 — grouped subtask assignment picker, build 65 (2026-11-18)
+
+Implementation and targeted validation complete; personal acceptance PENDING. No phase is accepted or advanced. [Source review and native adaptations](M7-subtask-people-build65-source-review.md).
+
+Subtask Lead and contributor pickers now show **On parent subtask** first for nested work, then **On this task**, then **Other eligible people**. Empty groups disappear. Search preserves staged choices across groups; confirmation changes the form and saving uses the existing checked command. Only explicitly eligible identities from the authorized work directory are offered as new assignments. Selected historical identities remain visible and disabled. The appointed Lead is excluded from contributors. Choosing an eligible specialist does not add them to the root Task team. Root Task staffing, creation/post-create staffing flow, permissions, server contracts and recovery receipts remain intact.
+
+### Executed checks
+
+- PASS: `npm run check` — TypeScript and Metro checks; Git whitespace check.
+- PASS: 52 focused tests in seven suites: Fields, Sheet, subtaskPeopleOptions, WorkEditorRecovery, workPermissions, workRecoveryStaffing and PostCreateStaffingSheet. Covers task/parent grouping, specialists outside the root team, no implicit root membership, absent/false/conflicting eligibility, selected historical identities, deduplication, unavailable parent context, staged search/confirmation, fresh eligibility and capability revocation, recovery and existing assignment restrictions. One existing picker-search fixture now explicitly supplies eligible identities, matching the real fail-closed contract.
+- PASS separately: Android and iOS production Hermes JS exports, including protected sign-in configuration verification.
+- PASS: Android native release compilation and packaging for ARM64/x86_64. [Standalone M7 QA APK, build 65](../../artifacts/M7/eFlow-Mobile-M7-Subtask-People-v65-arm64-x86_64.apk) passed signature, non-debuggable manifest, no-development-launcher, embedded-bundle and architecture checks. All three changed production picker sources match the embedded release source map. Existing local QA signing is retained; no store submission. [APK receipt](../STANDALONE_V65_APK_VERIFICATION.json) · [Build evidence](M7-subtask-people-build65-evidence.json).
+- PASS: credential audit on both final native exports and the embedded APK bundle. [Release audit](M7-subtask-people-build65-release-audit.json).
+- SKIPPED: full repository test suite. This is a focused picker slice; the seven relevant suites passed. The prior broader-suite failures documented for build 64 were not retested or claimed fixed. No separate lint command is configured; TypeScript and whitespace validation were executed. Shared `Choice` presentation changes and the phase APK requirement justified platform exports and release checks.
+
+### Pending personal QA — Android and iOS separately
+
+No approved dedicated actor or server-confirmed permanent role was used. Exact actor IDs, server-confirmed roles and fixture IDs must be recorded during approved testing; none are invented here. Hosted availability of Web's direct Office-member assignment expansion was not independently verified. Missing accounts/fixtures/backend prerequisites remain BLOCKED; no production fixture or membership was created.
+
+| Required role account/fixture | Scenario | Status |
+| --- | --- | --- |
+| Dedicated approved Member appointed Task Lead, with a safe root/subtask and eligible specialist outside the Task team | Open subtask → Choose people. Verify Task team appears first, search/select the specialist, cancel/reopen without a write, confirm/save, and compare exact branch staffing with Web. Root Task contributor list must remain unchanged. | BLOCKED: approved account/fixture and native workflow QA |
+| Dedicated approved Member appointed Subtask Lead, with a readable parent and nested child | Verify parent team precedes remaining Task team and other eligible people; no duplicates; Lead excluded from contributors. Check an authorized eight-level branch and exact origin/back behavior. | BLOCKED: approved account/branch fixture and native workflow QA |
+| Dedicated approved Head and Member with distinct project/Office contexts | Check current planning/active assignment restrictions and denied branches. A role or workspace switch must never enable staffing. Verify inaccessible parent/other Office people are absent unless the server explicitly authorizes them. | BLOCKED: approved actors, second Office and fixtures |
+| Dedicated approved Accounting Staff | Verify the permanent role grants no automatic staffing permission. If separately appointed to permitted work, compare its current scoped capabilities and picker with Web. Do not execute financial operations. | BLOCKED: approved actor and assignment fixture |
+| Dedicated approved Lead plus separate approved account/access administrator and safe fixture | Select a specialist, then separately revoke eligibility/capability through an authorized test change before saving. Mobile must block the write and retain the draft; verify stale revision and existing receipt recovery behavior. | BLOCKED: approved actors/fixtures and separately authorized access changes |
+| Each supported actor on both platforms | Light/dark themes, 150%/200% text, TalkBack/VoiceOver group headings and selection/disabled states, reduced motion, long names, no-result search, keyboard-open scrolling, Cancel/Back and confirm/save controls. | NOT TESTED on native devices for this revision |
+
+Android install/authenticated staffing workflows were not executed. iOS native compilation/install/workflows were not executed on this Windows host. Device/theme/accessibility/font-scale/reduced-motion/keyboard acceptance and personal acceptance remain pending. Automated rendering and Hermes exports do not establish these results or full release readiness.

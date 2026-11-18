@@ -25,7 +25,7 @@ const DEFAULT_STATUSES: WorkflowStatus[] = [
 
 export const DEFAULT_TEMPLATE: WorkflowTemplate = {
   id: 'default',
-  name: 'Standard LGU Workflow',
+  name: 'Standard LEDIPO Workflow',
   statuses: DEFAULT_STATUSES,
 };
 

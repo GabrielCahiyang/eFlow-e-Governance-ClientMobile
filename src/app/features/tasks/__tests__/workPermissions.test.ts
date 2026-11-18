@@ -7,6 +7,7 @@ import {
   canDecideSubtaskProposals,
   isProjectLeadSubtaskPlanningBlocked,
   isSubtaskLeadOrContributor,
+  isSubtaskExecutionParticipant,
   isTaskLeadOrContributor,
 } from "../workPermissions";
 
@@ -58,14 +59,26 @@ test("isTaskLeadOrContributor allows only appointed Task Lead and task contribut
   expect(isTaskLeadOrContributor(task, null)).toBe(false);
 });
 
-test("isSubtaskLeadOrContributor allows only Task Lead, Subtask Lead, and Subtask Contributors", () => {
+test("subtask execution excludes unassigned Task Leads and other supervising appointments", () => {
   const work = tree("task-lead");
   const sub = node();
-  expect(isSubtaskLeadOrContributor(work, sub, "task-lead")).toBe(true);
+  expect(isSubtaskLeadOrContributor(work, sub, "task-lead")).toBe(false);
   expect(isSubtaskLeadOrContributor(work, sub, "sub-lead")).toBe(true);
   expect(isSubtaskLeadOrContributor(work, sub, "contrib-1")).toBe(true);
   expect(isSubtaskLeadOrContributor(work, sub, "project-lead")).toBe(false);
   expect(isSubtaskLeadOrContributor(work, sub, "head")).toBe(false);
+  expect(isSubtaskLeadOrContributor(work, sub, "ancestor-lead")).toBe(false);
+  expect(isSubtaskLeadOrContributor(work, sub, null)).toBe(false);
+  sub.assigned_to_ids = ["task-lead"];
+  expect(isSubtaskLeadOrContributor(work, sub, "task-lead")).toBe(true);
+  sub.assigned_to_ids = null as unknown as string[];
+  expect(isSubtaskLeadOrContributor(work, sub, "task-lead")).toBe(false);
+  expect(isSubtaskLeadOrContributor(work, sub, "sub-lead")).toBe(true);
+});
+
+test("Personal root Lead execution remains separate from Office subtask membership", () => {
+  expect(isSubtaskExecutionParticipant(tree(), node(), "task-lead")).toBe(false);
+  expect(isSubtaskExecutionParticipant(tree("task-lead", "personal"), node(), "task-lead")).toBe(true);
 });
 
 test("isProjectLeadSubtaskPlanningBlocked allows planning projects and active Task Leads, while blocking non-Task-Lead Project Leads once active", () => {

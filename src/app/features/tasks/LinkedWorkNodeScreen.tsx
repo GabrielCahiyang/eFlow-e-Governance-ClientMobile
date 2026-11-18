@@ -38,7 +38,7 @@ import { useWorkRecordUpdates } from "./useWorkRecordUpdates";
 import { personalReviewAllowed, workNodeRoute } from "./branchInspector";
 import {
   canDecideSubtaskProposals,
-  isSubtaskLeadOrContributor,
+  isSubtaskExecutionParticipant,
 } from "./workPermissions";
 
 type TaskPlanningInfo = {
@@ -226,7 +226,7 @@ export function LinkedWorkNodeScreen({
   const isNodeWorkerOrLead = Boolean(
     branch &&
       actor &&
-      isSubtaskLeadOrContributor(branch.tree, branch.node, actor),
+      isSubtaskExecutionParticipant(branch.tree, branch.node, actor),
   );
   const canReviewProposals = Boolean(
     branch && actor && canDecideSubtaskProposals(branch.tree, branch.node, actor),
@@ -270,7 +270,7 @@ export function LinkedWorkNodeScreen({
                 })
             : undefined
         }
-        canManage={isNodeWorkerOrLead}
+        canManage={isNodeWorkerOrLead || (!!actor && branch.tree.root.lead === actor)}
         subtaskFinished={branch.node.status === "completed"}
         readOnly={effectiveReadOnly}
       />

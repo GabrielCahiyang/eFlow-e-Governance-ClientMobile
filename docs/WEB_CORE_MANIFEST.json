@@ -1,6 +1,6 @@
 {
   "source": "C:\\Users\\james\\projects\\eflow-e-Governance-Project",
-  "generatedAt": "2026-11-18T05:42:30.442Z",
+  "generatedAt": "2026-11-18T16:51:27.438Z",
   "files": [
     {
       "source": "src/app/components/ui/modalSizing.ts",
@@ -3450,6 +3450,18 @@
       "source": "src/app/features/nested-work/selectors/subtaskDates.ts",
       "sha256": "c5d28b686f30577e6bfe07df1db3ce96bf6f59d0410f75cffbf1ed3066b785fa",
       "native": "app/features/nested-work/selectors/subtaskDates.ts",
+      "adapted": false
+    },
+    {
+      "source": "src/app/features/nested-work/selectors/participation.ts",
+      "sha256": "4c9c0f4c116d4f54c712c4160595ec685e1cc7591f74600bce6d2be4e9eda699",
+      "native": "app/features/nested-work/selectors/participation.ts",
+      "adapted": false
+    },
+    {
+      "source": "src/app/shared/MutationRejectedError.ts",
+      "sha256": "08c6c24311f0ce1a028c3587ae5dc57f7e456d1d115556fcae532012eb69e0d9",
+      "native": "app/shared/MutationRejectedError.ts",
       "adapted": false
     }
   ],

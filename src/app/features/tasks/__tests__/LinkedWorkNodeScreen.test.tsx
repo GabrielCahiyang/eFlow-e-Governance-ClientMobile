@@ -56,9 +56,9 @@ jest.mock("../WorkTreePanel", () => ({
 }));
 jest.mock("../../projects/services", () => ({ fetchProject: async () => ({ status: "active" }) }));
 jest.mock("../../budget/TaskFundingCard", () => ({
-  TaskFundingCard: ({ subtaskId }: { subtaskId: string }) => {
+  TaskFundingCard: ({ subtaskId, canManage }: { subtaskId: string; canManage: boolean }) => {
     const { Text } = require("react-native");
-    return <Text>{"Funding " + subtaskId}</Text>;
+    return <Text>{"Funding " + subtaskId + ":manage:" + canManage}</Text>;
   },
 }));
 jest.mock("../OfficeSubitemActivity", () => ({
@@ -68,9 +68,9 @@ jest.mock("../OfficeSubitemActivity", () => ({
   },
 }));
 jest.mock("../WorkProposalSheet", () => ({
-  WorkProposalReview: ({ node }: { node?: string }) => {
+  WorkProposalReview: ({ node, canParticipate, canDecideProposals }: { node?: string; canParticipate?: boolean; canDecideProposals?: boolean }) => {
     const { Text } = require("react-native");
-    return <Text>{"Review view " + (node || "none")}</Text>;
+    return <><Text>{"Review view " + (node || "none")}</Text><Text testID="review-access">{`${canDecideProposals}:${canParticipate}`}</Text></>;
   },
   WorkProposalSheet: () => null,
 }));
@@ -92,6 +92,18 @@ const tree = {
     { id: "depth-eight", task_id: "root", title: "Exact branch" },
   ],
 } as unknown as WorkTreeSnapshot;
+
+test("an unassigned Task Lead keeps exact-branch review and funding controls without execution participation", async () => {
+  const office = { ...tree, root: { ...tree.root, kind: "office" as const, office: "office", project: "project",
+    status: "in_progress", lead: "actor" },
+    nodes: tree.nodes.map((node) => ({ ...node, lead_id: "subtask-lead", assigned_to_ids: [] })) };
+  jest.mocked(fetchWorkTree).mockResolvedValue(office);
+  const route = { name: "task" as const, id: "root", projectId: "project", nodeId: "depth-eight" };
+  const view = await render(<LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...route, view: "review" }} />);
+  await waitFor(() => expect(screen.getByTestId("review-access")).toHaveTextContent("true:false"));
+  await view.rerender(<LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...route, view: "budget" }} />);
+  expect(await screen.findByText("Funding depth-eight:manage:true")).toBeOnTheScreen();
+});
 
 test("personal links pass the exact branch from its verified root to the focused panel", async () => {
   jest.mocked(fetchWorkTree).mockResolvedValue(tree);
@@ -237,7 +249,7 @@ test("navigates subtask views to dedicated Activity, Evidence & review, Funding 
     <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "budget" }} />,
   );
   expect(await screen.findByText("Funding")).toBeOnTheScreen();
-  expect(screen.getByText("Funding depth-eight")).toBeOnTheScreen();
+  expect(screen.getByText("Funding depth-eight:manage:true")).toBeOnTheScreen();
   expect(screen.queryByText("Funding sibling")).toBeNull();
 
   await view.rerender(

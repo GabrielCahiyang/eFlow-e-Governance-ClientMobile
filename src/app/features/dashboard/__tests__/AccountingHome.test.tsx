@@ -1,6 +1,8 @@
 import { expect, jest, test } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import { nativeWindow } from "../../../../platform/webRuntime";
+import { NavigationHeaderContext } from "../../navigation/navigationHeaderContext";
 import { AccountingHome } from "../AccountingHome";
 
 const mockQueueData = {
@@ -313,5 +315,40 @@ test("AccountingHome renders illustrated empty states for empty Action required 
   expect(
     view.getByRole("header", { name: "No unresolved requests in this preview" }),
   ).toBeOnTheScreen();
+});
+
+test("AccountingHome extends HomeBody flush to the bottom without an awkward shadow or bottom container gap", async () => {
+  const view = await render(
+    <NavigationHeaderContext.Provider
+      value={{
+        onBack: jest.fn(),
+        backHint: "Returns to Home",
+        topInset: 24,
+        bottomInset: 108,
+      }}
+    >
+      <AccountingHome navigate={jest.fn()} />
+    </NavigationHeaderContext.Provider>,
+  );
+
+  const homeBody = view.getByTestId("home-body");
+  const bodyStyle = StyleSheet.flatten(homeBody.props.style);
+  expect(bodyStyle).toMatchObject({
+    flexGrow: 1,
+    paddingBottom: 124,
+  });
+  expect(bodyStyle.marginBottom).toBeUndefined();
+  expect(bodyStyle.elevation).toBeUndefined();
+  expect(bodyStyle.shadowOpacity).toBeUndefined();
+  expect(bodyStyle.shadowRadius).toBeUndefined();
+
+  let scroll = homeBody.parent;
+  while (scroll && !scroll.props?.contentContainerStyle) {
+    scroll = scroll.parent;
+  }
+  expect(scroll).toBeTruthy();
+  expect(
+    StyleSheet.flatten(scroll?.props.contentContainerStyle).paddingBottom,
+  ).toBe(0);
 });
 

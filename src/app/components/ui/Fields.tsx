@@ -1,5 +1,5 @@
 import { Text, TextInput } from "./Typography";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Platform,
   StyleSheet,
@@ -54,6 +54,7 @@ export interface Option {
   label: string;
   description?: string;
   disabled?: boolean;
+  group?: string;
 }
 export function Choice({
   label,
@@ -99,6 +100,13 @@ export function Choice({
   const showSearch = searchable;
   const visibleDescription = (description?: string) =>
     description && !isRawEntityId(description) ? description : undefined;
+  const visibleOptions = options.filter((option) => {
+    const query = search.trim().toLowerCase();
+    if (!showSearch || !query) return true;
+    return (option.label + " " + (visibleDescription(option.description) ?? ""))
+      .toLowerCase()
+      .includes(query);
+  });
   return (
     <View style={s.field}>
       <Text style={s.label}>
@@ -175,18 +183,43 @@ export function Choice({
             {userErrorMessage(error, "action")}
           </Text>
         )}
-        {options
-          .filter((o) => {
-            const query = search.trim().toLowerCase();
-            if (!showSearch || !query) return true;
-            const desc = visibleDescription(o.description) ?? "";
-            return (o.label + " " + desc).toLowerCase().includes(query);
-          })
-          .map((option) => {
-            const description = visibleDescription(option.description);
-            return (
+        {!visibleOptions.length && (
+          <Text style={s.help}>No options found.</Text>
+        )}
+        {visibleOptions.map((option, index) => {
+          const description = visibleDescription(option.description);
+          return (
+            <Fragment key={option.value}>
+              {!!option.group &&
+                option.group !== visibleOptions[index - 1]?.group && (
+                  <View
+                    style={[
+                      s.groupHeader,
+                      index > 0 && s.groupHeaderSpaced,
+                      {
+                        backgroundColor: palette.primarySoft,
+                        borderColor: palette.border,
+                      },
+                    ]}
+                  >
+                    <View
+                      accessible={false}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no-hide-descendants"
+                      style={[
+                        s.groupAccent,
+                        { backgroundColor: palette.primary },
+                      ]}
+                    />
+                    <Text
+                      accessibilityRole="header"
+                      style={[s.groupLabel, { color: palette.primaryDark }]}
+                    >
+                      {option.group}
+                    </Text>
+                  </View>
+                )}
               <Pressable
-                key={option.value}
                 accessibilityRole={multiple ? "checkbox" : "radio"}
                 aria-checked={selected.includes(option.value)}
                 accessibilityState={{
@@ -221,8 +254,9 @@ export function Choice({
                   <Check size={19} color={palette.primary} />
                 )}
               </Pressable>
-            );
-          })}
+            </Fragment>
+          );
+        })}
       </Sheet>
     </View>
   );
@@ -542,6 +576,23 @@ const s = StyleSheet.create({
   },
   selected: { backgroundColor: colors.primarySoft, borderRadius: 8 },
   optionDisabled: { opacity: 0.45 },
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  groupHeaderSpaced: { marginTop: 8 },
+  groupAccent: { width: 4, height: 14, borderRadius: 2 },
+  groupLabel: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
   help: { fontSize: 12, color: colors.muted, marginTop: 4 },
   toggle: { flexDirection: "row", alignItems: "center", gap: 12 },
   search: {

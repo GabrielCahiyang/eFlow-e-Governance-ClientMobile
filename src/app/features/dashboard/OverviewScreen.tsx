@@ -241,7 +241,12 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
   };
   const palette = useTheme();
   return (
-    <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
+    <Screen
+      compact
+      edgeToEdge
+      onRefresh={refresh}
+      style={{ gap: 0, paddingBottom: 0 }}
+    >
       <HomeHero
         navigate={navigate}
         subtitle={officeContextLabel(scope?.workspace.name)}
@@ -458,7 +463,12 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
   const recentUpdates = (updates.data?.items ?? []).slice(0, 3);
 
   return (
-    <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
+    <Screen
+      compact
+      edgeToEdge
+      onRefresh={refresh}
+      style={{ gap: 0, paddingBottom: 0 }}
+    >
       <HomeHero navigate={navigate} subtitle={officeContextLabel(organization?.name)}>
         {data && scope && (
           <HomeHeroStats

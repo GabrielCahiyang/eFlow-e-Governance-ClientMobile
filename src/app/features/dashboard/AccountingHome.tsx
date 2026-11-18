@@ -104,7 +104,12 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
     (queue.loading && !queue.data) || (reviews.loading && !reviews.data);
   const error = queue.error || reviews.error;
   return (
-    <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
+    <Screen
+      compact
+      edgeToEdge
+      onRefresh={refresh}
+      style={{ gap: 0, paddingBottom: 0 }}
+    >
       <HomeHero navigate={navigate} subtitle={officeContextLabel(organization?.name)}>
         {!!office && (
           <>

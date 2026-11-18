@@ -229,6 +229,8 @@ test("password reveal and inline password help work accessibly without theme tog
   expect(
     screen.queryByRole("button", { name: "Usage scenarios" }),
   ).toBeNull();
+  expect(screen.getByText("LEDIPO")).toBeOnTheScreen();
+  expect(screen.queryByText(/LGU Ormoc City/i)).toBeNull();
 
   const passwordInput = screen.getByLabelText("Password");
   expect(passwordInput).toHaveProp("secureTextEntry", true);

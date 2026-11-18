@@ -1,4 +1,6 @@
 import type {NodeWorkAction,RootWorkAction,WorkActionAvailability,WorkCapabilityContext,WorkCapabilityReasonCode,WorkTreeSnapshot} from '../types';
+import {isAssignedSubtaskParticipant} from './participation';
+export {isAssignedSubtaskParticipant};
 
 const reasons:Record<WorkCapabilityReasonCode|'capability_unavailable',string>={
  access_unavailable:'Your current access to this work could not be verified. Reload the work.',
@@ -8,7 +10,8 @@ const reasons:Record<WorkCapabilityReasonCode|'capability_unavailable',string>={
  lifecycle_blocked:'This task is not ready for this change yet.',
  history_blocked:'Existing work history or commitments block this change.',
  project_on_hold:'Work updates are paused while the project is under review.',
- active_staffing_locked:'Task Lead and Subtask Lead cannot be changed after the project is active.',
+ active_subtask_staffing_locked:'Subtask assignments are read-only for the Project Lead while the project is active. Assign people during planning.',
+ active_staffing_locked:'Root task contributors are read-only for the Task Lead after the project becomes active. Ask the Project Lead or Head to update the team.',
  capability_unavailable:'Action availability could not be verified. Reload the work.',
 };
 const rootActions:readonly RootWorkAction[]=['manage_contributors','appoint_lead','create_child','order_children'];
@@ -75,6 +78,12 @@ export function selectNodeWorkCapability(snapshot:WorkTreeSnapshot|undefined,nod
  const matches=snapshot!.nodes.filter(node=>node&&typeof node==='object'&&!Array.isArray(node)&&node.id===nodeId);
  if(matches.length!==1||matches[0].task_id!==context.rootId)return deny('capability_unavailable');
  const result=actionEntry(matches[0].capabilities,action);
+ if(result.allowed&&snapshot!.root.kind==='office'&&action==='delete'){
+  if(!context.actorId||snapshot!.root.lead!==context.actorId)return deny('branch_denied');
+  if(matches[0].status!=='todo'||!!matches[0].started_at||Number(matches[0].percent_complete||0)!==0)return deny('lifecycle_blocked');
+ }
+ if(result.allowed&&snapshot!.root.kind==='office'&&(action==='execute'||action==='submit')&&!isAssignedSubtaskParticipant(matches[0],context.actorId))return deny('branch_denied');
+ if(result.allowed&&snapshot!.root.subtask_staffing_locked===true&&(action==='appoint_lead'||action==='manage_contributors'))return deny('active_subtask_staffing_locked');
  if(result.allowed&&context.executionBlocked&&(action==='execute'||action==='submit'))return deny('project_on_hold');
  return result;
 }

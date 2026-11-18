@@ -97,6 +97,7 @@ export function SubtaskCompletionSheet({
             throw new PublicMessageError("Complete all prerequisite subtasks before completing this subtask.");
         }
         if (
+          tree.root.id !== rootId ||
           tree.root.project !== projectId ||
           tree.root.office !== officeId ||
           (completionMode(tree, node.id, actorId) !== "direct" &&

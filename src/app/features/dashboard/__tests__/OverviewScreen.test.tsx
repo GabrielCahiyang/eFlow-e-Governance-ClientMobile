@@ -3,6 +3,7 @@ import { act, fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import { nativeWindow } from "../../../../platform/webRuntime";
 import { colors } from "../../../components/ui/theme";
+import { NavigationHeaderContext } from "../../navigation/navigationHeaderContext";
 import { OverviewScreen } from "../OverviewScreen";
 import type { WorkRow } from "../../../../core/web/app/features/personal-work/types";
 import type { WorkspaceSnapshot } from "../../../../core/web/app/features/workspaces/types";
@@ -535,3 +536,41 @@ test("Head Home Current Projects risk pill uses simple text break strategy so Ov
     mockWorkRows = [];
   }
 });
+
+test.each(["head", "member"] as const)(
+  "%s Home extends HomeBody flush to the bottom without an awkward shadow or bottom container gap",
+  async (role) => {
+    mockRole = role;
+    const view = await render(
+      <NavigationHeaderContext.Provider
+        value={{
+          onBack: jest.fn(),
+          backHint: "Returns to Home",
+          topInset: 24,
+          bottomInset: 108,
+        }}
+      >
+        <OverviewScreen navigate={jest.fn()} />
+      </NavigationHeaderContext.Provider>,
+    );
+    const homeBody = view.getByTestId("home-body");
+    const bodyStyle = StyleSheet.flatten(homeBody.props.style);
+    expect(bodyStyle).toMatchObject({
+      flexGrow: 1,
+      paddingBottom: 124,
+    });
+    expect(bodyStyle.marginBottom).toBeUndefined();
+    expect(bodyStyle.elevation).toBeUndefined();
+    expect(bodyStyle.shadowOpacity).toBeUndefined();
+    expect(bodyStyle.shadowRadius).toBeUndefined();
+
+    let scroll = homeBody.parent;
+    while (scroll && !scroll.props?.contentContainerStyle) {
+      scroll = scroll.parent;
+    }
+    expect(scroll).toBeTruthy();
+    expect(
+      StyleSheet.flatten(scroll?.props.contentContainerStyle).paddingBottom,
+    ).toBe(0);
+  },
+);

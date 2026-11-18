@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { adaptSubtaskWorkUpdate } from "./adapt-native-subtask-work-update.mjs";
 const root = path.resolve(import.meta.dirname, "..");
 const core = path.join(root, "src/core/web");
 const require = createRequire(path.join(root, "package.json"));
@@ -51,6 +52,7 @@ function edit(rel, change) {
   const file = path.join(core, rel);
   fs.writeFileSync(file, change(fs.readFileSync(file, "utf8")));
 }
+edit('app/features/subtasks/services/subtaskWorkflowService.ts', adaptSubtaskWorkUpdate);
 fs.writeFileSync(
   path.join(core, "lib/supabase.ts"),
   "export {supabase} from '../../../platform/supabase';\n",

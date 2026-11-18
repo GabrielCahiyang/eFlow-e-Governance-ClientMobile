@@ -1,0 +1,35 @@
+{
+  "project": "ixnfphgjyelhckjwjkdv",
+  "checkedAtUtc": "2026-11-18 16:21:00.494191+00",
+  "checkedAtSingapore": "2026-11-19 00:21 SGT",
+  "method": "Supabase CLI db query --remote=ixnfphgjyelhckjwjkdv --read-only; SELECT catalog definitions and migration history only",
+  "transactionReadOnly": true,
+  "status": "INSTALLED: exact-node subtask participation restriction present in all three active functions",
+  "migrationVersion": "20261118152250",
+  "migrationHistoryRows": 0,
+  "migrationHistoryInterpretation": "No timestamp entry; installation confirmed from active definitions, not migration ledger",
+  "functions": [
+    {
+      "signature": "eflow_r7.operation_capabilities(uuid,uuid)",
+      "normalizedDefinitionMd5": "ee24e7b228f6b3bb2461d1d689749048",
+      "comparison": "Exact reviewed patch match"
+    },
+    {
+      "signature": "eflow_m7.require_progress_authority(uuid,uuid)",
+      "normalizedDefinitionMd5": "c2acb186275411454a6802e8bc088bd4",
+      "comparison": "Reviewed patch plus stricter contributor review condition"
+    },
+    {
+      "signature": "eflow_evidence.guard_progress()",
+      "normalizedDefinitionMd5": "6da00ac1d25e7812f8cdc8d6cfc3008d",
+      "comparison": "Reviewed patch plus direct-history contributor review delegation"
+    }
+  ],
+  "progressHistoryTrigger": {
+    "name": "evidence_guard_progress",
+    "table": "subtask_progress_updates",
+    "enabled": "O"
+  },
+  "hostedMutations": 0,
+  "limitations": "Read-only definition/trigger verification; no authenticated mutation, independent-review workflow or native-device acceptance test was run."
+}

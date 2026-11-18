@@ -4,6 +4,7 @@ import type {
   WorkCapabilityContext,
 } from "../../../core/web/app/features/nested-work/types";
 import { selectRootWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
+import { isAssignedSubtaskParticipant } from "../../../core/web/app/features/nested-work/selectors/participation";
 
 /** Keep Lead appointment and contributor management as separate server powers. */
 export function taskStaffingCapability(
@@ -58,20 +59,24 @@ export function isTaskLeadOrContributor(
 }
 
 /**
- * True only when the actor is a Lead (Task Lead or Subtask Lead) or Contributor
- * of this specific subtask node.
+ * Execution membership belongs to this exact node, never an ancestor appointment.
  */
 export function isSubtaskLeadOrContributor(
+  _tree: Pick<WorkTreeSnapshot, "root">,
+  node: Pick<WorkNode, "lead_id" | "assigned_to_ids">,
+  actorId?: string | null,
+): boolean {
+  return isAssignedSubtaskParticipant(node, actorId);
+}
+
+/** Preserve the separate Personal-work contract; Office execution is exact-node only. */
+export function isSubtaskExecutionParticipant(
   tree: Pick<WorkTreeSnapshot, "root">,
   node: Pick<WorkNode, "lead_id" | "assigned_to_ids">,
   actorId?: string | null,
 ): boolean {
-  if (!actorId) return false;
-  return (
-    tree.root.lead === actorId ||
-    node.lead_id === actorId ||
-    Boolean(node.assigned_to_ids?.includes(actorId))
-  );
+  return isSubtaskLeadOrContributor(tree, node, actorId) ||
+    (!!actorId && tree.root.kind === "personal" && tree.root.lead === actorId);
 }
 
 /**

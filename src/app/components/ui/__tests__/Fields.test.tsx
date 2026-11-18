@@ -5,6 +5,29 @@ import { AppearanceProvider } from "../Appearance";
 import { Choice, DateField, SearchField } from "../Fields";
 import { FilterChip } from "../FilterChip";
 
+test("grouped picker filters headings with search, keeps staged choices and shows an empty result", async () => {
+  const onChange = jest.fn();
+  const view = await render(<Choice label="Contributors" multiple confirmSelection value={["a"]} onChange={onChange}
+    options={[
+      { value: "a", label: "Andres", group: "On this task" },
+      { value: "b", label: "Maria", group: "Other eligible people" },
+      { value: "c", label: "Former Member", group: "No longer eligible", disabled: true },
+    ]} />);
+  await fireEvent.press(view.getByRole("button", { name: "Contributors" }));
+  expect(view.getAllByRole("header").map((header) => header.props.children))
+    .toEqual(["Contributors", "On this task", "Other eligible people", "No longer eligible"]);
+  expect(view.getByRole("checkbox", { name: "Former Member" })).toBeDisabled();
+  await fireEvent.press(view.getByRole("checkbox", { name: "Maria" }));
+  await fireEvent.changeText(view.getByLabelText("Search options"), "Maria");
+  expect(view.queryByText("On this task")).toBeNull();
+  expect(view.getByRole("checkbox", { name: "Maria" })).toBeChecked();
+  await fireEvent.changeText(view.getByLabelText("Search options"), "No match");
+  expect(view.getByText("No options found.")).toBeOnTheScreen();
+  expect(view.queryByText("Other eligible people")).toBeNull();
+  await fireEvent.press(view.getByRole("button", { name: "Confirm selection" }));
+  expect(onChange).toHaveBeenCalledWith(["a", "b"]);
+});
+
 test.each([false, true])("confirmed picker stages changes and discards X/Cancel until explicit confirmation; multiple=%s", async (multiple) => {
   const onChange = jest.fn();
   const view = await render(<Choice label="People" confirmSelection multiple={multiple}

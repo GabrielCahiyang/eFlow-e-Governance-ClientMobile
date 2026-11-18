@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-18",
+  "phase": "M7",
+  "versionCode": 65,
+  "mobileGitBase": "3af48f8175005518356b6adfc186a512acf9457f",
+  "reviewedWebMain": "4d6163e61f2675c60d3b8de7d2ee42bb932c6bae",
+  "typeScriptAndMetro": "PASS: npm run check",
+  "focusedTests": {
+    "passed": 52,
+    "suites": 7,
+    "failed": 0
+  },
+  "fullRepositoryTests": "SKIPPED: focused picker slice; prior unrelated failures not claimed fixed",
+  "androidProductionHermesExport": "PASS",
+  "iosProductionHermesExport": "PASS",
+  "androidNativeReleaseBuild": "PASS",
+  "apkSignature": "PASS: apksigner verify --verbose",
+  "apk": "C:\\Users\\james\\projects\\eFlow-e-Governance-ClientMobile\\artifacts\\M7\\eFlow-Mobile-M7-Subtask-People-v65-arm64-x86_64.apk",
+  "apkBytes": 100418369,
+  "apkSha256": "c2901910bb018cd187b08a56218f4175e46f0140d510efa8b164a241a30db6c8",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "apkManifestAndStartupChecks": "PASS: scripts/verify-standalone-apk.py; docs/STANDALONE_V65_APK_VERIFICATION.json",
+  "modifiedNativeSources": [
+    {
+      "file": "src/app/components/ui/Fields.tsx",
+      "matches": true
+    },
+    {
+      "file": "src/app/features/tasks/WorkEditorSheet.tsx",
+      "matches": true
+    },
+    {
+      "file": "src/app/features/tasks/subtaskPeopleOptions.ts",
+      "matches": true
+    }
+  ],
+  "credentialAudit": "PASS: Android export, iOS export and embedded APK bundle",
+  "hostedChanges": "NONE; no hosted deployment availability inferred from repository migrations",
+  "androidInstallationAndAuthenticatedWorkflows": "NOT EXECUTED; dedicated approved actors/fixtures required",
+  "iosNativeCompilationAndWorkflows": "NOT EXECUTED; Windows host and approved actors/devices required",
+  "nativeThemesAccessibilityFontScalingReducedMotionKeyboard": "NOT TESTED for this revision",
+  "personalAcceptance": "PENDING"
+}

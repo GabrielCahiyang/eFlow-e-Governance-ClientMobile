@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Paperclip from "lucide-react-native/icons/paperclip";
 import Send from "lucide-react-native/icons/send";
 import Trash2 from "lucide-react-native/icons/trash";
@@ -15,18 +15,33 @@ import { useTheme } from "../../components/ui/Appearance";
 import { useToast } from "../../components/ui/Toast";
 import { asServiceFile, chooseFiles, type PickedFile } from "../../../platform/files";
 import { useAction } from "../../shared/useAction";
-import { formDraftKey, useRetainedDraft } from "../../shared/formDraftMemory";
 import {
-  PublicMessageError,
-  feedback,
-  isDeterministicRejection,
-} from "../../shared/userMessages";
-import { saveSubtaskWorkUpdate } from "../../../core/web/app/features/subtasks/services/subtaskWorkflowService";
+  formDraftKey,
+  readFormDraft,
+  useRetainedDraft,
+} from "../../shared/formDraftMemory";
+import { PublicMessageError, feedback } from "../../shared/userMessages";
+import {
+  saveSubtaskWorkUpdate,
+  SubtaskWorkUpdateRejectedError,
+} from "../../../core/web/app/features/subtasks/services/subtaskWorkflowService";
 import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
 import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
 import type { WorkTreeSnapshot } from "../../../core/web/app/features/nested-work/types";
 import { workScope } from "./branchInspector";
 import { isSubtaskLeadOrContributor } from "./workPermissions";
+
+type UpdateDraft = {
+  state: "in_progress" | "stuck";
+  note: string;
+  blocker: string;
+  nextStep: string;
+  attachment?: PickedFile;
+  seededBlocker: string;
+  dirty: boolean;
+  stateTouched: boolean;
+  attempted: boolean;
+};
 
 export function OfficeSubitemUpdateSheet({
   tree,
@@ -44,28 +59,37 @@ export function OfficeSubitemUpdateSheet({
   onSaved: (data: WorkTreeSnapshot) => Promise<void>;
 }) {
   const baseline = useRef(tree).current;
+  const initialActor = useRef(actorId).current;
+  const initialNode = useRef(nodeId).current;
   const palette = useTheme();
   const activeBlocker =
     tree.nodes.find((item) => item.id === nodeId)?.blocker?.trim() || "";
   const { toast } = useToast();
-  const [attempted, setAttempted] = useState(false);
   const action = useAction();
-  const [draft, updateDraft, clearDraft] = useRetainedDraft(
-    formDraftKey(actorId, "subitem-update:" + nodeId),
+  const draftKey = formDraftKey(actorId, "subitem-update:" + nodeId);
+  const [draft, updateDraft, clearDraft] = useRetainedDraft<UpdateDraft>(
+    draftKey,
     true,
-    () => ({
-      state: (activeBlocker ? "stuck" : "in_progress") as "in_progress" | "stuck",
-      note: "",
-      blocker: activeBlocker,
-      nextStep: "",
-      attachment: undefined as PickedFile | undefined,
-      seededBlocker: activeBlocker,
-      dirty: false,
-      stateTouched: false,
-    }), { restoreOnOpen: false },
+    () => {
+      const retained = readFormDraft<UpdateDraft>(draftKey);
+      // Ordinary abandoned edits reset; an attempted write must survive reopening.
+      if (retained?.attempted) return retained;
+      return {
+        state: activeBlocker ? "stuck" : "in_progress",
+        note: "",
+        blocker: activeBlocker,
+        nextStep: "",
+        attachment: undefined,
+        seededBlocker: activeBlocker,
+        dirty: false,
+        stateTouched: false,
+        attempted: false,
+      };
+    },
+    { restoreOnOpen: false },
   );
   useEffect(() => {
-    if (action.busy) return;
+    if (action.busy || draft.attempted) return;
     const seeded = draft.seededBlocker ?? "";
     if (seeded === activeBlocker) return;
     if (!draft.dirty || (!draft.stateTouched && draft.blocker === seeded)) {
@@ -77,6 +101,7 @@ export function OfficeSubitemUpdateSheet({
     }
   }, [
     action.busy,
+    draft.attempted,
     activeBlocker,
     draft.blocker,
     draft.dirty,
@@ -84,7 +109,7 @@ export function OfficeSubitemUpdateSheet({
     draft.stateTouched,
     updateDraft,
   ]);
-  const { state, note, blocker, nextStep, attachment } = draft;
+  const { state, note, blocker, nextStep, attachment, attempted } = draft;
   const close = () => {
     if (action.busy) return;
     action.clear();
@@ -99,11 +124,17 @@ export function OfficeSubitemUpdateSheet({
       const latestNode = latest.nodes.find((item) => item.id === nodeId);
       if (
         readOnly ||
+        actorId !== initialActor ||
+        nodeId !== initialNode ||
+        tree.root.id !== baseline.root.id ||
+        tree.root.project !== baseline.root.project ||
+        tree.root.office !== baseline.root.office ||
+        latest.root.id !== baseline.root.id ||
         latest.root.kind !== "office" ||
         latest.root.project !== baseline.root.project ||
         latest.root.office !== baseline.root.office ||
         latest.revision !== baseline.revision ||
-        !latestNode ||
+        !latestNode || latestNode.task_id !== baseline.root.id ||
         !isSubtaskLeadOrContributor(latest, latestNode, actorId) ||
         !selectNodeWorkCapability(
           latest,
@@ -117,7 +148,7 @@ export function OfficeSubitemUpdateSheet({
         );
       }
       const file = attachment ? await asServiceFile(attachment) : null;
-      setAttempted(true);
+      updateDraft({ attempted: true });
       try {
         await saveSubtaskWorkUpdate({
           subtaskId: nodeId,
@@ -128,7 +159,8 @@ export function OfficeSubitemUpdateSheet({
           attachment: file,
         });
       } catch (error) {
-        if (isDeterministicRejection(error)) setAttempted(false);
+        if (error instanceof SubtaskWorkUpdateRejectedError)
+          updateDraft({ attempted: false });
         throw error;
       }
       clearDraft();
@@ -220,10 +252,11 @@ export function OfficeSubitemUpdateSheet({
           Attach evidence (optional)
         </Button>
       )}
-      {attempted && !!action.error && (
+      {attempted && !action.busy && (
         <Notice>
-          Close this sheet and refresh the subtask before trying again. Check
-          activity to see whether the update was recorded.
+          The update may have been saved. Close this sheet and check current
+          activity to see whether it was recorded. This draft is kept and cannot
+          be sent again while the outcome is uncertain.
         </Notice>
       )}
     </Sheet>

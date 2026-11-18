@@ -44,6 +44,10 @@ import {
   type WorkProposal,
 } from "./workProposals";
 import { assertWorkAcceptanceAvailable } from "../budget";
+import { fetchWorkTree } from "../../../core/web/app/features/nested-work/services/workTreeService";
+import { selectNodeWorkCapability } from "../../../core/web/app/features/nested-work/selectors/capabilities";
+import { workScope } from "./branchInspector";
+import { isSubtaskLeadOrContributor } from "./workPermissions";
 
 export function WorkProposalReview({
   actor,
@@ -492,6 +496,7 @@ export function WorkProposalReview({
           supersedes={resubmission.id}
           initialNextStep={resubmission.terms.next_step}
           canParticipate={canParticipate}
+          officeSubtask={officeSubtask}
           onClose={() => setResubmission(undefined)}
           onSaved={refresh}
         />
@@ -510,6 +515,7 @@ export function WorkProposalSheet({
   initialNextStep,
   currentProgress,
   canParticipate = true,
+  officeSubtask = false,
   onClose,
   onSaved,
 }: {
@@ -522,6 +528,7 @@ export function WorkProposalSheet({
   initialNextStep?: string | null;
   currentProgress?: number | null;
   canParticipate?: boolean;
+  officeSubtask?: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -588,6 +595,21 @@ export function WorkProposalSheet({
           );
         let next = request;
         if (!next || next.files) {
+          if (officeSubtask) {
+            const latest = await fetchWorkTree(root);
+            const current = latest.nodes.find((item) => item.id === node);
+            // Direct `submit` belongs to the appointed Subtask Lead; an assigned
+            // contributor proposes completion with execute access and the fresh
+            // m7 canProposeCompletion check below.
+            const requiredCapability =
+              kind === "progress" || current?.lead_id !== actor ? "execute" : "submit";
+            if (!node || latest.root.id !== root || latest.root.kind !== "office" ||
+              !current || !isSubtaskLeadOrContributor(latest, current, actor) ||
+              !selectNodeWorkCapability(latest, node, requiredCapability,
+                workScope(latest, actor)).allowed) {
+              throw new PublicMessageError("Current assignment and work access are required to submit work for this subtask.");
+            }
+          }
           const context = await fetchWorkProposals(root, node);
           if (
             !(kind === "progress"

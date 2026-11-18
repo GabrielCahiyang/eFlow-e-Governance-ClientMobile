@@ -38,7 +38,7 @@ import {
 import {
   canDecideSubtaskProposals,
   isProjectLeadSubtaskPlanningBlocked,
-  isSubtaskLeadOrContributor,
+  isSubtaskExecutionParticipant,
 } from "./workPermissions";
 import {
   isCurrentWorkSnapshot,
@@ -188,7 +188,7 @@ export function WorkTreePanel({
   const finish = node && completionMode(data, node.id, actor, readOnly, executionBlocked);
   const subtaskLead = !!actor && node?.lead_id === actor;
   const contributor = !!actor && !subtaskLead && !!node?.assigned_to_ids?.includes(actor);
-  const isNodeWorkerOrLead = !!node && isSubtaskLeadOrContributor(data, node, actor);
+  const isNodeWorkerOrLead = !!node && isSubtaskExecutionParticipant(data, node, actor);
   const canExecuteNode = isNodeWorkerOrLead && can("execute") && !effectiveReadOnly;
   const canReviewProposals = !!node && canDecideSubtaskProposals(data, node, actor);
   const requiresCompletionReview = (subtaskLead || contributor) &&
@@ -443,7 +443,7 @@ export function WorkTreePanel({
                     variant: "secondary",
                     icon: "pencil",
                     onPress: () => {
-                      if (contributor && actor !== data.root.lead)
+                      if (contributor && (data.root.kind === "office" || actor !== data.root.lead))
                         setProposal("progress");
                       else if (data.root.kind === "office")
                         setOfficeUpdate(node.id);
@@ -453,7 +453,10 @@ export function WorkTreePanel({
                 : null,
               !effectiveReadOnly &&
               readyToComplete &&
-              (finish === "direct" || finish === "review" || (requiresCompletionReview && canExecuteNode))
+              (finish === "direct" || finish === "review" || (requiresCompletionReview && canExecuteNode &&
+                // Direct `submit` is reserved for the appointed Subtask Lead. Assigned
+                // contributors propose completion through m7 using their execute access.
+                (data.root.kind !== "office" || (subtaskLead ? can("submit") : canExecuteNode))))
                 ? {
                     label:
                       finish === "review" || requiresCompletionReview
@@ -506,6 +509,11 @@ export function WorkTreePanel({
             <Notice tone="neutral">
               Work actions are unavailable while access is being refreshed or this
               work is closed.
+            </Notice>
+          )}
+          {data.root.kind === "office" && !!actor && !isNodeWorkerOrLead && (
+            <Notice tone="neutral">
+              Only this subtask's appointed Lead and assigned contributors can post work updates or submit completion. Review and other authorized actions remain available separately.
             </Notice>
           )}
           {!!startAction.error && <ErrorState context="action" error={startAction.error} />}
@@ -638,6 +646,7 @@ export function WorkTreePanel({
 
         {proposal && actor && isNodeWorkerOrLead && (
           <WorkProposalSheet actor={actor} root={data.root.id} node={node.id} kind={proposal}
+            officeSubtask={data.root.kind === "office"}
             initialBlocker={node.blocker}
             canParticipate={isNodeWorkerOrLead}
             onClose={() => setProposal(undefined)}

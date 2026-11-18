@@ -21,7 +21,13 @@ jest.mock("../../authentication", () => ({
   useAuth: () => ({ profile: { id: "lead" } }),
 }));
 jest.mock("../../../../platform/supabase", () => ({ supabase: {} }));
-jest.mock("../WorkProposalSheet", () => ({ WorkProposalReview: () => null, WorkProposalSheet: () => null }));
+jest.mock("../WorkProposalSheet", () => {
+  const { Text } = require("react-native");
+  return {
+  WorkProposalReview: ({ canDecideProposals, canParticipate }: { canDecideProposals: boolean; canParticipate: boolean }) =>
+    <Text testID="proposal-access">{`review:${canDecideProposals}:participate:${canParticipate}`}</Text>,
+  WorkProposalSheet: ({ kind }: { kind: string }) => <Text testID="proposal-form">{kind}</Text>,
+}; });
 jest.mock("../OfficeSubitemUpdateSheet", () => ({
   OfficeSubitemUpdateSheet: () => null,
 }));
@@ -67,6 +73,80 @@ test.each(["todo", "in_progress"])("Subtask visibility follows parent Task %s wi
   else expect(screen.getByText("Draft consultation agenda")).toBeOnTheScreen();
   expect(screen.queryByRole("button", { name: "Edit subtask" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Delete subtask" })).toBeNull();
+});
+
+test.each(["unassigned-task-lead", "assigned-task-lead", "subtask-lead", "contributor", "missing-grants"])(
+  "exact-node execution keeps review and contributor routing separate: %s", async (scenario) => {
+    const taskLead = scenario === "unassigned-task-lead" || scenario === "assigned-task-lead";
+    const subtaskLead = scenario === "subtask-lead";
+    const tree = { revision: 1,
+      root: { id: "root", kind: "office", project: "project", office: "office", status: "in_progress",
+        open: true, lead: taskLead ? "lead" : "other-lead" },
+      nodes: [{ id: "sub", task_id: "root", title: "Scoped work", parent_subtask_id: null,
+        status: "in_progress", started_at: "2026-11-18T00:00:00Z", dependency_ids: [],
+        lead_id: subtaskLead ? "lead" : "subtask-lead", assigned_to_ids: scenario === "unassigned-task-lead" ? [] : ["lead"],
+        capabilities: scenario === "missing-grants" ? {} : {
+          execute: { allowed: true, reason_code: null }, submit: { allowed: true, reason_code: null },
+          review: { allowed: true, reason_code: null }, edit_details: { allowed: true, reason_code: null },
+        } }], people: [] } as unknown as WorkTreeSnapshot;
+    rememberWorkCapabilityContext(tree, "lead");
+    await render(<WorkTreePanel data={tree} focusNodeId="sub" proposalId="proposal"
+      navigate={jest.fn()} onSaved={async () => {}} />);
+    expect(screen.getByTestId("proposal-access")).toHaveTextContent(
+      `review:${taskLead || subtaskLead}:participate:${scenario !== "unassigned-task-lead"}`);
+    expect(screen.queryByRole("button", { name: "Start work" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mark as complete" })).toBeNull();
+    if (scenario === "unassigned-task-lead" || scenario === "missing-grants") {
+      expect(screen.queryByRole("button", { name: "Update work" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Submit for review" })).toBeNull();
+      if (taskLead) {
+        expect(screen.getByText(/Only this subtask's appointed Lead/)).toBeOnTheScreen();
+        expect(screen.getByRole("button", { name: "Edit subtask" })).toBeOnTheScreen();
+      }
+    } else {
+      expect(screen.getByRole("button", { name: "Submit for review" })).toBeOnTheScreen();
+      if (!subtaskLead) {
+        await fireEvent.press(screen.getByRole("button", { name: "Update work" }));
+        expect(screen.getByTestId("proposal-form")).toHaveTextContent("progress");
+      }
+      await fireEvent.press(screen.getByRole("button", { name: "Submit for review" }));
+      expect(screen.getByTestId("proposal-form")).toHaveTextContent("completion");
+    }
+  },
+);
+
+test("an assigned Subtask Contributor denied direct submit (branch_denied) can still propose completion", async () => {
+  const tree = { revision: 1,
+    root: { id: "root", kind: "office", project: "project", office: "office", status: "in_progress",
+      open: true, lead: "task-lead" },
+    nodes: [{ id: "sub", task_id: "root", title: "Scoped work", parent_subtask_id: null,
+      status: "in_progress", started_at: "2026-11-18T00:00:00Z", dependency_ids: [], percent_complete: 90,
+      lead_id: "subtask-lead", assigned_to_ids: ["lead"],
+      capabilities: {
+        execute: { allowed: true, reason_code: null },
+        submit: { allowed: false, reason_code: "branch_denied" },
+      } }], people: [] } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(tree, "lead");
+  await render(<WorkTreePanel data={tree} focusNodeId="sub" navigate={jest.fn()} onSaved={async () => {}} />);
+  expect(screen.getByRole("button", { name: "Update work" })).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("button", { name: "Submit for review" }));
+  expect(screen.getByTestId("proposal-form")).toHaveTextContent("completion");
+});
+
+test("an appointed Subtask Lead still requires direct submit capability to submit for review", async () => {
+  const tree = { revision: 1,
+    root: { id: "root", kind: "office", project: "project", office: "office", status: "in_progress",
+      open: true, lead: "task-lead" },
+    nodes: [{ id: "sub", task_id: "root", title: "Scoped work", parent_subtask_id: null,
+      status: "in_progress", started_at: "2026-11-18T00:00:00Z", dependency_ids: [], percent_complete: 90,
+      lead_id: "lead", assigned_to_ids: [],
+      capabilities: {
+        execute: { allowed: true, reason_code: null },
+        submit: { allowed: false, reason_code: "branch_denied" },
+      } }], people: [] } as unknown as WorkTreeSnapshot;
+  rememberWorkCapabilityContext(tree, "lead");
+  await render(<WorkTreePanel data={tree} focusNodeId="sub" navigate={jest.fn()} onSaved={async () => {}} />);
+  expect(screen.queryByRole("button", { name: "Submit for review" })).toBeNull();
 });
 
 test.each([false, true])("Task Lead sees deletion only before the Subtask starts; started=%s", async (started) => {
@@ -207,9 +287,7 @@ test("a linked Subtask navigates supporting boxes to dedicated subpages and omit
   await fireEvent.press(
     screen.getByRole("button", { name: "Funding, Financial records" }),
   );
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Files, Attachments" }),
-  );
+  expect(screen.queryByRole("button", { name: "Files, Attachments" })).toBeNull();
   expect(
     screen.queryByRole("button", { name: "Planning details, Additional fields" }),
   ).toBeNull();
@@ -238,15 +316,7 @@ test("a linked Subtask navigates supporting boxes to dedicated subpages and omit
     view: "budget",
     title: "Funding",
   });
-  expect(navigate).toHaveBeenNthCalledWith(4, {
-    name: "task",
-    id: "task",
-    projectId: "project",
-    nodeId,
-    view: "files",
-    title: "Files",
-  });
-  expect(navigate).toHaveBeenCalledTimes(4);
+  expect(navigate).toHaveBeenCalledTimes(3);
 
   expect(screen.queryByRole("button", { name: "Branch actions" })).toBeNull();
   expect(screen.queryByText("Branch actions")).toBeNull();

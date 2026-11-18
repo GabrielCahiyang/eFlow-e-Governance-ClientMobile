@@ -17,13 +17,15 @@ import { Text } from "../../components/ui/Typography";
 import { useTheme } from "../../components/ui/Appearance";
 import { useScrollOffset } from "../../components/ui/FolderRefresh";
 import { useMotionPreferences } from "../../shared/motion";
+import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import { HomeHeader } from "./HomeGreeting";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle } from "react-native-svg";
 import type { Navigate } from "../../shared/routes";
 
 // Screen pads its content by 16 (10 on top when compact); the hero and the
-// body cancel that so the colours run edge to edge.
+// body cancel horizontal/top padding so colors run edge to edge while HomeBody
+// owns the bottom clearance above the floating tab bar.
 const edge = 16;
 // Distance over which the hero fades as the white section covers it.
 const collapseDistance = 260;
@@ -224,25 +226,24 @@ export function HomeBody({
   gap?: number;
 }) {
   const palette = useTheme();
+  const navHeader = useNavigationHeader();
+  const bottomPadding = navHeader?.bottomInset
+    ? 16 + navHeader.bottomInset
+    : 32;
   return (
     <View
+      testID="home-body"
       style={{
         flexGrow: 1,
         zIndex: 1,
         marginHorizontal: -edge,
         marginTop: -24,
-        marginBottom: -24,
         paddingHorizontal: edge,
         paddingTop: 18,
-        paddingBottom: 32,
+        paddingBottom: bottomPadding,
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
         backgroundColor: palette.background,
-        shadowColor: palette.primaryDark,
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: -6 },
-        elevation: 4,
         gap,
       }}
     >
