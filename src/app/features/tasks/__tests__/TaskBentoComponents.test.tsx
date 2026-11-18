@@ -284,7 +284,7 @@ describe("TaskBentoComponents", () => {
     expect(view.getByText("Funding")).toBeOnTheScreen();
     expect(view.getByText("Financial records")).toBeOnTheScreen();
     expect(view.getByText("Files")).toBeOnTheScreen();
-    expect(view.getByText("Attachments")).toBeOnTheScreen();
+    expect(view.getByText("Workflow evidence")).toBeOnTheScreen();
 
     await fireEvent.press(view.getByLabelText("Activity, Updates & history"));
     expect(onActivity).toHaveBeenCalledTimes(1);
@@ -295,31 +295,29 @@ describe("TaskBentoComponents", () => {
     await fireEvent.press(view.getByLabelText("Funding, Financial records"));
     expect(onFunding).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(view.getByLabelText("Files, Attachments"));
+    await fireEvent.press(view.getByLabelText("Files, Workflow evidence"));
     expect(onFiles).toHaveBeenCalledTimes(1);
   });
 
   test("BentoSubtaskSupportingGrid omits Planning details and handles Subtask grid tiles", async () => {
     const onReview = jest.fn();
     const onFunding = jest.fn();
-    const onFiles = jest.fn();
 
     const view = await render(
       <BentoSubtaskSupportingGrid
         onPressReview={onReview}
         onPressFunding={onFunding}
-        onPressFiles={onFiles}
       />,
     );
 
     expect(view.getByText("Evidence & review")).toBeOnTheScreen();
     expect(view.getByText("Funding")).toBeOnTheScreen();
-    expect(view.getByText("Files")).toBeOnTheScreen();
+    expect(view.queryByText("Files")).toBeNull();
     expect(view.queryByText("Planning details")).toBeNull();
     expect(view.queryByText("Additional fields")).toBeNull();
 
-    await fireEvent.press(view.getByLabelText("Files, Attachments"));
-    expect(onFiles).toHaveBeenCalledTimes(1);
+    await fireEvent.press(view.getByLabelText("Evidence & review, Submissions"));
+    expect(onReview).toHaveBeenCalledTimes(1);
 
     // Test PlanningDetailsSheet standalone helper
     const sheetView = await render(
@@ -462,11 +460,10 @@ describe("TaskBentoComponents", () => {
     expect(view.getByText("Subtask 4")).toBeOnTheScreen();
   });
 
-  test("BentoSubtaskSupportingGrid renders 4 tiles when showFunding is true and 3 tiles when false (without Planning details)", async () => {
+  test("BentoSubtaskSupportingGrid follows Web by keeping subtask evidence in Work and omitting the parent Files shortcut", async () => {
     const onPressActivity = jest.fn();
     const onPressReview = jest.fn();
     const onPressFunding = jest.fn();
-    const onPressFiles = jest.fn();
 
     const officeView = await render(
       <BentoSubtaskSupportingGrid
@@ -474,7 +471,6 @@ describe("TaskBentoComponents", () => {
         onPressActivity={onPressActivity}
         onPressReview={onPressReview}
         onPressFunding={onPressFunding}
-        onPressFiles={onPressFiles}
       />,
     );
 
@@ -491,8 +487,8 @@ describe("TaskBentoComponents", () => {
       officeView.getByRole("button", { name: "Funding, Financial records" }),
     ).toBeOnTheScreen();
     expect(
-      officeView.getByRole("button", { name: "Files, Attachments" }),
-    ).toBeOnTheScreen();
+      officeView.queryByRole("button", { name: "Files, Attachments" }),
+    ).toBeNull();
 
     await fireEvent.press(
       officeView.getByRole("button", { name: "Activity, Updates & history" }),
@@ -505,7 +501,6 @@ describe("TaskBentoComponents", () => {
         showFunding={false}
         onPressActivity={onPressActivity}
         onPressReview={onPressReview}
-        onPressFiles={onPressFiles}
       />,
     );
 
@@ -516,8 +511,8 @@ describe("TaskBentoComponents", () => {
       personalView.getByRole("button", { name: "Evidence & review, Submissions" }),
     ).toBeOnTheScreen();
     expect(
-      personalView.getByRole("button", { name: "Files, Attachments" }),
-    ).toBeOnTheScreen();
+      personalView.queryByRole("button", { name: "Files, Attachments" }),
+    ).toBeNull();
     expect(
       personalView.queryByRole("button", { name: "Planning details, Additional fields" }),
     ).toBeNull();

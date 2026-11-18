@@ -519,8 +519,7 @@ export function BudgetReleaseHistory({
         )}
 
         <Notice tone="neutral">
-          Scheduled amounts become available on their release date, Philippine
-          time.
+          Scheduled amounts become available on their release date.
         </Notice>
 
         {target && (

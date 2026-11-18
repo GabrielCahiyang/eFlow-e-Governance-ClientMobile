@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useWorkStatus } from "../../shared/workStatusPresentation";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
@@ -61,8 +62,8 @@ export function ProjectTaskTable({
       render: (t: Task) =>
         text(
           t.orgId && t.orgId === organization?.id
-            ? organization.name
-            : t.department || t.teamName || "—",
+            ? mobileOfficeLabel(organization.name)
+            : mobileOfficeLabel(t.department || t.teamName || "—"),
         ),
     },
     {

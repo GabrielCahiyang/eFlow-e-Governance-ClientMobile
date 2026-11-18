@@ -58,13 +58,14 @@ jest.mock("../portfolioFacts", () => ({
       .filter((project) => project.kind === "office")
       .map((project) => ({
         id: project.id,
+        org_id: "office",
         status:
           project.id in mockRecordedStatus
             ? mockRecordedStatus[project.id]
             : project.status,
       })),
     tasks: [],
-    offices: [],
+    offices: [{ id: "office", name: "LEDIPO" }],
     owners: [],
   }),
 }));
@@ -110,6 +111,9 @@ test("compact project filter exposes the current status, changes visible rows an
     view.getByRole("button", { name: "Project status: Current projects" }),
   ).toBeOnTheScreen();
   expect(view.getByText("Current inspection")).toBeOnTheScreen();
+  expect(view.queryByText("Office")).toBeNull();
+  expect(view.queryByText("Type")).toBeNull();
+  expect(view.queryByText("Authorized Office & personal projects")).toBeNull();
   expect(view.queryByText("Archived inspection")).toBeNull();
   await fireEvent.press(
     view.getByRole("button", { name: "Project status: Current projects" }),

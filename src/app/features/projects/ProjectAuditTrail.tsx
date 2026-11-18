@@ -27,6 +27,7 @@ import {
   type ActivityFilters,
 } from "../../../core/web/app/features/projects/activity/types";
 import { netProjectUpdates } from "./subscriptions";
+import { projectAuditDetail } from "./projectAuditPresentation";
 
 const categories: { value: ActivityFilters["kind"]; label: string }[] = [
   { value: "all", label: "All activity" },
@@ -115,7 +116,7 @@ export function ProjectAuditTrail({
             <FilterChip
               key={category.value}
               label={category.label}
-              active={active}
+              selected={active}
               tone={active ? "tinted" : "default"}
               onPress={() => {
                 setPage(firstPage);
@@ -192,7 +193,7 @@ export function ProjectAuditTrail({
               </View>
               {!!event.detail && (
                 <Text style={[styles.eventDetail, { color: palette.text }]}>
-                  {event.detail}
+                  {projectAuditDetail(event)}
                 </Text>
               )}
             </View>

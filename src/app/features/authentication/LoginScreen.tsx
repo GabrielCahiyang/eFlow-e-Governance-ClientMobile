@@ -27,10 +27,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import CirclePlay from "lucide-react-native/icons/circle-play";
 import Eye from "lucide-react-native/icons/eye";
 import EyeOff from "lucide-react-native/icons/eye-off";
-import Info from "lucide-react-native/icons/info";
 import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
 import LogIn from "lucide-react-native/icons/log-in";
-import { Button, Choice, ErrorState, Notice, Sheet } from "../../components/ui";
+import { Button, ErrorState, Notice } from "../../components/ui";
 import { Text, TextInput } from "../../components/ui/Typography";
 import { brandColors, withOpacity } from "../../components/ui/theme";
 import { useAppearance, useTheme } from "../../components/ui/Appearance";
@@ -131,18 +130,12 @@ export function LoginScreen() {
     recovery,
     notice,
     setNotice,
-    scenarios,
-    setScenarios,
-    selected,
-    setSelected,
     signIn,
-    openScenarios,
     markState,
   } = useNativeLogin();
 
   const insetFieldBg = isDark ? "#0d152d" : "#f7f9fd";
   const showWalkthrough = !recovery && !!walkthroughUrl;
-  const showScenarios = Boolean(__DEV__ && !recovery);
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: palette.background }]}>
@@ -398,102 +391,37 @@ export function LoginScreen() {
               </MotionView>
             </View>
 
-            {/* Quiet footer links below the card */}
-            {(showWalkthrough || showScenarios) && (
+            {/* Quiet footer link below the card */}
+            {showWalkthrough && (
               <MotionView kind="login" index={5} style={s.footer}>
                 <View style={s.footerLinks}>
-                  {showWalkthrough && (
-                    <Pressable
-                      accessibilityRole="link"
-                      disabled={busy}
-                      hitSlop={6}
-                      onPress={() => {
-                        void Linking.openURL(walkthroughUrl).catch(() =>
-                          setNotice(
-                            "Could not open the eFlow Web walkthroughs.",
-                          ),
-                        );
-                      }}
-                      style={({ pressed }) => [
-                        s.footerLink,
-                        busy ? { opacity: 0.45 } : pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <CirclePlay size={15} color={palette.blue} />
-                      <Text style={[s.linkText, { color: palette.blue }]}>
-                        Watch the eFlow Web walkthroughs
-                      </Text>
-                    </Pressable>
-                  )}
-                  {showWalkthrough && showScenarios && (
-                    <Text
-                      importantForAccessibility="no"
-                      style={[s.footerDot, { color: palette.border }]}
-                    >
-                      •
+                  <Pressable
+                    accessibilityRole="link"
+                    disabled={busy}
+                    hitSlop={6}
+                    onPress={() => {
+                      void Linking.openURL(walkthroughUrl).catch(() =>
+                        setNotice(
+                          "Could not open the eFlow Web walkthroughs.",
+                        ),
+                      );
+                    }}
+                    style={({ pressed }) => [
+                      s.footerLink,
+                      busy ? { opacity: 0.45 } : pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <CirclePlay size={15} color={palette.blue} />
+                    <Text style={[s.linkText, { color: palette.blue }]}>
+                      Watch the eFlow Web walkthroughs
                     </Text>
-                  )}
-                  {showScenarios && (
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={busy}
-                      hitSlop={6}
-                      onPress={() => void openScenarios()}
-                      style={({ pressed }) => [
-                        s.footerLink,
-                        busy ? { opacity: 0.45 } : pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <Info size={15} color={palette.blue} />
-                      <Text style={[s.linkText, { color: palette.blue }]}>
-                        Usage scenarios
-                      </Text>
-                    </Pressable>
-                  )}
+                  </Pressable>
                 </View>
               </MotionView>
             )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <Sheet
-        open={!!scenarios}
-        title="Usage scenarios"
-        description="Choose an existing development account."
-        busy={busy}
-        onClose={() => setScenarios(undefined)}
-        footer={
-          <Button
-            busy={busy}
-            disabled={!selected}
-            icon={<LogIn size={16} color={palette.onPrimary} />}
-            onPress={() => {
-              const account = scenarios?.find((a) => a.email === selected);
-              if (account) {
-                setEmail(account.email);
-                setPassword(account.password);
-                setScenarios(undefined);
-                void signIn(account.email, account.password);
-              }
-            }}
-          >
-            Use selected account
-          </Button>
-        }
-      >
-        <Choice
-          label="Development account"
-          value={selected}
-          searchable={false}
-          onChange={setSelected}
-          options={(scenarios || []).map((a) => ({
-            value: a.email,
-            label: a.label,
-            description: a.roleLabel,
-          }))}
-        />
-      </Sheet>
     </SafeAreaView>
   );
 }

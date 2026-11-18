@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useRef, useState } from "react";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import Check from "lucide-react-native/icons/check";
@@ -75,7 +76,7 @@ export function ActivationScreen({
           </Notice>
           <LabelValue label="Name" value={preview.data.full_name} />
           <LabelValue label="Email" value={preview.data.email} />
-          <LabelValue label="Office" value={preview.data.office_name} />
+          <LabelValue label="Office" value={mobileOfficeLabel(preview.data.office_name)} />
           <LabelValue
             label="Role"
             value={activationRoleLabel(

@@ -1,3 +1,4 @@
+import { officeContextLabel } from "../../shared/officeLabels";
 import AlertCircle from "lucide-react-native/icons/circle-alert";
 import Banknote from "lucide-react-native/icons/banknote";
 import Bell from "lucide-react-native/icons/bell";
@@ -243,13 +244,13 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
     <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
       <HomeHero
         navigate={navigate}
-        subtitle={scope?.workspace.name}
+        subtitle={officeContextLabel(scope?.workspace.name)}
         actions={[
           ...(scope && showAnalytics
             ? [
                 {
                   key: "analytics",
-                  label: "Office Analytics",
+                  label: "Analytics",
                   Icon: ChartColumn,
                   onPress: () => navigate({ name: "reports" }),
                 },
@@ -296,13 +297,13 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
       {workspace.error ? (
         <ErrorState error={workspace.error} retry={() => void refresh()} />
       ) : !scope && workspace.loading ? (
-        <Loading label="Loading Office overview" layout="summary" />
+        <Loading label="Loading overview" layout="summary" />
       ) : !scope ? (
         <HomeCard>
           <Empty
             compact
             kind="people"
-            title="Office work isn't available right now"
+            title="Work isn't available right now"
           />
         </HomeCard>
       ) : (
@@ -321,7 +322,7 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
             {!attention.length &&
               (waiting ? (
                 <Loading
-                  label="Checking Office attention"
+                  label="Checking work that needs attention"
                   layout="summary"
                   rows={2}
                 />
@@ -332,13 +333,13 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                     compact
                     kind="complete"
                     title="All clear"
-                    description="No Office work needs your attention right now."
+                    description="No work needs your attention right now."
                   />
                 )
               ))}
             {incomplete && (
               <ErrorState
-                error="Some Office attention records are unavailable."
+                error="Some attention records are unavailable."
                 retry={() => void refresh()}
               />
             )}
@@ -358,7 +359,7 @@ function HeadHome({ navigate }: { navigate: Navigate }) {
                   <Empty
                     compact
                     kind="projects"
-                    title="No current Office projects"
+                    title="No current projects"
                   />
                 </HomeCard>
               ) : (
@@ -458,7 +459,7 @@ function MemberHome({ navigate }: { navigate: Navigate }) {
 
   return (
     <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
-      <HomeHero navigate={navigate} subtitle={organization?.name}>
+      <HomeHero navigate={navigate} subtitle={officeContextLabel(organization?.name)}>
         {data && scope && (
           <HomeHeroStats
             stats={[
@@ -740,7 +741,7 @@ function MemberActionCardItem({
 
   const relation = item.relation || (item.isLead ? "Lead" : "Contributor");
   const context = [
-    item.projectTitle || item.workspaceName,
+    officeContextLabel(item.projectTitle || item.workspaceName),
     item.dueLabel && statusText !== "Due today" && statusText !== "Overdue"
       ? `Due ${item.dueLabel}`
       : undefined,
@@ -1166,7 +1167,7 @@ function MemberWaitingItemCard({
               {item.reason}
             </Text>
           </View>
-          {!!(item.projectTitle || item.workspaceName) && (
+          {!!officeContextLabel(item.projectTitle || item.workspaceName) && (
             <Text
               style={{
                 fontSize: 12,
@@ -1175,7 +1176,7 @@ function MemberWaitingItemCard({
               }}
               numberOfLines={1}
             >
-              {item.projectTitle || item.workspaceName}
+              {officeContextLabel(item.projectTitle || item.workspaceName)}
             </Text>
           )}
         </View>

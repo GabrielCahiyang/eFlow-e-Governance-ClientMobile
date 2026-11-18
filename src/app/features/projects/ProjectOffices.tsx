@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useTheme } from "../../components/ui/Appearance";
 import { Text } from "../../components/ui/Typography";
 import { useState } from "react";
@@ -145,8 +146,7 @@ export function ProjectOffices({
               <Card
                 key={office.id}
                 title={
-                  facts.data?.orgs.find((o) => o.id === office.office_id)
-                    ?.name || "Office"
+                  mobileOfficeLabel(facts.data?.orgs.find((o) => o.id === office.office_id)?.name)
                 }
                 icon={<Building size={16} color={palette.primary} />}
                 action={
@@ -213,7 +213,7 @@ export function ProjectOffices({
               .map((identity) => (
                 <Card
                   key={identity.id}
-                  title={identity.display_name}
+                  title={mobileOfficeLabel(identity.display_name)}
                   icon={<Building size={16} color={palette.mutedLabel} />}
                   action={
                     <Status value={identity.contact_status} variant="pill" />
@@ -336,7 +336,7 @@ export function ProjectOffices({
                 { value: "", label: "Project-local Office" },
                 ...(facts.data?.orgs || []).map((o) => ({
                   value: o.id,
-                  label: o.name,
+                  label: mobileOfficeLabel(o.name),
                 })),
               ]}
             />

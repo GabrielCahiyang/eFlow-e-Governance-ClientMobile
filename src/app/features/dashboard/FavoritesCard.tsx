@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useEffect, useRef, useState } from "react";
 import {
   Pressable,
@@ -159,7 +160,7 @@ export function FavoritesCard({
               <Pressable
                 key={item.id}
                 accessibilityRole="button"
-                accessibilityLabel={`Open favorite workspace ${item.name}`}
+                accessibilityLabel={`Open favorite workspace ${mobileOfficeLabel(item.name)}`}
                 onPress={() => onOpenWorkspace(item.id)}
                 style={({ pressed }) => ({
                   width: tileWidth,
@@ -183,7 +184,7 @@ export function FavoritesCard({
                     fontWeight: "600",
                   }}
                 >
-                  {item.name}
+                  {mobileOfficeLabel(item.name)}
                 </Text>
               </Pressable>
             ))}

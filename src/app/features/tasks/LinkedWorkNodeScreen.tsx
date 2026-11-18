@@ -24,7 +24,6 @@ import { OfficeSubitemActivity } from "./OfficeSubitemActivity";
 import { WorkProposalReview } from "./WorkProposalSheet";
 import { WorkEditorSheet } from "./WorkEditorSheet";
 import { TaskFundingCard } from "../budget/TaskFundingCard";
-import { ProjectFiles } from "../projects/ProjectFiles";
 import type { AppRoute, Navigate } from "../../shared/routes";
 import { fetchProject } from "../projects/services";
 import {
@@ -57,7 +56,7 @@ const SUBPAGE_TITLES: Record<string, string> = {
   activity: "Activity",
   review: "Evidence & review",
   budget: "Funding",
-  files: "Files",
+  files: "Evidence & review",
   planning: "Planning details",
 };
 
@@ -201,7 +200,8 @@ export function LinkedWorkNodeScreen({
   const legacyPresentation =
     legacyStatus && resolveStatus(legacyStatus, data?.customStatusId);
 
-  const view = route.view;
+  const requestedView = route.view;
+  const view = requestedView === "files" ? "review" : requestedView;
   const isOverview = !view || view === "details" || view === "subitems";
   const subpageTitle = view ? SUBPAGE_TITLES[view] : undefined;
   const itemTitle = data?.node?.title || data?.legacy?.title;
@@ -375,6 +375,7 @@ export function LinkedWorkNodeScreen({
                 description="Sign in to view evidence and work submissions."
               />
             )}
+            <OfficeSubitemActivity tree={branch.tree} nodeId={branch.node.id} actorId={actor || null} />
             {personalReviewOpen && (
               <WorkEditorSheet
                 data={branch.tree}
@@ -396,22 +397,6 @@ export function LinkedWorkNodeScreen({
               kind="budget"
               title="Funding unavailable"
               description="Only office subtasks have task funding controls."
-            />
-          )
-        ) : view === "files" ? (
-          branch.tree.root.project ? (
-            <ProjectFiles
-              projectId={branch.tree.root.project}
-              taskId={branch.tree.root.id}
-              contextTitle={itemTitle || branch.node.title}
-              eyebrow="Parent task attachments"
-              scopeNote="Parent task files shown here. Files submitted specifically for this subtask live in Evidence & review."
-            />
-          ) : (
-            <Empty
-              kind="files"
-              title="Files unavailable"
-              description="No project is linked to this subtask."
             />
           )
         ) : view === "planning" ? (
@@ -470,22 +455,6 @@ export function LinkedWorkNodeScreen({
           ) : (
             <Empty kind="budget" title="Funding unavailable" />
           )
-        ) : view === "files" ? (
-          data.legacyProjectId && rootId ? (
-            <ProjectFiles
-              projectId={data.legacyProjectId}
-              taskId={rootId}
-              contextTitle={itemTitle || data.legacy.title}
-              eyebrow="Parent task attachments"
-              scopeNote="Parent task files shown here. Files submitted specifically for this subtask live in Evidence & review."
-            />
-          ) : (
-            <Empty
-              kind="files"
-              title="Files unavailable"
-              description="No project is linked to this subtask."
-            />
-          )
         ) : view === "planning" ? (
           <PlanningDetailsView
             description={data.taskPlanning?.description}
@@ -493,11 +462,7 @@ export function LinkedWorkNodeScreen({
             acceptanceCriteria={data.taskPlanning?.acceptanceCriteria}
           />
         ) : view === "review" ? (
-          <Empty
-            kind="tasks"
-            title="No review submissions"
-            description="Extended work submissions are unavailable for archived subtasks."
-          />
+          <OfficeSubitemActivity rootId={rootId} nodeId={data.legacy.id} actorId={actor || null} />
         ) : (
           <>
             <EditorialMetadataStrip
@@ -556,16 +521,6 @@ export function LinkedWorkNodeScreen({
                     nodeId: data.legacy!.id,
                     view: "budget",
                     title: "Funding",
-                  })
-                }
-                onPressFiles={() =>
-                  navigate({
-                    name: "task",
-                    id: rootId,
-                    projectId,
-                    nodeId: data.legacy!.id,
-                    view: "files",
-                    title: "Files",
                   })
                 }
               />

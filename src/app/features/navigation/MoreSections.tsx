@@ -61,6 +61,7 @@ export function MoreIdentityHero({
   fullName,
   email,
   role,
+  customRoleLabel,
   officeName,
   avatarUrl,
   onOpenProfile,
@@ -68,6 +69,7 @@ export function MoreIdentityHero({
   fullName?: string | null;
   email?: string | null;
   role?: string | null;
+  customRoleLabel?: string | null;
   officeName: string;
   avatarUrl?: string | null;
   onOpenProfile: () => void;
@@ -121,7 +123,7 @@ export function MoreIdentityHero({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open profile"
-          accessibilityHint="Opens Account details and Professional Profile"
+          accessibilityHint="Opens Account details"
           onPress={onOpenProfile}
           hitSlop={6}
           style={({ pressed }) => [
@@ -141,12 +143,14 @@ export function MoreIdentityHero({
       <View style={s.heroContextBar}>
         <View style={[s.heroChip, s.heroRoleChip]}>
           <ShieldCheck size={13} color="#ffffff" />
-          <Text style={s.heroChipText}>{roleDisplay(role)}</Text>
+          <Text style={s.heroChipText}>{customRoleLabel || roleDisplay(role)}</Text>
         </View>
-        <View style={s.heroChip}>
-          <Building2 size={13} color="#eef4ff" />
-          <Text style={s.heroChipText}>{officeName}</Text>
-        </View>
+        {!!officeName && (
+          <View style={s.heroChip}>
+            <Building2 size={13} color="#eef4ff" />
+            <Text style={s.heroChipText}>{officeName}</Text>
+          </View>
+        )}
       </View>
     </LinearGradient>
   );

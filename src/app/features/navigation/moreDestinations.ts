@@ -45,7 +45,7 @@ const all: (MoreDestination & {
   {
     id: "projects",
     label: "Projects",
-    subtitle: "Browse your authorized Office projects",
+    subtitle: "Browse your authorized projects",
     group: "Work",
     Icon: Folder,
     tone: "blue",
@@ -77,7 +77,7 @@ const all: (MoreDestination & {
   },
   {
     id: "reports",
-    label: "Office Analytics",
+    label: "Analytics",
     subtitle: "Office completion, workload & risk overview",
     group: "Work",
     Icon: ChartColumn,
@@ -117,8 +117,8 @@ const all: (MoreDestination & {
   },
   {
     id: "profile",
-    label: "Profile & Professional Record",
-    subtitle: "Name, avatar, skills & PDS uploads",
+    label: "Profile",
+    subtitle: "Name, photo & account details",
     group: "Account",
     Icon: UserRound,
     tone: "navy",

@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useState } from "react";
 import Building2 from "lucide-react-native/icons/building";
 import Check from "lucide-react-native/icons/check";
@@ -247,7 +248,7 @@ export function ProjectInvitations({ project }: { project: string }) {
                 onChange={setSponsor}
                 options={(offices.data || []).map((office) => ({
                   value: office.id,
-                  label: office.name,
+                  label: mobileOfficeLabel(office.name),
                 }))}
               />
               <Button

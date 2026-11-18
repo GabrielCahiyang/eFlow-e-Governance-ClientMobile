@@ -27,12 +27,10 @@ const taskColumns = [
   { label: "Budget", width: 130 },
   { label: "Actual expense", width: 144 },
 ];
-const directoryColumns = ["Project", "Status", "Type"];
+const directoryColumns = ["Project", "Status"];
 export const projectDirectoryWidths = (viewport: number) => {
   const status = Math.floor(viewport * 0.3);
-  if (viewport < 380) return [viewport - status - rail, status];
-  const type = Math.floor(viewport * 0.22);
-  return [viewport - status - type - rail, status, type];
+  return [viewport - status - rail, status];
 };
 const rail = 4;
 export const projectTableWidths = (viewport: number, fontScale: number) => {
@@ -264,19 +262,18 @@ export function ProjectDirectoryCells({
   const palette = useTheme();
   const resolve = useWorkStatus();
   const status = project && resolve(project.status);
-  const type = project?.kind === "personal" ? "Personal" : "Office";
-  const compact = widths.length === 2;
-  const detail = type + (project?.shortcut ? " shortcut" : "");
+  const detail = project?.shortcut ? "Shortcut" : undefined;
+  const rowWidths = widths.length > 2 ? [widths[0] + widths.slice(2).reduce((sum, width) => sum + width, 0), widths[1]] : widths;
   const values = project
-    ? [project.title, status?.label ?? "", ...(compact ? [] : [detail])]
+    ? [project.title, status?.label ?? ""]
     : undefined;
   return (
     <WorkTableRow
-      columns={compact ? directoryColumns.slice(0, 2) : directoryColumns}
-      titleDetail={compact && project ? detail : undefined}
+      columns={directoryColumns}
+      titleDetail={project ? detail : undefined}
       values={values}
       status={project?.status}
-      widths={widths}
+      widths={rowWidths}
       accent={palette.primary}
       onOpen={onOpen}
     />

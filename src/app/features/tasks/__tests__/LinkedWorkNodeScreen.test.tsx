@@ -197,7 +197,7 @@ test("a mismatched project or a missing branch never opens another row", async (
   expect(screen.queryByText(/Focused branch/)).toBeNull();
 });
 
-test("navigates subtask views to dedicated Activity, Evidence & review, Funding, Files, and Planning subpages", async () => {
+test("navigates subtask views to dedicated Activity, Evidence & review, Funding and Planning subpages; old Files links resolve to exact subtask evidence", async () => {
   const office = {
     ...tree,
     root: {
@@ -243,8 +243,10 @@ test("navigates subtask views to dedicated Activity, Evidence & review, Funding,
   await view.rerender(
     <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "files" }} />,
   );
-  expect(await screen.findByText("Files")).toBeOnTheScreen();
-  expect(screen.getByText("Files view project:root")).toBeOnTheScreen();
+  expect(await screen.findByText("Evidence & review")).toBeOnTheScreen();
+  expect(screen.getByText("Review view depth-eight")).toBeOnTheScreen();
+  expect(screen.getByText("Activity view depth-eight")).toBeOnTheScreen();
+  expect(screen.queryByText("Files view project:root")).toBeNull();
 
   await view.rerender(
     <LinkedWorkNodeScreen navigate={jest.fn()} route={{ ...baseRoute, view: "planning" }} />,

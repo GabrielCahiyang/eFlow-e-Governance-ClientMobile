@@ -7,9 +7,21 @@ import { clearDisplayCache } from "../../../shared/displayCache";
 import { ProjectFiles } from "../ProjectFiles";
 import type { ProjectFileSnapshot } from "../../../../core/web/app/features/project-files/types";
 
-const mockFetchProjectFiles = jest.fn<
-  (project: string, task?: string) => Promise<ProjectFileSnapshot>
->();
+const mockFetchProjectFiles =
+  jest.fn<(project: string, task?: string) => Promise<ProjectFileSnapshot>>();
+let mockSavedUpload: unknown = null;
+const mockConfirm = jest.fn<() => Promise<boolean>>();
+jest.mock("../../../shared/confirm", () => ({
+  confirmAction: () => mockConfirm(),
+}));
+const mockChangeDocument = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockSaveDocument = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+jest.mock("../projectDocumentActions", () => ({
+  documentUploadScope: (scope: { project: string; task?: string }) =>
+    `project-document:${scope.project}:${scope.task || "library"}`,
+  changeProjectDocument: (...args: unknown[]) => mockChangeDocument(...args),
+  saveProjectDocument: (...args: unknown[]) => mockSaveDocument(...args),
+}));
 const mockOpenProjectFile = jest.fn<(file: unknown) => Promise<string>>();
 
 jest.mock("../../authentication", () => ({
@@ -25,10 +37,35 @@ jest.mock(
   }),
 );
 
+jest.mock("../../../../platform/draftStore", () => ({
+  draftStore: {
+    get: jest.fn(async () => mockSavedUpload),
+    set: jest.fn(async () => {}),
+    remove: jest.fn(async () => {}),
+  },
+}));
+jest.mock("../../../components/ui/SelectionSheet", () => ({
+  SelectionSheet: ({ open, options, onSelect }: any) => {
+    const { View, Button } = require("react-native");
+    return open ? (
+      <View>
+        {options.map((option: any) => (
+          <Button
+            key={option.id}
+            title={option.title}
+            onPress={() => onSelect(option.id)}
+          />
+        ))}
+      </View>
+    ) : null;
+  },
+}));
+
 const sampleSnapshot: ProjectFileSnapshot = {
   can_write: true,
   files: [
     {
+      linked: true,
       id: "file-pdf",
       project_id: "proj-1",
       project_kind: "office",
@@ -45,6 +82,7 @@ const sampleSnapshot: ProjectFileSnapshot = {
       committed_at: "2026-11-14T08:01:00Z",
     },
     {
+      linked: true,
       id: "file-xlsx",
       project_id: "proj-1",
       project_kind: "office",
@@ -62,6 +100,7 @@ const sampleSnapshot: ProjectFileSnapshot = {
       committed_at: "2026-11-15T08:01:00Z",
     },
     {
+      linked: true,
       id: "file-img",
       project_id: "proj-1",
       project_kind: "office",
@@ -78,6 +117,7 @@ const sampleSnapshot: ProjectFileSnapshot = {
       committed_at: "2026-11-16T08:01:00Z",
     },
     {
+      linked: true,
       id: "file-pending",
       project_id: "proj-1",
       project_kind: "office",
@@ -96,13 +136,17 @@ const sampleSnapshot: ProjectFileSnapshot = {
   ],
 };
 
-describe("ProjectFiles", () => {
-  beforeEach(async () => {
-    jest.clearAllMocks();
-    clearDisplayCache();
-    await AsyncStorage.removeItem("eflow.appearance");
-  });
+beforeEach(async () => {
+  jest.clearAllMocks();
+  mockSavedUpload = null;
+  mockConfirm.mockResolvedValue(true);
+  mockChangeDocument.mockResolvedValue(undefined);
+  mockSaveDocument.mockResolvedValue({});
+  clearDisplayCache();
+  await AsyncStorage.removeItem("eflow.appearance");
+});
 
+describe("ProjectFiles", () => {
   test("renders hero metrics, MIME-coded Card v2 rows, search/filter chips, opens ready files, and never renders Manage library files", async () => {
     mockFetchProjectFiles.mockResolvedValue(sampleSnapshot);
     mockOpenProjectFile.mockResolvedValue("https://signed.example/file.pdf");
@@ -139,9 +183,9 @@ describe("ProjectFiles", () => {
       ).toBeOnTheScreen();
 
       // Side-by-side hero pods at normal font scale
-      expect(
-        view.getByLabelText("Library count: 4 files").parent,
-      ).toHaveStyle({ flexDirection: "row" });
+      expect(view.getByLabelText("Library count: 4 files").parent).toHaveStyle({
+        flexDirection: "row",
+      });
 
       // Card header & semantic status pills
       expect(view.getByText("Attached files")).toBeOnTheScreen();
@@ -207,13 +251,9 @@ describe("ProjectFiles", () => {
     resolveFiles({ can_write: false, files: [] });
 
     await waitFor(() => {
-      expect(
-        loadingView.getByText("No files attached yet"),
-      ).toBeOnTheScreen();
+      expect(loadingView.getByText("No files attached yet")).toBeOnTheScreen();
     });
-    expect(
-      loadingView.queryByText("Manage on eFlow Web"),
-    ).toBeNull();
+    expect(loadingView.queryByText("Manage on eFlow Web")).toBeNull();
     await loadingView.unmount();
 
     clearDisplayCache();
@@ -265,4 +305,152 @@ describe("ProjectFiles", () => {
       await AsyncStorage.removeItem("eflow.appearance");
     }
   });
+});
+
+test("personal task documents show only linked references and expose Web's authorized link/unlink actions", async () => {
+  mockFetchProjectFiles.mockResolvedValue({
+    ...sampleSnapshot,
+    files: [
+      ...sampleSnapshot.files,
+      {
+        ...sampleSnapshot.files[0],
+        id: "unlinked",
+        file_name: "Unused project reference.pdf",
+        linked: false,
+      },
+    ],
+  });
+  const view = await render(
+    <ProjectFiles projectId="proj-1" taskId="task-a" readOnly={false} />,
+  );
+  await view.findByText("Q4_Budget_Plan.pdf");
+  expect(view.queryByText("Unused project reference.pdf")).toBeNull();
+  expect(
+    await view.findByRole("button", { name: "Upload a project document" }),
+  ).toBeOnTheScreen();
+  await fireEvent.press(
+    view.getByRole("button", { name: "Insert from project library" }),
+  );
+  await fireEvent.press(
+    view.getByRole("button", { name: "Unused project reference.pdf" }),
+  );
+  await waitFor(() =>
+    expect(mockChangeDocument).toHaveBeenCalledWith(
+      { actor: "user-1", project: "proj-1", task: "task-a" },
+      "link",
+      "unlinked",
+    ),
+  );
+  await fireEvent.press(
+    view.getAllByRole("button", { name: "Unlink document" })[0],
+  );
+  await waitFor(() =>
+    expect(mockChangeDocument).toHaveBeenLastCalledWith(
+      { actor: "user-1", project: "proj-1", task: "task-a" },
+      "unlink",
+      "file-pdf",
+    ),
+  );
+});
+
+test("closed/missing capabilities hide document writes, including after capabilities change", async () => {
+  mockFetchProjectFiles.mockResolvedValue({
+    can_write: false,
+    files: sampleSnapshot.files,
+  });
+  const view = await render(
+    <ProjectFiles projectId="proj-1" taskId="task-a" readOnly={false} />,
+  );
+  await view.findByText("Q4_Budget_Plan.pdf");
+  expect(
+    view.queryByRole("button", { name: "Upload a project document" }),
+  ).toBeNull();
+  expect(view.queryByRole("button", { name: "Unlink document" })).toBeNull();
+  await view.rerender(
+    <ProjectFiles projectId="proj-1" taskId="task-b" readOnly />,
+  );
+  await view.findByText("Q4_Budget_Plan.pdf");
+  expect(
+    view.queryByRole("button", { name: "Upload a project document" }),
+  ).toBeNull();
+});
+
+test("a restored uncertain upload blocks a new file and retries its original request", async () => {
+  const saved = {
+    id: "original-upload",
+    file: {
+      uri: "file:///Plan.pdf",
+      name: "Plan.pdf",
+      size: 2,
+      type: "application/pdf",
+    },
+    sha256: "ab".repeat(32),
+    attempted: true,
+  };
+  mockSavedUpload = saved;
+  mockFetchProjectFiles.mockResolvedValue(sampleSnapshot);
+  mockSaveDocument.mockRejectedValueOnce(new Error("Receipt unavailable"));
+  const view = await render(
+    <ProjectFiles projectId="proj-1" taskId="task-a" readOnly={false} />,
+  );
+  const retry = await view.findByRole("button", { name: "Retry saved upload" });
+  expect(
+    view.getByRole("button", { name: "Upload a project document" }),
+  ).toBeDisabled();
+  expect(
+    view.queryByRole("button", { name: "Discard upload draft" }),
+  ).toBeNull();
+  await fireEvent.press(retry);
+  expect(await view.findByRole("alert")).toBeOnTheScreen();
+  await fireEvent.press(
+    view.getByRole("button", { name: "Retry saved upload" }),
+  );
+  await waitFor(() => expect(mockSaveDocument).toHaveBeenCalledTimes(2));
+  expect(mockSaveDocument.mock.calls.every((call) => call[1] === saved)).toBe(
+    true,
+  );
+});
+
+test("a denied mutation refreshes capabilities and removes stale write controls", async () => {
+  mockFetchProjectFiles.mockResolvedValue(sampleSnapshot);
+  const view = await render(
+    <ProjectFiles projectId="proj-1" taskId="task-a" readOnly={false} />,
+  );
+  await view.findByRole("button", { name: "Upload a project document" });
+  mockFetchProjectFiles.mockResolvedValue({
+    can_write: false,
+    files: sampleSnapshot.files,
+  });
+  mockChangeDocument.mockRejectedValueOnce(
+    new Error("Document access changed"),
+  );
+  await fireEvent.press(
+    view.getAllByRole("button", { name: "Unlink document" })[0],
+  );
+  await view.findByRole("alert");
+  await waitFor(() =>
+    expect(
+      view.queryByRole("button", { name: "Upload a project document" }),
+    ).toBeNull(),
+  );
+  expect(view.queryByRole("button", { name: "Unlink document" })).toBeNull();
+});
+
+test("canceling removal makes no command and never displays removal success", async () => {
+  mockConfirm.mockResolvedValueOnce(false);
+  mockFetchProjectFiles.mockResolvedValue({
+    can_write: true,
+    files: [
+      { ...sampleSnapshot.files[0], linked: false, can_remove: true, links: 0 },
+    ],
+  });
+  const view = await render(
+    <ProjectFiles projectId="proj-1" readOnly={false} />,
+  );
+  await fireEvent.press(
+    await view.findByRole("button", { name: "Remove from library" }),
+  );
+  expect(mockConfirm).toHaveBeenCalledTimes(1);
+  expect(mockChangeDocument).not.toHaveBeenCalled();
+  expect(view.queryByText("Document removed; provenance retained.")).toBeNull();
 });

@@ -1,21 +1,34 @@
 import { expect, jest, test } from "@jest/globals";
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import { MobileContent } from "../MobileContent";
 
 let mockRole = "accounting_staff";
+let mockCan = true,
+  mockDisplay = true;
 const mockOfficeBudgetScreen = jest.fn();
 
 jest.mock("../../authentication", () => ({
   useAuth: () => ({
     profile: { id: "accountant", role: mockRole, org_id: "office-a" },
-    can: () => true,
+    can: () => mockCan,
+    canDisplayDestination: () => mockDisplay,
   }),
 }));
 jest.mock("../../workspaces", () => ({
   useWorkspace: () => ({ selected: undefined }),
 }));
 jest.mock("../../projects", () => ({
-  ProjectScreen: () => null,
+  ProjectScreen: () => {
+    const [draft, setDraft] = require("react").useState("");
+    const { TextInput } = require("react-native");
+    return (
+      <TextInput
+        accessibilityLabel="Project draft"
+        value={draft}
+        onChangeText={setDraft}
+      />
+    );
+  },
   ProjectsScreen: () => null,
 }));
 jest.mock("../../tasks", () => ({ TaskDetailsScreen: () => null }));
@@ -63,7 +76,11 @@ test("accounting_overview opens OfficeBudgetScreen overview rather than looping 
 
   await view.rerender(
     <MobileContent
-      current={{ name: "accounting_overview", view: "overview", fiscalYear: 2026 }}
+      current={{
+        name: "accounting_overview",
+        view: "overview",
+        fiscalYear: 2026,
+      }}
       navigate={jest.fn()}
     />,
   );
@@ -75,4 +92,32 @@ test("accounting_overview opens OfficeBudgetScreen overview rather than looping 
       fiscalYear: 2026,
     }),
   );
+});
+
+test("account refresh retains the exact record draft, then confirmed revocation removes it", async () => {
+  const props = {
+    current: { name: "project" as const, id: "project-a" },
+    navigate: jest.fn(),
+  };
+  const view = await render(<MobileContent {...props} />);
+  await fireEvent.changeText(
+    screen.getByLabelText("Project draft"),
+    "Unsaved work",
+  );
+  try {
+    mockCan = false; // Actions and new protected navigation are unavailable during the read.
+    await view.rerender(<MobileContent {...props} />);
+    expect(screen.getByDisplayValue("Unsaved work")).toBeOnTheScreen();
+    mockDisplay = false; // Authoritative response confirms this destination was revoked.
+    await view.rerender(<MobileContent {...props} />);
+    expect(screen.queryByLabelText("Project draft")).toBeNull();
+    expect(
+      screen.getByText(
+        "Your current account permissions do not allow this destination.",
+      ),
+    ).toBeOnTheScreen();
+  } finally {
+    mockCan = true;
+    mockDisplay = true;
+  }
 });

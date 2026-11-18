@@ -3,7 +3,6 @@ import NetInfo from "@react-native-community/netinfo";
 import { rememberSession } from "../../../platform/authStorage";
 import { signInOnMobile } from "./mobileSignIn";
 import { validateLoginFields } from "../../../core/web/app/features/authentication/services/loginValidation";
-import type { QuickLoginAccount } from "../../../core/web/app/shared/quickLoginAccounts";
 import type { MarkState } from "../../components/brand/EFlowMark";
 import { loginErrorMessage } from "./loginError";
 export function useNativeLogin() {
@@ -15,9 +14,7 @@ export function useNativeLogin() {
     [error, setError] = useState(""),
     [errors, setErrors] = useState<{ email?: string; password?: string }>({}),
     [shake, setShake] = useState(0),
-    [notice, setNotice] = useState(""),
-    [scenarios, setScenarios] = useState<readonly QuickLoginAccount[]>(),
-    [selected, setSelected] = useState("");
+    [notice, setNotice] = useState("");
   const pending = useRef(false);
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -53,17 +50,6 @@ export function useNativeLogin() {
       setBusy(false);
     }
   };
-  const openScenarios = async () => {
-    if (__DEV__) {
-      const module =
-        await import("../../../core/web/app/shared/quickLoginAccounts");
-      setScenarios(
-        module.QUICK_LOGIN_ACCOUNTS.filter(
-          (account) => account.roleLabel.toLowerCase() !== "admin",
-        ),
-      );
-    }
-  };
   const markState: MarkState = busy
     ? "submitting"
     : error || errors.email || errors.password
@@ -88,12 +74,7 @@ export function useNativeLogin() {
     recovery: false,
     notice,
     setNotice,
-    scenarios,
-    setScenarios,
-    selected,
-    setSelected,
     signIn,
-    openScenarios,
     markState,
   };
 }

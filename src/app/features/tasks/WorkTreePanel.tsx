@@ -634,9 +634,6 @@ export function WorkTreePanel({
                   navigate(subtaskViewRoute(data, node.id, "budget", "Funding"))
               : undefined
           }
-          onPressFiles={() =>
-            navigate(subtaskViewRoute(data, node.id, "files", "Files"))
-          }
         />
 
         {proposal && actor && isNodeWorkerOrLead && (

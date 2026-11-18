@@ -1,3 +1,4 @@
+import { officeContextLabel } from "../../shared/officeLabels";
 import type { MobileWorkRow } from "./displayWorkSnapshot";
 import { workDateLabel } from "../../../core/web/app/shared/workCalendar";
 import { MondayTableRow } from "../../components/ui/MondayTable";
@@ -31,7 +32,7 @@ export function WorkRowItem({
           : null;
   const context = [
     row.projectTitle,
-    row.workspaceName !== row.projectTitle ? row.workspaceName : null,
+    row.workspaceName !== row.projectTitle ? officeContextLabel(row.workspaceName) : null,
   ]
     .filter(Boolean)
     .join(" · ");

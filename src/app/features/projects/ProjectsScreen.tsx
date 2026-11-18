@@ -1,3 +1,4 @@
+import { officeContextLabel } from "../../shared/officeLabels";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { useNavigationHeader } from "../navigation/navigationHeaderContext";
 import { SelectionSheet } from "../../components/ui/SelectionSheet";
@@ -7,12 +8,7 @@ import {
   RefreshSectionList,
 } from "../../components/ui/FolderRefresh";
 import { useState } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Building from "lucide-react-native/icons/building";
 import Calendar from "lucide-react-native/icons/calendar";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
@@ -166,9 +162,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
           <PageHeader
             title="Projects"
             subtitle={
-              current
-                ? "Authorized Office & personal projects"
-                : "Select a workspace"
+              current ? "Your authorized projects" : "Select a workspace"
             }
           />
           {!!pull.error && (
@@ -292,10 +286,13 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
           item.status === "unavailable"
             ? undefined
             : resolveStatus(item.status);
-        const officeName = String(
-          facts.data?.offices.find(
-            (office) => office.id === authoritative.get(item.id)?.org_id,
-          )?.name || (item.kind === "personal" ? "Personal" : "Unavailable"),
+        const recordedOfficeName = facts.data?.offices.find(
+          (office) => office.id === authoritative.get(item.id)?.org_id,
+        )?.name;
+        const officeName = officeContextLabel(
+          typeof recordedOfficeName === "string"
+            ? recordedOfficeName
+            : undefined,
         );
         const ownerName = String(
           facts.data?.owners.find(
@@ -397,15 +394,20 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                   ]}
                 >
                   <View style={styles.metaRow}>
-                    <View style={styles.metaItem}>
-                      <Building size={13} color={palette.mutedLabel} />
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.metaText, { color: palette.mutedLabel }]}
-                      >
-                        {officeName}
-                      </Text>
-                    </View>
+                    {!!officeName && (
+                      <View style={styles.metaItem}>
+                        <Building size={13} color={palette.mutedLabel} />
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.metaText,
+                            { color: palette.mutedLabel },
+                          ]}
+                        >
+                          {officeName}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.metaItem}>
                       <User size={13} color={palette.mutedLabel} />
                       <Text
@@ -429,10 +431,7 @@ export function ProjectsScreen({ navigate }: { navigate: Navigate }) {
                   <View style={styles.progressSection}>
                     <View style={styles.progressHeader}>
                       <Text
-                        style={[
-                          styles.progressText,
-                          { color: palette.text },
-                        ]}
+                        style={[styles.progressText, { color: palette.text }]}
                       >
                         {!progress
                           ? "Unavailable"

@@ -1,6 +1,6 @@
 {
-  "source": "C:\\Users\\gabri\\OneDrive\\Desktop\\EflowWeb",
-  "generatedAt": "2026-11-12T20:17:39.030Z",
+  "source": "C:\\Users\\james\\projects\\eflow-e-Governance-Project",
+  "generatedAt": "2026-11-18T05:42:30.442Z",
   "files": [
     {
       "source": "src/app/components/ui/modalSizing.ts",
@@ -1282,7 +1282,7 @@
     },
     {
       "source": "src/app/features/permissions/selectors.ts",
-      "sha256": "ce8e8746ec6ccb384361db3841b26b6137c411b0ef8baa01528f89424e389f3c",
+      "sha256": "53193acd97578613e7fc79a431ff25ab665a44c4825d1318e4919c418dcb90e0",
       "native": "app/features/permissions/selectors.ts",
       "adapted": false
     },
@@ -1294,7 +1294,7 @@
     },
     {
       "source": "src/app/features/permissions/types.ts",
-      "sha256": "2f2753387a610fa4404dfb06f71bc0cf2db466b3d3da5b1aff6c89891a0b1213",
+      "sha256": "9e587a9aea0a95b86fe19a5a73d1842c1cd6bd31d7e8428e6f5992e198c7f869",
       "native": "app/features/permissions/types.ts",
       "adapted": false
     },
@@ -3388,7 +3388,7 @@
     },
     {
       "source": "src/app/types.ts",
-      "sha256": "4545ad5db6c88f5933cafb45415df91f46512eac848d77b9f033fe2cfbdc4bfb",
+      "sha256": "46aa88e607b0f8f51443bfe355e2f46fdd76c4e59f49c9fb926b8bacb6983f84",
       "native": "app/types.ts",
       "adapted": false
     },

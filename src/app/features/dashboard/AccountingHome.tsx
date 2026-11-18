@@ -1,3 +1,4 @@
+import { officeContextLabel } from "../../shared/officeLabels";
 import { HomeBody, HomeHero, HomeHeroMetrics, HomeHeroStats } from "./HomeHero";
 import { useCallback, useEffect } from "react";
 import { StyleSheet, View } from "react-native";
@@ -104,7 +105,7 @@ export function AccountingHome({ navigate }: { navigate: Navigate }) {
   const error = queue.error || reviews.error;
   return (
     <Screen compact edgeToEdge onRefresh={refresh} style={{ gap: 0 }}>
-      <HomeHero navigate={navigate} subtitle={organization?.name}>
+      <HomeHero navigate={navigate} subtitle={officeContextLabel(organization?.name)}>
         {!!office && (
           <>
             <HomeHeroStats

@@ -78,7 +78,7 @@ test("Favorites immediately lists searchable authorized workspaces and expands o
   expect(close).toHaveBeenCalled();
 });
 
-test("workspace chooser row selects context, while its star never selects or dismisses", async () => {
+test("hidden Office branding keeps workspace selection and favorites bound to the authoritative ID", async () => {
   const select = jest.fn(),
     toggle = jest.fn(),
     close = jest.fn();
@@ -88,7 +88,7 @@ test("workspace chooser row selects context, while its star never selects or dis
       mode="all"
       workspaces={
         [
-          { id: "a", name: "Office A", state: "active", kind: "office" },
+          { id: "a", name: "LeDiPo", state: "active", kind: "office" },
         ] as Workspace[]
       }
       favorites={new Set()}
@@ -100,11 +100,13 @@ test("workspace chooser row selects context, while its star never selects or dis
     />,
   );
   await fireEvent.press(
-    view.getByRole("checkbox", { name: "Favorite workspace Office A" }),
+    view.getByRole("checkbox", { name: "Favorite workspace Workspace" }),
   );
   expect(toggle).toHaveBeenCalledWith("a");
   expect(select).not.toHaveBeenCalled();
   expect(close).not.toHaveBeenCalled();
-  await fireEvent.press(view.getByRole("radio", { name: "Office A" }));
+  expect(view.queryByText(/ledipo/i)).toBeNull();
+  await fireEvent.changeText(view.getByPlaceholderText("Search workspaces"), "Workspace");
+  await fireEvent.press(view.getByRole("radio", { name: "Workspace" }));
   expect(select).toHaveBeenCalledWith("a");
 });

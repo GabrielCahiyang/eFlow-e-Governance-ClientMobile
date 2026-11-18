@@ -74,9 +74,7 @@ function ConversationSection({
               ? `Task chat${item.projectTitle ? " · " + item.projectTitle : ""}`
               : item.kind === "project"
                 ? `Project chat${item.defaultName && item.defaultName !== item.name ? " · " + item.defaultName : ""}`
-                : item.kind === "org"
-                  ? "Office"
-                  : undefined;
+                : undefined;
 
           return (
             <Pressable

@@ -549,6 +549,7 @@ export function PersonalProjectScreen({
                     <ProjectFiles
                       projectId={id}
                       taskId={task.id}
+                      readOnly={!active || facts.loading || !!facts.error}
                       embedded
                     />
                   )}
@@ -619,6 +620,7 @@ export function PersonalProjectScreen({
               projectId={id}
               contextTitle={data.project.title}
               eyebrow="Project attachments"
+              readOnly={!active || facts.loading || !!facts.error}
             />
           )}
           {view === "activity" && (

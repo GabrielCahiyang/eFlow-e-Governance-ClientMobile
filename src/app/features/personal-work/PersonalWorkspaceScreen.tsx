@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useState } from "react";
 import Plus from "lucide-react-native/icons/plus";
 import { Pressable } from "../../components/ui/Primitives";
@@ -30,7 +31,7 @@ export function PersonalWorkspaceScreen({ navigate }: { navigate: Navigate }) {
   );
   return (
     <Screen
-      title={current?.workspace.name || "Personal workspace"}
+      title={mobileOfficeLabel(current?.workspace.name, "Personal workspace")}
       description={`Personal workspace · Owner: ${current?.workspace.owner_name || profile?.full_name || "Workspace owner"}`}
       onRefresh={() => workspace.refresh()}
 

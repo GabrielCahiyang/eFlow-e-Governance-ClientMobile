@@ -226,6 +226,9 @@ test("password reveal and inline password help work accessibly without theme tog
     screen.queryByRole("button", { name: /Switch to (?:dark|light) theme/ }),
   ).toBeNull();
   expect(screen.queryByText(/Head, Member & Accounting Staff/)).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: "Usage scenarios" }),
+  ).toBeNull();
 
   const passwordInput = screen.getByLabelText("Password");
   expect(passwordInput).toHaveProp("secureTextEntry", true);

@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useState, type ReactNode } from "react";
 import {
   Pressable,
@@ -1316,7 +1317,7 @@ export function ContributorsSheet({
                 <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
                   Contributor
                   {person.office && !isRawEntityId(person.office) && person.office !== person.id
-                    ? ` · ${person.office}`
+                    ? ` · ${mobileOfficeLabel(person.office)}`
                     : ""}
                 </Text>
               </View>
@@ -2071,7 +2072,7 @@ export function BentoSupportingGrid({
           accent={palette.primary}
           soft={palette.glassSurface}
           title="Files"
-          subtitle="Attachments"
+          subtitle="Workflow evidence"
           onPress={onPressFiles}
           minHeight={minHeight}
         />
@@ -2081,133 +2082,27 @@ export function BentoSupportingGrid({
 }
 
 export function BentoSubtaskSupportingGrid({
-  onPressActivity,
-  onPressReview,
-  onPressFunding,
-  onPressFiles,
-  showFunding = true,
+  onPressActivity, onPressReview, onPressFunding, showFunding = true,
 }: {
   onPressActivity?: () => void;
   onPressReview: () => void;
   onPressFunding?: () => void;
-  onPressFiles: () => void;
   showFunding?: boolean;
 }) {
   const palette = useTheme();
   const { fontScale, width } = useWindowDimensions();
   const stacked = fontScale > 1.8 || width < 340;
   const minHeight = fontScale > 1.5 ? 112 : 104;
-
-  const hasFunding = showFunding && !!onPressFunding;
-  const activityTile = onPressActivity ? (
-    <SupportingTile
-      icon={<Activity size={18} color={palette.blue} />}
-      accent={palette.blue}
-      soft={palette.blueSoft}
-      title="Activity"
-      subtitle="Updates & history"
-      onPress={onPressActivity}
-      minHeight={minHeight}
-    />
-  ) : null;
-  const reviewTile = (
-    <SupportingTile
-      icon={<ShieldCheck size={18} color={palette.review} />}
-      accent={palette.review}
-      soft={palette.reviewSoft}
-      title="Evidence & review"
-      subtitle="Submissions"
-      onPress={onPressReview}
-      minHeight={minHeight}
-    />
-  );
-  const fundingTile = hasFunding ? (
-    <SupportingTile
-      icon={<Wallet size={18} color={palette.success} />}
-      accent={palette.success}
-      soft={palette.successSoft}
-      title="Funding"
-      subtitle="Financial records"
-      onPress={onPressFunding!}
-      minHeight={minHeight}
-    />
-  ) : null;
-  const filesTile = (
-    <SupportingTile
-      icon={<Files size={18} color={palette.primary} />}
-      accent={palette.primary}
-      soft={palette.glassSurface}
-      title="Files"
-      subtitle="Attachments"
-      onPress={onPressFiles}
-      minHeight={minHeight}
-    />
-  );
-
-  if (activityTile && hasFunding) {
-    return (
-      <View style={{ gap: 10, marginBottom: 16 }}>
-        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
-          {activityTile}
-          {reviewTile}
-        </View>
-
-        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
-          {fundingTile}
-          {filesTile}
-        </View>
-      </View>
-    );
-  }
-
-  if (activityTile) {
-    return (
-      <View style={{ gap: 10, marginBottom: 16 }}>
-        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
-          {activityTile}
-          {reviewTile}
-        </View>
-        <SupportingTile
-          fullWidth
-          icon={<Files size={18} color={palette.primary} />}
-          accent={palette.primary}
-          soft={palette.glassSurface}
-          title="Files"
-          subtitle="Attachments"
-          onPress={onPressFiles}
-        />
-      </View>
-    );
-  }
-
-  if (hasFunding) {
-    return (
-      <View style={{ gap: 10, marginBottom: 16 }}>
-        <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
-          {reviewTile}
-          {fundingTile}
-        </View>
-        <SupportingTile
-          fullWidth
-          icon={<Files size={18} color={palette.primary} />}
-          accent={palette.primary}
-          soft={palette.glassSurface}
-          title="Files"
-          subtitle="Attachments"
-          onPress={onPressFiles}
-        />
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ gap: 10, marginBottom: 16 }}>
-      <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
-        {reviewTile}
-        {filesTile}
-      </View>
+  return <View style={{ gap: 10, marginBottom: 16 }}>
+    <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
+      {!!onPressActivity && <SupportingTile icon={<Activity size={18} color={palette.blue} />}
+        accent={palette.blue} soft={palette.blueSoft} title="Activity" subtitle="Updates & history" onPress={onPressActivity} minHeight={minHeight} />}
+      <SupportingTile icon={<ShieldCheck size={18} color={palette.review} />} accent={palette.review}
+        soft={palette.reviewSoft} title="Evidence & review" subtitle="Submissions" onPress={onPressReview} fullWidth={!onPressActivity} minHeight={minHeight} />
     </View>
-  );
+    {!!(showFunding && onPressFunding) && <SupportingTile fullWidth icon={<Wallet size={18} color={palette.success} />}
+      accent={palette.success} soft={palette.successSoft} title="Funding" subtitle="Financial records" onPress={onPressFunding!} />}
+  </View>;
 }
 
 export function PlanningDetailsView({

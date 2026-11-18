@@ -1,3 +1,4 @@
+import { officeContextLabel } from "../../shared/officeLabels";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, View, Pressable } from "react-native";
 import BottomSheet, {
@@ -51,7 +52,9 @@ export function WorkspaceSheet({
   const items = workspaces.filter(
     (item) =>
       item.state === "active" &&
-      item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+      (officeContextLabel(item.name) || "Workspace")
+        .toLocaleLowerCase()
+        .includes(query.trim().toLocaleLowerCase()),
   );
   return (
     <BottomSheet
@@ -177,13 +180,12 @@ export function WorkspaceSheet({
                         color: palette.text,
                       }}
                     >
-                      {item.name}
+                      {officeContextLabel(item.name) || "Workspace"}
                     </Text>
                     <Text style={{ fontSize: 13, color: palette.mutedLabel }}>
-                      {item.kind === "office"
-                        ? "Office workspace"
-                        : "Personal workspace"}
-                      {selectedId === item.id ? " · Current" : ""}
+                      {selectedId === item.id
+                        ? "Current workspace"
+                        : "Workspace"}
                     </Text>
                   </View>
                 </>
@@ -211,7 +213,9 @@ export function WorkspaceSheet({
                   ) : (
                     <Pressable
                       accessibilityRole="radio"
-                      accessibilityLabel={item.name}
+                      accessibilityLabel={
+                        officeContextLabel(item.name) || "Workspace"
+                      }
                       accessibilityState={{
                         checked: selectedId === item.id,
                       }}
@@ -223,7 +227,7 @@ export function WorkspaceSheet({
                   )}
                   <FavoriteStar
                     checked={favorites.has(item.id)}
-                    label={`Favorite workspace ${item.name}`}
+                    label={`Favorite workspace ${officeContextLabel(item.name) || "Workspace"}`}
                     onToggle={() => onToggleFavorite(item.id)}
                   />
                 </View>

@@ -149,7 +149,7 @@ test("Head Home displays exactly three Office projects with consistent totals an
     view.getByRole("button", { name: "See all projects" }),
   );
   expect(navigate).toHaveBeenLastCalledWith({ name: "projects" });
-  await fireEvent.press(view.getByRole("button", { name: "Office Analytics" }));
+  await fireEvent.press(view.getByRole("button", { name: "Analytics" }));
   expect(navigate).toHaveBeenLastCalledWith({ name: "reports" });
   await fireEvent.press(view.getByRole("button", { name: "Office Budget" }));
   expect(navigate).toHaveBeenLastCalledWith({ name: "budget" });

@@ -8,6 +8,8 @@ import { NativeBottomNavigation } from "../NativeBottomNavigation";
 
 let mockRole = "accounting_staff";
 let mockHasOffice = true;
+let mockOfficeName = "Engineering Office";
+let mockCustomRole: { label: string } | null = null;
 const mockSignOut = jest.fn(async () => undefined);
 const mockUnread = [{ id: "c1", unread: true, archived: false }];
 
@@ -21,9 +23,10 @@ jest.mock("../../authentication", () => ({
       org_id: mockHasOffice ? "office-a" : undefined,
     },
     organization: mockHasOffice
-      ? { id: "office-a", name: "Engineering Office" }
+      ? { id: "office-a", name: mockOfficeName }
       : undefined,
     can: () => true,
+    customRole: mockCustomRole,
     signOut: mockSignOut,
   }),
 }));
@@ -35,7 +38,28 @@ jest.mock("../../communication", () => ({
 beforeEach(() => {
   mockRole = "accounting_staff";
   mockHasOffice = true;
+  mockOfficeName = "Engineering Office";
+  mockCustomRole = null;
   mockSignOut.mockClear();
+});
+
+test("More shows the assigned custom name while retaining base-role destinations", async () => {
+  mockCustomRole = { label: "Disbursement Clerk" };
+  await render(<MoreScreen navigate={jest.fn()} />);
+  expect(screen.getByText("Disbursement Clerk")).toBeOnTheScreen();
+  expect(screen.queryByText("Accounting Staff")).toBeNull();
+  expect(screen.getByRole("button", { name: "Office budget & releases" })).toBeOnTheScreen();
+  expect(screen.queryByText(/manage roles|user management/i)).toBeNull();
+});
+
+test("More removes the LEDIPO badge and keeps the actor's role and Profile destination", async () => {
+  mockOfficeName = "LEDIPO";
+  const navigate = jest.fn();
+  await render(<MoreScreen navigate={navigate} />);
+  expect(screen.queryByText(/ledipo/i)).toBeNull();
+  expect(screen.getByText("Accounting Staff")).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("button", { name: "Open profile" }));
+  expect(navigate).toHaveBeenCalledWith({ name: "profile" });
 });
 
 test("Accounting Staff More renders Identity hero, grouped Work/Communication/Account lists and routes cleanly", async () => {
@@ -57,7 +81,7 @@ test("Accounting Staff More renders Identity hero, grouped Work/Communication/Ac
   expect(screen.getByText("Accounting Staff")).toBeOnTheScreen();
   expect(screen.getByText("Engineering Office")).toBeOnTheScreen();
 
-  expect(screen.getByRole("header", { name: "Work & Office" })).toBeOnTheScreen();
+  expect(screen.getByRole("header", { name: "Work" })).toBeOnTheScreen();
   expect(screen.getByRole("header", { name: "Communication" })).toBeOnTheScreen();
   expect(screen.getByRole("header", { name: "Account & preferences" })).toBeOnTheScreen();
 
@@ -73,7 +97,10 @@ test("Accounting Staff More renders Identity hero, grouped Work/Communication/Ac
   expect(screen.getByTestId("notifications-unread-indicator")).toBeOnTheScreen();
   expect(screen.getByText("4 unread")).toBeOnTheScreen();
 
-  expect(screen.getByRole("button", { name: "Profile & Professional Record" })).toBeOnTheScreen();
+  expect(screen.getByRole("button", { name: "Profile" })).toBeOnTheScreen();
+  expect(screen.queryByText(/professional profile|professional record|PDS uploads/i)).toBeNull();
+  await fireEvent.press(screen.getByRole("button", { name: "Profile" }));
+  expect(navigate).toHaveBeenLastCalledWith({ name: "profile" });
   expect(screen.queryByRole("button", { name: "Notification alerts" })).toBeNull();
   expect(screen.getByRole("button", { name: "Password & security" })).toBeOnTheScreen();
 
@@ -101,7 +128,7 @@ test("Accounting Staff More renders Identity hero, grouped Work/Communication/Ac
 });
 
 test.each([
-  ["head", ["Office petty cash", "Office Budget", "Office Analytics"], ["Assigned reviews", "Office budget & releases"]],
+  ["head", ["Office petty cash", "Office Budget", "Analytics"], ["Assigned reviews", "Office budget & releases"]],
   ["member", ["Office petty cash", "Assigned reviews"], ["Office Budget", "Office budget & releases"]],
 ])(
   "%s sees role-appropriate Work & Office items in More",

@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { Linking, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useEffect } from "react";
 import { LinearGradient } from "expo-linear-gradient";
@@ -124,7 +125,7 @@ export function FinancialReviewsScreen({
         packages.map((pack) => {
           const yearSuffix = "year" in pack ? ` · FY ${pack.year}` : "";
           const officeLabel =
-            staffing && organization?.name ? `${organization.name} · ` : "";
+            staffing && organization?.name ? `${mobileOfficeLabel(organization.name)} · ` : "";
           return (
             <View key={pack.liquidation.id} style={s.packageRoot}>
               <LinearGradient

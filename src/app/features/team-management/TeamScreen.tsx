@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useEffect, useState } from "react";
 import ExternalLink from "lucide-react-native/icons/external-link";
 import Pencil from "lucide-react-native/icons/pencil";
@@ -263,7 +264,7 @@ export function TeamScreen({
                     <LabelValue label="Role" value={person.jobTitle} />
                     <LabelValue
                       label="Office"
-                      value={person.departmentName || "Not provided"}
+                      value={mobileOfficeLabel(person.departmentName || "Not provided")}
                     />
                     <LabelValue
                       label="Workload"

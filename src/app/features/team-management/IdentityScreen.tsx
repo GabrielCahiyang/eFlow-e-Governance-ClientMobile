@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useState } from "react";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
@@ -71,7 +72,7 @@ export function IdentityScreen() {
       if (
         !(await confirmAction(
           assigned ? "Assign accounting access?" : "Remove accounting access?",
-          `${person.full_name} · ${data?.office?.name}. ${assigned ? "This changes the system role to Accounting Staff. Individual accounting action permissions and independent review rules still apply." : "The person returns to Member access; accounting history remains."}`,
+          `${person.full_name} · ${mobileOfficeLabel(data?.office?.name)}. ${assigned ? "This changes the system role to Accounting Staff. Individual accounting action permissions and independent review rules still apply." : "The person returns to Member access; accounting history remains."}`,
           "Save accounting access",
           !assigned,
         ))
@@ -113,7 +114,7 @@ export function IdentityScreen() {
         <Card title="Office Leadership">
           <LabelValue
             label="Office"
-            value={data.office?.name || "Not provided"}
+            value={mobileOfficeLabel(data.office?.name || "Not provided")}
           />
           <LabelValue
             label="Head"

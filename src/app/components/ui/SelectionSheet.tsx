@@ -11,6 +11,7 @@ export function SelectionSheet({
   open,
   title,
   description,
+  emptyLabel = "No authorized workspaces are available.",
   value,
   options,
   onSelect,
@@ -19,6 +20,7 @@ export function SelectionSheet({
   open: boolean;
   title: string;
   description?: string;
+  emptyLabel?: string;
   value?: string;
   options: {
     id: string;
@@ -100,7 +102,7 @@ export function SelectionSheet({
               ))}
               {!options.length && (
                 <Text style={{ padding: 16, color: palette.muted }}>
-                  No authorized workspaces are available.
+                  {emptyLabel}
                 </Text>
               )}
             </ScrollView>

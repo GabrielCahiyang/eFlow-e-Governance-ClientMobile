@@ -1,3 +1,4 @@
+import { officeContextLabel } from "../../shared/officeLabels";
 import { useState } from "react";
 import { Linking, Pressable } from "react-native";
 import Briefcase from "lucide-react-native/icons/briefcase";
@@ -22,7 +23,7 @@ import {
 } from "./MoreSections";
 
 export function MoreScreen({ navigate }: { navigate: Navigate }) {
-  const { profile, organization, can, signOut } = useAuth();
+  const { profile, organization, customRole, can, signOut } = useAuth();
   const palette = useTheme();
   const appearance = useAppearance();
   const [error, setError] = useState<Error>();
@@ -53,21 +54,20 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
   );
   const accountItems = destinations.filter((entry) => entry.group === "Account");
 
-  const officeLabel =
-    organization?.name ||
-    (profile?.org_id ? "Authorized Office" : "Personal workspace");
+  const officeLabel = officeContextLabel(organization?.name);
 
   return (
     <Screen
       compact
       title="More"
-      description="Workspace tools & account"
+      description="Tools & account"
       style={{ gap: 14 }}
     >
       <MoreIdentityHero
         fullName={profile?.full_name}
         email={profile?.email}
         role={profile?.role}
+        customRoleLabel={customRole?.label}
         officeName={officeLabel}
         avatarUrl={avatar.data}
         onOpenProfile={() => navigate({ name: "profile" })}
@@ -75,7 +75,7 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
 
       {workItems.length > 0 && (
         <MoreSectionCard
-          title="Work & Office"
+          title="Work"
           icon={<Briefcase size={16} color={palette.primary} />}
           badge={`${workItems.length} ${workItems.length === 1 ? "tool" : "tools"}`}
         >
@@ -189,9 +189,6 @@ export function MoreScreen({ navigate }: { navigate: Navigate }) {
         }
         style={{ alignSelf: "center", paddingVertical: 8 }}
       >
-        <Text style={{ fontSize: 12, color: palette.mutedLabel }}>
-          Illustrations by Storyset
-        </Text>
       </Pressable>
     </Screen>
   );

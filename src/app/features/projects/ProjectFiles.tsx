@@ -1,6 +1,5 @@
-import { useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import {
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,7 +36,10 @@ import { FilterChip } from "../../components/ui/FilterChip";
 import { statusLabel } from "../../shared/statusLabels";
 import { useAction } from "../../shared/useAction";
 import { useFacts } from "../../shared/useFacts";
+import { subscribeAppResume } from "../../shared/liveUpdates";
 import { useAuth } from "../authentication";
+import { openFileUrl } from "../../../platform/files";
+import { useProjectDocumentManagement } from "./useProjectDocumentManagement";
 import {
   fetchProjectFiles,
   openProjectFile,
@@ -173,36 +175,76 @@ function matchesCategory(
 }
 
 /** Displays authorized project or task attachments using Card v2, circular MIME badges, and hero metrics. */
-export function ProjectFiles({
-  projectId,
-  taskId,
-  contextTitle,
-  eyebrow,
-  scopeNote,
-  embedded = false,
-}: {
+export type ProjectFilesProps = {
   projectId: string;
   taskId?: string;
   contextTitle?: string;
   eyebrow?: string;
   scopeNote?: string;
   embedded?: boolean;
+  readOnly?: boolean;
   onManage?: () => void;
-}) {
+};
+
+export function ProjectFiles(props: ProjectFilesProps) {
+  const { profile } = useAuth();
+  return (
+    <ProjectFilesContent
+      key={`${profile?.id}:${props.projectId}:${props.taskId || ""}`}
+      {...props}
+    />
+  );
+}
+
+function ProjectFilesContent({
+  projectId,
+  taskId,
+  contextTitle,
+  eyebrow,
+  scopeNote,
+  embedded = false,
+  readOnly = true,
+}: ProjectFilesProps) {
   const { profile } = useAuth();
   const palette = useTheme();
   const { isDark } = useAppearance();
   const { fontScale, width } = useWindowDimensions();
   const stacked = fontScale > 1.35 || width < 340;
-  const facts = useFacts(`files:${profile?.id}:${projectId}:${taskId}`, () =>
-    fetchProjectFiles(projectId, taskId),
+  const facts = useFacts(
+    `files:${profile?.id}:${projectId}:${taskId}`,
+    () => fetchProjectFiles(projectId, taskId),
+    !!profile?.id,
   );
   const action = useAction();
   const [openingId, setOpeningId] = useState<string>();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<FileCategory>("all");
 
-  const files = facts.data?.files ?? [];
+  const management = useProjectDocumentManagement({
+    actor: profile?.id,
+    project: projectId,
+    task: taskId,
+    snapshot: facts.data,
+    unavailable: facts.loading || !!facts.error,
+    readOnly,
+    refresh: facts.refresh,
+  });
+  useEffect(
+    () =>
+      subscribeAppResume(
+        () => {
+          if (!management.busy) void facts.refresh();
+        },
+        { staleAfterMs: 0 },
+      ),
+    [management.busy, facts.refresh],
+  );
+  const files = useMemo(() => {
+    const available = facts.data?.files ?? [];
+    return taskId
+      ? available.filter((file) => file.linked === true)
+      : available;
+  }, [facts.data, taskId]);
 
   const summary = useMemo(() => {
     let readyCount = 0;
@@ -249,6 +291,14 @@ export function ProjectFiles({
     });
   }, [files, query, category, palette]);
 
+  if (!profile?.id)
+    return (
+      <Empty
+        kind="files"
+        title="Files unavailable"
+        description="Sign in to view project documents."
+      />
+    );
   if (facts.error)
     return (
       <ErrorState error={facts.error} retry={() => void facts.refresh()} />
@@ -308,10 +358,7 @@ export function ProjectFiles({
           </View>
 
           <View
-            style={[
-              s.podsRow,
-              { flexDirection: stacked ? "column" : "row" },
-            ]}
+            style={[s.podsRow, { flexDirection: stacked ? "column" : "row" }]}
           >
             <View
               accessible
@@ -356,6 +403,11 @@ export function ProjectFiles({
         </View>
       )}
 
+      <Text style={{ color: palette.mutedLabel, fontSize: 13 }}>
+        Shared reference files for this project, separate from formal task
+        submission evidence.
+      </Text>
+      {management.header}
       {!!scopeNote && <Notice tone="info">{scopeNote}</Notice>}
 
       {!files.length ? (
@@ -463,139 +515,152 @@ export function ProjectFiles({
                   const a11yLabel = `${file.file_name}, ${typePillText}, ${isReady ? "Ready" : statusLabel(file.state)}, ${file.uploader_name}`;
 
                   return (
-                    <Pressable
-                      key={file.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={a11yLabel}
-                      accessibilityHint={isReady ? "Opens file" : undefined}
-                      accessibilityState={{ disabled: !isReady || action.busy }}
-                      disabled={!isReady || action.busy}
-                      onPress={() => {
-                        setOpeningId(file.id);
-                        void action
-                          .run(async () => {
-                            await Linking.openURL(await openProjectFile(file));
-                          })
-                          .finally(() => {
-                            setOpeningId((current) =>
-                              current === file.id ? undefined : current,
-                            );
-                          });
-                      }}
-                      style={({ pressed }) => [
-                        s.fileRow,
-                        {
-                          backgroundColor: pressed
-                            ? palette.primarySoft
-                            : "transparent",
-                          borderBottomWidth:
-                            index === filteredFiles.length - 1
-                              ? 0
-                              : StyleSheet.hairlineWidth,
-                          borderBottomColor: palette.border,
-                        },
-                      ]}
-                    >
-                      <View
-                        accessible={false}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no-hide-descendants"
-                        style={[
-                          s.fileCircle,
+                    <View key={file.id}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={a11yLabel}
+                        accessibilityHint={isReady ? "Opens file" : undefined}
+                        accessibilityState={{
+                          disabled: !isReady || action.busy,
+                        }}
+                        disabled={!isReady || action.busy}
+                        onPress={() => {
+                          setOpeningId(file.id);
+                          void action
+                            .run(async () => {
+                              if (
+                                !(await openFileUrl(() =>
+                                  openProjectFile(file),
+                                ))
+                              )
+                                throw new Error(
+                                  "Allow the browser to open this file, then try again.",
+                                );
+                            })
+                            .finally(() => {
+                              setOpeningId((current) =>
+                                current === file.id ? undefined : current,
+                              );
+                            });
+                        }}
+                        style={({ pressed }) => [
+                          s.fileRow,
                           {
-                            backgroundColor: meta.bg,
-                            borderColor: meta.border,
+                            backgroundColor: pressed
+                              ? palette.primarySoft
+                              : "transparent",
+                            borderBottomWidth:
+                              index === filteredFiles.length - 1
+                                ? 0
+                                : StyleSheet.hairlineWidth,
+                            borderBottomColor: palette.border,
                           },
                         ]}
                       >
-                        <TypeIcon size={18} color={meta.color} />
-                      </View>
+                        <View
+                          accessible={false}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no-hide-descendants"
+                          style={[
+                            s.fileCircle,
+                            {
+                              backgroundColor: meta.bg,
+                              borderColor: meta.border,
+                            },
+                          ]}
+                        >
+                          <TypeIcon size={18} color={meta.color} />
+                        </View>
 
-                      <View style={s.fileBody}>
-                        <Text style={[s.fileName, { color: palette.text }]}>
-                          {file.file_name}
-                        </Text>
+                        <View style={s.fileBody}>
+                          <Text style={[s.fileName, { color: palette.text }]}>
+                            {file.file_name}
+                          </Text>
 
-                        <View style={s.badgesRow}>
-                          <View
-                            style={[
-                              s.typePill,
-                              {
-                                backgroundColor: palette.surface,
-                                borderColor: palette.border,
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                s.typePillText,
-                                { color: palette.mutedLabel },
-                              ]}
-                            >
-                              {typePillText}
-                            </Text>
-                          </View>
-
-                          {!isReady && (
+                          <View style={s.badgesRow}>
                             <View
                               style={[
-                                s.statePill,
+                                s.typePill,
                                 {
-                                  backgroundColor:
-                                    file.state === "pending"
-                                      ? palette.warningSoft
-                                      : withOpacity(palette.mutedLabel, 0.14),
+                                  backgroundColor: palette.surface,
+                                  borderColor: palette.border,
                                 },
                               ]}
                             >
                               <Text
                                 style={[
-                                  s.statePillText,
+                                  s.typePillText,
+                                  { color: palette.mutedLabel },
+                                ]}
+                              >
+                                {typePillText}
+                              </Text>
+                            </View>
+
+                            {!isReady && (
+                              <View
+                                style={[
+                                  s.statePill,
                                   {
-                                    color:
+                                    backgroundColor:
                                       file.state === "pending"
-                                        ? palette.warning
-                                        : palette.mutedLabel,
+                                        ? palette.warningSoft
+                                        : withOpacity(palette.mutedLabel, 0.14),
                                   },
                                 ]}
                               >
-                                {file.state === "pending"
-                                  ? "Pending upload"
-                                  : statusLabel(file.state)}
-                              </Text>
-                            </View>
-                          )}
+                                <Text
+                                  style={[
+                                    s.statePillText,
+                                    {
+                                      color:
+                                        file.state === "pending"
+                                          ? palette.warning
+                                          : palette.mutedLabel,
+                                    },
+                                  ]}
+                                >
+                                  {file.state === "pending"
+                                    ? "Pending upload"
+                                    : statusLabel(file.state)}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <Text
+                            style={[s.fileMeta, { color: palette.mutedLabel }]}
+                          >
+                            {file.uploader_name} · {dateLabel(file.created_at)}
+                          </Text>
                         </View>
 
-                        <Text
-                          style={[s.fileMeta, { color: palette.mutedLabel }]}
+                        <View
+                          accessible={false}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no-hide-descendants"
+                          style={[
+                            s.openCircle,
+                            {
+                              backgroundColor: palette.surface,
+                              borderColor: palette.border,
+                              opacity: isReady ? 1 : 0.45,
+                            },
+                          ]}
                         >
-                          {file.uploader_name} · {dateLabel(file.created_at)}
-                        </Text>
+                          {isOpening ? (
+                            <BusyIndicator size={15} color={palette.primary} />
+                          ) : isReady ? (
+                            <ExternalLink size={15} color={palette.primary} />
+                          ) : (
+                            <Clock size={15} color={palette.mutedLabel} />
+                          )}
+                        </View>
+                      </Pressable>
+                      <View style={{ paddingHorizontal: 12 }}>
+                        {management.rowActions(file)}
                       </View>
-
-                      <View
-                        accessible={false}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no-hide-descendants"
-                        style={[
-                          s.openCircle,
-                          {
-                            backgroundColor: palette.surface,
-                            borderColor: palette.border,
-                            opacity: isReady ? 1 : 0.45,
-                          },
-                        ]}
-                      >
-                        {isOpening ? (
-                          <BusyIndicator size={15} color={palette.primary} />
-                        ) : isReady ? (
-                          <ExternalLink size={15} color={palette.primary} />
-                        ) : (
-                          <Clock size={15} color={palette.mutedLabel} />
-                        )}
-                      </View>
-                    </Pressable>
+                    </View>
                   );
                 })}
               </View>

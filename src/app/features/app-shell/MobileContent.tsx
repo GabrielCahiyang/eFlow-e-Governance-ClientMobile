@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { Screen, Empty, ErrorState } from "../../components/ui";
 import type { AppRoute, Navigate } from "../../shared/routes";
 import { useAuth } from "../authentication";
@@ -29,15 +30,18 @@ export function MobileContent({
   current: AppRoute;
   navigate: Navigate;
 }) {
-  const { profile, organization, can } = useAuth(),
+  const { profile, organization, can, canDisplayDestination } = useAuth(),
     workspace = useWorkspace();
+  // Retain the mounted record and draft while account authority is rechecked.
+  // Child actions still use `can` and AccountActionAccess, both fail closed.
+  const canRead = canDisplayDestination || can;
   const hasLeadingWork = false;
   let content;
   if (
     !canOpenNativeSection(
       profile?.role || "",
       current.name,
-      can,
+      canRead,
       hasLeadingWork,
     )
   )
@@ -83,7 +87,7 @@ export function MobileContent({
           title="Office petty cash"
           description={
             organization?.name
-              ? `${organization.name} · Office fund`
+              ? `${mobileOfficeLabel(organization.name)} · Office fund`
               : "Office fund & receipts"
           }
         >
@@ -98,7 +102,7 @@ export function MobileContent({
           title="Office petty cash"
           description={
             organization?.name
-              ? `${organization.name} · Office fund`
+              ? `${mobileOfficeLabel(organization.name)} · Office fund`
               : "Office fund & receipts"
           }
         >
@@ -143,7 +147,7 @@ export function MobileContent({
   } else if (
     current.name === "project" &&
     current.id &&
-    can("navigation.projects")
+    canRead("navigation.projects")
   )
     content = (
       <ProjectScreen
@@ -153,7 +157,7 @@ export function MobileContent({
         navigate={navigate}
       />
     );
-  else if (current.name === "task" && current.id && can("navigation.tasks"))
+  else if (current.name === "task" && current.id && canRead("navigation.tasks"))
     content = (
       <TaskDetailsScreen
         key={
@@ -178,7 +182,7 @@ export function MobileContent({
         navigate={navigate}
       />
     );
-  else if (current.name === "projects" && can("navigation.projects"))
+  else if (current.name === "projects" && canRead("navigation.projects"))
     content = <ProjectsScreen navigate={navigate} />;
   else if (
     current.name === "personal_work" ||

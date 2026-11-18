@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { recordedPeso } from "../../components/ui/theme";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions } from "react-native";
@@ -97,7 +98,7 @@ export function OfficeBudgetScreen({
     selectedOffice && selectedOffice !== profile?.org_id
       ? (!scopes.error ? otherOffice?.id : undefined) || ""
       : profile?.org_id || "";
-  const officeName = otherOffice?.name || organization?.name || "Office";
+  const officeName = mobileOfficeLabel(otherOffice?.name || organization?.name);
   const detail = useFacts(
     JSON.stringify(["office-cash-request", profile?.id, orgId, year, recordId]),
     () =>
@@ -311,7 +312,7 @@ export function OfficeBudgetScreen({
           value={orgId}
           options={scopes.data!.map((office) => ({
             value: office.id,
-            label: office.name,
+            label: mobileOfficeLabel(office.name),
           }))}
           onChange={(id) => {
             setOffice(id);
@@ -411,8 +412,7 @@ export function OfficeBudgetScreen({
                 />
               </DetailGroup>
               <Notice tone="neutral">
-                Only released budget can be committed. Scheduled releases use
-                Philippine time.
+                Only released budget can be committed.
               </Notice>
             </>
           ) : summary.loading ? (
@@ -714,7 +714,7 @@ export function OfficeBudgetScreen({
                 value={orgId}
                 options={officeOptions.map((office) => ({
                   value: office.id,
-                  label: office.name,
+                  label: mobileOfficeLabel(office.name),
                 }))}
                 onChange={(id) => {
                   setOffice(id);

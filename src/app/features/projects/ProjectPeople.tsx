@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { StyleSheet, View } from "react-native";
 import {
   Empty,
@@ -89,7 +90,7 @@ export function ProjectPeople({
                   <Text
                     style={[styles.memberSub, { color: palette.mutedLabel }]}
                   >
-                    {member.office_name || "Project member"} ·{" "}
+                    {mobileOfficeLabel(member.office_name || "Project member")} ·{" "}
                     {member.engagement}
                   </Text>
                   <View style={styles.badgeRow}>

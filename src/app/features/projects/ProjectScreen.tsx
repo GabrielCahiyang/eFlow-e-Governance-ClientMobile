@@ -376,7 +376,7 @@ export function ProjectScreen({
       {!!pull.error && <ErrorState error={pull.error} retry={pull.refresh} />}
       <PageHeader
         title={project.title}
-        subtitle={workspace.selected?.workspace.name || "Project workspace"}
+        subtitle={workspace.selected?.workspace.kind === "personal" ? workspace.selected.workspace.name : undefined}
         right={
           <Pressable
             accessibilityRole="checkbox"

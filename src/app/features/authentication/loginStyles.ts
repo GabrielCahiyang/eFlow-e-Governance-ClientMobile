@@ -164,8 +164,4 @@ export const loginStyles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 6,
   },
-  footerDot: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
 });

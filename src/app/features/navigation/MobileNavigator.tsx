@@ -225,7 +225,7 @@ export function MobileNavigator({ initialRoute }: { initialRoute?: AppRoute }) {
 function MobileTabStack({ tab }: { tab: PrimaryTab }) {
   const palette = useTheme(),
     { reduced } = useMotionPreferences(),
-    { profile, can } = useAuth();
+    { profile, can, canDisplayDestination } = useAuth();
   return (
     <TabContext.Provider value={tab}>
       <Stack.Navigator
@@ -251,7 +251,7 @@ function MobileTabStack({ tab }: { tab: PrimaryTab }) {
             title: resolveMobileRoute(
               route.params,
               profile?.role || "",
-              can,
+              canDisplayDestination || can,
               tab,
             ).title,
           })}
@@ -270,11 +270,11 @@ function MobileRoute({
     focused = useIsFocused(),
     inset = useSafeAreaInsets(),
     palette = useTheme(),
-    { profile, can } = useAuth();
+    { profile, can, canDisplayDestination } = useAuth();
   const destination = resolveMobileRoute(
     route.params,
     profile?.role || "",
-    can,
+    canDisplayDestination || can,
     tab,
   );
   // Automatic workspace selection (there is no switcher). The Projects tab
@@ -423,7 +423,7 @@ function MobileRoute({
         <Empty
           kind="workspace"
           title="No workspace available"
-          description="Projects are shown only inside an authorized Office or personal workspace."
+          description="Projects are shown only inside a workspace you have access to."
         />
       </Screen>
     ) : mismatch && unavailableKey === routeKey && !wantsHome ? (

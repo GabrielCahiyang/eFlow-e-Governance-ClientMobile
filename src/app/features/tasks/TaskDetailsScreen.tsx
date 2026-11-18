@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import {
   ProjectTaskEditor,
   useTaskStructure,
@@ -36,7 +37,7 @@ import {
   WorkFinancialClearancePanel,
   assertWorkAcceptanceAvailable,
 } from "../budget";
-import { ProjectFiles } from "../projects";
+import { WorkflowFiles } from "./WorkflowFiles";
 import type { Navigate } from "../../shared/routes";
 import { supabase } from "../../../platform/supabase";
 import { rowToTask } from "../../../core/web/app/features/tasks/services/taskMapper";
@@ -594,7 +595,7 @@ export function TaskDetailsScreen({
           <View style={{ gap: 4, marginBottom: 4 }}>
             <PageHeader
               title={task.title}
-              subtitle={task.projectTitle || task.department || undefined}
+              subtitle={task.projectTitle || mobileOfficeLabel(task.department, "") || undefined}
               right={
                 canEditTask || canDeleteTask || actionsChecking ? (
                   <View
@@ -1010,21 +1011,7 @@ export function TaskDetailsScreen({
         </>
       )}
       {view === "budget" && funding}
-      {view === "files" &&
-        (task.linkedProjectId ? (
-          <ProjectFiles
-            projectId={task.linkedProjectId}
-            taskId={id}
-            contextTitle={task.title}
-            eyebrow="Task attachments"
-          />
-        ) : (
-          <Empty
-            kind="files"
-            title="Files unavailable"
-            description="No project is linked to this task."
-          />
-        ))}
+      {view === "files" && <WorkflowFiles taskId={id} />}
       {!!action.error && <ErrorState context="action" error={action.error} />}
       {execution === "submit" && !!profile && (
         <TaskEvidenceSheet

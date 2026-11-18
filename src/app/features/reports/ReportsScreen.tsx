@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { useState } from "react";
 import { StyleSheet } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
@@ -80,7 +81,7 @@ export function ReportsScreen({
 
   if (!office && loading && !error)
     return (
-      <Screen title="Office Analytics">
+      <Screen title="Analytics">
         <Loading label="Verifying Office access" layout="verification" />
       </Screen>
     );
@@ -94,7 +95,7 @@ export function ReportsScreen({
     !isAppointedOfficeHead(profile, organization ? [organization] : [])
   )
     return (
-      <Screen title="Office Analytics">
+      <Screen title="Analytics">
         <ErrorState error="Select your appointed Office workspace to view Office reports." />
       </Screen>
     );
@@ -186,7 +187,7 @@ function OfficeReports({
     setPeriod("0");
   };
 
-  const scope = `${organization?.name || "Assigned Office"} · Authorized Office scope · ${period === "0" ? "All time" : `Last ${period} days`} · Person: ${person === "all" ? "All" : data?.employees.find((p) => p.id === person)?.name || person} · Project: ${project === "all" ? "All" : data?.projects.find((p) => p.id === project)?.title || project} · Status: ${status} · Search: ${query || "None"}`;
+  const scope = `${mobileOfficeLabel(organization?.name, "Assigned Office")} · Authorized Office scope · ${period === "0" ? "All time" : `Last ${period} days`} · Person: ${person === "all" ? "All" : data?.employees.find((p) => p.id === person)?.name || person} · Project: ${project === "all" ? "All" : data?.projects.find((p) => p.id === project)?.title || project} · Status: ${status} · Search: ${query || "None"}`;
   const noticeTone =
     kind === "reviews"
       ? "review"
@@ -198,8 +199,8 @@ function OfficeReports({
 
   return (
     <Screen
-      title="Office Analytics"
-      description={`${organization?.name || "Assigned Office"} · ${period === "0" ? "All dates" : `Last ${period} calendar days`} · Philippine time`}
+      title="Analytics"
+      description={`${mobileOfficeLabel(organization?.name, "Assigned Office")} · ${period === "0" ? "All dates" : `Last ${period} calendar days`}`}
       onRefresh={() => analytics.refresh()}
     >
       <ScrollView

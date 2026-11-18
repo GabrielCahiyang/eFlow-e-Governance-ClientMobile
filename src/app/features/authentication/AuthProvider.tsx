@@ -31,17 +31,22 @@ import { normalizeUserRole } from "../../../core/web/app/shared/roles";
 import { isMobileRole } from "../../shared/mobileRoles";
 import { resolvePermissions } from "../../../core/web/app/features/permissions/selectors";
 import type { UserProfile, Organization } from "../../../core/web/app/types";
+import type { CustomRoleDefinition } from "../../../core/web/app/features/permissions/types";
+import { readAssignedCustomRole } from "./assignedCustomRole";
 
 type AuthValue = {
   user: User | null;
   profile: UserProfile | null;
   organization: Organization | null;
+  customRole: CustomRoleDefinition | null;
   loading: boolean;
   checkingAccess: boolean;
   accessError?: Error;
   error?: Error;
   permissions: Set<string>;
   can: (key: string) => boolean;
+  /** Last verified visibility for an already mounted destination; never action authority. */
+  canDisplayDestination: (key: string) => boolean;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -65,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null),
     [profile, setProfile] = useState<UserProfile | null>(null),
     [organization, setOrganization] = useState<Organization | null>(null),
+    [customRole, setCustomRole] = useState<CustomRoleDefinition | null>(null),
     [permissions, setPermissions] = useState(new Set<string>()),
     [loading, setLoading] = useState(true),
     [checkingAccess, setCheckingAccess] = useState(false),
@@ -75,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     identity = useRef<string | null>(null),
     current = useRef<User | null>(null),
     verifiedProfile = useRef<UserProfile | null>(null),
+    verifiedPermissions = useRef(new Set<string>()),
+    displayPermissions = useRef(new Set<string>()),
     appState = useRef(AppState.currentState),
     needsResumeCheck = useRef(AppState.currentState === "background"),
     actionAccess = useRef<AccountActionAccess>({ actor: null, ready: false }),
@@ -88,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const actor = current.current;
     if (!actor) return Promise.resolve();
     actionAccess.current = { actor: actor.id, ready: false };
+    verifiedPermissions.current = new Set();
+    setPermissions(new Set());
     if (pending.current?.actor === actor.id) {
       if (invalidate) {
         ++version.current;
@@ -126,8 +136,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               throw new Error(
                 "This account is inactive. Contact your Office Head or Admin.",
               );
+            const assignedRole = await readAssignedCustomRole(
+              result.data.custom_role_key,
+              role,
+            );
             const [defaults, overrides, org] = await Promise.all([
-              supabase.from("role_permissions").select("*").eq("role", role),
+              supabase
+                .from("role_permissions")
+                .select("*")
+                .eq("role", assignedRole?.key || role),
               supabase
                 .from("user_permission_overrides")
                 .select("*")
@@ -156,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 allowed: r.allowed,
                 setBy: r.set_by,
               })),
+              assignedRole,
             );
             return {
               profile: {
@@ -167,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 department: result.data.org_id,
               } as UserProfile,
               org: org.data as Organization | null,
+              customRole: assignedRole,
               permissions: resolved,
             };
           });
@@ -175,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             actor.id,
             access.profile.role,
             access.profile.org_id,
+            access.customRole,
             [...access.permissions].sort(),
           ]);
           setDisplayCacheActor(actor.id);
@@ -184,7 +204,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           verifiedProfile.current = access.profile;
           setProfile(access.profile);
           setOrganization(access.org);
+          setCustomRole(access.customRole);
           setPermissions(access.permissions);
+          verifiedPermissions.current = access.permissions;
+          displayPermissions.current = access.permissions;
           actionAccess.current = {
             actor: actor.id,
             ready: appState.current !== "background" && !job.again,
@@ -203,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setDisplayCacheActor(null);
             setProfile(null);
             setOrganization(null);
+            setCustomRole(null);
             setPermissions(new Set());
             setError(failure);
           }
@@ -238,6 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDisplayCacheActor(nextId);
         setProfile(null);
         setOrganization(null);
+        setCustomRole(null);
         setPermissions(new Set());
         setAccessError(undefined);
         setError(undefined);
@@ -317,11 +342,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
     const fallback = setInterval(() => {
-      if (
-        appState.current === "active" &&
-        verifiedProfile.current?.employee_id === `GUEST-${user.id}`
-      )
-        void requestRefresh(true);
+      // Reconcile missed events (including filtered DELETE events) for every actor.
+      if (appState.current === "active") void requestRefresh(true);
     }, 60_000);
     const app = AppState.addEventListener("change", (state) => {
       appState.current = state;
@@ -341,9 +363,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void supabase.removeChannel(channel);
     };
   }, [user?.id, refresh, requestRefresh]);
-  // Only the actor's own role defaults affect resolved permissions. A role
-  // change arrives through the `profiles` listener and resubscribes here.
+  // Assignment changes arrive through profiles, including changes within the same base role.
   const role = profile?.role;
+  const customRoleKey = profile?.custom_role_key?.trim() || null;
   useEffect(() => {
     if (!user || !role) return;
     let subscribed = false;
@@ -352,29 +374,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearDisplayCache("access");
       void requestRefresh(true);
     };
-    const channel = createPostgresChannel(
-      "native-role-access-" + user.id,
-    )
-      .on(
+    const channel = createPostgresChannel("native-role-access-" + user.id).on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "role_permissions",
+        filter: roleDefaultsFilter(customRoleKey || role),
+      },
+      accessChanged,
+    );
+    if (customRoleKey) {
+      channel.on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "role_permissions",
-          filter: roleDefaultsFilter(role),
+          table: "custom_roles",
+          filter: "key=eq." + customRoleKey,
         },
         accessChanged,
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          if (subscribed) void requestRefresh(true);
-          subscribed = true;
-        }
-      });
+      );
+    }
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        if (subscribed) void requestRefresh(true);
+        subscribed = true;
+      }
+    });
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user?.id, role, requestRefresh]);
+  }, [user?.id, role, customRoleKey, requestRefresh]);
   const signOut = async () => {
     current.current = null;
     actionAccess.current.ready = false;
@@ -384,6 +415,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDisplayCacheActor(null);
     setProfile(null);
     setOrganization(null);
+    setCustomRole(null);
     setPermissions(new Set());
     setError(undefined);
     setAccessError(undefined);
@@ -400,6 +432,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         organization,
+        customRole,
         permissions,
         loading,
         checkingAccess,
@@ -407,7 +440,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         refresh,
         signOut,
-        can: (key) => !!profile?.is_active && permissions.has(key),
+        can: (key) =>
+          actionAccess.current.ready &&
+          current.current?.id === profile?.id &&
+          !!verifiedProfile.current?.is_active &&
+          verifiedPermissions.current.has(key),
+        canDisplayDestination: (key) =>
+          current.current?.id === profile?.id &&
+          !!verifiedProfile.current?.is_active &&
+          displayPermissions.current.has(key),
       }}
     >
       <AccountActionContext.Provider value={actionAccess}>

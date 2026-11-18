@@ -1,3 +1,4 @@
+import { officeLabel as mobileOfficeLabel } from "../../shared/officeLabels";
 import { ProjectGuestProfile } from "./ProjectGuestProfile";
 import { useRef, useState } from "react";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
@@ -131,10 +132,10 @@ export function InvitationScreen({
           title={
             data.project_title
               ? `Join ${data.project_title}.`
-              : `Join ${data.office_name}’s team.`
+              : `Join ${mobileOfficeLabel(data.office_name)}’s team.`
           }
         >
-          <LabelValue label="Office" value={data.office_name} />
+          <LabelValue label="Office" value={mobileOfficeLabel(data.office_name)} />
           <LabelValue label="Email" value={data.email} />
           <LabelValue
             label="Access"
